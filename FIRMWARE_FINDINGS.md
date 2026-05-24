@@ -1,0 +1,239 @@
+# Важные факты по disk_image
+
+## Общая идентификация
+
+- `disk_image` похож не на один монолитный firmware image, а на содержимое SD/FAT-раздела: ROM-коллекции, медиа, ресурсы интерфейса, плюс прошивочные артефакты в `cubegm` и извлеченный/сопутствующий `rootfs`.
+- Устройство относится к платформе Hichip HC16xx / HC1600A.
+- Архитектура основного Linux/userspace: ELF32 little-endian MIPS, O32 ABI.
+- CPU из DTB: `MIPS 74Kc`.
+- Плата/вариант из DTB: `hc1600a@dbE3100v20`.
+- `rootfs` основан на Buildroot 2021.05-rc2.
+
+## Важные маскировки
+
+- `disk_image\cubegm\advapi32.dll` не Windows DLL, а U-Boot legacy `uImage` с именем `vmlinux`.
+- `disk_image\cubegm\ApplicationFrame.dll` не Windows DLL, а U-Boot legacy `uImage` с именем `avp`.
+- `disk_image\cubegm\Bubbles.scr` не скринсейвер, а DTB/FDT device tree.
+- Это похоже на намеренную маскировку загрузочных артефактов в FAT-разделе под безобидные Windows-имена.
+
+## Загрузочные артефакты
+
+- `disk_image\cubegm\advapi32.dll`
+  - Тип: U-Boot legacy uImage
+  - Name: `vmlinux`
+  - Data size: `3905915`
+  - Load: `0x80000000`
+  - Entry: `0x803337C0`
+  - Arch code: `5` = MIPS
+  - SHA256: `8DB1F56E59A05C58BCCE15EE3B2927A4E9118ED02FE3ED8094AB1890D773DD61`
+
+- `disk_image\cubegm\vmlinux.uImage`
+  - Тип: U-Boot legacy uImage
+  - Name: `vmlinux`
+  - Data size: `3905906`
+  - Load: `0x80000000`
+  - Entry: `0x803337C0`
+  - Arch code: `5` = MIPS
+  - SHA256: `53B3E0B3D57FCDBEF40D448AE2D3A00159BC84F2FD5BE4C10A826827C7F2E01E`
+
+- `disk_image\cubegm\ApplicationFrame.dll`
+  - Тип: U-Boot legacy uImage
+  - Name: `avp`
+  - Data size: `1381415`
+  - Load: `0x83DA4000`
+  - Entry: `0x83DA4000`
+  - Arch code: `5` = MIPS
+  - SHA256: `7FE578665A9AA9707FDE83CAE04A798CA332C7164E56C531C143E3136D88CF5C`
+
+- `disk_image\cubegm\avp.uImage`
+  - Тип: U-Boot legacy uImage
+  - Name: `avp`
+  - Data size: `1381540`
+  - Load: `0x8BDA4000`
+  - Entry: `0x8BDA4000`
+  - Arch code: `5` = MIPS
+  - SHA256: `A9788995DB80197DB6D743B8B237EADBFD3C424FCF1AB448FCD99C003B0950B2`
+
+- `disk_image\cubegm\dtb.bin`
+  - Тип: DTB/FDT
+  - SHA256: `1258F1EBA809E43540C581B815C87815540A9E5897A4E8584363AB7DE5CC27BB`
+
+- `disk_image\cubegm\Bubbles.scr`
+  - Тип: DTB/FDT
+  - SHA256: `220BE381988651E73F0538D41B446762AA5ABD7FD72A808F2F26036970A992CB`
+
+## DTB/device tree факты
+
+В `dtb.bin` и `Bubbles.scr` найдены строки:
+
+- `Hichip hc16xx`
+- `Hichip,1600`
+- `MIPS 74Kc`
+- `hichip,hc16xx`
+- `soc-16xx`
+- `hc1600a@dbE3100v20`
+- `root=/dev/ram0 rootfstype=ramfs rw init=/linuxrc`
+- `external_files`
+- `cubegm`
+- `dtb.bin`
+- `avp.uImage`
+- `vmlinux.uImage`
+
+Это подтверждает, что `cubegm` содержит не только игровой frontend, но и внешние загрузочные файлы для платформы.
+
+## Основные исполняемые файлы
+
+- `disk_image\rootfs\usr\bin\hcprojector`
+  - MIPS ELF32 LE EXEC
+  - Размер: `14737552`
+  - Основное projector-приложение.
+  - SHA256: `95B89D1503CBD281A1C3F7C1C14D87763F046CD29D217DCEE0BC7FBD51D70801`
+
+- `disk_image\rootfs\usr\bin\cubevol`
+  - MIPS ELF32 LE EXEC
+  - Размер: `268544`
+  - Системный контроллер питания, standby, backlight, HDMI/MIPI, input.
+  - SHA256: `930288B2DBB8D3B5E723701AC365D7180DD8E747279693BAC0D3240A4224B5A0`
+
+- `disk_image\cubegm\rkgame`
+  - MIPS ELF32 LE EXEC
+  - Размер: `1178732`
+  - Главный игровой frontend / loader эмуляторных ядер.
+  - SHA256: `57D8B4FD85E0AAB44D17A51D209879C3F98130D066B622142736B42AD08DDCB9`
+
+- `disk_image\cubegm\icube`
+  - MIPS ELF32 LE EXEC
+  - Размер: `11976`
+  - Маленький launcher, запускает `rkgame`.
+  - SHA256: `21EADC68EDC6298137E941D4C50DADB4314FAC0FC68F9856649284308B000522`
+
+- `disk_image\cubegm\usr\bin\icube`
+  - MIPS ELF32 LE EXEC
+  - Размер: `63616`
+  - Альтернативный/старый `icube`, по строкам больше похож на GBA/gpsp-oriented app.
+  - SHA256: `2146C4C61C6D5AE1A7C3B5F53E05445A8D3913952C9130EC113BF6D5F57828F7`
+
+- `disk_image\cubegm\MyExecutable`
+  - MIPS ELF32 LE EXEC
+  - Размер: `24672`
+  - Helper для железа: MIPI, HDMI hotplug, backlight, joystick/status.
+  - SHA256: `B1F8C1D3EBA5882D6528F503E6EC73C2382783BBB1CD82A106C17A4BAF5F9418`
+
+## ELF-статистика по firmware-части
+
+По `disk_image\cubegm` и `disk_image\rootfs`:
+
+- `430` ELF32 LE MIPS shared object / DYN
+- `342` ELF32 LE MIPS executable / EXEC
+- `24` ELF32 LE MIPS relocatable / REL
+- `5` ELF32 LE ARM shared object / DYN
+
+ARM `.so` выбиваются из общей архитектуры и, скорее всего, являются чужими/ошибочно положенными/неиспользуемыми файлами:
+
+- `disk_image\cubegm\cores\libemu_fbalpha.so`
+- `disk_image\cubegm\lib\libcrypto.so`
+- `disk_image\cubegm\lib\libcrypto.so.1.0.0`
+- `disk_image\cubegm\lib\libfreetype.so.6`
+- `disk_image\cubegm\lib\libz.so.1`
+
+Основная целевая архитектура для своих бинарников все равно MIPS32 little-endian, не ARM.
+
+## Старт и переключение frontend/app
+
+`disk_image\rootfs\etc\inittab` через BusyBox init запускает:
+
+- `/etc/init.d/rcS`
+- `/usr/bin/cubevol > /dev/console 2>&1` в respawn
+
+В `cubegm` есть скрипты переключения:
+
+- `disk_image\cubegm\icube.sh`
+  - Добавляет `cubegm\lib` и `cubegm\usr\lib` в `LD_LIBRARY_PATH`.
+  - Запускает `/mnt/sdcard/cubegm/icube`.
+  - Делает `init -q`.
+
+- `disk_image\cubegm\icube_start.sh`
+  - Убивает `hcprojector`.
+  - Запускает `/mnt/sdcard/cubegm/icube`.
+
+- `disk_image\cubegm\icubemp_start.sh`
+  - Убивает `rkgame` и `icube`.
+  - Запускает `/usr/bin/hcprojector`.
+
+Это удобная точка для мягкой кастомизации без перепаковки ядра.
+
+## Эмуляторы и игровой frontend
+
+- `disk_image\cubegm\rkgame` использует `dlopen/dlsym` и грузит `.so` cores из `disk_image\cubegm\cores`.
+- `disk_image\cubegm\cores\config.xml` сопоставляет расширения ROM-ов и эмуляторные ядра.
+- В строках `rkgame` есть признаки libretro-like API: `retro_*`, save states, screenshots, настройки, PCSX/PSX, FBA/MAME/SNES/GBA/MD/FC и т.д.
+- `disk_image\cubegm\setting.xml` содержит пользовательские настройки, hotkeys и пути ресурсов.
+
+## Найденные публичные исходники/SDK
+
+В `internet_sources\hcrtos` лежит найденный публичный SDK/исходники HCRTOS.
+
+Особенно важные части:
+
+- `internet_sources\hcrtos\components\applications\apps-projector\source\hcprojector_app`
+  - Исходники projector-приложения.
+  - В `projector.c` есть строка `Welcome to Hichip world!`, совпадающая со строками из `hcprojector`.
+
+- `internet_sources\hcrtos\configs`
+  - Есть множество defconfig для HC16xx projector.
+  - Особенно близкие по названию: `hichip_hc16xx_*_d3100_*_projector_*`.
+
+- `internet_sources\hcrtos\board\hc16xx\projector`
+  - DTS/board files для HC16xx projector variants.
+
+- `internet_sources\hcrtos\components\hcfota`
+  - OTA/update components.
+
+- `internet_sources\hcrtos\components\liblvgl`
+  - LVGL-related source.
+
+Вывод: для собственной прошивки разумнее стартовать не с нуля, а от этого HCRTOS SDK/дерева.
+
+## Практические варианты модификации
+
+### Самый безопасный вариант
+
+Оставить vendor kernel, DTB, AVP и rootfs как есть, а заменить/добавить userspace-приложение:
+
+1. Собрать свой ELF под MIPS32 little-endian O32.
+2. Линковаться с существующими библиотеками из `cubegm\lib`, `cubegm\usr\lib`, `rootfs\lib`, `rootfs\usr\lib`.
+3. Запускать свой бинарник через `icube_start.sh`, заменить `rkgame`, либо заменить `icube` launcher.
+4. Для UI/вывода использовать доступные framebuffer/SDL/DirectFB/LVGL/Hichip-библиотеки.
+
+### Средний риск
+
+Собрать свою версию `hcprojector` или игрового frontend на базе найденного HCRTOS SDK, сохраняя vendor kernel/AVP/DTB.
+
+### Высокий риск
+
+Менять загрузочные артефакты:
+
+- `vmlinux.uImage` / `advapi32.dll`
+- `avp.uImage` / `ApplicationFrame.dll`
+- `dtb.bin` / `Bubbles.scr`
+
+Для этого нужны корректные U-Boot legacy headers, правильные load/entry адреса и совместимый DTS. Перед любыми заменами обязательно сохранить оригиналы и их SHA256.
+
+### Полностью своя прошивка
+
+Теоретически возможна, но практически лучше идти через HCRTOS SDK. Mainline Linux будет сложным путем, потому что железо завязано на vendor-драйверы и Hichip AVP:
+
+- `/dev/ge`
+- `/dev/dis`
+- `/dev/hdmi`
+- `/dev/auddec`
+- `/dev/backlight`
+- AVP proxy devices
+
+## Рекомендуемая следующая работа
+
+1. Декомпилировать/разобрать `rkgame`, `icube`, `MyExecutable` в Ghidra.
+2. Сравнить текущий `dtb.bin` с DTS из `internet_sources\hcrtos\board\hc16xx\projector`.
+3. Поднять toolchain для MIPS32 little-endian O32.
+4. Собрать минимальный тестовый ELF, который пишет в stdout/log и запускается через `icube_start.sh`.
+5. Потом уже делать свой frontend или замену `rkgame`.

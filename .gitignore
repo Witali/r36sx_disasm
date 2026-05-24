@@ -1,0 +1,56 @@
+# Firmware/image payloads
+disk_image/
+
+# Local Ghidra installation, projects, and generated exports
+ghidra_12.0.4_PUBLIC/
+ghidra_projects/
+ghidra_exports/
+
+# Downloaded third-party repositories and source mirrors
+internet_sources/
+
+# Downloaded toolchains, SDKs, archives, and tool caches.
+# Keep only our small local notes/scripts under tools/.
+tools/*
+!tools/*.md
+!tools/scan-download.ps1
+
+# Build outputs and caches
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.tmp
+*.temp
+*.cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Large downloaded archives/images if they appear outside ignored directories
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.img
+*.iso
+*.bin
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
