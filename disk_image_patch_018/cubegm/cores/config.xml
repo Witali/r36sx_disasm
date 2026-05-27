@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<core>
+<emucore name="libemu_fba" file="libemu_fba.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="libemu_pgm" file="libemu_pgm.so" />
+<supported_extensions>ZIP</supported_extensions>
+<supported_extensions>7Z</supported_extensions>
+</core>
+
+<core>
+<emucore name="fbalpha2012" file="libemu_fbalpha2012.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="mame2000" file="libemu_mame2000.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="libemu_cps2" file="libemu_cps2.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="libemu_extend" file="libemu_extend.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="libemu_fba3100" file="libemu_fba3100.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="libemu_fbafast" file="libemu_fbafast.so" />
+<supported_extensions>ZIP</supported_extensions>
+</core>
+
+<core>
+<emucore name="Snes9x" file="libemu_snes9x.so" />
+<supported_extensions>SMC</supported_extensions>
+<supported_extensions>SFC</supported_extensions>
+<supported_extensions>SWC</supported_extensions>
+<supported_extensions>FIG</supported_extensions>
+</core>
+
+<core>
+<emucore name="Snes9x 2005" file="libemu_sfc.so" />
+<supported_extensions>SMC</supported_extensions>
+<supported_extensions>FIG</supported_extensions>
+<supported_extensions>SFC</supported_extensions>
+<supported_extensions>GD3</supported_extensions>
+<supported_extensions>GD7</supported_extensions>
+<supported_extensions>DX2</supported_extensions>
+<supported_extensions>BSX</supported_extensions>
+<supported_extensions>SWC</supported_extensions>
+</core>
+
+<core>
+<emucore name="Snes9x 2010" file="libemu_snes9x2010.so" />
+<supported_extensions>SMC</supported_extensions>
+<supported_extensions>FIG</supported_extensions>
+<supported_extensions>SFC</supported_extensions>
+<supported_extensions>GD3</supported_extensions>
+<supported_extensions>GD7</supported_extensions>
+<supported_extensions>DX2</supported_extensions>
+<supported_extensions>BSX</supported_extensions>
+<supported_extensions>SWC</supported_extensions>
+</core>
+
+<core>
+<emucore name="mgba" file="libemu_mgba.so" />
+<supported_extensions>GBA</supported_extensions>
+<supported_extensions>GB</supported_extensions>
+<supported_extensions>GBC</supported_extensions>
+</core>
+
+<core>
+<emucore name="VBA-M" file="libemu_vbam.so" />
+<supported_extensions>GBA</supported_extensions>
+</core>
+
+<core>
+<emucore name="picodrive" file="libemu_md.so" />
+<supported_extensions>BIN</supported_extensions>
+<supported_extensions>GEN</supported_extensions>
+<supported_extensions>SMD</supported_extensions>
+<supported_extensions>MD</supported_extensions>
+</core>
+
+<core>
+<emucore name="FCEUmm" file="libemu_nes.so" />
+<supported_extensions>NES</supported_extensions>
+<supported_extensions>FDS</supported_extensions>
+<supported_extensions>UNIF</supported_extensions>
+<supported_extensions>UNF</supported_extensions>
+</core>
+
+<core>
+<emucore name="NEStopia" file="libemu_nestopia.so" />
+<supported_extensions>NES</supported_extensions>
+</core>
+
+<core>
+<emucore name="Stella" file="libemu_stella.so" />
+<supported_extensions>A26</supported_extensions>
+</core>
+
+<core>
+<emucore name="TGB Dual" file="libemu_tgbdual.so" />
+<supported_extensions>GB</supported_extensions>
+<supported_extensions>GBC</supported_extensions>
+<supported_extensions>SGB</supported_extensions>
+</core>
+
+<core>
+<emucore name="Button Demo" file="libemu_buttondemo.so" />
+<supported_extensions>DEMO</supported_extensions>
+</core>
+
+<core>
+<emucore name="Pong Demo" file="libemu_pong.so" />
+<supported_extensions>PONG</supported_extensions>
+</core>
+
+<core>
+<emucore name="Fuse ZX Spectrum 48K" file="libemu_fuse.so" />
+<supported_extensions>TAP</supported_extensions>
+<supported_extensions>TZX</supported_extensions>
+<supported_extensions>Z80</supported_extensions>
+<supported_extensions>RZX</supported_extensions>
+<supported_extensions>SCL</supported_extensions>
+<supported_extensions>TRD</supported_extensions>
+<supported_extensions>DSK</supported_extensions>
+<supported_extensions>SNA</supported_extensions>
+<supported_extensions>SZX</supported_extensions>
+</core>
+
+<core>
+<emucore name="PrBoom" file="libemu_prboom.so" />
+<supported_extensions>WAD</supported_extensions>
+<supported_extensions>IWAD</supported_extensions>
+<supported_extensions>PWAD</supported_extensions>
+<supported_extensions>LMP</supported_extensions>
+<supported_extensions>M3U</supported_extensions>
+</core>

@@ -27,6 +27,7 @@ tools/*
 *.tmp
 *.temp
 *.cache
+homebrew/*/obj/
 __pycache__/
 *.py[cod]
 .pytest_cache/
