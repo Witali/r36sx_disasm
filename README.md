@@ -114,6 +114,7 @@ toolchains and large SDK archives are ignored.
 Important local notes:
 
 - [`LOCAL_EMULATION.md`](LOCAL_EMULATION.md)
+- [`ZX_SPECTRUM_EMULATOR_CANDIDATES.md`](ZX_SPECTRUM_EMULATOR_CANDIDATES.md)
 - [`tools/PROJECT_RULES.md`](tools/PROJECT_RULES.md)
 - [`tools/SF3000_TOOLCHAIN.md`](tools/SF3000_TOOLCHAIN.md)
 - [`tools/SECURITY_RULES.md`](tools/SECURITY_RULES.md)
