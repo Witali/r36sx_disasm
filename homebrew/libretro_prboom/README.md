@@ -21,6 +21,7 @@ Patch overlay output:
 ```text
 disk_image_patch_018/cubegm/cores/libemu_prboom.so
 disk_image_patch_018/cubegm/cores/system/prboom/prboom.wad
+disk_image_patch_018/GB/freedoom1.wad
 ```
 
 ## Runtime files
@@ -47,12 +48,15 @@ Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
 ```
 
 `disk_image_patch_018` also includes `GB/filelist.csv` rows for those test
-entries. To test on the device, copy a legal IWAD into `GB/` using one of
-those names, for example:
+entries and bundles the free `freedoom1.wad` from Freedoom 0.13.0. The bundled
+entry is:
 
 ```text
-doom1.wad,Doom Shareware,Doom Shareware
+freedoom1.wad,Freedoom Phase 1,Freedoom Phase 1
 ```
+
+For commercial Doom, copy a legal IWAD into `GB/` using one of the other names,
+for example `doom1.wad`.
 
 ## Build
 
@@ -70,5 +74,6 @@ GLIBC versions through `GLIBC_2.19`. The hybrid route keeps the output to
 
 ## Current status
 
-The core builds and links as an ELF32 MIPS shared object. It has not yet been
-device-tested with a real Doom IWAD in this workspace.
+The core builds and links as an ELF32 MIPS shared object. `disk_image_patch_018`
+now includes a free IWAD for first device testing, but the core has not yet been
+physical-device tested in this workspace.

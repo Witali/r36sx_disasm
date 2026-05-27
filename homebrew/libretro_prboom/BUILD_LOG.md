@@ -117,11 +117,11 @@ Overlay scan:
 Result: found no threats
 ```
 
-Known limitation:
+Known limitation at initial overlay creation:
 
-The core has not yet been tested on the physical device with a legal Doom IWAD.
-The overlay does not include `doom1.wad`, `doom.wad`, `doom2.wad`, or Freedoom
-IWAD files.
+The core had not yet been tested on the physical device, and the first overlay
+did not include any game IWAD. A free `freedoom1.wad` was added in the later
+entry below.
 
 ## 2026-05-27 patch CSV correction
 
@@ -143,4 +143,52 @@ Rows added at the top of the copied GB list:
 doom1.wad,Doom Shareware,Doom Shareware
 freedoom1.wad,Freedoom Phase 1,Freedoom Phase 1
 doom.m3u,Doom Playlist,Doom Playlist
+```
+
+## 2026-05-27 Freedoom IWAD addition
+
+Reason:
+
+PRBoom cannot run a game with only `prboom.wad`; it also needs an IWAD. To make
+the test patch usable without commercial Doom data, `freedoom1.wad` was
+downloaded from the official Freedoom 0.13.0 GitHub release and added to the
+Game Boy test route.
+
+Source:
+
+```text
+URL: https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
+Release page: https://github.com/freedoom/freedoom/releases/tag/v0.13.0
+```
+
+Download command:
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip -OutFile .\internet_sources\freedoom\freedoom-0.13.0.zip
+```
+
+Downloaded archive:
+
+```text
+Path: internet_sources\freedoom\freedoom-0.13.0.zip
+Size: 24,143,781 bytes
+SHA256: 3F9B264F3E3CE503B4FB7F6BDCB1F419D93C7B546F4DF3E874DD878DB9688F59
+Defender scan: found no threats
+```
+
+Extracted and copied into patch:
+
+```text
+disk_image_patch_018\GB\freedoom1.wad
+disk_image_patch_018\GB\freedoom-0.13.0-COPYING.txt
+disk_image_patch_018\GB\freedoom-0.13.0-CREDITS.txt
+disk_image_patch_018\GB\freedoom-0.13.0-CREDITS-MUSIC.txt
+```
+
+IWAD verification:
+
+```text
+freedoom1.wad size: 28,795,076 bytes
+freedoom1.wad SHA256: 7323BCC168C5A45FF10749B339960E98314740A734C30D4B9F3337001F9E703D
+Defender scan: found no threats
 ```
