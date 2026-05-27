@@ -221,6 +221,8 @@ Notable patch history:
 - `disk_image_patch_015`: Fuse ZX Spectrum 48K rebuild with a guard against the
   `Loading` hang.
 - `disk_image_patch_016`: Pong Demo core based on the working Button Demo shell.
+- `disk_image_patch_017`: Pong Demo compatibility patch using a stock
+  `GB/pong.gb` launch file plus an explicit `filelist.xml` core override.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

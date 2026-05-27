@@ -506,7 +506,7 @@ void retro_get_system_info(struct retro_system_info *info)
     zero_memory(info, sizeof(*info));
     info->library_name = "Pong Demo";
     info->library_version = "0.1";
-    info->valid_extensions = "pong";
+    info->valid_extensions = "gb|pong";
     info->need_fullpath = false;
     info->block_extract = false;
 }

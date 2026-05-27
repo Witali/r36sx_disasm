@@ -54,11 +54,16 @@ Add a core entry to `cubegm\cores\config.xml`:
 For the current launcher, the safest test path is to reuse the `GB` menu:
 
 ```text
-GB\pong.pong
+GB\pong.gb
 ```
 
 and add an override to `cubegm\cores\filelist.xml`:
 
 ```xml
+<file name="GB/pong.gb" core="libemu_pong.so" />
 <file name="GB/pong.pong" core="libemu_pong.so" />
 ```
+
+`GB\pong.pong` is still kept as a secondary diagnostic route, but the normal
+`.gb` extension should be tried first because earlier Button Demo tests showed
+that stock extensions are more reliable with this launcher.

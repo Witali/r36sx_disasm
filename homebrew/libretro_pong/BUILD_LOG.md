@@ -73,3 +73,52 @@ Patch directory:
 ```text
 disk_image_patch_016
 ```
+
+## 2026-05-27 `.gb` launch compatibility rebuild
+
+Reason:
+
+The first device test of `disk_image_patch_016` briefly showed a black screen
+and returned to the launcher. This matches an earlier Button Demo failure mode
+where a custom extension appeared in the GB list but was not a reliable launch
+route. Button Demo became reliable after adding a dummy file with a stock
+`.gb` extension plus a `cores/filelist.xml` override.
+
+Source change:
+
+- `retro_get_system_info()` now reports `valid_extensions = "gb|pong"`.
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\libretro_pong\pong.c
+```
+
+Integration changes:
+
+- Added `GB\pong.gb`.
+- Added `<file name="GB/pong.gb" core="libemu_pong.so" />` to
+  `cubegm\cores\filelist.xml`.
+- Added `pong.gb,Pong Demo GB,Pong Demo GB` to `GB\filelist.csv`.
+- Kept `GB\pong.pong` as a secondary diagnostic entry.
+
+Verification:
+
+```text
+Size: 41512 bytes
+SHA256: CDA9C881BA3A40AA3984B8B4274508022F64C743341C690EEAA61F2BCE63AC55
+Required symbol strings include retro_run, retro_load_game,
+retro_set_video_refresh, retro_set_audio_sample,
+retro_set_audio_sample_batch, check_encrypty, CheckEncrypty.
+No NEEDED/UND/__ubsan/GLIBC/ld-linux/libc.so/libm.so/memset strings found.
+Defender scan of homebrew SO: found no threats.
+Defender scan of disk_image_patch_017: found no threats.
+```
+
+Patch directory:
+
+```text
+disk_image_patch_017
+```
