@@ -149,7 +149,22 @@ use a 640x480 framebuffer so display scaling can be inspected on the real
 device, and `disk_image_patch_014` adds a short generated sound on new button
 presses.
 
-Important discoveries from this experiment:
+### Pong Demo Core
+
+A small Pong-style game module was built using the same no-libc libretro-style
+shell as Button Demo:
+
+- Source: [`homebrew/libretro_pong/pong.c`](homebrew/libretro_pong/pong.c)
+- Notes: [`homebrew/libretro_pong/README.md`](homebrew/libretro_pong/README.md)
+- Build log: [`homebrew/libretro_pong/BUILD_LOG.md`](homebrew/libretro_pong/BUILD_LOG.md)
+- Built module: `homebrew/libretro_pong/libemu_pong.so`
+
+It renders a 640x480 RGB565 playfield, supports D-pad left-paddle control,
+optional face-button right-paddle control, simple AI when the right paddle is
+not controlled manually, Start pause/resume, Select reset, score display, and
+generated tones.
+
+Important discoveries from these homebrew experiments:
 
 - A dummy ROM with a stock extension such as `.gb` was more reliable than a new
   custom extension.
@@ -205,6 +220,7 @@ Notable patch history:
   audio.
 - `disk_image_patch_015`: Fuse ZX Spectrum 48K rebuild with a guard against the
   `Loading` hang.
+- `disk_image_patch_016`: Pong Demo core based on the working Button Demo shell.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

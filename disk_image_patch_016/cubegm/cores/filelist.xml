@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<file name="GB/button.gb" core="libemu_buttondemo.so" />
+<file name="GB/button.demo" core="libemu_buttondemo.so" />
+<file name="GB/pong.pong" core="libemu_pong.so" />
+<file name="SFC/Targa (Europe) (Proto).zip" core="libemu_snes9x.so" />
+<file name="SFC/Batman - Revenge of the Joker (USA) (Proto).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Battle Soccer - Field no Hasha (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Habu Meijin no Omoshiro Shougi (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Kishin Douji Zenki - Tenchi Meidou (Japan).zip" core="libemu_snes9x.so" />
+<file name="SFC/Marvelous - Mouhitotsu no Takara-jima (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Pachi-Slot Monogatari - PAL Kougyou Special (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/PGA European Tour (Europe).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/PGA European Tour (USA).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/PGA Tour 96 (Europe).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/PGA Tour 96 (USA) (Rev 1).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/PGA Tour 96 (USA).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Power Piggs of the Dark Age (Europe) (Beta).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Ring ni Kakero (Japan) (NP).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Rin Kaihou Kudan no Igo Taidou (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Rise of the Robots (Europe).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Shougi Saikyou II - Jissen Taikyoku Hen (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Shougi Saikyou (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Soul Blade (World) (Unl) (Pirate).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Super Bomberman 2 (Europe).zip" core="libemu_snes9x2010.so" />
+<file name="SFC/Takemiya Masaki Kudan no Igo Taishou (Japan).zip" core="libemu_snes9x2010.so" />
+<file name="GBA/Bubble Dragon New and Old Edition.zip" core="libemu_mgba.so" />
+<file name="GBA/Desert Strike Advance(US).zip" core="libemu_mgba.so" />
+<file name="GBA/Elevator war.zip" core="libemu_mgba.so" />
+<file name="GBA/NHL 2SFC(US).zip" core="libemu_mgba.so" />
+<file name="GBA/Ninja criminal police.zip" core="libemu_mgba.so" />
+<file name="GBA/Postman Pat and Green Rocket.zip" core="libemu_mgba.so" />
+<file name="GBA/Rockman Zero4.zip" core="libemu_mgba.so" />
+<file name="GBA/Sponge Barber - Movie Edition.zip" core="libemu_mgba.so" />
+<file name="GBA/Star Wars - Jedi Power Battles(EU).zip" core="libemu_mgba.so" />
+<file name="GBA/Lord of the Rings - Twin Towers.zip" core="libemu_mgba.so" />
+<file name="MAME/kof96.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/1944.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/1944ad.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/1944d.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/1944j.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/8bpm.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/aceattaca.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/altbeast5.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/bayroutej.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/bgaregga.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/blockgal.zip" core="libemu_extend.so" />
+<file name="MAME/bloxeed.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/bwcasino.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/cltchitr.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/cltchitrd.zip" core="libemu_extend.so" />
+<file name="MAME/cltchitrj.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/cotton.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/cottonu.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ddcrew1.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ddcrewu.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ddux.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/mazinger.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/metlsavr.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/mrflea.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/passshtj.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/shinobi2.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/skywolf.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/skywolf2.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/spacecho.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ponpoko.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ponpokov.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/sfw.zip" core="libemu_extend.so" /> 
+<file name="MAME/shadowwa.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/shinobi1.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/skyadvntu.zip" core="libemu_extend.so" />
+<file name="MAME/speakres.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/sprglbpg.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/sprglobp.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ssideki4.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/stratvox.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tetris.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tetris1.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tetris2.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tetris3.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/theglobp.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tknight.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/truxton2.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/vliner.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/vlinero.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/wb31.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/wb33.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/wb34.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/eswat.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/eswatj.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/eswatu.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/flashgal.zip" core="libemu_extend.so" />
+<file name="MAME/fpoint.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/fpoint1.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/fstarfrc.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/fx.zip" core="libemu_extend.so" />
+<file name="MAME/galaxyfg.zip" core="libemu_fba.so" />
+<file name="MAME/ganryu.zip" core="libemu_fba.so" />
+<file name="MAME/garoubl.zip" core="libemu_fba.so" />
+<file name="MAME/garoup.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/gensitou.zip" core="libemu_extend.so" />
+<file name="MAME/ginkun.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/goldnaxe1.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/goldnaxe3.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/goldnaxej.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/goldnaxeu.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/herodku.zip" core="libemu_fbafast.so" />
+<file name="MAME/hellfire.zip" core="libemu_extend.so" />
+<file name="MAME/jack.zip" core="libemu_extend.so" />
+<file name="MAME/jack2.zip" core="libemu_extend.so" />
+<file name="MAME/jack3.zip" core="libemu_extend.so" />
+<file name="MAME/joinem.zip" core="libemu_extend.so" />
+<file name="MAME/kizuna.zip" core="libemu_fba.so" />
+<file name="MAME/legend.zip" core="libemu_extend.so" />
+<file name="MAME/madgear.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/madgearj.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/magdrop2.zip" core="libemu_cps2.so" />
+<file name="MAME/matrimbl.zip" core="libemu_fba.so" />
+<file name="MAME/mia.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/mmaze.zip" core="libemu_extend.so" />
+<file name="MAME/mmaze2.zip" core="libemu_extend.so" />
+<file name="MAME/mvp.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/mvpj.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/myangel2.zip" core="libemu_extend.so" />
+<file name="MAME/naname.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/ninjamas.zip" core="libemu_fba.so" />
+<file name="MAME/nitd.zip" core="libemu_fba.so" />
+<file name="MAME/overtop.zip" core="libemu_fba.so" />
+<file name="MAME/preisle2.zip" core="libemu_fba.so" />
+<file name="MAME/quartet.zip" core="libemu_extend.so" />
+<file name="MAME/rbff1.zip" core="libemu_fba.so" />
+<file name="MAME/rbffspec.zip" core="libemu_fba.so" />
+<file name="MAME/rocktrv2.zip" core="libemu_extend.so" />
+<file name="MAME/samsho2.zip" core="libemu_fba.so" />
+<file name="MAME/samsho4.zip" core="libemu_fba.so" />
+<file name="MAME/spacegun.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/suprleag.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/tetrsark.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/viewpoin.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/acitya.zip" core="libemu_fbalpha2012.so" />
+<file name="MAME/bayroute.zip" core="libemu_fbalpha2012.so" />
+<file name="ATARI/R36SX_ZX48.tap" core="libemu_fuse.so" />
