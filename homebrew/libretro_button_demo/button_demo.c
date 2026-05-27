@@ -11,14 +11,6 @@
 #include <stdint.h>
 
 #define RETRO_API_VERSION 1
-#define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT 10
-
-enum retro_pixel_format {
-    RETRO_PIXEL_FORMAT_0RGB1555 = 0,
-    RETRO_PIXEL_FORMAT_XRGB8888 = 1,
-    RETRO_PIXEL_FORMAT_RGB565 = 2
-};
-
 enum retro_device {
     RETRO_DEVICE_JOYPAD = 1
 };
@@ -80,24 +72,31 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device, unsigned 
 
 static retro_environment_t environ_cb;
 static retro_video_refresh_t video_cb;
-static retro_audio_sample_batch_t audio_batch_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 enum {
     FB_WIDTH = 320,
     FB_HEIGHT = 240,
-    SQUARE_SIZE = 32,
-    AUDIO_FRAMES_PER_RUN = 735
+    SQUARE_SIZE = 32
+};
+
+enum {
+    LOG_LINES = 5,
+    LOG_TEXT_LEN = 12,
+    LOG_X = 12,
+    LOG_Y = 158,
+    FONT_SCALE = 2
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];
-static int16_t silence[AUDIO_FRAMES_PER_RUN * 2];
 static int square_x = (FB_WIDTH - SQUARE_SIZE) / 2;
 static int square_y = (FB_HEIGHT - SQUARE_SIZE) / 2;
 static unsigned color_index;
 static bool checker;
 static bool prev_start;
+static unsigned prev_buttons;
+static char button_log[LOG_LINES][LOG_TEXT_LEN];
 
 static void zero_memory(void *ptr, size_t size)
 {
@@ -151,6 +150,143 @@ static void draw_rect(int x, int y, int w, int h, uint16_t color)
     }
 }
 
+static uint8_t glyph_row(char c, unsigned row)
+{
+    static const uint8_t blank[7] = {0, 0, 0, 0, 0, 0, 0};
+    static const uint8_t glyph_a[7] = {14, 17, 17, 31, 17, 17, 17};
+    static const uint8_t glyph_b[7] = {30, 17, 17, 30, 17, 17, 30};
+    static const uint8_t glyph_c[7] = {14, 17, 16, 16, 16, 17, 14};
+    static const uint8_t glyph_d[7] = {30, 17, 17, 17, 17, 17, 30};
+    static const uint8_t glyph_e[7] = {31, 16, 16, 30, 16, 16, 31};
+    static const uint8_t glyph_f[7] = {31, 16, 16, 30, 16, 16, 16};
+    static const uint8_t glyph_g[7] = {14, 17, 16, 23, 17, 17, 15};
+    static const uint8_t glyph_h[7] = {17, 17, 17, 31, 17, 17, 17};
+    static const uint8_t glyph_i[7] = {14, 4, 4, 4, 4, 4, 14};
+    static const uint8_t glyph_l[7] = {16, 16, 16, 16, 16, 16, 31};
+    static const uint8_t glyph_n[7] = {17, 25, 21, 19, 17, 17, 17};
+    static const uint8_t glyph_o[7] = {14, 17, 17, 17, 17, 17, 14};
+    static const uint8_t glyph_p[7] = {30, 17, 17, 30, 16, 16, 16};
+    static const uint8_t glyph_r[7] = {30, 17, 17, 30, 20, 18, 17};
+    static const uint8_t glyph_s[7] = {15, 16, 16, 14, 1, 1, 30};
+    static const uint8_t glyph_t[7] = {31, 4, 4, 4, 4, 4, 4};
+    static const uint8_t glyph_u[7] = {17, 17, 17, 17, 17, 17, 14};
+    static const uint8_t glyph_w[7] = {17, 17, 17, 21, 21, 21, 10};
+    static const uint8_t glyph_x[7] = {17, 17, 10, 4, 10, 17, 17};
+    static const uint8_t glyph_y[7] = {17, 17, 10, 4, 4, 4, 4};
+    const uint8_t *glyph = blank;
+
+    switch (c) {
+    case 'A': glyph = glyph_a; break;
+    case 'B': glyph = glyph_b; break;
+    case 'C': glyph = glyph_c; break;
+    case 'D': glyph = glyph_d; break;
+    case 'E': glyph = glyph_e; break;
+    case 'F': glyph = glyph_f; break;
+    case 'G': glyph = glyph_g; break;
+    case 'H': glyph = glyph_h; break;
+    case 'I': glyph = glyph_i; break;
+    case 'L': glyph = glyph_l; break;
+    case 'N': glyph = glyph_n; break;
+    case 'O': glyph = glyph_o; break;
+    case 'P': glyph = glyph_p; break;
+    case 'R': glyph = glyph_r; break;
+    case 'S': glyph = glyph_s; break;
+    case 'T': glyph = glyph_t; break;
+    case 'U': glyph = glyph_u; break;
+    case 'W': glyph = glyph_w; break;
+    case 'X': glyph = glyph_x; break;
+    case 'Y': glyph = glyph_y; break;
+    default: break;
+    }
+
+    return glyph[row];
+}
+
+static void draw_char(int x, int y, char c, uint16_t color)
+{
+    for (unsigned row = 0; row < 7; row++) {
+        uint8_t bits = glyph_row(c, row);
+        for (unsigned col = 0; col < 5; col++) {
+            if ((bits & (uint8_t)(1u << (4 - col))) != 0) {
+                draw_rect(x + (int)(col * FONT_SCALE), y + (int)(row * FONT_SCALE),
+                          FONT_SCALE, FONT_SCALE, color);
+            }
+        }
+    }
+}
+
+static void draw_text(int x, int y, const char *text, uint16_t color)
+{
+    for (unsigned i = 0; text[i] != '\0'; i++) {
+        draw_char(x + (int)(i * 6 * FONT_SCALE), y, text[i], color);
+    }
+}
+
+static void log_button(const char *label)
+{
+    for (unsigned row = 0; row + 1 < LOG_LINES; row++) {
+        for (unsigned col = 0; col < LOG_TEXT_LEN; col++) {
+            button_log[row][col] = button_log[row + 1][col];
+        }
+    }
+
+    for (unsigned col = 0; col < LOG_TEXT_LEN; col++) {
+        char c = label[col];
+        button_log[LOG_LINES - 1][col] = c;
+        if (c == '\0') {
+            break;
+        }
+    }
+    button_log[LOG_LINES - 1][LOG_TEXT_LEN - 1] = '\0';
+}
+
+static unsigned read_buttons(void)
+{
+    unsigned mask = 0;
+
+    for (unsigned id = 0; id <= RETRO_DEVICE_ID_JOYPAD_R; id++) {
+        if (pressed(id)) {
+            mask |= 1u << id;
+        }
+    }
+
+    return mask;
+}
+
+static void log_pressed_buttons(unsigned changed)
+{
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_UP)) != 0) {
+        log_button("UP");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_DOWN)) != 0) {
+        log_button("DOWN");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_LEFT)) != 0) {
+        log_button("LEFT");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_RIGHT)) != 0) {
+        log_button("RIGHT");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_A)) != 0) {
+        log_button("A");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_B)) != 0) {
+        log_button("B");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_X)) != 0) {
+        log_button("X");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_Y)) != 0) {
+        log_button("Y");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_START)) != 0) {
+        log_button("START");
+    }
+    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_SELECT)) != 0) {
+        log_button("SELECT");
+    }
+}
+
 static void draw_frame(void)
 {
     static const uint16_t square_colors[] = {
@@ -171,9 +307,15 @@ static void draw_frame(void)
 
     draw_rect(0, 0, FB_WIDTH, 8, rgb565(40, 160, 180));
     draw_rect(0, FB_HEIGHT - 8, FB_WIDTH, 8, rgb565(180, 80, 40));
+    draw_rect(0, LOG_Y - 6, FB_WIDTH, 76, rgb565(4, 10, 14));
+    draw_rect(0, LOG_Y - 8, FB_WIDTH, 2, rgb565(40, 160, 180));
     draw_rect(square_x, square_y, SQUARE_SIZE, SQUARE_SIZE,
               square_colors[color_index % (sizeof(square_colors) / sizeof(square_colors[0]))]);
     draw_rect(square_x + 8, square_y + 8, 16, 16, rgb565(0, 0, 0));
+
+    for (unsigned row = 0; row < LOG_LINES; row++) {
+        draw_text(LOG_X, LOG_Y + (int)(row * 14), button_log[row], rgb565(220, 240, 245));
+    }
 }
 
 unsigned retro_api_version(void)
@@ -184,10 +326,6 @@ unsigned retro_api_version(void)
 void retro_set_environment(retro_environment_t cb)
 {
     environ_cb = cb;
-    if (environ_cb) {
-        enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
-        environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
-    }
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
@@ -202,7 +340,7 @@ void retro_set_audio_sample(retro_audio_sample_t cb)
 
 void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
 {
-    audio_batch_cb = cb;
+    (void)cb;
 }
 
 void retro_set_input_poll(retro_input_poll_t cb)
@@ -244,6 +382,8 @@ void retro_init(void)
     color_index = 0;
     checker = false;
     prev_start = false;
+    prev_buttons = 0;
+    zero_memory(button_log, sizeof(button_log));
 }
 
 void retro_deinit(void)
@@ -271,47 +411,49 @@ void retro_run(void)
         input_poll_cb();
     }
 
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_LEFT)) {
+    unsigned buttons = read_buttons();
+    unsigned changed = buttons & ~prev_buttons;
+
+    log_pressed_buttons(changed);
+
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_LEFT)) != 0) {
         square_x -= 2;
     }
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_RIGHT)) {
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_RIGHT)) != 0) {
         square_x += 2;
     }
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_UP)) {
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_UP)) != 0) {
         square_y -= 2;
     }
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_DOWN)) {
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_DOWN)) != 0) {
         square_y += 2;
     }
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_SELECT)) {
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_SELECT)) != 0) {
         square_x = (FB_WIDTH - SQUARE_SIZE) / 2;
         square_y = (FB_HEIGHT - SQUARE_SIZE) / 2;
     }
-    if (pressed(RETRO_DEVICE_ID_JOYPAD_A)) {
+    if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_A)) != 0) {
         color_index = 1;
-    } else if (pressed(RETRO_DEVICE_ID_JOYPAD_B)) {
+    } else if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_B)) != 0) {
         color_index = 2;
-    } else if (pressed(RETRO_DEVICE_ID_JOYPAD_X)) {
+    } else if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_X)) != 0) {
         color_index = 3;
-    } else if (pressed(RETRO_DEVICE_ID_JOYPAD_Y)) {
+    } else if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_Y)) != 0) {
         color_index = 4;
     }
 
-    bool start = pressed(RETRO_DEVICE_ID_JOYPAD_START);
+    bool start = (buttons & (1u << RETRO_DEVICE_ID_JOYPAD_START)) != 0;
     if (start && !prev_start) {
         checker = !checker;
     }
     prev_start = start;
+    prev_buttons = buttons;
 
     clamp_square();
     draw_frame();
 
     if (video_cb) {
         video_cb(frame, FB_WIDTH, FB_HEIGHT, FB_WIDTH * sizeof(frame[0]));
-    }
-
-    if (audio_batch_cb) {
-        audio_batch_cb(silence, AUDIO_FRAMES_PER_RUN);
     }
 }
 

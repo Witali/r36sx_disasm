@@ -366,6 +366,114 @@ disk_image\cubegm\cores\libemu_buttondemo.so
 disk_image_patch_002\cubegm\cores\libemu_buttondemo.so
 ```
 
+## 2026-05-27 loading hang rebuild
+
+Reason:
+
+After Patch001/Patch002 were tested on device, the launcher showed `loading` and did not enter the demo. Inspection of Patch002's `.so` found unresolved UBSan runtime symbols such as `__ubsan_handle_type_mismatch_v1` and `__ubsan_handle_pointer_overflow`. The device firmware is unlikely to provide the UBSan runtime, so this could prevent clean `dlopen()`/startup.
+
+Source changes:
+
+- removed the early `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` call from `retro_set_environment()`, because stock `libemu_tgbdual.so` does not do that there;
+- kept `check_encrypty()` and `CheckEncrypty()` returning success;
+- kept silent 735-frame audio batches.
+
+Build command:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -shared -fPIC -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o .\homebrew\libretro_button_demo\libemu_buttondemo.so .\homebrew\libretro_button_demo\button_demo.c
+```
+
+Verification:
+
+```text
+ELF magic: 7F 45 4C 46; class=1; endian=1; type=0x0003; machine=0x0008; flags=0x70001007
+SHA256: 37F348DD99255CDB81F6EC6B06F519C64A509FFCAEC51715864611BCDB557BC4
+No __ubsan symbols found.
+Defender: found no threats
+```
+
+Patch directory:
+
+```text
+disk_image_patch_003
+```
+
+## 2026-05-27 static-video callback isolation build
+
+Reason:
+
+After Patch003, the device briefly black-screened and returned to the Game Boy launcher. That suggests the `.so` loads farther than before, but either a callback interaction or a launcher/core contract mismatch still exits the game. This build removes input/audio callback calls from `retro_run()` and leaves only video output.
+
+Source changes:
+
+- `retro_run()` no longer calls `input_poll_cb`.
+- `retro_run()` no longer calls `input_state_cb`.
+- `retro_run()` no longer calls `audio_batch_cb`.
+- The module still draws the 320x240 RGB565 frame and calls `video_cb`.
+
+Build command:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -shared -fPIC -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o .\homebrew\libretro_button_demo\libemu_buttondemo.so .\homebrew\libretro_button_demo\button_demo.c
+```
+
+Verification:
+
+```text
+ELF magic: 7F 45 4C 46; class=1; endian=1; type=0x0003; machine=0x0008; flags=0x70001007
+SHA256: B9279DFB25510373527466A8287AA51A9CE56B547BB63A0DFAED70FDFF092493
+No __ubsan/GLIBC/libc/ld-linux runtime dependency strings found.
+Defender: found no threats
+```
+
+Patch directory:
+
+```text
+disk_image_patch_004
+```
+
+## 2026-05-27 button log build
+
+Reason:
+
+After input was confirmed useful, the demo was extended to show which button was pressed directly on screen.
+
+Source changes:
+
+- added a tiny built-in 5x7 bitmap font;
+- added a 5-line button log in the lower part of the framebuffer;
+- new button presses are appended at the bottom and older lines scroll upward;
+- square movement and color changes remain active;
+- audio callback remains disabled.
+
+Build command:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -shared -fPIC -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o .\homebrew\libretro_button_demo\libemu_buttondemo.so .\homebrew\libretro_button_demo\button_demo.c
+```
+
+Verification:
+
+```text
+ELF magic: 7F 45 4C 46; class=1; endian=1; type=0x0003; machine=0x0008; flags=0x70001007
+SHA256: 2AB1C612DB2A495B1CB82C753A92497A993CE793C985A0745372B9838E6A76DA
+No __ubsan/GLIBC/libc/ld-linux runtime dependency strings found.
+Defender: found no threats
+```
+
+Patch directory:
+
+```text
+disk_image_patch_007
+```
+
 Defender scan of built module:
 
 ```powershell
