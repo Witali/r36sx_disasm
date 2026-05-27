@@ -17,6 +17,7 @@ cubegm\cores\libemu_prboom.so
 cubegm\cores\system\prboom\prboom.wad
 cubegm\cores\config.xml
 cubegm\cores\filelist.xml
+GB\filelist.csv
 ```
 
 ## Core config
@@ -42,13 +43,17 @@ Added to `cubegm\cores\filelist.xml` as optional Game Boy menu test routes:
 <file name="GB/doom.m3u" core="libemu_prboom.so" />
 ```
 
-The actual WAD/M3U files are not included. To test through the existing Game
-Boy menu route, copy a legal IWAD into `GB\` and add a row to `GB\filelist.csv`,
-for example:
+The actual WAD/M3U files are not included. This patch now includes
+`GB\filelist.csv` rows for these test entries:
 
 ```text
 doom1.wad,Doom Shareware,Doom Shareware
+freedoom1.wad,Freedoom Phase 1,Freedoom Phase 1
+doom.m3u,Doom Playlist,Doom Playlist
 ```
+
+To test through the existing Game Boy menu route, copy a legal IWAD into
+`GB\` with one of those names, or create `GB\doom.m3u` that points to the IWAD.
 
 ## Build
 

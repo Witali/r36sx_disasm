@@ -106,6 +106,7 @@ cubegm\cores\libemu_prboom.so
 cubegm\cores\system\prboom\prboom.wad
 cubegm\cores\config.xml
 cubegm\cores\filelist.xml
+GB\filelist.csv
 MANIFEST.md
 ```
 
@@ -121,3 +122,25 @@ Known limitation:
 The core has not yet been tested on the physical device with a legal Doom IWAD.
 The overlay does not include `doom1.wad`, `doom.wad`, `doom2.wad`, or Freedoom
 IWAD files.
+
+## 2026-05-27 patch CSV correction
+
+Reason:
+
+The first `disk_image_patch_018` overlay added `cubegm\cores\filelist.xml`
+overrides for Doom test names, but did not include `GB\filelist.csv`. That made
+the patch incomplete for the existing Game Boy menu test route.
+
+Added:
+
+```text
+disk_image_patch_018\GB\filelist.csv
+```
+
+Rows added at the top of the copied GB list:
+
+```text
+doom1.wad,Doom Shareware,Doom Shareware
+freedoom1.wad,Freedoom Phase 1,Freedoom Phase 1
+doom.m3u,Doom Playlist,Doom Playlist
+```

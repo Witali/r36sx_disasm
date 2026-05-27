@@ -46,8 +46,9 @@ Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
 <file name="GB/doom.m3u" core="libemu_prboom.so" />
 ```
 
-To test on the device, copy a legal IWAD into `GB/` and add a matching
-`GB/filelist.csv` row, for example:
+`disk_image_patch_018` also includes `GB/filelist.csv` rows for those test
+entries. To test on the device, copy a legal IWAD into `GB/` using one of
+those names, for example:
 
 ```text
 doom1.wad,Doom Shareware,Doom Shareware
