@@ -101,6 +101,22 @@
 
 ## Эмуляторы / дополнительные cores
 
+- https://murmulator.ru/zxmurmulator
+  - Murmulator ZX Spectrum firmware / `pico-spec`.
+  - Это богатый ZX Spectrum/Pentagon/Byte/ALF эмулятор для RP2040/RP2350,
+    но он bare-metal Pico SDK firmware, а не Linux/libretro `.so`.
+  - Подробная локальная оценка портирования: `MURMULATOR_PORTING_ANALYSIS.md`.
+
+- https://github.com/DnCraptor/pico-spec
+  - Исходники Murmulator/pico-spec.
+  - Локальная копия скачана в `internet_sources\murmulator\pico-spec-main`
+    и архив просканирован Defender без угроз.
+
+- https://github.com/EremusOne/ESPectrum
+  - Оригинальный ESPectrum, от которого унаследован pico-spec.
+  - Может быть полезен для сравнения платформенного слоя и поиска менее
+    embedded-зависимых частей.
+
 - https://github.com/angree/sf2000-uae-amiga-emulator/releases
   - Amiga emulator для SF2000/GB300.
   - Полезно как пример добавления нового эмуляторного компонента в похожую экосистему.
