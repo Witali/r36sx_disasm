@@ -1,7 +1,7 @@
 /*
  * Minimal libretro core for the SF3000/R36SX-like cubegm launcher.
  *
- * It draws a 320x240 RGB565 framebuffer and reacts to joypad buttons:
+ * It draws a 640x480 RGB565 framebuffer and reacts to joypad buttons:
  * D-pad moves the square, A/B change colors, Start toggles background,
  * Select resets the square position.
  */
@@ -76,18 +76,18 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 enum {
-    FB_WIDTH = 320,
-    FB_HEIGHT = 240,
-    SQUARE_SIZE = 32
+    FB_WIDTH = 640,
+    FB_HEIGHT = 480,
+    SQUARE_SIZE = 48
 };
 
 enum {
     LOG_LINES = 5,
     LOG_TEXT_LEN = 16,
-    LOG_X = 12,
-    LOG_Y = 158,
+    LOG_X = 20,
+    LOG_Y = 370,
     FONT_SCALE = 2,
-    LOG_LINE_STEP = 16
+    LOG_LINE_STEP = 18
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];
@@ -342,11 +342,17 @@ static void draw_frame(void)
 
     draw_rect(0, 0, FB_WIDTH, 8, rgb565(40, 160, 180));
     draw_rect(0, FB_HEIGHT - 8, FB_WIDTH, 8, rgb565(180, 80, 40));
-    draw_rect(0, LOG_Y - 6, FB_WIDTH, 76, rgb565(4, 10, 14));
-    draw_rect(0, LOG_Y - 8, FB_WIDTH, 2, rgb565(40, 160, 180));
+    draw_rect(0, 0, FB_WIDTH, 1, rgb565(255, 255, 255));
+    draw_rect(0, 0, 1, FB_HEIGHT, rgb565(255, 255, 255));
+    draw_rect(FB_WIDTH - 1, 0, 1, FB_HEIGHT, rgb565(255, 255, 255));
+    draw_rect(0, FB_HEIGHT - 1, FB_WIDTH, 1, rgb565(255, 255, 255));
+    draw_rect(FB_WIDTH / 2, 0, 1, FB_HEIGHT, rgb565(80, 120, 140));
+    draw_rect(0, FB_HEIGHT / 2, FB_WIDTH, 1, rgb565(80, 120, 140));
+    draw_rect(0, LOG_Y - 8, FB_WIDTH, 98, rgb565(4, 10, 14));
+    draw_rect(0, LOG_Y - 10, FB_WIDTH, 2, rgb565(40, 160, 180));
     draw_rect(square_x, square_y, SQUARE_SIZE, SQUARE_SIZE,
               square_colors[color_index % (sizeof(square_colors) / sizeof(square_colors[0]))]);
-    draw_rect(square_x + 8, square_y + 8, 16, 16, rgb565(0, 0, 0));
+    draw_rect(square_x + 12, square_y + 12, 24, 24, rgb565(0, 0, 0));
 
     for (unsigned row = 0; row < LOG_LINES; row++) {
         draw_text(LOG_X, LOG_Y + (int)(row * LOG_LINE_STEP), button_log[row], rgb565(220, 240, 245));

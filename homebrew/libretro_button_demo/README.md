@@ -2,7 +2,7 @@
 
 Minimal libretro core for the MIPS32 little-endian `cubegm` launcher.
 
-It draws a 320x240 RGB565 framebuffer and reacts to buttons:
+It draws a 640x480 RGB565 framebuffer and reacts to buttons:
 
 - D-pad: move square
 - A/B/X/Y: change square color

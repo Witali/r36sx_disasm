@@ -30,7 +30,7 @@ Latest rebuilt SHA256 after the 2026-05-24 compatibility fix:
 
 Build a minimal MIPS32 little-endian libretro core for the `cubegm/rkgame` launcher.
 
-The module draws a 320x240 RGB565 framebuffer and reacts to joypad buttons:
+The module draws a 640x480 RGB565 framebuffer and reacts to joypad buttons:
 
 - D-pad: move square
 - A/B/X/Y: change square color
@@ -412,7 +412,7 @@ Source changes:
 - `retro_run()` no longer calls `input_poll_cb`.
 - `retro_run()` no longer calls `input_state_cb`.
 - `retro_run()` no longer calls `audio_batch_cb`.
-- The module still draws the 320x240 RGB565 frame and calls `video_cb`.
+- The module now draws a 640x480 RGB565 frame and calls `video_cb`.
 
 Build command:
 
@@ -510,3 +510,32 @@ DEMO\button.demo
 ```
 
 If the launcher does not show new platforms from arbitrary root folders, reuse an existing platform folder for testing and add a `filelist.xml` override for one dummy file.
+
+## 2026-05-27 native 640x480 test build
+
+Changed `button_demo.c` to render a 640x480 RGB565 framebuffer instead of 320x240.
+The test frame keeps the moving square and button log, and adds a 1-pixel border plus center crosshair for scaling checks.
+
+Build command from `homebrew/libretro_button_demo`:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path ..\..\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path ..\..\tools\zig-cache).Path
+..\..\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o libemu_buttondemo.so button_demo.c
+```
+
+Verification:
+
+```text
+ELF32 little-endian DYN(shared object), machine=MIPS, flags=0x70001007
+Exported symbols include retro_run, retro_get_system_av_info, retro_set_video_refresh, check_encrypty, CheckEncrypty.
+SHA256: 5B6EBEC0430295A7952E19963F3B592092CA6A803DB58AAA7BD7A98435BFB6A6
+Defender: found no threats
+```
+
+Installed copy:
+
+```text
+disk_image\cubegm\cores\libemu_buttondemo.so
+disk_image_patch_010\cubegm\cores\libemu_buttondemo.so
+```
