@@ -83,10 +83,11 @@ enum {
 
 enum {
     LOG_LINES = 5,
-    LOG_TEXT_LEN = 12,
+    LOG_TEXT_LEN = 16,
     LOG_X = 12,
     LOG_Y = 158,
-    FONT_SCALE = 2
+    FONT_SCALE = 2,
+    LOG_LINE_STEP = 16
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];
@@ -95,7 +96,7 @@ static int square_y = (FB_HEIGHT - SQUARE_SIZE) / 2;
 static unsigned color_index;
 static bool checker;
 static bool prev_start;
-static unsigned prev_buttons;
+static uint32_t prev_buttons;
 static char button_log[LOG_LINES][LOG_TEXT_LEN];
 
 static void zero_memory(void *ptr, size_t size)
@@ -173,6 +174,16 @@ static uint8_t glyph_row(char c, unsigned row)
     static const uint8_t glyph_w[7] = {17, 17, 17, 21, 21, 21, 10};
     static const uint8_t glyph_x[7] = {17, 17, 10, 4, 10, 17, 17};
     static const uint8_t glyph_y[7] = {17, 17, 10, 4, 4, 4, 4};
+    static const uint8_t glyph_0[7] = {14, 17, 19, 21, 25, 17, 14};
+    static const uint8_t glyph_1[7] = {4, 12, 4, 4, 4, 4, 14};
+    static const uint8_t glyph_2[7] = {14, 17, 1, 2, 4, 8, 31};
+    static const uint8_t glyph_3[7] = {30, 1, 1, 14, 1, 1, 30};
+    static const uint8_t glyph_4[7] = {2, 6, 10, 18, 31, 2, 2};
+    static const uint8_t glyph_5[7] = {31, 16, 16, 30, 1, 1, 30};
+    static const uint8_t glyph_6[7] = {14, 16, 16, 30, 17, 17, 14};
+    static const uint8_t glyph_7[7] = {31, 1, 2, 4, 8, 8, 8};
+    static const uint8_t glyph_8[7] = {14, 17, 17, 14, 17, 17, 14};
+    static const uint8_t glyph_9[7] = {14, 17, 17, 15, 1, 1, 14};
     const uint8_t *glyph = blank;
 
     switch (c) {
@@ -196,6 +207,16 @@ static uint8_t glyph_row(char c, unsigned row)
     case 'W': glyph = glyph_w; break;
     case 'X': glyph = glyph_x; break;
     case 'Y': glyph = glyph_y; break;
+    case '0': glyph = glyph_0; break;
+    case '1': glyph = glyph_1; break;
+    case '2': glyph = glyph_2; break;
+    case '3': glyph = glyph_3; break;
+    case '4': glyph = glyph_4; break;
+    case '5': glyph = glyph_5; break;
+    case '6': glyph = glyph_6; break;
+    case '7': glyph = glyph_7; break;
+    case '8': glyph = glyph_8; break;
+    case '9': glyph = glyph_9; break;
     default: break;
     }
 
@@ -240,11 +261,50 @@ static void log_button(const char *label)
     button_log[LOG_LINES - 1][LOG_TEXT_LEN - 1] = '\0';
 }
 
-static unsigned read_buttons(void)
+static const char *button_name(unsigned id)
 {
-    unsigned mask = 0;
+    switch (id) {
+    case RETRO_DEVICE_ID_JOYPAD_B: return "B";
+    case RETRO_DEVICE_ID_JOYPAD_Y: return "Y";
+    case RETRO_DEVICE_ID_JOYPAD_SELECT: return "SELECT";
+    case RETRO_DEVICE_ID_JOYPAD_START: return "START";
+    case RETRO_DEVICE_ID_JOYPAD_UP: return "UP";
+    case RETRO_DEVICE_ID_JOYPAD_DOWN: return "DOWN";
+    case RETRO_DEVICE_ID_JOYPAD_LEFT: return "LEFT";
+    case RETRO_DEVICE_ID_JOYPAD_RIGHT: return "RIGHT";
+    case RETRO_DEVICE_ID_JOYPAD_A: return "A";
+    case RETRO_DEVICE_ID_JOYPAD_X: return "X";
+    case RETRO_DEVICE_ID_JOYPAD_L: return "L";
+    case RETRO_DEVICE_ID_JOYPAD_R: return "R";
+    default: return "";
+    }
+}
 
-    for (unsigned id = 0; id <= RETRO_DEVICE_ID_JOYPAD_R; id++) {
+static void log_button_id(unsigned id)
+{
+    const char *name = button_name(id);
+    char label[LOG_TEXT_LEN];
+    unsigned pos = 0;
+
+    label[pos++] = 'I';
+    label[pos++] = 'D';
+    label[pos++] = (char)('0' + ((id / 10) % 10));
+    label[pos++] = (char)('0' + (id % 10));
+    if (name[0] != '\0') {
+        label[pos++] = ' ';
+        for (unsigned i = 0; name[i] != '\0' && pos + 1 < LOG_TEXT_LEN; i++) {
+            label[pos++] = name[i];
+        }
+    }
+    label[pos] = '\0';
+    log_button(label);
+}
+
+static uint32_t read_buttons(void)
+{
+    uint32_t mask = 0;
+
+    for (unsigned id = 0; id < 32; id++) {
         if (pressed(id)) {
             mask |= 1u << id;
         }
@@ -253,37 +313,12 @@ static unsigned read_buttons(void)
     return mask;
 }
 
-static void log_pressed_buttons(unsigned changed)
+static void log_pressed_buttons(uint32_t changed)
 {
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_UP)) != 0) {
-        log_button("UP");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_DOWN)) != 0) {
-        log_button("DOWN");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_LEFT)) != 0) {
-        log_button("LEFT");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_RIGHT)) != 0) {
-        log_button("RIGHT");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_A)) != 0) {
-        log_button("A");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_B)) != 0) {
-        log_button("B");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_X)) != 0) {
-        log_button("X");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_Y)) != 0) {
-        log_button("Y");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_START)) != 0) {
-        log_button("START");
-    }
-    if ((changed & (1u << RETRO_DEVICE_ID_JOYPAD_SELECT)) != 0) {
-        log_button("SELECT");
+    for (unsigned id = 0; id < 32; id++) {
+        if ((changed & (1u << id)) != 0) {
+            log_button_id(id);
+        }
     }
 }
 
@@ -314,7 +349,7 @@ static void draw_frame(void)
     draw_rect(square_x + 8, square_y + 8, 16, 16, rgb565(0, 0, 0));
 
     for (unsigned row = 0; row < LOG_LINES; row++) {
-        draw_text(LOG_X, LOG_Y + (int)(row * 14), button_log[row], rgb565(220, 240, 245));
+        draw_text(LOG_X, LOG_Y + (int)(row * LOG_LINE_STEP), button_log[row], rgb565(220, 240, 245));
     }
 }
 

@@ -237,3 +237,30 @@ close(fd);
 - упоминает DirectFB в `cubegm` и отсутствие SDL/EGL/GLES в stock system.
 
 Вывод: `goph-R/SF3000-RE` полезен как заметка по homebrew/custom launcher, но не даёт исходных файлов, по которым можно подтвердить `halt`, MIPS `wait`, cpufreq или powersaving mode. Для ответа на вопрос об энергосбережении всё ещё важнее локальный бинарный анализ `rkgame`, `driver.so`, `hcprojector`, `cubevol`, `libhudi.so` и HCRTOS standby-кода.
+
+## Проверка libc usleep и kernel nanosleep
+
+Дополнительно проверен локальный `disk_image\rootfs\lib\libc.so.6` через Ghidra:
+
+- `usleep` находится по адресу `000f5ed0`;
+- `nanosleep` находится по адресу `000bfb84`;
+- `clock_nanosleep` находится по адресу `0010ea90`;
+- Ghidra определила библиотеку как `MIPS:LE:32`.
+
+Декомпилированная логика `usleep`:
+
+```c
+local_10.tv_sec = __useconds / 1000000;
+local_10.tv_nsec = (__useconds % 1000000) * 1000;
+return nanosleep(&local_10, 0);
+```
+
+В MIPS-дизассемблере `nanosleep` перед `syscall` загружает `v0 = 0x1046`, то есть `usleep` в userspace не содержит собственного ожидания, busy-wait, `halt` или MIPS `wait`; он переводит микросекунды в `timespec` и передает управление ядру через syscall `nanosleep`.
+
+`disk_image\cubegm\advapi32.dll` подтвержден как U-Boot `uImage` с именем `vmlinux`, MIPS, gzip. Payload распакован в `ghidra_exports\kernel\advapi32_vmlinux_decompressed.bin`; внутри есть строка:
+
+```text
+Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #21 PREEMPT Thu Dec 18 18:13:45 CST 2025
+```
+
+В распакованном ядре также есть строки `cpu_wait` и `wait instruction`, поэтому kernel idle path, вероятно, умеет использовать MIPS `wait`. Но это отдельный уровень: приложение вызывает `usleep`/`nanosleep`, задача снимается с выполнения scheduler'ом, а уже если системе нечего делать, ядро может уйти в idle/wait.
