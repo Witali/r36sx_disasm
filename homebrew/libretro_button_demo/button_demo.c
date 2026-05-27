@@ -3,7 +3,8 @@
  *
  * It draws a 640x480 RGB565 framebuffer and reacts to joypad buttons:
  * D-pad moves the square, A/B change colors, Start toggles background,
- * Select resets the square position.
+ * Select resets the square position. New button presses trigger a short
+ * integer-generated "pew-pew" sound through the libretro audio batch callback.
  */
 
 #include <stdbool.h>
@@ -72,13 +73,20 @@ typedef int16_t (*retro_input_state_t)(unsigned port, unsigned device, unsigned 
 
 static retro_environment_t environ_cb;
 static retro_video_refresh_t video_cb;
+static retro_audio_sample_t audio_sample_cb;
+static retro_audio_sample_batch_t audio_batch_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 enum {
     FB_WIDTH = 640,
     FB_HEIGHT = 480,
-    SQUARE_SIZE = 48
+    SQUARE_SIZE = 48,
+    AUDIO_RATE = 44100,
+    AUDIO_FRAMES_PER_VIDEO_FRAME = 735,
+    PEW_CHIRP_SAMPLES = 4410,
+    PEW_GAP_SAMPLES = 1470,
+    PEW_TOTAL_SAMPLES = (PEW_CHIRP_SAMPLES * 2) + PEW_GAP_SAMPLES
 };
 
 enum {
@@ -91,12 +99,16 @@ enum {
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];
+static int16_t audio_frame[AUDIO_FRAMES_PER_VIDEO_FRAME * 2];
 static int square_x = (FB_WIDTH - SQUARE_SIZE) / 2;
 static int square_y = (FB_HEIGHT - SQUARE_SIZE) / 2;
 static unsigned color_index;
 static bool checker;
 static bool prev_start;
 static uint32_t prev_buttons;
+static uint32_t pew_sample;
+static uint32_t pew_phase;
+static bool pew_active;
 static char button_log[LOG_LINES][LOG_TEXT_LEN];
 
 static void zero_memory(void *ptr, size_t size)
@@ -322,6 +334,73 @@ static void log_pressed_buttons(uint32_t changed)
     }
 }
 
+static void trigger_pew(void)
+{
+    pew_sample = 0;
+    pew_phase = 0;
+    pew_active = true;
+}
+
+static int16_t synth_pew_sample(void)
+{
+    if (!pew_active) {
+        return 0;
+    }
+
+    uint32_t local = pew_sample;
+    pew_sample++;
+
+    if (local >= PEW_TOTAL_SAMPLES) {
+        pew_active = false;
+        return 0;
+    }
+
+    if (local >= PEW_CHIRP_SAMPLES && local < PEW_CHIRP_SAMPLES + PEW_GAP_SAMPLES) {
+        return 0;
+    }
+
+    uint32_t chirp_pos = local;
+    if (local >= PEW_CHIRP_SAMPLES + PEW_GAP_SAMPLES) {
+        chirp_pos = local - PEW_CHIRP_SAMPLES - PEW_GAP_SAMPLES;
+    }
+
+    uint32_t freq = 1800u - ((1200u * chirp_pos) / PEW_CHIRP_SAMPLES);
+    uint32_t step = (freq << 16) / AUDIO_RATE;
+    uint32_t envelope = PEW_CHIRP_SAMPLES - chirp_pos;
+    int32_t amp = (int32_t)((5000u * envelope) / PEW_CHIRP_SAMPLES);
+
+    pew_phase += step;
+    return (pew_phase & 0x8000u) ? (int16_t)amp : (int16_t)-amp;
+}
+
+static void emit_audio(void)
+{
+    if (!audio_batch_cb && !audio_sample_cb) {
+        return;
+    }
+
+    bool had_sound = pew_active;
+
+    for (unsigned i = 0; i < AUDIO_FRAMES_PER_VIDEO_FRAME; i++) {
+        int16_t sample = synth_pew_sample();
+        audio_frame[i * 2] = sample;
+        audio_frame[i * 2 + 1] = sample;
+    }
+
+    if (!had_sound) {
+        return;
+    }
+
+    if (audio_batch_cb) {
+        audio_batch_cb(audio_frame, AUDIO_FRAMES_PER_VIDEO_FRAME);
+        return;
+    }
+
+    for (unsigned i = 0; i < AUDIO_FRAMES_PER_VIDEO_FRAME; i++) {
+        audio_sample_cb(audio_frame[i * 2], audio_frame[i * 2 + 1]);
+    }
+}
+
 static void draw_frame(void)
 {
     static const uint16_t square_colors[] = {
@@ -376,12 +455,12 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
 {
-    (void)cb;
+    audio_sample_cb = cb;
 }
 
 void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
 {
-    (void)cb;
+    audio_batch_cb = cb;
 }
 
 void retro_set_input_poll(retro_input_poll_t cb)
@@ -424,6 +503,9 @@ void retro_init(void)
     checker = false;
     prev_start = false;
     prev_buttons = 0;
+    pew_sample = 0;
+    pew_phase = 0;
+    pew_active = false;
     zero_memory(button_log, sizeof(button_log));
 }
 
@@ -456,6 +538,9 @@ void retro_run(void)
     unsigned changed = buttons & ~prev_buttons;
 
     log_pressed_buttons(changed);
+    if (changed != 0) {
+        trigger_pew();
+    }
 
     if ((buttons & (1u << RETRO_DEVICE_ID_JOYPAD_LEFT)) != 0) {
         square_x -= 2;
@@ -496,6 +581,8 @@ void retro_run(void)
     if (video_cb) {
         video_cb(frame, FB_WIDTH, FB_HEIGHT, FB_WIDTH * sizeof(frame[0]));
     }
+
+    emit_audio();
 }
 
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t num_info)

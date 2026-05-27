@@ -539,3 +539,50 @@ Installed copy:
 disk_image\cubegm\cores\libemu_buttondemo.so
 disk_image_patch_010\cubegm\cores\libemu_buttondemo.so
 ```
+
+## 2026-05-27 button press audio build
+
+Reason:
+
+Add a small audible response to the working Button Demo core. Any newly pressed
+button should trigger a short generated "pew-pew" sound.
+
+Source changes:
+
+- `retro_set_audio_sample()` now stores the single-sample callback.
+- `retro_set_audio_sample_batch()` now stores the batch callback.
+- Added a tiny integer-only audio generator.
+- A new button press starts a two-part descending chirp.
+- Audio is generated as 44.1 kHz stereo PCM, 735 frames per video frame.
+- Audio is only emitted while the effect is active.
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o .\homebrew\libretro_button_demo\libemu_buttondemo.so .\homebrew\libretro_button_demo\button_demo.c
+```
+
+The `-fno-builtin` flag was added because an earlier audio build without it had
+one unresolved `memset` symbol.
+
+Verification:
+
+```text
+ELF32 little-endian DYN(shared object), machine=MIPS, flags=0x70001007
+Size: 30220 bytes
+NEEDED: empty
+Undefined dynamic symbols: 0
+Required exports include retro_run, retro_load_game, retro_set_audio_sample, retro_set_audio_sample_batch, check_encrypty, CheckEncrypty.
+No __ubsan/GLIBC/libc/libm/ld-linux/memset dependency strings found.
+SHA256: 6B9DAD3DCB3CE4B7B9B7CC63C1CAE8660839603B81D5AF0AF3D3D36CA452B378
+Defender: found no threats
+```
+
+Installed copy:
+
+```text
+disk_image\cubegm\cores\libemu_buttondemo.so
+disk_image_patch_014\cubegm\cores\libemu_buttondemo.so
+```

@@ -8,6 +8,7 @@ It draws a 640x480 RGB565 framebuffer and reacts to buttons:
 - A/B/X/Y: change square color
 - Start: toggle checker background
 - Select: reset square position
+- Any new button press: play a short generated "pew-pew" sound
 
 ## Build
 
@@ -23,6 +24,13 @@ On the current Windows workspace, the module was built with local Zig:
 $env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path ..\..\tools\zig-global-cache).Path
 $env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path ..\..\tools\zig-cache).Path
 ..\..\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -shared -fPIC -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o libemu_buttondemo.so button_demo.c
+```
+
+The current audio build also uses `-fno-builtin` so the compiler does not emit
+an external `memset` dependency:
+
+```powershell
+..\..\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o libemu_buttondemo.so button_demo.c
 ```
 
 Expected output:
