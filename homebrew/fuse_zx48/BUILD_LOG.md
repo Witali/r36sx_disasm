@@ -2,6 +2,12 @@
 
 Experimental MIPS32 little-endian build of `libretro/fuse-libretro` for the `cubegm/rkgame` launcher.
 
+Command-level reproduction notes are documented in:
+
+```text
+homebrew/fuse_zx48/BUILD_COMMANDS.md
+```
+
 ## Source
 
 - Repository: `https://github.com/libretro/fuse-libretro.git`
@@ -39,7 +45,7 @@ The final file was copied as:
 homebrew/fuse_zx48/libemu_fuse.so
 ```
 
-## Verification
+## Verification Of First Build
 
 - ELF32 little-endian shared object.
 - Machine: MIPS.
@@ -48,6 +54,83 @@ homebrew/fuse_zx48/libemu_fuse.so
 - `NEEDED` list is empty because this build uses `-nostdlib`; standard libc/libm symbols are expected to resolve from the `rkgame` process at `dlopen` time.
 - Microsoft Defender found no threats in the built `.so`.
 - SHA256: `BEBCFF5B456A10C6888ED20F5AACE173CC60B8668D037F98E2FD9411EAFB62A5`
+
+## R36SX Compatibility Rebuild
+
+After the first device test showed a short black screen followed by a return to
+the launcher, two likely compatibility problems were addressed.
+
+First, `src/libretro.c` was patched so `retro_load_game()` does not fail when
+`rkgame` ignores `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT`. The core continues with
+the default RGB565 format.
+
+Patch file:
+
+```text
+homebrew/fuse_zx48/r36sx_fuse_compat.patch
+```
+
+Second, the module was relinked with explicit dynamic dependencies from the
+device image:
+
+```text
+libm.so.6
+libgcc_s.so.1
+libc.so.6
+```
+
+New verification:
+
+- ELF32 little-endian shared object.
+- Machine: MIPS.
+- Flags: `0x70001007`.
+- `NEEDED`: `libm.so.6`, `libgcc_s.so.1`, `libc.so.6`.
+- Required exports are present, including `retro_load_game`, `retro_run`,
+  `check_encrypty`, and `CheckEncrypty`.
+- Microsoft Defender found no threats in the rebuilt `.so`.
+- SHA256: `29DEE42C31586965415A57CE69A17E19DB0AD3D813656CFEDCF2EAA9AE9AE10D`
+
+## Minimal No-NEEDED Rebuild
+
+The explicit-`NEEDED` build also returned to the launcher on device, so a
+smaller no-`NEEDED` build was produced for `disk_image_patch_013`.
+
+This build keeps the R36SX `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` compatibility
+patch, but compiles with size-oriented flags and links without passing any
+runtime libraries:
+
+```text
+-Oz
+-ffunction-sections
+-fdata-sections
+-fno-unwind-tables
+-fno-asynchronous-unwind-tables
+-fno-ident
+-fmerge-all-constants
+-fno-stack-protector
+-fno-math-errno
+-Wl,--gc-sections
+-Wl,--strip-all
+-Wl,--discard-all
+```
+
+New verification:
+
+- ELF32 little-endian shared object.
+- Machine: MIPS.
+- Flags: `0x70001007`.
+- Size: `2254084` bytes.
+- `NEEDED`: empty.
+- Required exports are present.
+- Undefined dynamic symbols: `75`.
+- `exit` and `abort` are resolved inside `r36sx_shim.c` to avoid terminating
+  the `rkgame` process from Fuse error paths.
+- Microsoft Defender found no threats in the rebuilt `.so`.
+- SHA256: `64ED74EDA1873D7B0E5A3BDCFFB3EF4B85CB38A22DA5054E65E6F32B8E4BA179`
+
+Attempting to embed static `libc.a` / `libm.a` failed because the SDK static
+libraries contain non-PIC MIPS relocations that cannot be linked into a shared
+object.
 
 ## Runtime Config
 

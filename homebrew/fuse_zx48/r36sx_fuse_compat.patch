@@ -1,0 +1,13 @@
+diff --git a/src/libretro.c b/src/libretro.c
+--- a/src/libretro.c
++++ b/src/libretro.c
+@@
+-   if (!env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+-   {
+-      log_cb(RETRO_LOG_ERROR, "RGB565 is not supported\n");
+-      return false;
+-   }
++   if (!env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
++   {
++      log_cb(RETRO_LOG_WARN, "RGB565 pixel format request was ignored by frontend; continuing with default RGB565\n");
++   }

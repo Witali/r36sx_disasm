@@ -158,6 +158,7 @@ An experimental ZX Spectrum 48K core was built from `libretro/fuse-libretro`:
 
 - Notes: [`homebrew/fuse_zx48/README.md`](homebrew/fuse_zx48/README.md)
 - Build log: [`homebrew/fuse_zx48/BUILD_LOG.md`](homebrew/fuse_zx48/BUILD_LOG.md)
+- Build commands: [`homebrew/fuse_zx48/BUILD_COMMANDS.md`](homebrew/fuse_zx48/BUILD_COMMANDS.md)
 - Test tape: `homebrew/fuse_zx48/R36SX_ZX48.tap`
 - Built module: `homebrew/fuse_zx48/libemu_fuse.so`
 
@@ -165,9 +166,11 @@ The ready integration patch is:
 
 - [`disk_image_patch_011/MANIFEST.md`](disk_image_patch_011/MANIFEST.md)
 
-This is still experimental. The current build is linked with `-nostdlib`, so it
-has no explicit `NEEDED` entries and expects standard libc/libm symbols to be
-available from the already-running `rkgame` process.
+This is still experimental. The first device tests returned to the launcher
+after a black screen. `disk_image_patch_012` tried explicit runtime
+dependencies, while `disk_image_patch_013` switches to a smaller no-`NEEDED`
+build that keeps the R36SX `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` compatibility
+patch.
 
 ## Patch Sets
 
@@ -187,6 +190,9 @@ Notable patch history:
 - `disk_image_patch_009`: adjusted text spacing.
 - `disk_image_patch_010`: native-resolution 640x480 Button Demo test.
 - `disk_image_patch_011`: experimental Fuse ZX Spectrum 48K core.
+- `disk_image_patch_012`: Fuse ZX Spectrum 48K compatibility rebuild after the
+  first black-screen test.
+- `disk_image_patch_013`: minimal no-`NEEDED` Fuse ZX Spectrum 48K rebuild.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
