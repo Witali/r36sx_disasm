@@ -1,0 +1,87 @@
+diff --git a/src/externs.h b/src/externs.h
+--- a/src/externs.h
++++ b/src/externs.h
+@@
+ extern retro_environment_t env_cb;
+ extern retro_log_printf_t log_cb;
++extern retro_audio_sample_t audio_sample_cb;
+ extern retro_audio_sample_batch_t audio_cb;
+ extern retro_input_state_t input_state_cb;
+diff --git a/src/libretro.c b/src/libretro.c
+--- a/src/libretro.c
++++ b/src/libretro.c
+@@
+ retro_environment_t env_cb;
+ retro_log_printf_t log_cb = dummy_log;
++retro_audio_sample_t audio_sample_cb;
+ retro_audio_sample_batch_t audio_cb;
+ retro_input_state_t input_state_cb;
+@@
+ void retro_set_audio_sample(retro_audio_sample_t cb)
+ {
+-   (void)cb;
++   audio_sample_cb = cb;
+ }
+@@
+ void retro_get_system_av_info(struct retro_system_av_info *info)
+ {
++   unsigned base_width = hard_width ? hard_width : 320;
++   unsigned base_height = hard_height ? hard_height : 240;
++
+    // Here we always use the "hard" resolution to accomodate output with *and*
+    // without the video border
+-   info->geometry.base_width = hard_width;
+-   info->geometry.base_height = hard_height;
++   info->geometry.base_width = base_width;
++   info->geometry.base_height = base_height;
+@@
+ static void render_video(void)
+ {
++   if (!video_cb || !hard_width || !hard_height || !soft_width || !soft_height)
++      return;
++
+    if (!keyb_overlay)
+@@
+ void retro_run(void)
+ {
+    bool updated = false;
++   unsigned guard = 0;
+@@
+-   do {
+-      input_poll_cb();
++   do {
++      if (input_poll_cb)
++         input_poll_cb();
+       z80_do_opcodes();
+       event_do_events();
+    }
+-   while (!some_audio);
++   while (!some_audio && ++guard < 1024);
+ 
+    render_video();
+ }
+diff --git a/src/compat/sound.c b/src/compat/sound.c
+--- a/src/compat/sound.c
++++ b/src/compat/sound.c
+@@
+ void sound_lowlevel_frame(libspectrum_signed_word *data, int len)
+ {
+-   audio_cb( data, (size_t)len / 2 );
++   size_t frames = (size_t)len / 2;
++
++   if (audio_cb)
++   {
++      audio_cb( data, frames );
++   }
++   else if (audio_sample_cb)
++   {
++      size_t i;
++
++      for (i = 0; i < frames; i++)
++      {
++         audio_sample_cb( data[i * 2], data[i * 2 + 1] );
++      }
++   }
++
+    some_audio = 1;
+ }

@@ -113,6 +113,8 @@ toolchains and large SDK archives are ignored.
 
 Important local notes:
 
+- [`LOCAL_EMULATION.md`](LOCAL_EMULATION.md)
+- [`tools/PROJECT_RULES.md`](tools/PROJECT_RULES.md)
 - [`tools/SF3000_TOOLCHAIN.md`](tools/SF3000_TOOLCHAIN.md)
 - [`tools/SECURITY_RULES.md`](tools/SECURITY_RULES.md)
 - [`tools/scan-download.ps1`](tools/scan-download.ps1)
@@ -126,6 +128,10 @@ Security rule for this project: every downloaded tool, archive, SDK, extracted
 tool directory, or executable bundle must be scanned before use. The local scan
 helper is `tools/scan-download.ps1`.
 
+Logging rule for this project: every non-trivial analysis, build, download,
+generated artifact, device-test patch, and verification step must be recorded in
+the appropriate notes, build log, command log, or patch manifest.
+
 ## Homebrew Experiments
 
 ### Button Demo Core
@@ -137,9 +143,10 @@ The first working homebrew experiment is a tiny libretro-style core:
 - Build log: [`homebrew/libretro_button_demo/BUILD_LOG.md`](homebrew/libretro_button_demo/BUILD_LOG.md)
 
 It draws an RGB565 framebuffer, shows a moving square, logs button presses, and
-was iterated until it could run through the stock `rkgame` loader. The final
-test builds use a 640x480 framebuffer so display scaling can be inspected on
-the real device.
+was iterated until it could run through the stock `rkgame` loader. Later builds
+use a 640x480 framebuffer so display scaling can be inspected on the real
+device, and `disk_image_patch_014` adds a short generated sound on new button
+presses.
 
 Important discoveries from this experiment:
 
@@ -168,9 +175,9 @@ The ready integration patch is:
 
 This is still experimental. The first device tests returned to the launcher
 after a black screen. `disk_image_patch_012` tried explicit runtime
-dependencies, while `disk_image_patch_013` switches to a smaller no-`NEEDED`
-build that keeps the R36SX `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` compatibility
-patch.
+dependencies, `disk_image_patch_013` switched to a smaller no-`NEEDED` build,
+and `disk_image_patch_015` adds a guard for the device-side `Loading` hang by
+bounding Fuse's audio-driven `retro_run()` loop.
 
 ## Patch Sets
 
@@ -193,6 +200,10 @@ Notable patch history:
 - `disk_image_patch_012`: Fuse ZX Spectrum 48K compatibility rebuild after the
   first black-screen test.
 - `disk_image_patch_013`: minimal no-`NEEDED` Fuse ZX Spectrum 48K rebuild.
+- `disk_image_patch_014`: Button Demo rebuild with generated button-press
+  audio.
+- `disk_image_patch_015`: Fuse ZX Spectrum 48K rebuild with a guard against the
+  `Loading` hang.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -209,7 +220,8 @@ Tracked or intentionally small project files:
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/`: source and build logs for custom modules.
 - `disk_image_patch_*`: copyable patch overlays.
-- `tools/*.md` and `tools/scan-download.ps1`: local notes and helper scripts.
+- `tools/*.md` and `tools/scan-download.ps1`: local rules, notes, and helper
+  scripts.
 
 Ignored local data:
 

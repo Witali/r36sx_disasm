@@ -132,6 +132,66 @@ Attempting to embed static `libc.a` / `libm.a` failed because the SDK static
 libraries contain non-PIC MIPS relocations that cannot be linked into a shared
 object.
 
+## Loading Guard Rebuild
+
+The minimal no-`NEEDED` build from `disk_image_patch_013` hung on the stock
+launcher's `Loading` screen. The likely culprit is Fuse's libretro main loop:
+`retro_run()` keeps executing Z80/events until `some_audio` becomes true. If the
+device frontend does not provide the expected audio batch path, the first frame
+can never return.
+
+Patch file:
+
+```text
+homebrew/fuse_zx48/r36sx_loading_guard.patch
+```
+
+The patch changes:
+
+- `retro_set_audio_sample()` now stores the single-sample callback instead of
+  discarding it.
+- `sound_lowlevel_frame()` uses audio batch when available, falls back to the
+  single-sample callback, and still marks `some_audio` if audio output is not
+  configured.
+- `retro_run()` has a 1024-iteration guard around the `while (!some_audio)`
+  loop.
+- `retro_get_system_av_info()` reports 320x240 before Fuse has initialized its
+  geometry.
+- `render_video()` returns early if video callbacks or geometry are not ready.
+
+The build reused `build-r36sx-oz` and rebuilt only:
+
+```text
+internet_sources/fuse-libretro/src/libretro.c
+internet_sources/fuse-libretro/src/compat/sound.c
+```
+
+The final link command kept the same minimal no-`NEEDED` model:
+
+```text
+zig cc -target mipsel-linux-gnu -march=mips32r2 -shared -nostdlib
+  -Wl,--gc-sections -Wl,--strip-all -Wl,--discard-all
+  -Wl,-soname,libemu_fuse.so
+  -Wl,-version-script=homebrew/fuse_zx48/r36sx_link.T
+  -o homebrew/fuse_zx48/libemu_fuse.so
+  <all build-r36sx-oz/*.o>
+```
+
+New verification:
+
+- ELF32 little-endian shared object.
+- Machine: MIPS.
+- Flags: `0x70001007`.
+- Size: `2254248` bytes.
+- `NEEDED`: empty.
+- Required exports are present, including `retro_load_game`, `retro_run`,
+  `retro_set_audio_sample`, `retro_set_audio_sample_batch`,
+  `retro_get_system_av_info`, `check_encrypty`, and `CheckEncrypty`.
+- Undefined dynamic symbols: `75`.
+- Microsoft Defender found no threats in `homebrew/fuse_zx48/libemu_fuse.so`
+  and `disk_image_patch_015/cubegm/cores/libemu_fuse.so`.
+- SHA256: `FAE075F3F90E5B5E459455AA5082DB1EB849A11B31A252B86DEAFA6D2655B837`
+
 ## Runtime Config
 
 `libemu_fuse.so.cfg` pins the machine to `Spectrum 48K`, enables tape auto-load and fast-load, and maps joypad buttons to common Spectrum keys:

@@ -375,6 +375,77 @@ The current `r36sx_shim.c` also defines local `exit()` and `abort()` traps. They
 are intentionally not exported, but they prevent Fuse-internal error paths from
 calling the process-wide libc implementations and terminating `rkgame`.
 
+## Loading Guard Rebuild
+
+After `disk_image_patch_013` hung on the device `Loading` screen, the source
+tree was patched with:
+
+```text
+homebrew/fuse_zx48/r36sx_loading_guard.patch
+```
+
+The manual source changes were made in:
+
+```text
+internet_sources/fuse-libretro/src/externs.h
+internet_sources/fuse-libretro/src/libretro.c
+internet_sources/fuse-libretro/src/compat/sound.c
+```
+
+Only the affected objects were rebuilt:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR = (Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path .\tools\zig-cache).Path
+$zig = (Resolve-Path .\tools\zig-x86_64-windows-0.16.0\zig.exe).Path
+$sysroot = (Resolve-Path .\tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot).Path
+$outdir = (Resolve-Path .\internet_sources\fuse-libretro\build-r36sx-oz).Path
+```
+
+Compile arguments were the same as the minimal no-`NEEDED` build:
+
+```text
+cc -target mipsel-linux-gnu -march=mips32r2 --sysroot=<sysroot>
+-isystem <sysroot>/usr/include -Oz -fomit-frame-pointer -fPIC
+-ffunction-sections -fdata-sections -fno-unwind-tables
+-fno-asynchronous-unwind-tables -fno-ident -fmerge-all-constants
+-fno-stack-protector -fno-math-errno -D__LIBRETRO__ -DHAVE_CONFIG_H
+-DNDEBUG -Wall
+```
+
+Recompiled sources:
+
+```powershell
+& $zig @common -c internet_sources\fuse-libretro\src\libretro.c `
+  -o $outdir\internet_sources__fuse-libretro__src__libretro.c.o
+
+& $zig @common -c internet_sources\fuse-libretro\src\compat\sound.c `
+  -o $outdir\internet_sources__fuse-libretro__src__compat__sound.c.o
+```
+
+Relink:
+
+```powershell
+$objs = Get-ChildItem -Path $outdir -Filter '*.o' | Sort-Object Name |
+  ForEach-Object { $_.FullName }
+
+& $zig cc -target mipsel-linux-gnu -march=mips32r2 -shared -nostdlib `
+  -Wl,--gc-sections -Wl,--strip-all -Wl,--discard-all `
+  -Wl,-soname,libemu_fuse.so `
+  -Wl,-version-script=homebrew\fuse_zx48\r36sx_link.T `
+  -o homebrew\fuse_zx48\libemu_fuse.so @objs
+```
+
+Output:
+
+```text
+homebrew/fuse_zx48/libemu_fuse.so
+size:   2254248
+sha256: FAE075F3F90E5B5E459455AA5082DB1EB849A11B31A252B86DEAFA6D2655B837
+NEEDED: empty
+undefined dynamic symbols: 75
+```
+
 ## Patch Directory Creation
 
 The working image copy is updated with:
@@ -385,10 +456,10 @@ Copy-Item -LiteralPath .\homebrew\fuse_zx48\libemu_fuse.so `
   -Force
 ```
 
-The test overlay is:
+The current test overlay is:
 
 ```text
-disk_image_patch_012
+disk_image_patch_015
 ```
 
 It contains:

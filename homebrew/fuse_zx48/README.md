@@ -9,10 +9,11 @@ Experimental ZX Spectrum 48K libretro core for the `cubegm/rkgame` launcher.
 - `R36SX_ZX48.tap`: tiny generated autostart BASIC test tape.
 - `BUILD_LOG.md`: source, build, verification, and risk notes.
 - `BUILD_COMMANDS.md`: repeatable command-level build notes.
+- `r36sx_loading_guard.patch`: device-facing guard for the `Loading` hang.
 
 ## Install
 
-Use `disk_image_patch_013` to copy the ready files into the SD/image.
+Use `disk_image_patch_015` to copy the ready files into the SD/image.
 
 The first test entry appears in the existing `ATARI` menu as:
 
@@ -63,4 +64,16 @@ C/POSIX symbols that must be visible from the already-running process or loader.
 It does define local `exit()` and `abort()` traps so Fuse error paths should not
 terminate the launcher process directly.
 
-Use `disk_image_patch_013` for the next device test.
+## Loading Guard Build
+
+`disk_image_patch_013` hung on the stock `Loading` screen. The most likely
+cause is Fuse's `retro_run()` waiting forever for `some_audio` before returning
+the first frame. `disk_image_patch_015` adds `r36sx_loading_guard.patch`:
+
+- keep `retro_run()` bounded if no audio frame arrives;
+- store and use the single-sample audio callback as a fallback;
+- avoid calling a null audio batch callback;
+- return a safe default 320x240 AV geometry before Fuse has initialized;
+- skip video submit if geometry/callbacks are not ready yet.
+
+Use `disk_image_patch_015` for the next device test.
