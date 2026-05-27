@@ -169,6 +169,39 @@ ARM `.so` выбиваются из общей архитектуры и, ско
 - В строках `rkgame` есть признаки libretro-like API: `retro_*`, save states, screenshots, настройки, PCSX/PSX, FBA/MAME/SNES/GBA/MD/FC и т.д.
 - `disk_image\cubegm\setting.xml` содержит пользовательские настройки, hotkeys и пути ресурсов.
 
+### Кнопка Fn и hotkeys
+
+Fn явно фигурирует в пользовательских настройках:
+
+- `disk_image\cubegm\setting.xml`
+  - `<gamemenuhotkey>SELECT+START</gamemenuhotkey>`
+  - `<quicksavehotkey>FN+A</quicksavehotkey>`
+  - `<quickloadhotkey>FN+B</quickloadhotkey>`
+  - `<quicksnaphotkey>FN+START</quicksnaphotkey>`
+  - `<savestatehotkey>DISABLE</savestatehotkey>`
+
+Fn также есть в device tree:
+
+- `disk_image\cubegm\dtb.bin` и маскированный дубликат `disk_image\cubegm\Bubbles.scr`
+  - `/panel/key-fn = 0x00000002`
+  - рядом описаны `/panel/key-do = 0x00000009`, `key-clk = 0x00000008`,
+    `key-tl1 = 0x0000000b`, `key-tr1 = 0x00000007`,
+    `key-shoulder-left = 0x0000000b`, `key-shoulder-right = 0x00000007`,
+    `key-volume-down = 0x0000000c`, `key-volume-up = 0x0000000d`.
+
+Строки `rkgame` содержат имена `quicksavehotkey`, `quickloadhotkey`,
+`quicksnaphotkey`, `savestatehotkey`, `GameMenuHotKey`, `KeyMapping`,
+`KeyName`, `SetKeyMap` и `gpio_get_input`. Это похоже на обработку Fn как
+frontend/system-модификатора, а не как обычной libretro-кнопки. `driver.so` и
+`MyExecutable` также содержат `/tmp/joy_key`/`gpio_get_input`; `MyExecutable`
+читает несколько `/proc/device-tree/panel/key-*` свойств, но строка
+`/proc/device-tree/panel/key-fn` в нем не нашлась.
+
+Практический вывод: Fn аппаратно описана и используется настройками launcher-а
+для quicksave/quickload/screenshot. Для homebrew cores ее надо проверять
+отдельным raw-scanner модулем: возможно, launcher перехватывает Fn-комбинации
+до вызова `retro_input_state()`.
+
 ## Найденные публичные исходники/SDK
 
 В `internet_sources\hcrtos` лежит найденный публичный SDK/исходники HCRTOS.
