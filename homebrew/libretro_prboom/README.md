@@ -19,9 +19,12 @@ homebrew/libretro_prboom/prboom_libretro.so
 Patch overlay output:
 
 ```text
-disk_image_patch_019/cubegm/cores/libemu_prboom.so
-disk_image_patch_019/cubegm/cores/system/prboom/prboom.wad
-disk_image_patch_019/GB/freedoom1.wad
+disk_image_patch_020/cubegm/cores/libemu_prboom.so
+disk_image_patch_020/cubegm/cores/system/prboom/prboom.wad
+disk_image_patch_020/GB/prboom.wad
+disk_image_patch_020/GB/doom1.wad
+disk_image_patch_020/GB/doom.m3u
+disk_image_patch_020/GB/freedoom1.wad
 ```
 
 ## Runtime files
@@ -39,7 +42,7 @@ The libretro core searches runtime WAD files in this order:
 
 For the current launcher experiments, the safest route is still the existing
 Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
-`disk_image_patch_019` includes overrides for:
+`disk_image_patch_020` includes overrides for:
 
 ```xml
 <file name="GB/doom1.wad" core="libemu_prboom.so" />
@@ -47,16 +50,19 @@ Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
 <file name="GB/doom.m3u" core="libemu_prboom.so" />
 ```
 
-`disk_image_patch_019` also includes `GB/filelist.csv` rows for those test
-entries and bundles the free `freedoom1.wad` from Freedoom 0.13.0. The bundled
-entry is:
+`disk_image_patch_020` also includes `GB/filelist.csv` rows for those test
+entries, bundles the free `freedoom1.wad` from Freedoom 0.13.0, and adds a
+smaller Doom shareware IWAD from the idgames archive. Recommended device test
+order:
 
 ```text
-freedoom1.wad,Freedoom Phase 1,Freedoom Phase 1
+Doom Shareware
+Doom Playlist
+Freedoom Phase 1
 ```
 
-For commercial Doom, copy a legal IWAD into `GB/` using one of the other names,
-for example `doom1.wad`.
+`GB/prboom.wad` is also copied next to the WADs so PRBoom can find its support
+data even if the frontend does not provide a useful system directory.
 
 ## Build
 
@@ -74,7 +80,8 @@ GLIBC versions through `GLIBC_2.19`. The hybrid route keeps the output to
 
 ## Current status
 
-The core builds and links as an ELF32 MIPS shared object. `disk_image_patch_019`
-adds the R36SX vendor exports `check_encrypty`, `CheckEncrypty`, and
-`SetFrameSkip`, and includes a free IWAD for first device testing. This rebuild
-has not yet been physical-device tested in this workspace.
+The core builds and links as an ELF32 MIPS shared object. `disk_image_patch_020`
+keeps the R36SX vendor exports `check_encrypty`, `CheckEncrypty`, and
+`SetFrameSkip`, includes free/test IWAD files, and puts `prboom.wad` next to the
+loaded WAD. This patch has not yet been physical-device tested in this
+workspace.

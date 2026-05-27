@@ -245,3 +245,75 @@ Patch directory:
 ```text
 disk_image_patch_019
 ```
+
+## 2026-05-27 WAD adjacency and Doom shareware test patch
+
+Device result:
+
+```text
+Doom Shareware: did not start.
+Freedoom Phase 1: showed Loading..., then black screen, then returned to launcher.
+Doom Playlist: did not start.
+```
+
+Interpretation:
+
+`Doom Shareware` and `Doom Playlist` were menu/config entries only; the files
+`GB\doom1.wad` and `GB\doom.m3u` were not present in patch 019. `Freedoom
+Phase 1` did start loading, so the PRBoom core is being selected, but it still
+fails during early engine/content initialization.
+
+Changes in `disk_image_patch_020`:
+
+```text
+GB\doom1.wad
+GB\doom.m3u
+GB\prboom.wad
+GB\doom-1.8.wad.txt
+```
+
+`GB\prboom.wad` duplicates the support WAD next to the loaded content, avoiding
+reliance on `RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY`.
+
+Official idgames downloads:
+
+```powershell
+Invoke-WebRequest -Uri https://www.gamers.org/pub/idgames/idstuff/doom/doom19s.zip -OutFile .\internet_sources\doom_shareware\doom19s.zip
+Invoke-WebRequest -Uri https://www.gamers.org/pub/idgames/idstuff/doom/doom-1.8.wad.gz -OutFile .\internet_sources\doom_shareware\doom-1.8.wad.gz
+Invoke-WebRequest -Uri https://www.gamers.org/pub/idgames/idstuff/doom/doom-1.8.wad.txt -OutFile .\internet_sources\doom_shareware\doom-1.8.wad.txt
+```
+
+The older `doom19s.zip` package was scanned and extracted only far enough to
+inspect its contents. It contains a DOS `DEICE.EXE` installer plus data slices,
+so it was not used for the patch. The patch instead uses the directly
+available gzip-compressed IWAD.
+
+Download verification:
+
+```text
+doom19s.zip size: 2,450,688 bytes
+doom19s.zip SHA256: CACF0142B31CA1AF00796B4A0339E07992AC5F21BC3F81E7532FE1B5E1B486E6
+doom19s.zip Defender scan: found no threats
+DEICE.EXE Defender scan: found no threats
+
+doom-1.8.wad.gz size: 1,756,050 bytes
+doom-1.8.wad.gz SHA256: 58CF6A563B631A47561630AFA6276D853C27079342F7969EC3006965DA8557A1
+doom-1.8.wad.gz Defender scan: found no threats
+```
+
+Patch IWAD verification:
+
+```text
+doom1.wad size: 4,196,020 bytes
+doom1.wad SHA256: BB449C7480E9A02A62012D041406E8E43DAA51CAA0650646D1307D8650B8F837
+doom1.wad header: IWAD
+doom1.wad Defender scan: found no threats
+prboom.wad SHA256: B4DD3642932193CC42BCA0EE98BF30004888CA4850D69E85023B8BAACFBA1D1D
+doom.m3u contents: doom1.wad
+```
+
+Patch directory:
+
+```text
+disk_image_patch_020
+```

@@ -1,0 +1,4 @@
+
+This is the doom1.wad file, v1.8.  You should only use this with
+Solaris DOOM right now.
+
