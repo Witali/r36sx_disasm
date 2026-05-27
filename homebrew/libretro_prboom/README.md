@@ -19,9 +19,9 @@ homebrew/libretro_prboom/prboom_libretro.so
 Patch overlay output:
 
 ```text
-disk_image_patch_018/cubegm/cores/libemu_prboom.so
-disk_image_patch_018/cubegm/cores/system/prboom/prboom.wad
-disk_image_patch_018/GB/freedoom1.wad
+disk_image_patch_019/cubegm/cores/libemu_prboom.so
+disk_image_patch_019/cubegm/cores/system/prboom/prboom.wad
+disk_image_patch_019/GB/freedoom1.wad
 ```
 
 ## Runtime files
@@ -39,7 +39,7 @@ The libretro core searches runtime WAD files in this order:
 
 For the current launcher experiments, the safest route is still the existing
 Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
-`disk_image_patch_018` adds overrides for:
+`disk_image_patch_019` includes overrides for:
 
 ```xml
 <file name="GB/doom1.wad" core="libemu_prboom.so" />
@@ -47,7 +47,7 @@ Game Boy menu path with a core override in `cubegm/cores/filelist.xml`.
 <file name="GB/doom.m3u" core="libemu_prboom.so" />
 ```
 
-`disk_image_patch_018` also includes `GB/filelist.csv` rows for those test
+`disk_image_patch_019` also includes `GB/filelist.csv` rows for those test
 entries and bundles the free `freedoom1.wad` from Freedoom 0.13.0. The bundled
 entry is:
 
@@ -74,6 +74,7 @@ GLIBC versions through `GLIBC_2.19`. The hybrid route keeps the output to
 
 ## Current status
 
-The core builds and links as an ELF32 MIPS shared object. `disk_image_patch_018`
-now includes a free IWAD for first device testing, but the core has not yet been
-physical-device tested in this workspace.
+The core builds and links as an ELF32 MIPS shared object. `disk_image_patch_019`
+adds the R36SX vendor exports `check_encrypty`, `CheckEncrypty`, and
+`SetFrameSkip`, and includes a free IWAD for first device testing. This rebuild
+has not yet been physical-device tested in this workspace.

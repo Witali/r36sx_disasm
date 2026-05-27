@@ -192,3 +192,56 @@ freedoom1.wad size: 28,795,076 bytes
 freedoom1.wad SHA256: 7323BCC168C5A45FF10749B339960E98314740A734C30D4B9F3337001F9E703D
 Defender scan: found no threats
 ```
+
+## 2026-05-27 R36SX export compatibility rebuild
+
+Reason:
+
+The physical device test of the first PRBoom overlay showed a black screen and
+returned to the launcher. The generated PRBoom core exported only `retro_*`
+symbols because upstream `libretro/link.T` hides every other symbol. Working
+local cores export three extra vendor-facing hooks:
+
+```text
+check_encrypty
+CheckEncrypty
+SetFrameSkip
+```
+
+The earlier Ghidra analysis of stock cores showed that `check_encrypty()` must
+return non-zero for the launcher path to continue.
+
+Changes:
+
+```text
+homebrew\libretro_prboom\r36sx_compat.c
+homebrew\libretro_prboom\r36sx_link.T
+homebrew\libretro_prboom\build_prboom.ps1
+```
+
+`r36sx_compat.c` implements `check_encrypty()` and `CheckEncrypty(...)` with a
+return value of `1`, matching Button Demo and Pong. `r36sx_link.T` exports
+those symbols plus `SetFrameSkip`.
+
+Build command:
+
+```powershell
+.\homebrew\libretro_prboom\build_prboom.ps1
+```
+
+Verification:
+
+```text
+Path: homebrew\libretro_prboom\prboom_libretro.so
+Size: 1,630,504 bytes
+SHA256: 408280389E3853468A10A227E5FBA282A7BC41BA04A9DD410B2A7E9FF5B6757F
+Required export strings: check_encrypty, CheckEncrypty, SetFrameSkip
+GLIBC strings: GLIBC_2.0, GLIBC_2.2, GLIBC_2.3, GLIBC_2.7, GLIBC_2.15
+Defender scan: found no threats
+```
+
+Patch directory:
+
+```text
+disk_image_patch_019
+```

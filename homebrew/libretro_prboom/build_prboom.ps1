@@ -14,6 +14,8 @@ $out = Join-Path $repo $OutFile
 $objdirPath = Join-Path $repo $ObjDir
 $cc = (Resolve-Path $Zig).Path
 $sysrootPath = (Resolve-Path $Sysroot).Path
+$compatSrc = Join-Path $repo "homebrew\libretro_prboom\r36sx_compat.c"
+$versionScript = Join-Path $repo "homebrew\libretro_prboom\r36sx_link.T"
 
 $env:ZIG_GLOBAL_CACHE_DIR = (Resolve-Path ".\tools\zig-global-cache").Path
 $env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path ".\tools\zig-cache").Path
@@ -82,6 +84,25 @@ foreach ($src in $srcs) {
     $objects += $obj
 }
 
+$compatObj = Join-Path $objdirPath "r36sx_compat.c.o"
+$compatFlags = @(
+    "cc",
+    "-target", "mipsel-linux-gnu",
+    "--sysroot", $sysrootPath,
+    "-march=mips32r2",
+    "-O2",
+    "-fPIC",
+    "-Wall",
+    "-Wextra",
+    "-std=c99"
+)
+Write-Host "  homebrew\libretro_prboom\r36sx_compat.c"
+& $cc @compatFlags -c $compatSrc -o $compatObj
+if ($LASTEXITCODE -ne 0) {
+    throw "compile failed: r36sx_compat.c"
+}
+$objects += $compatObj
+
 Set-Content -Encoding ASCII -Path (Join-Path $objdirPath "objects.txt") -Value $objects
 
 Push-Location $root
@@ -93,7 +114,7 @@ try {
         -march=mips32r2 `
         -shared `
         -fPIC `
-        "-Wl,--version-script=libretro/link.T" `
+        "-Wl,--version-script=$versionScript" `
         "-Wl,--no-undefined" `
         "-Wl,--as-needed" `
         "-Wl,-s" `

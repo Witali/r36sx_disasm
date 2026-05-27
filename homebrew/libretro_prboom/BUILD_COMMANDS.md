@@ -29,6 +29,8 @@ The script:
 - reads `internet_sources/libretro-prboom/Makefile.common`;
 - excludes the optional FluidSynth block;
 - compiles 101 C files into `homebrew/libretro_prboom/obj`;
+- compiles `homebrew/libretro_prboom/r36sx_compat.c` for the vendor launcher
+  hooks;
 - links `homebrew/libretro_prboom/prboom_libretro.so`;
 - prints size and SHA256.
 
@@ -62,7 +64,7 @@ Important linker flags:
 -march=mips32r2
 -shared
 -fPIC
--Wl,--version-script=libretro/link.T
+-Wl,--version-script=homebrew/libretro_prboom/r36sx_link.T
 -Wl,--no-undefined
 -Wl,--as-needed
 -Wl,-s
@@ -86,4 +88,12 @@ The dynamic section was parsed with a small PowerShell ELF reader; final
 
 ```text
 libm.so.6, libc.so.6
+```
+
+Required R36SX export strings:
+
+```text
+check_encrypty
+CheckEncrypty
+SetFrameSkip
 ```
