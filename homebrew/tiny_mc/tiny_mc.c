@@ -10,6 +10,7 @@
 #define _GNU_SOURCE
 #define DEBUG 1
 #define USE_ICUBE_HEARTBEAT 0
+#define ENABLE_FN_ICUBE_SHORTCUT 0
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -70,8 +71,11 @@ enum button_bits {
     BTN_A_BIT = 1u << 4,
     BTN_B_BIT = 1u << 5,
     BTN_START_BIT = 1u << 6,
-    BTN_SELECT_BIT = 1u << 7,
+    BTN_SELECT_BIT = 1u << 7
+#if ENABLE_FN_ICUBE_SHORTCUT
+    ,
     BTN_FN_BIT = 1u << 8
+#endif
 };
 
 struct fb_bitfield_local {
@@ -259,11 +263,13 @@ static int g_entry_count;
 static int g_selected;
 static int g_scroll;
 static char g_cwd[PATH_MAX] = "/mnt/sdcard";
-static char g_status[256] = "A/Start runs a file. FN starts iCube.";
+static char g_status[256] = "A/Start runs a file. Right/A enters a directory.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+#if ENABLE_FN_ICUBE_SHORTCUT
 static int g_fn_shortcut_armed;
+#endif
 #if DEBUG
 static int g_log_fd = -1;
 static char g_log_path[PATH_MAX];
@@ -1082,9 +1088,11 @@ static uint32_t input_translate_rkgame_keys(uint32_t raw)
     if ((raw & R36SX_RKGAME_KEY_SELECT) != 0) {
         b |= BTN_SELECT_BIT;
     }
+#if ENABLE_FN_ICUBE_SHORTCUT
     if ((raw & R36SX_RKGAME_KEY_FN) != 0) {
         b |= BTN_FN_BIT;
     }
+#endif
 
     return b;
 }
@@ -1349,7 +1357,7 @@ static void draw_ui(void)
     draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
-              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK  FN iCube",
+              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK",
               rgb565(230, 240, 220), 1, g_fb.width - 24);
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 
@@ -1481,6 +1489,7 @@ static void launch_selected(void)
     scan_directory();
 }
 
+#if ENABLE_FN_ICUBE_SHORTCUT
 static void launch_icube(void)
 {
     int err;
@@ -1505,6 +1514,7 @@ static void launch_icube(void)
     display_open();
     input_open_devices();
 }
+#endif
 
 static void choose_start_dir(int argc, char **argv)
 {
@@ -1533,6 +1543,7 @@ static void handle_buttons(uint32_t buttons)
                 buttons, changed, buttons ^ g_prev_buttons);
     }
 
+#if ENABLE_FN_ICUBE_SHORTCUT
     if ((buttons & BTN_FN_BIT) == 0) {
         if (!g_fn_shortcut_armed) {
             log_msg("FN shortcut armed after release");
@@ -1546,6 +1557,7 @@ static void handle_buttons(uint32_t buttons)
         }
         log_msg("FN startup state ignored until release");
     }
+#endif
 
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {
         if (g_selected > 0) {

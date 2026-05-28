@@ -298,6 +298,8 @@ Notable patch history:
   `MIPS_NATIVE/pong/pong` for launch directly from Tiny MC.
 - `disk_image_patch_036`: fixes the Tiny MC Fn shortcut so an initially raised
   Fn bit is ignored until Fn has been released once.
+- `disk_image_patch_037`: disables Tiny MC Fn handling entirely and documents
+  the original `icube` supervisor structure.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -310,6 +312,7 @@ Tracked or intentionally small project files:
 - `FIRMWARE_FINDINGS.md`: main firmware and architecture findings.
 - `POWER_MANAGEMENT_ANALYSIS.md`: power management, `usleep`, standby, and idle
   behavior notes.
+- `ICUBE_ANALYSIS.md`: original `icube` launch and watchdog structure.
 - `RELATED_PROJECTS.md`: public project links and research references.
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/`: source and build logs for custom modules.

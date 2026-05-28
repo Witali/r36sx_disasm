@@ -116,10 +116,8 @@ and route `cubegm\icube_start.sh` directly to:
 ```
 
 This bypasses `icube`; if Tiny MC hangs, there is no `icube` supervisor restart.
-Pressing Fn from Tiny MC closes Tiny MC and starts `/mnt/sdcard/cubegm/icube`,
-which in turn launches the stock `cubegm/rkgame`.
-To avoid an immediate jump to `icube` on startup, the Fn shortcut is armed only
-after Tiny MC has first observed Fn released.
+Fn handling is currently disabled in Tiny MC. The binary should not contain the
+`/mnt/sdcard/cubegm/icube` path or treat Fn as a command.
 
 ## Native Program Folder
 
