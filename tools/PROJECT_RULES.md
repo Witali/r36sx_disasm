@@ -68,3 +68,14 @@ pile up.
 Push less often than commit. Default cadence: push after about three local
 commits, or sooner when the user explicitly asks for `git push`, when a remote
 backup is important, or before a risky next step.
+
+## Native App Exit Rule
+
+Rule: native Tiny MC applications should use `Select + Start` held together as
+the standard exit gesture.
+
+This avoids accidental exits from a single `Select` press and gives native apps
+a consistent escape hatch independent of app-specific controls. `Fn` may remain
+as a secondary hardware escape when it is already supported or useful for device
+testing, but new native app behavior should not depend on `Fn` as the only exit
+path.

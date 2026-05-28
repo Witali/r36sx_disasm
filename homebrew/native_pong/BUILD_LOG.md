@@ -205,3 +205,57 @@ Defender scan homebrew\native_pong\pong: found no threats
 Defender scan patches\disk_image_patch_046: found no threats
 Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
 ```
+
+## 2026-05-28 unified Pong source and Select+Start exit rebuild
+
+Purpose:
+
+Make native Pong and libretro Pong share one source file, and apply the native
+app exit rule: hold `Select + Start` together to exit. `Fn` remains a secondary
+hardware escape.
+
+Source layout:
+
+```text
+homebrew\pong\pong.c
+```
+
+Target selection:
+
+```text
+R36SX_PONG_TARGET=1  libretro core for rkgame
+R36SX_PONG_TARGET=2  native Tiny MC executable using driver.so
+```
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_047
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_047\MIPS_NATIVE\pong\pong
+patches\disk_image_patch_047\MIPS_NATIVE\pong\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: YOU WIN, YOU LOSE, /mnt/sdcard/cubegm/driver.so, sound_driver_init, sound_driver_playframe, cube_ioctl
+Does not contain string: /dev/auddec
+Does not contain string: retro_run
+ELF: class=1, data=1, type=2, machine=8, interpreter /lib/ld.so.1
+Size: 17844 bytes
+SHA256: C0B64C219BFDD16ACE0E41E945931AB4E04CC61F21F230B60ED06690AD701FF9
+Defender scan homebrew\native_pong\pong: found no threats
+Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
+Defender scan patches\disk_image_patch_047: found no threats
+```

@@ -1,6 +1,8 @@
 # Native Pong
 
 Standalone MIPS32 little-endian Pong executable for Tiny MC.
+Its game logic is shared with the libretro core in `homebrew/pong/pong.c`; this
+build compiles that source with `R36SX_PONG_TARGET=2`.
 
 Unlike `homebrew/libretro_pong/libemu_pong.so`, this program is not a libretro
 core. It has a normal `main()` and Tiny MC can launch it directly with
@@ -14,7 +16,8 @@ core. It has a normal `main()` and Tiny MC can launch it directly with
 - Start: pause.
 - A while paused: reset.
 - A or Start after `YOU WIN` / `YOU LOSE`: new game.
-- Select or Fn: exit back to Tiny MC.
+- Select + Start together: exit back to Tiny MC.
+- Fn: secondary hardware escape back to Tiny MC.
 
 If the right paddle is not controlled manually, a small built-in AI follows the
 ball. The left player wins when the left score reaches 9. If the right side

@@ -186,3 +186,56 @@ SHA256: A769CA8D5710D4863D0348E7ECC8F41C9CD28CC3F14505F4E934014AFC782EA4
 Binary contents remained identical to the previous shared-header rebuild.
 Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
 ```
+
+## 2026-05-28 unified Pong source rebuild
+
+Purpose:
+
+Make libretro Pong and native Pong share one source file instead of keeping two
+diverging game implementations.
+
+Source layout:
+
+```text
+homebrew\pong\pong.c
+```
+
+Target selection:
+
+```text
+R36SX_PONG_TARGET=1  libretro core for rkgame
+R36SX_PONG_TARGET=2  native Tiny MC executable using driver.so
+```
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -DR36SX_PONG_TARGET=1 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\pong\pong.c
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_047
+```
+
+Patch file:
+
+```text
+patches\disk_image_patch_047\cubegm\cores\libemu_pong.so
+```
+
+Verification:
+
+```text
+Contains strings: retro_run, retro_load_game, retro_set_audio_sample_batch, check_encrypty, CheckEncrypty, YOU WIN, YOU LOSE
+Does not contain strings: libc.so, ld-linux, __ubsan, /dev/auddec
+ELF: class=1, data=1, type=3, machine=8
+Size: 36436 bytes
+SHA256: F8A114C8D5CE9A34DF06521A2FA69D611176DDB901FCBE52E3290C18E811AC7D
+Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
+Defender scan disk_image\cubegm\cores\libemu_pong.so: found no threats
+Defender scan patches\disk_image_patch_047: found no threats
+```

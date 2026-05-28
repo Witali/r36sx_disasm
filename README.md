@@ -155,7 +155,7 @@ presses.
 A small Pong-style game module was built using the same no-libc libretro-style
 shell as Button Demo:
 
-- Source: [`homebrew/libretro_pong/pong.c`](homebrew/libretro_pong/pong.c)
+- Shared source: [`homebrew/pong/pong.c`](homebrew/pong/pong.c)
 - Notes: [`homebrew/libretro_pong/README.md`](homebrew/libretro_pong/README.md)
 - Build log: [`homebrew/libretro_pong/BUILD_LOG.md`](homebrew/libretro_pong/BUILD_LOG.md)
 - Built module: `homebrew/libretro_pong/libemu_pong.so`
@@ -169,15 +169,15 @@ generated tones.
 
 A standalone Pong executable was added for direct launch from Tiny MC:
 
-- Source: [`homebrew/native_pong/native_pong.c`](homebrew/native_pong/native_pong.c)
+- Shared source: [`homebrew/pong/pong.c`](homebrew/pong/pong.c)
 - Notes: [`homebrew/native_pong/README.md`](homebrew/native_pong/README.md)
 - Build log: [`homebrew/native_pong/BUILD_LOG.md`](homebrew/native_pong/BUILD_LOG.md)
 - Build script: `homebrew/native_pong/build_native_pong.ps1`
 - Built executable: `homebrew/native_pong/pong`
 
 Unlike the older `libemu_pong.so`, this is a normal MIPS executable with
-`main()`. It uses `driver.so` for display/input and exits back to Tiny MC on
-Select or Fn.
+`main()`. It uses `driver.so` for display/input and exits back to Tiny MC when
+Select and Start are held together; Fn remains a secondary hardware escape.
 
 ### Native Button Demo
 
@@ -336,6 +336,9 @@ Notable patch history:
 - `disk_image_patch_046`: rebuilds native Pong and native Button Demo so their
   generated sounds use `driver.so` `sound_driver_playframe`, matching the stock
   `rkgame` LibRetro audio path instead of writing to `/dev/auddec` directly.
+- `disk_image_patch_047`: rebuilds both libretro and native Pong from the
+  single shared source under `homebrew/pong/pong.c` and changes native Pong to
+  the standard `Select + Start` exit gesture.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -354,6 +357,9 @@ Tracked or intentionally small project files:
 - `RELATED_PROJECTS.md`: public project links and research references.
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/`: source and build logs for custom modules.
+  - `homebrew/pong/pong.c`: unified Pong source compiled as either libretro
+    (`R36SX_PONG_TARGET=1`) or native Tiny MC
+    (`R36SX_PONG_TARGET=2`).
   - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
     firmware constants used by homebrew programs.
   - `homebrew/common/libretro_hardware.h`: libretro-specific screen/audio

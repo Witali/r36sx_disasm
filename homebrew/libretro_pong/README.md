@@ -1,6 +1,9 @@
 # libretro Pong demo
 
 Small Pong-style libretro core for the MIPS32 little-endian `cubegm` launcher.
+Its game logic is shared with the native Tiny MC build in
+`homebrew/pong/pong.c`; this build compiles that source with
+`R36SX_PONG_TARGET=1`.
 
 This is based on the proven Button Demo integration pattern:
 
@@ -25,7 +28,7 @@ From the repository root on the current Windows workspace:
 ```powershell
 $env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
 $env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
-.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\libretro_pong\pong.c
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -DR36SX_PONG_TARGET=1 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\pong\pong.c
 ```
 
 Expected output:

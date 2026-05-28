@@ -5,7 +5,7 @@ $Zig = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\zig.exe"
 $ZigInclude = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\lib\include"
 $Out = Join-Path $PSScriptRoot "pong"
 $Obj = Join-Path $PSScriptRoot "native_pong.o"
-$Src = Join-Path $PSScriptRoot "native_pong.c"
+$Src = Join-Path $Root "homebrew\pong\pong.c"
 $Sysroot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot"
 $SysrootInclude = Join-Path $Sysroot "usr\include"
 $SysrootLib = Join-Path $Sysroot "lib"
@@ -30,6 +30,7 @@ $env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path (Join-Path $Root "tools\zig-cache")).Pa
     -Wall `
     -Wextra `
     -std=c99 `
+    -DR36SX_PONG_TARGET=2 `
     -c `
     -o $Obj `
     $Src
