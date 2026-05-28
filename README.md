@@ -329,6 +329,8 @@ Notable patch history:
   `/mnt/sdcard/cubegm/icube` directly, with startup Fn-release arming.
 - `disk_image_patch_043`: adds native Button Demo under
   `MIPS_NATIVE/button_demo/button_demo` for launch directly from Tiny MC.
+- `disk_image_patch_044`: restores sound in native Pong and native Button Demo
+  through the stock `/dev/auddec` audio packet path.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -351,6 +353,8 @@ Tracked or intentionally small project files:
     firmware constants used by homebrew programs.
   - `homebrew/common/libretro_hardware.h`: libretro-specific screen/audio
     cadence constants layered on top of `hardware.h`.
+  - `homebrew/common/native_audio.h`: minimal `/dev/auddec` PCM packet helper
+    for standalone Tiny MC programs.
 - `patches/`: copyable patch overlays and patch application notes.
 - `patches/disk_image_patch_tiny_mc`: consolidated install overlay for the
   current Tiny MC boot route and Fn-to-iCube behavior.

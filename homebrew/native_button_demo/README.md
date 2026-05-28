@@ -38,5 +38,5 @@ MIPS_NATIVE\button_demo\button_demo
 ```
 
 This native build uses `/mnt/sdcard/cubegm/driver.so` for display and controls.
-The old libretro build's generated audio is not included here because native
-Tiny MC children do not receive libretro audio callbacks.
+It plays a short generated button sound through `/dev/auddec`, following the
+same packet model that `hcprojector` uses for its UI WAV effects.

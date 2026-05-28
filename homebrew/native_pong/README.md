@@ -40,5 +40,7 @@ For Tiny MC, copy it to:
 MIPS_NATIVE\pong\pong
 ```
 
-The program uses `/mnt/sdcard/cubegm/driver.so` for display and controls, and
-returns to Tiny MC when it exits.
+The program uses `/mnt/sdcard/cubegm/driver.so` for display and controls. It
+plays generated bounce, score, pause, win, and lose sounds through `/dev/auddec`,
+following the same packet model that `hcprojector` uses for its UI WAV effects.
+It returns to Tiny MC when it exits.

@@ -141,6 +141,27 @@ main loop after about 80 iterations. This matches our earlier observation that
 custom replacements need to keep both the `icube` heartbeat and the hardware
 watchdog behavior in mind.
 
+## UI Sound Path
+
+The stock `icube` supervisor does not play sounds itself. The useful reference
+for native application sound is `hcprojector`'s small UI WAV path.
+
+Ghidra export `ghidra_exports/hcprojector/decompiled_all.c` shows:
+
+- `FUN_00419d60()` opens `/dev/auddec`.
+- It initializes a PCM decoder with ioctl `0x82780301` and starts it with
+  ioctl `0x20000304`.
+- The `cube_wav` worker writes a packed `AvPktHd` header followed by PCM/WAV
+  payload data.
+- Stock UI files include `PageBack_media.wav`, `PressYesNo_media.wav`,
+  `MoveYesNo_media.wav`, `FlyIn_V_media.wav`, and `SelectGame_media.wav` under
+  `/mnt/sdcard/cubegm`.
+
+`homebrew/common/native_audio.h` reuses this `/dev/auddec` packet model for
+standalone Tiny MC programs. It generates short PCM effects in-process, so
+native Pong and native Button Demo do not depend on libretro audio callbacks or
+external WAV assets.
+
 ## Transition to RKGame
 
 The game transition is implemented as a vendor-specific extension in the stock

@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "../common/hardware.h"
+#include "../common/native_audio.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -73,6 +74,7 @@ static unsigned g_color_index;
 static int g_checker;
 static uint32_t g_prev_buttons;
 static char g_button_log[LOG_LINES][LOG_TEXT_LEN];
+static struct r36sx_audio_state g_audio;
 
 static void display_close(void);
 
@@ -434,6 +436,9 @@ static void tick_demo(uint32_t buttons)
     uint32_t changed = buttons & ~g_prev_buttons;
 
     log_pressed_buttons(changed);
+    if (changed != 0) {
+        r36sx_audio_play_button(&g_audio);
+    }
 
     if ((buttons & BTN_LEFT_BIT) != 0) {
         g_square_x -= 3;
@@ -482,6 +487,7 @@ int main(void)
         display_close();
         return 1;
     }
+    r36sx_audio_init(&g_audio);
 
     memset(g_button_log, 0, sizeof(g_button_log));
     copy_label(g_button_log[0], "PRESS BUTTONS");
@@ -496,10 +502,12 @@ int main(void)
             tick_demo(buttons);
             draw_frame();
             present_frame();
+            r36sx_audio_update(&g_audio);
             usleep(FRAME_USEC);
         }
     }
 
+    r36sx_audio_close(&g_audio);
     display_close();
     return 0;
 }

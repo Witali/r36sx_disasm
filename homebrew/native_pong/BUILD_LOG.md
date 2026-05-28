@@ -99,3 +99,59 @@ SHA256: 9C9FBA430AFB47B1685BEC13B524CC877C6BB4CE301816AAA33619C30AB8C650
 Defender scan homebrew\native_pong\pong: found no threats
 Defender scan disk_image_patch_041\MIPS_NATIVE\pong\pong: found no threats
 ```
+
+## 2026-05-28 native /dev/auddec audio rebuild
+
+Purpose:
+
+Restore Pong sound in the standalone Tiny MC executable. The original libretro
+Pong sound went through `rkgame` audio callbacks, but the native Tiny MC child
+process does not have those callbacks.
+
+Firmware audio reference:
+
+- `ghidra_exports/icube/decompiled_all.c` shows `icube` is only a supervisor
+  for `rkgame`; it does not play audio.
+- `ghidra_exports/hcprojector/decompiled_all.c` shows the stock UI sound path:
+  open `/dev/auddec`, ioctl `0x82780301` for init, ioctl `0x20000304` for
+  start, then write `AvPktHd` + PCM payload packets.
+
+Implementation:
+
+- Added `homebrew/common/native_audio.h`.
+- Pong now plays generated sounds for wall/paddle bounces, score changes,
+  pause/reset, and win/lose states.
+- The audio helper uses generated 44.1 kHz stereo PCM and does not require
+  external WAV files.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_044
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_044\MIPS_NATIVE\pong\pong
+patches\disk_image_patch_044\MIPS_NATIVE\pong\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: YOU WIN, YOU LOSE, /mnt/sdcard/cubegm/driver.so, /dev/auddec, cube_ioctl
+Does not contain string: retro_run
+ELF: class=1, data=1, type=2, machine=8, interpreter /lib/ld.so.1
+Size: 19256 bytes
+SHA256: 8C9E69A38B24F8B9CF054B31A80065A952E9B497A00E810EEBBE1D62948514B0
+Defender scan homebrew\native_pong\pong: found no threats
+Defender scan patches\disk_image_patch_044\MIPS_NATIVE\pong\pong: found no threats
+Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
+```
