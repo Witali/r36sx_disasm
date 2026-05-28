@@ -384,3 +384,41 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 BIOS INT 10h text services
+
+Added missing text-mode BIOS services to the patched CPU source so BIOS and DOS
+boot screens can print through standard `INT 10h` calls instead of relying only
+on direct video-memory writes.
+
+Implemented services:
+
+- `AH=01h`: set cursor shape.
+- `AH=02h`: set cursor position.
+- `AH=03h`: read cursor position and shape.
+- `AH=06h` / `AH=07h`: scroll or clear text window.
+- `AH=08h`: read character and attribute at cursor.
+- `AH=09h` / `AH=0Ah`: write character with/without explicit attribute.
+- `AH=0Eh`: teletype output with CR/LF/backspace/tab handling.
+- `AH=0Fh`: read video mode, columns, and active page.
+- `AH=13h`: write string from `ES:BP`.
+- normal `AH=05h`: active page selection.
+
+Also corrected the text-mode renderer so 40/80-column modes read characters
+and attributes from logical `VIDEORAM` cells, matching upstream Win32 renderer
+semantics.  The previous byte-pointer cast could read from the wrong layout and
+hide text that was present in emulated video memory.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,917,604 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

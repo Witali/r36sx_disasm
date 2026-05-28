@@ -518,6 +518,33 @@ int main() {')
     $Text = $Text.Replace("VIDEORAM + ", "(uint8_t *)VIDEORAM + ")
     $Text = $Text.Replace("vram_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + vram_offset")
     $Text = $Text.Replace("tga_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + tga_offset")
+    $Text = $Text.Replace('    uint8_t *vidramptr = (uint8_t *)VIDEORAM + 0x8000 + ((vram_offset & 0xffff) << 1);',
+'    uint8_t *vidramptr = (uint8_t *)(VIDEORAM + 0x8000 + ((vram_offset & 0xffff) << 1));')
+    $Text = $Text.Replace('                    uint8_t *text_buffer_line = vidramptr + y_div_16 * 80;
+
+                    for (int column = 0; column < 40; column++) {
+                        uint8_t glyph_pixels = font_8x8[*text_buffer_line++ * 8 + glyph_line]; // Glyph row from font
+                        uint8_t color = *text_buffer_line++; // Color attribute',
+'                    uint32_t *text_buffer_line =
+                            &VIDEORAM[0x8000 + ((vram_offset & 0xffff) << 1) + y_div_16 * 80];
+
+                    for (int column = 0; column < 40; column++) {
+                        uint8_t charcode = (uint8_t)(*text_buffer_line++ & 0xffu);
+                        uint8_t glyph_pixels = font_8x8[charcode * 8 + glyph_line]; // Glyph row from font
+                        uint8_t color = (uint8_t)(*text_buffer_line++ & 0xffu); // Color attribute')
+    $Text = $Text.Replace('                    uint8_t *text_row = vidramptr + y_div_16 * 160;
+                    for (uint8_t column = 0; column < 80; column++) {
+                        // Access vidram and font data once per character
+                        uint8_t *charcode = text_row + column * 2; // Character code
+                        uint8_t glyph_row = font_8x16[*charcode * 16 + glyph_line]; // Glyph row from font
+                        uint8_t color = *++charcode; // Color attribute',
+'                    uint32_t *text_row =
+                            &VIDEORAM[0x8000 + ((vram_offset & 0xffff) << 1) + y_div_16 * 160];
+                    for (uint8_t column = 0; column < 80; column++) {
+                        // Access vidram and font data once per character
+                        uint8_t charcode = (uint8_t)(text_row[column * 2] & 0xffu); // Character code
+                        uint8_t glyph_row = font_8x16[charcode * 16 + glyph_line]; // Glyph row from font
+                        uint8_t color = (uint8_t)(text_row[column * 2 + 1] & 0xffu); // Color attribute')
     Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
     return $Dest
 }
@@ -532,6 +559,338 @@ function New-Patched-Cpu {
     $Text = $Text.Replace("""../fdd1.img""", """fdd1.img""")
     $Text = $Text.Replace("""../hdd.img""", """hdd.img""")
     $Text = $Text.Replace("""../hdd2.img""", """hdd2.img""")
+    $VideoBiosPatch = @'
+#define R36SX_BIOS_TEXT_BASE 0x8000u
+#define R36SX_BIOS_TEXT_PAGE_CELLS 0x1000u
+#define R36SX_BIOS_MAX_TEXT_COLS 80u
+#define R36SX_BIOS_MAX_TEXT_ROWS 25u
+
+static uint8_t r36sx_bios_active_page(void)
+{
+    return FIRST_RAM_PAGE[0x462] & 7u;
+}
+
+static uint8_t r36sx_bios_text_cols(void)
+{
+    uint8_t cols = FIRST_RAM_PAGE[0x44A];
+    if (videomode == 0x00 || videomode == 0x01) {
+        return 40;
+    }
+    if (cols == 0 || cols > R36SX_BIOS_MAX_TEXT_COLS) {
+        return 80;
+    }
+    return cols;
+}
+
+static uint8_t r36sx_bios_text_rows(void)
+{
+    uint8_t rows = FIRST_RAM_PAGE[0x484] + 1u;
+    if (rows == 0 || rows > R36SX_BIOS_MAX_TEXT_ROWS) {
+        return 25;
+    }
+    return rows;
+}
+
+static void r36sx_bios_set_cursor(uint8_t page, uint8_t col, uint8_t row)
+{
+    const uint8_t cols = r36sx_bios_text_cols();
+    const uint8_t rows = r36sx_bios_text_rows();
+
+    page &= 7u;
+    if (col >= cols) {
+        col = cols - 1u;
+    }
+    if (row >= rows) {
+        row = rows - 1u;
+    }
+
+    FIRST_RAM_PAGE[0x450 + page * 2u] = col;
+    FIRST_RAM_PAGE[0x451 + page * 2u] = row;
+    if (page == r36sx_bios_active_page()) {
+        CURSOR_X = col;
+        CURSOR_Y = row;
+    }
+}
+
+static uint32_t r36sx_bios_text_index(uint8_t page, uint8_t col, uint8_t row)
+{
+    const uint32_t stride = (uint32_t)r36sx_bios_text_cols() * 2u;
+    return R36SX_BIOS_TEXT_BASE +
+           (uint32_t)(page & 7u) * R36SX_BIOS_TEXT_PAGE_CELLS +
+           (uint32_t)row * stride +
+           (uint32_t)col * 2u;
+}
+
+static uint8_t r36sx_bios_read_text_attr(uint8_t page, uint8_t col,
+                                         uint8_t row)
+{
+    uint32_t index = r36sx_bios_text_index(page, col, row) + 1u;
+    uint8_t attr = 0x07;
+    if (index < VIDEORAM_SIZE) {
+        attr = (uint8_t)(VIDEORAM[index] & 0xffu);
+    }
+    return attr ? attr : 0x07;
+}
+
+static void r36sx_bios_write_text_cell(uint8_t page, uint8_t col, uint8_t row,
+                                       uint8_t ch, uint8_t attr)
+{
+    uint32_t index = r36sx_bios_text_index(page, col, row);
+    if (index + 1u >= VIDEORAM_SIZE) {
+        return;
+    }
+    VIDEORAM[index] = ch;
+    VIDEORAM[index + 1u] = attr;
+}
+
+static void r36sx_bios_clear_text_window(uint8_t page, uint8_t top,
+                                         uint8_t left, uint8_t bottom,
+                                         uint8_t right, uint8_t attr)
+{
+    const uint8_t cols = r36sx_bios_text_cols();
+    const uint8_t rows = r36sx_bios_text_rows();
+
+    if (top >= rows) top = rows - 1u;
+    if (bottom >= rows) bottom = rows - 1u;
+    if (left >= cols) left = cols - 1u;
+    if (right >= cols) right = cols - 1u;
+    if (bottom < top || right < left) {
+        return;
+    }
+
+    for (uint8_t row = top; row <= bottom; row++) {
+        for (uint8_t col = left; col <= right; col++) {
+            r36sx_bios_write_text_cell(page, col, row, ' ', attr);
+        }
+    }
+}
+
+static void r36sx_bios_scroll_text_window(uint8_t page, uint8_t top,
+                                          uint8_t left, uint8_t bottom,
+                                          uint8_t right, uint8_t lines,
+                                          uint8_t attr, int direction)
+{
+    const uint8_t cols = r36sx_bios_text_cols();
+    const uint8_t rows = r36sx_bios_text_rows();
+
+    if (top >= rows) top = rows - 1u;
+    if (bottom >= rows) bottom = rows - 1u;
+    if (left >= cols) left = cols - 1u;
+    if (right >= cols) right = cols - 1u;
+    if (bottom < top || right < left) {
+        return;
+    }
+
+    uint8_t height = (uint8_t)(bottom - top + 1u);
+    if (lines == 0 || lines >= height) {
+        r36sx_bios_clear_text_window(page, top, left, bottom, right, attr);
+        return;
+    }
+
+    if (direction > 0) {
+        for (uint8_t row = top; row <= (uint8_t)(bottom - lines); row++) {
+            for (uint8_t col = left; col <= right; col++) {
+                uint32_t src = r36sx_bios_text_index(page, col, row + lines);
+                uint32_t dst = r36sx_bios_text_index(page, col, row);
+                if (src + 1u < VIDEORAM_SIZE && dst + 1u < VIDEORAM_SIZE) {
+                    VIDEORAM[dst] = VIDEORAM[src];
+                    VIDEORAM[dst + 1u] = VIDEORAM[src + 1u];
+                }
+            }
+        }
+        r36sx_bios_clear_text_window(page, (uint8_t)(bottom - lines + 1u),
+                                     left, bottom, right, attr);
+    } else {
+        for (int row = bottom; row >= (int)top + lines; row--) {
+            for (uint8_t col = left; col <= right; col++) {
+                uint32_t src = r36sx_bios_text_index(page, col,
+                                                     (uint8_t)(row - lines));
+                uint32_t dst = r36sx_bios_text_index(page, col, (uint8_t)row);
+                if (src + 1u < VIDEORAM_SIZE && dst + 1u < VIDEORAM_SIZE) {
+                    VIDEORAM[dst] = VIDEORAM[src];
+                    VIDEORAM[dst + 1u] = VIDEORAM[src + 1u];
+                }
+            }
+        }
+        r36sx_bios_clear_text_window(page, top, left, (uint8_t)(top + lines - 1u),
+                                     right, attr);
+    }
+}
+
+static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
+{
+    const uint8_t cols = r36sx_bios_text_cols();
+    const uint8_t rows = r36sx_bios_text_rows();
+    uint8_t col = FIRST_RAM_PAGE[0x450 + (page & 7u) * 2u];
+    uint8_t row = FIRST_RAM_PAGE[0x451 + (page & 7u) * 2u];
+
+    if (col >= cols) col = 0;
+    if (row >= rows) row = rows - 1u;
+    if (attr == 0) {
+        attr = r36sx_bios_read_text_attr(page, col, row);
+    }
+
+    if (ch == '\a') {
+        return;
+    } else if (ch == '\b') {
+        if (col > 0) {
+            col--;
+        }
+    } else if (ch == '\r') {
+        col = 0;
+    } else if (ch == '\n') {
+        row++;
+    } else if (ch == '\t') {
+        do {
+            r36sx_bios_teletype(page, ' ', attr);
+            col = FIRST_RAM_PAGE[0x450 + (page & 7u) * 2u];
+        } while ((col & 7u) != 0);
+        return;
+    } else {
+        r36sx_bios_write_text_cell(page, col, row, ch, attr);
+        col++;
+        if (col >= cols) {
+            col = 0;
+            row++;
+        }
+    }
+
+    if (row >= rows) {
+        r36sx_bios_scroll_text_window(page, 0, 0, rows - 1u, cols - 1u, 1,
+                                      attr, 1);
+        row = rows - 1u;
+    }
+    r36sx_bios_set_cursor(page, col, row);
+}
+
+'@
+    $Text = $Text.Replace('void intcall86(uint8_t intnum) {',
+        $VideoBiosPatch + 'void intcall86(uint8_t intnum) {')
+    $Text = $Text.Replace('                case 0x09:
+                case 0x0a:
+                    if (videomode >= 8 && videomode <= 0x13) {
+                        // TODO: char attr?
+                        tga_draw_char(CPU_AL, CURSOR_X, CURSOR_Y, 9);
+                        printf("%c", CPU_AL);
+                        return;
+                    }
+                    break;
+                case 0x0f:
+                    if (videomode < 8) break;
+                    CPU_AL = videomode;
+                    CPU_AH = 80;
+                    CPU_BH = 0;
+                    return;
+                case 0x00:',
+'                case 0x01:
+                    cursor_start = CPU_CH;
+                    cursor_end = CPU_CL;
+                    FIRST_RAM_PAGE[0x460] = CPU_CH;
+                    FIRST_RAM_PAGE[0x461] = CPU_CL;
+                    return;
+                case 0x02:
+                    r36sx_bios_set_cursor(CPU_BH, CPU_DL, CPU_DH);
+                    return;
+                case 0x03:
+                    CPU_CH = cursor_start;
+                    CPU_CL = cursor_end;
+                    CPU_DH = FIRST_RAM_PAGE[0x451 + (CPU_BH & 7u) * 2u];
+                    CPU_DL = FIRST_RAM_PAGE[0x450 + (CPU_BH & 7u) * 2u];
+                    return;
+                case 0x06:
+                    r36sx_bios_scroll_text_window(r36sx_bios_active_page(),
+                                                  CPU_CH, CPU_CL, CPU_DH,
+                                                  CPU_DL, CPU_AL, CPU_BH, 1);
+                    return;
+                case 0x07:
+                    r36sx_bios_scroll_text_window(r36sx_bios_active_page(),
+                                                  CPU_CH, CPU_CL, CPU_DH,
+                                                  CPU_DL, CPU_AL, CPU_BH, -1);
+                    return;
+                case 0x08: {
+                    uint8_t page = CPU_BH & 7u;
+                    uint8_t col = FIRST_RAM_PAGE[0x450 + page * 2u];
+                    uint8_t row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint32_t index = r36sx_bios_text_index(page, col, row);
+                    CPU_AL = index < VIDEORAM_SIZE ? (uint8_t)(VIDEORAM[index] & 0xffu) : '' '';
+                    CPU_AH = index + 1u < VIDEORAM_SIZE ? (uint8_t)(VIDEORAM[index + 1u] & 0xffu) : 0x07;
+                    return;
+                }
+                case 0x09:
+                case 0x0a: {
+                    uint8_t page = CPU_BH & 7u;
+                    uint8_t col = FIRST_RAM_PAGE[0x450 + page * 2u];
+                    uint8_t row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint8_t attr = CPU_AH == 0x09 ? CPU_BL :
+                                   r36sx_bios_read_text_attr(page, col, row);
+                    uint16_t count = CPU_CX ? CPU_CX : 1u;
+                    for (uint16_t i = 0; i < count; i++) {
+                        uint16_t pos = (uint16_t)col + i;
+                        uint8_t write_col = (uint8_t)(pos % r36sx_bios_text_cols());
+                        uint8_t write_row = (uint8_t)(row + pos / r36sx_bios_text_cols());
+                        if (write_row < r36sx_bios_text_rows()) {
+                            r36sx_bios_write_text_cell(page, write_col,
+                                                       write_row, CPU_AL, attr);
+                        }
+                    }
+                    if (videomode >= 8 && videomode <= 0x13) {
+                        tga_draw_char(CPU_AL, CURSOR_X, CURSOR_Y, attr & 0x0f);
+                    }
+                    return;
+                }
+                case 0x0e:
+                    if (videomode >= 8 && videomode <= 0x13) {
+                        tga_draw_char(CPU_AL, CURSOR_X, CURSOR_Y, CPU_BL ? CPU_BL : 9);
+                    }
+                    r36sx_bios_teletype(CPU_BH, CPU_AL, CPU_BL);
+                    return;
+                case 0x0f:
+                    CPU_AL = (uint8_t)videomode;
+                    CPU_AH = r36sx_bios_text_cols();
+                    CPU_BH = r36sx_bios_active_page();
+                    return;
+                case 0x13: {
+                    uint8_t mode = CPU_AL;
+                    uint8_t page = CPU_BH & 7u;
+                    uint8_t attr = CPU_BL;
+                    uint8_t old_col = FIRST_RAM_PAGE[0x450 + page * 2u];
+                    uint8_t old_row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint32_t memloc = CPU_ES * 16u + CPU_BP;
+
+                    r36sx_bios_set_cursor(page, CPU_DL, CPU_DH);
+                    for (uint16_t i = 0; i < CPU_CX; i++) {
+                        uint8_t ch = read86(memloc++);
+                        if (mode & 0x02u) {
+                            attr = read86(memloc++);
+                        }
+                        r36sx_bios_teletype(page, ch, attr);
+                    }
+                    if ((mode & 0x01u) == 0) {
+                        r36sx_bios_set_cursor(page, old_col, old_row);
+                    }
+                    return;
+                }
+                case 0x00:')
+    $Text = $Text.Replace('FIRST_RAM_PAGE[0x44A] = videomode <= 2 || (videomode >= 0x8 && videomode <= 0xa) ? 40 : 80;',
+        'FIRST_RAM_PAGE[0x44A] = videomode <= 1 || (videomode >= 0x8 && videomode <= 0xa) ? 40 : 80;')
+    $Text = $Text.Replace('                    tga_offset = 0x8000;
+                    break;',
+'                    tga_offset = 0x8000;
+                    FIRST_RAM_PAGE[0x462] = 0;
+                    r36sx_bios_set_cursor(0, 0, 0);
+                    break;')
+    $Text = $Text.Replace('
+                    break;
+                }
+                case 0x10:',
+'
+                    FIRST_RAM_PAGE[0x462] = CPU_AL & 7u;
+                    r36sx_bios_set_cursor(FIRST_RAM_PAGE[0x462],
+                                          FIRST_RAM_PAGE[0x450 + FIRST_RAM_PAGE[0x462] * 2u],
+                                          FIRST_RAM_PAGE[0x451 + FIRST_RAM_PAGE[0x462] * 2u]);
+                    return;
+                }
+                case 0x10:')
     $Text = $Text.Replace('            insertdisk(0, "fdd0.img");
             insertdisk(1, "fdd1.img");
             insertdisk(128, "hdd.img");

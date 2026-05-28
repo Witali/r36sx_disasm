@@ -77,3 +77,10 @@ emulated screen area.  Look in `MIPS_NATIVE/pico_286/pico_286.log` for:
 
 The paired logical/renderer views help diagnose whether BIOS text exists in
 video memory but is not visible because the renderer reads a different layout.
+
+The current build adds the missing text-mode BIOS `INT 10h` services needed by
+BIOS/DOS boot screens, including cursor shape/position, scroll/clear window,
+read/write character and attribute, teletype output, mode query, active page
+selection, and write string.  It also fixes the normal text-mode renderer to
+read from logical `VIDEORAM` cells so text printed by those BIOS calls can be
+shown on screen.

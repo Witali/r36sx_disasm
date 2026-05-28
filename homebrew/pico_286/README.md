@@ -30,10 +30,15 @@ patched copies into `homebrew/pico_286/obj/`:
   `reset86()`, matching the upstream Win32 entrypoint.  BIOS video modes
   `0x20` and `0x30` are aliased to the normal 80x25 text renderer and scaled
   into the 640x480 output.  The debug build also logs changed text rows from
-  the emulated screen area with `screen_text:*` prefixes.
+  the emulated screen area with `screen_text:*` prefixes.  Normal 40/80-column
+  text modes now read from the same logical `VIDEORAM` cell layout used by the
+  emulator and the upstream Win32 renderer.
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
-  directory, matching TinyMC's `chdir()` before launch.
+  directory, matching TinyMC's `chdir()` before launch.  It also adds missing
+  text-mode BIOS `INT 10h` services used by BIOS/DOS boot screens: cursor
+  shape/position, scroll/clear window, read/write character and attribute,
+  teletype output, mode query, active page selection, and write string.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
   writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
