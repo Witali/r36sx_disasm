@@ -190,14 +190,6 @@ Rebuild command:
 Result:
 
 - Output: `homebrew/pico_286/pico_286`
-- Size: 7,909,160 bytes
-- Updated copies:
-  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
-  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
-
-Result:
-
-- Output: `homebrew/pico_286/pico_286`
 - Size: 7,894,916 bytes
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
@@ -464,3 +456,27 @@ Rebuild command:
 ```powershell
 .\homebrew\pico_286\build_pico_286.ps1
 ```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,909,160 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 DOS boot confirmed
+
+Device testing confirmed that DOS boots successfully from the included FreeDOS
+floppy image.  This confirms the current Pico-286 R36SX port has a working
+startup path through:
+
+- `driver.so` video/input/audio host integration;
+- initialized `read86`/`write86` memory backend pointers before `reset86()`;
+- local `fdd0.img`/`fdd1.img`/`hdd.img` disk image paths;
+- BIOS video mode aliases for `0x20` and `0x30`;
+- added `INT 10h` text services for BIOS/DOS text output;
+- corrected logical `VIDEORAM` text renderer layout.
+
+The on-screen debug overlay and `screen_text:*` log dumps remained disabled in
+the confirmed booting build.

@@ -71,6 +71,12 @@ The local test image set uses official FreeDOS 1.4 Floppy Edition images:
 - `hdd.img`: blank raw hard disk image, 65 cylinders, 16 heads, 63 sectors.
 - `hdd2.img`: blank raw hard disk image with the same geometry.
 
+Device status: this port has successfully booted DOS from the included
+FreeDOS floppy image on the console.  The working build includes the host
+memory backend initialization, FreeDOS disk images, disk activity LED,
+`0x20`/`0x30` text-mode aliases, added BIOS `INT 10h` text services, and the
+logical `VIDEORAM` text renderer fix.
+
 Build:
 
 ```powershell

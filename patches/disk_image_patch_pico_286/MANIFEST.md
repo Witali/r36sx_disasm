@@ -78,3 +78,6 @@ The on-screen debug overlay has been disabled.  Diagnostics still go to
 `MIPS_NATIVE/pico_286/pico_286.log`, but `DEBUG_VRAM` is no longer drawn into
 the bottom of the framebuffer, and the emulated screen text is no longer dumped
 to the log as `screen_text:*` entries.
+
+Device testing confirmed that this patch set boots DOS successfully from the
+included FreeDOS `fdd0.img` floppy image.
