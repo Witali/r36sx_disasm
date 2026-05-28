@@ -741,11 +741,11 @@ static void tick_demo(uint32_t buttons)
     if ((buttons & BTN_A_BIT) != 0) {
         g_color_index = 1;
     } else if ((buttons & BTN_B_BIT) != 0) {
-        g_color_index = 2;
+        g_color_index = 4;
     } else if ((buttons & BTN_X_BIT) != 0) {
         g_color_index = 3;
     } else if ((buttons & BTN_Y_BIT) != 0) {
-        g_color_index = 4;
+        g_color_index = 2;
     }
 
     if ((changed & BTN_START_BIT) != 0) {

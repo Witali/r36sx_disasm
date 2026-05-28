@@ -228,3 +228,50 @@ Defender scan homebrew\native_button_demo\button_demo: found no threats
 Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
 Defender scan patches\disk_image_patch_053: found no threats
 ```
+
+## 2026-05-28 B/Y color mapping rebuild
+
+Purpose:
+
+Swap the face-button color mapping requested during device testing:
+
+```text
+B button: yellow
+Y button: green
+```
+
+Implementation:
+
+- `native_button_demo.c` now maps `BTN_B_BIT` to square color index `4`
+  (`0xffe0`, yellow).
+- `native_button_demo.c` now maps `BTN_Y_BIT` to square color index `2`
+  (`0x07e0`, green).
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_button_demo\build_native_button_demo.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_054
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_054\MIPS_NATIVE\button_demo\button_demo
+patches\disk_image_patch_054\MIPS_NATIVE\button_demo\README.txt
+```
+
+Verification:
+
+```text
+Size: 19400 bytes
+SHA256: 0D2FE9A4A80C8CE58EFD13F8226FE42A65CC5CBC2081A879DFCB74B78C1EE2E5
+Defender scan homebrew\native_button_demo\button_demo: found no threats
+Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
+Defender scan patches\disk_image_patch_054: found no threats
+```
