@@ -263,6 +263,7 @@ static char g_status[256] = "A/Start runs a file. FN starts iCube.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+static int g_fn_shortcut_armed;
 #if DEBUG
 static int g_log_fd = -1;
 static char g_log_path[PATH_MAX];
@@ -1532,10 +1533,18 @@ static void handle_buttons(uint32_t buttons)
                 buttons, changed, buttons ^ g_prev_buttons);
     }
 
-    if ((changed & BTN_FN_BIT) != 0) {
-        launch_icube();
-        g_prev_buttons = buttons;
-        return;
+    if ((buttons & BTN_FN_BIT) == 0) {
+        if (!g_fn_shortcut_armed) {
+            log_msg("FN shortcut armed after release");
+        }
+        g_fn_shortcut_armed = 1;
+    } else if ((changed & BTN_FN_BIT) != 0) {
+        if (g_fn_shortcut_armed) {
+            launch_icube();
+            g_prev_buttons = buttons;
+            return;
+        }
+        log_msg("FN startup state ignored until release");
     }
 
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {

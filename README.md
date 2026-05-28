@@ -296,6 +296,8 @@ Notable patch history:
   `cubegm/rkgame`.
 - `disk_image_patch_035`: adds standalone native Pong under
   `MIPS_NATIVE/pong/pong` for launch directly from Tiny MC.
+- `disk_image_patch_036`: fixes the Tiny MC Fn shortcut so an initially raised
+  Fn bit is ignored until Fn has been released once.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
