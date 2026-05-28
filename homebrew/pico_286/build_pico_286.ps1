@@ -331,6 +331,7 @@ int main() {')
 }
 
 function New-Patched-Cpu {
+    New-Patched-DisksWin32 | Out-Null
     $Source = Join-Path $PicoRoot "src\emulator\cpu.c"
     $Dest = Join-Path $ObjDir "r36sx_cpu.c"
     $Text = Get-Content -Raw -Path $Source
@@ -351,6 +352,31 @@ function New-Patched-Cpu {
                 r36sx_pico286_debug_log("cpu: int19 disk attach fdd0=%u fdd1=%u hdd=%u hdd2=%u",
                                         fdd0_ok, fdd1_ok, hdd0_ok, hdd1_ok);
             }')
+    Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
+    return $Dest
+}
+
+function New-Patched-DisksWin32 {
+    $Source = Join-Path $PicoRoot "src\emulator\disks-win32.c.inl"
+    $Dest = Join-Path $ObjDir "disks-win32.c.inl"
+    $Text = Get-Content -Raw -Path $Source
+    $Text = $Text.Replace("`r`n", "`n")
+    $Text = $Text.Replace('#include "emulator.h"',
+'#include "emulator.h"
+
+extern void r36sx_pico286_disk_activity(void);')
+    $Text = $Text.Replace('        // Read the sector into buffer
+        if (fread(&sectorbuffer[0], 512, 1, disk[drivenum].diskfile) != 1) {',
+'        r36sx_pico286_disk_activity();
+
+        // Read the sector into buffer
+        if (fread(&sectorbuffer[0], 512, 1, disk[drivenum].diskfile) != 1) {')
+    $Text = $Text.Replace('        // Write the buffer to the file
+        fwrite(sectorbuffer, 512, 1, disk[drivenum].diskfile);',
+'        r36sx_pico286_disk_activity();
+
+        // Write the buffer to the file
+        fwrite(sectorbuffer, 512, 1, disk[drivenum].diskfile);')
     Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
     return $Dest
 }

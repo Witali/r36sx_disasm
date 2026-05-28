@@ -59,3 +59,7 @@ Follow-up fix: the first diagnostic run reached `main: before exec loop=0` and
 then crashed.  The Linux entrypoint had not initialized `read86`, `write86`,
 `readw86`, `writew86`, `readdw86`, or `writedw86`; the new binary initializes
 them to the same `*_ob` memory backend used by upstream `win32-main.cpp`.
+
+Current build also includes an on-screen disk activity indicator: a small
+blinking red circle appears in the lower-right corner when Pico-286 reads from
+or writes to disk image sectors.

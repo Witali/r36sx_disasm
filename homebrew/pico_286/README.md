@@ -13,6 +13,8 @@ integration pieces:
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.
+- `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
+  lower-right corner when the emulator reads or writes disk image sectors.
 - `r36sx_pico286_compat.h` is forced into the build to provide POSIX prototypes
   and harmless Pico PSRAM/swap stubs for upstream branches that are parsed but
   not used by the Linux/host configuration.
@@ -29,6 +31,8 @@ patched copies into `homebrew/pico_286/obj/`:
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
   directory, matching TinyMC's `chdir()` before launch.
+- `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
+  writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
   before clamping to the emulator's `int16_t` stereo buffer, avoiding the
   upstream host cast from `int16_t *` to `int32_t *` on MIPS.

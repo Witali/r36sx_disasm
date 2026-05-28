@@ -23,6 +23,9 @@
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_PICO286_FRAME_USEC 16666u
+#define R36SX_PICO286_DISK_LED_HOLD_MS 350u
+#define R36SX_PICO286_DISK_LED_BLINK_MS 120u
+#define R36SX_PICO286_DISK_LED_RADIUS 8
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -55,6 +58,7 @@ struct r36sx_key_map {
 
 static struct r36sx_mfb_driver g_mfb;
 static uint32_t g_palette[256];
+static volatile uint32_t g_disk_activity_until_ms;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 
@@ -65,12 +69,64 @@ static uint64_t r36sx_mfb_now_us(void)
     return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
 }
 
+static uint32_t r36sx_mfb_now_ms32(void)
+{
+    return (uint32_t)(r36sx_mfb_now_us() / 1000ull);
+}
+
+void r36sx_pico286_disk_activity(void)
+{
+    g_disk_activity_until_ms =
+        r36sx_mfb_now_ms32() + R36SX_PICO286_DISK_LED_HOLD_MS;
+}
+
 static uint16_t r36sx_mfb_rgb888_to_rgb565(uint32_t color)
 {
     uint32_t r = (color >> 16) & 0xffu;
     uint32_t g = (color >> 8) & 0xffu;
     uint32_t b = color & 0xffu;
     return (uint16_t)(((r & 0xf8u) << 8) | ((g & 0xfcu) << 3) | (b >> 3));
+}
+
+static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
+{
+    int cx;
+    int cy;
+    const int radius = R36SX_PICO286_DISK_LED_RADIUS;
+    const int outer_radius = radius + 2;
+    const uint16_t red = 0xf800u;
+    const uint16_t dark_red = 0x6000u;
+    const uint16_t outline = 0x0000u;
+
+    if ((int32_t)(g_disk_activity_until_ms - now_ms) <= 0) {
+        return;
+    }
+    if (((now_ms / R36SX_PICO286_DISK_LED_BLINK_MS) & 1u) == 0u) {
+        return;
+    }
+
+    cx = g_mfb.width - radius - 12;
+    cy = g_mfb.height - radius - 12;
+    for (int y = -outer_radius; y <= outer_radius; y++) {
+        int py = cy + y;
+        if (py < 0 || py >= g_mfb.height) {
+            continue;
+        }
+        for (int x = -outer_radius; x <= outer_radius; x++) {
+            int px = cx + x;
+            int dist2 = x * x + y * y;
+            if (px < 0 || px >= g_mfb.width) {
+                continue;
+            }
+            if (dist2 <= radius * radius) {
+                g_mfb.frame[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
+                    dist2 <= (radius - 3) * (radius - 3) ? red : dark_red;
+            } else if (dist2 <= outer_radius * outer_radius) {
+                g_mfb.frame[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
+                    outline;
+            }
+        }
+    }
 }
 
 static int r36sx_mfb_load_driver(void)
@@ -298,6 +354,7 @@ int mfb_update(void *buffer, int fps_limit)
             dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
         }
     }
+    r36sx_mfb_draw_disk_led((uint32_t)(now / 1000ull));
     g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     g_mfb.last_present_us = now;
     return 0;

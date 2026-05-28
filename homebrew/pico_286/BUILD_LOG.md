@@ -246,6 +246,33 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-28 disk activity LED
+
+Added a visible disk activity indicator for hardware testing:
+
+- `r36sx_minifb.c` exports `r36sx_pico286_disk_activity()`.
+- The build now writes a patched `obj/disks-win32.c.inl` next to
+  `obj/r36sx_cpu.c`, so the `#include "disks-win32.c.inl"` in generated CPU
+  code resolves to the local copy.
+- The patched disk backend calls `r36sx_pico286_disk_activity()` for sector
+  reads and writes.
+- `mfb_update()` draws a blinking red circle in the lower-right corner for
+  about 350 ms after disk activity.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,897,020 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-28 FreeDOS disk images
 
 Device test reached the BIOS disk attach stage and reported missing disk image
