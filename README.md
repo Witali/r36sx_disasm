@@ -352,6 +352,15 @@ Notable patch history:
   larger and increases file-list row height to match.
 - `disk_image_patch_052`: adds `MIPS_NATIVE/tiny_mc/tiny_mc.conf` and rebuilds
   Tiny MC so the font path and text sizes are configurable at runtime.
+- `disk_image_patch_053`: rebuilds native Button Demo to render the pressed-key
+  log through FreeType with the stock Arial font and removes the old top labels.
+- `disk_image_patch_054`: rebuilds native Button Demo with adjusted face-button
+  colors, including green `Y` and yellow `B`.
+- `disk_image_patch_055`: rebuilds native Button Demo with the rear-trigger
+  masks used by stock `rkgame`: `L`, `R`, `L2`, `R2`, `L3`, and `R3`.
+- `disk_image_patch_056`: rebuilds Tiny MC, native Button Demo, and native Pong
+  so they preserve the current mixer volume around `driver.so`
+  `sound_driver_init()`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

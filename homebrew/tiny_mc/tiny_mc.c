@@ -571,6 +571,9 @@ static void config_load(void)
 
 static void audio_driver_open(void)
 {
+    uint32_t saved_volume = 0;
+    int have_saved_volume = 0;
+
     if (!g_driver.handle || g_driver.sound_active) {
         return;
     }
@@ -590,8 +593,20 @@ static void audio_driver_open(void)
         return;
     }
 
+    if (g_driver.cube_ioctl &&
+        g_driver.cube_ioctl(R36SX_CUBE_IOCTL_GET_VOLUME, &saved_volume, 0, 0) == 0) {
+        saved_volume &= 0xffu;
+        have_saved_volume = 1;
+        log_msg("preserving mixer volume before sound init: %u", saved_volume);
+    }
+
     g_driver.sound_init(0, TINY_CLICK_AUDIO_RATE, TINY_CLICK_AUDIO_CHANNELS);
     g_driver.sound_active = 1;
+    if (have_saved_volume) {
+        g_driver.cube_ioctl(R36SX_CUBE_IOCTL_SET_VOLUME,
+                            (uint32_t *)(uintptr_t)saved_volume, 0, 0);
+        log_msg("restored mixer volume after sound init: %u", saved_volume);
+    }
     log_msg("click audio initialized through driver.so");
 }
 

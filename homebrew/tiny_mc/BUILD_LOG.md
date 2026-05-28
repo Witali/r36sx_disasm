@@ -1275,3 +1275,45 @@ Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc.conf: found no threats
 Defender scan patches\disk_image_patch_052: found no threats
 Defender scan patches\disk_image_patch_tiny_mc: found no threats
 ```
+
+## 2026-05-28 preserve mixer volume rebuild
+
+Purpose:
+
+Avoid audible volume jumps when Tiny MC initializes click audio through
+`driver.so`. The vendor `sound_driver_init()` path opens `/dev/auddec` and also
+reapplies the saved AV volume to `/dev/sndC0i2so`. Tiny MC now reads the current
+mixer volume with `cube_ioctl(0x40010204)` before sound init and restores it
+with `cube_ioctl(0x20010203)` immediately afterward.
+
+Implementation:
+
+- Added volume preserve/restore around `audio_driver_open()`.
+- With `DEBUG=1`, Tiny MC logs:
+  - `preserving mixer volume before sound init: N`
+  - `restored mixer volume after sound init: N`
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_056
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 54516 bytes
+Tiny MC SHA256: 144F89FA72FE1372B7E3F7E522BFD40C4F66243B149B4963E8D877AB51177B94
+Contains strings: preserving mixer volume, restored mixer volume,
+sound_driver_init, sound_driver_playframe
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_056: found no threats
+```

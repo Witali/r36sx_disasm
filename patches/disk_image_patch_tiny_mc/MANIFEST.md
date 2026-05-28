@@ -81,6 +81,8 @@ Tiny MC:
 - uses `/mnt/sdcard/cubegm/driver.so` for display and built-in controls;
 - uses `/mnt/sdcard/cubegm/driver.so` `sound_driver_init()` and
   `sound_driver_playframe()` for short button-click sounds;
+- preserves the currently applied mixer volume around `sound_driver_init()`,
+  because vendor `driver.so` reapplies its saved AV volume during audio init;
 - tries `/mnt/sdcard/cubegm/lib/libfreetype.so.6` for TrueType text rendering;
 - uses `/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf`
   as the preferred monospaced font, with other common mono fonts and the
@@ -103,8 +105,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 54208 bytes
-  SHA256: FEA903CABAEFEE5CB8871512903C821A0ABC2A67248C5FC6827A9C7CEBAD16C8
+  Size: 54516 bytes
+  SHA256: 144F89FA72FE1372B7E3F7E522BFD40C4F66243B149B4963E8D877AB51177B94
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -112,7 +114,8 @@ Tiny MC:
             JetBrainsMonoNL-Regular.ttf, LiberationMono-Regular.ttf,
             DejaVuSansMono.ttf, NotoSansMono-Regular.ttf,
             SourceCodePro-Regular.ttf, Hack-Regular.ttf,
-            RobotoMono-Regular.ttf, tiny_mc.conf, config loaded
+            RobotoMono-Regular.ttf, tiny_mc.conf, config loaded,
+            preserving mixer volume, restored mixer volume
   Does not contain: icube heartbeat, shmget
 
 Tiny MC config:

@@ -337,3 +337,42 @@ Defender scan homebrew\native_button_demo\button_demo: found no threats
 Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
 Defender scan patches\disk_image_patch_055: found no threats
 ```
+
+## 2026-05-28 preserve mixer volume rebuild
+
+Purpose:
+
+Avoid audible volume jumps when native Button Demo initializes audio through
+`driver.so`. Reverse-engineering showed that vendor `sound_driver_init()`
+reapplies the saved AV volume to `/dev/sndC0i2so`, so the native helper now
+reads the current mixer volume through `cube_ioctl(0x40010204)` before audio
+init and restores it through `cube_ioctl(0x20010203)` afterward.
+
+Implementation:
+
+- Added `r36sx_driver_audio_bind_preserve_volume()` to
+  `homebrew/common/driver_audio.h`.
+- Button Demo now passes its resolved `cube_ioctl` symbol to that helper.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\native_button_demo\build_native_button_demo.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_056
+```
+
+Verification:
+
+```text
+Size: 19928 bytes
+SHA256: 348B37F0F4ACCC0CEC54F396EA5B94EE5E655181DA419CD8D7D01A0299E9D59F
+Contains strings: sound_driver_init, sound_driver_playframe
+Defender scan homebrew\native_button_demo\button_demo: found no threats
+Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
+Defender scan patches\disk_image_patch_056: found no threats
+```

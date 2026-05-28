@@ -14,6 +14,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hardware.h"
+
 #define R36SX_DRIVER_AUDIO_RATE 44100u
 #define R36SX_DRIVER_AUDIO_CHANNELS 2u
 #define R36SX_DRIVER_AUDIO_SAMPLES_PER_FRAME (R36SX_DRIVER_AUDIO_RATE / 60u)
@@ -29,6 +31,7 @@ typedef void (*r36sx_sound_driver_init_fn)(int, int, int);
 typedef int (*r36sx_sound_driver_playframe_fn)(const int16_t *, int);
 typedef void (*r36sx_sound_driver_flush_fn)(void);
 typedef void (*r36sx_sound_driver_deinit_fn)(void);
+typedef int (*r36sx_cube_ioctl_fn)(int, uint32_t *, uint32_t, uint32_t);
 
 struct r36sx_driver_audio_segment {
     uint32_t start_freq;
@@ -59,17 +62,56 @@ static void r36sx_driver_audio_init(struct r36sx_driver_audio_state *audio)
     memset(audio, 0, sizeof(*audio));
 }
 
+/* Read the currently applied mixer volume through driver.so cube_ioctl(). */
+static int r36sx_driver_audio_get_volume(r36sx_cube_ioctl_fn cube_ioctl,
+                                         uint32_t *volume)
+{
+    if (!cube_ioctl || !volume) {
+        return -1;
+    }
+    *volume = 0;
+    if (cube_ioctl((int)R36SX_CUBE_IOCTL_GET_VOLUME, volume, 0, 0) != 0) {
+        return -1;
+    }
+    *volume &= 0xffu;
+    return 0;
+}
+
+/*
+ * Restore the mixer volume. The vendor cube_ioctl ABI passes SET_VOLUME as the
+ * low byte of the second argument, not as a pointer, matching stock rkgame.
+ */
+static void r36sx_driver_audio_set_volume(r36sx_cube_ioctl_fn cube_ioctl,
+                                          uint32_t volume)
+{
+    if (!cube_ioctl) {
+        return;
+    }
+    (void)cube_ioctl((int)R36SX_CUBE_IOCTL_SET_VOLUME,
+                     (uint32_t *)(uintptr_t)(volume & 0xffu), 0, 0);
+}
+
 /*
  * Resolve the stock driver.so audio entry points and initialize 44.1 kHz
  * stereo PCM output. The caller owns the dlopen() handle and must keep it
- * alive until r36sx_driver_audio_close().
+ * alive until r36sx_driver_audio_close(). When cube_ioctl is available, the
+ * current mixer volume is restored after sound_driver_init(), because vendor
+ * driver.so reapplies its saved AV volume during audio initialization.
  */
-static int r36sx_driver_audio_bind(struct r36sx_driver_audio_state *audio,
-                                   void *driver_handle)
+static int
+r36sx_driver_audio_bind_preserve_volume(struct r36sx_driver_audio_state *audio,
+                                        void *driver_handle,
+                                        r36sx_cube_ioctl_fn cube_ioctl)
 {
+    uint32_t saved_volume = 0;
+    int have_saved_volume;
+
     if (!driver_handle) {
         return -1;
     }
+
+    have_saved_volume =
+        (r36sx_driver_audio_get_volume(cube_ioctl, &saved_volume) == 0);
 
     audio->init = (r36sx_sound_driver_init_fn)dlsym(driver_handle,
                                                    "sound_driver_init");
@@ -88,7 +130,21 @@ static int r36sx_driver_audio_bind(struct r36sx_driver_audio_state *audio,
     audio->init(0, (int)R36SX_DRIVER_AUDIO_RATE,
                 (int)R36SX_DRIVER_AUDIO_CHANNELS);
     audio->active = 1;
+    if (have_saved_volume) {
+        r36sx_driver_audio_set_volume(cube_ioctl, saved_volume);
+    }
     return 0;
+}
+
+/*
+ * Compatibility wrapper for callers that cannot access cube_ioctl. Prefer
+ * r36sx_driver_audio_bind_preserve_volume() when driver.so exposes cube_ioctl.
+ */
+static int R36SX_DRIVER_AUDIO_MAYBE_UNUSED
+r36sx_driver_audio_bind(struct r36sx_driver_audio_state *audio,
+                        void *driver_handle)
+{
+    return r36sx_driver_audio_bind_preserve_volume(audio, driver_handle, NULL);
 }
 
 /* Flush/deinitialize driver.so audio if it was successfully bound. */

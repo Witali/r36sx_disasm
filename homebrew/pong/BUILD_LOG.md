@@ -60,3 +60,41 @@ Scan results:
 Defender scan homebrew\pong\libemu_pong.so: found no threats
 Defender scan homebrew\pong\pong: found no threats
 ```
+
+## 2026-05-28 preserve mixer volume rebuild
+
+Purpose:
+
+Avoid audible volume jumps when native Pong initializes audio through
+`driver.so`. The vendor `sound_driver_init()` path also writes the saved AV
+volume to `/dev/sndC0i2so`, so native Pong now preserves and restores the
+currently applied mixer volume around audio initialization.
+
+Implementation:
+
+- Reused `r36sx_driver_audio_bind_preserve_volume()` from
+  `homebrew/common/driver_audio.h`.
+- Native Pong passes its resolved `cube_ioctl` symbol to the audio helper.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_056
+```
+
+Verification:
+
+```text
+Size: 19284 bytes
+SHA256: D011576B1235901DF9E0BB844D3688967372CA77B923CA4235FC12F9DFE05642
+Contains strings: sound_driver_init, sound_driver_playframe
+Defender scan homebrew\pong\pong: found no threats
+Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
+Defender scan patches\disk_image_patch_056: found no threats
+```

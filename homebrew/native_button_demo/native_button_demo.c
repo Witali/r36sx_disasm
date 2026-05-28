@@ -627,7 +627,8 @@ static int display_open(void)
         return -1;
     }
     r36sx_driver_audio_init(&g_audio);
-    (void)r36sx_driver_audio_bind(&g_audio, g_driver.handle);
+    (void)r36sx_driver_audio_bind_preserve_volume(
+        &g_audio, g_driver.handle, (r36sx_cube_ioctl_fn)g_driver.cube_ioctl);
 
     {
         int cfg[5] = {
