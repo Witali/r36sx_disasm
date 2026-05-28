@@ -1032,3 +1032,71 @@ An initial `zig objdump -f` / `zig objdump --file-headers` check failed because
 this bundled Zig objdump wrapper did not accept those arguments. The ELF header
 was then verified with a PowerShell byte read: `e_ident[4]=1`, `e_ident[5]=1`,
 `e_machine=0x0008`.
+
+## 2026-05-28 FreeType text renderer rebuild
+
+Purpose:
+
+Add TrueType text rendering to Tiny MC through the stock firmware FreeType
+library, while keeping the old built-in 5x7 bitmap font as fallback.
+
+Design:
+
+- Tiny MC loads `/mnt/sdcard/cubegm/lib/libfreetype.so.6` with `dlopen()`.
+- FreeType symbols are resolved with `dlsym()`; the executable is not linked
+  directly against `libfreetype`, so startup can fall back safely.
+- Preferred font:
+  `/mnt/sdcard/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf`.
+- The downloaded font is JetBrains Mono NL Regular v2.304 under OFL-1.1.
+- UTF-8 is decoded before rendering, so Cyrillic filenames can be displayed if
+  the filesystem provides UTF-8 names.
+- Glyphs are rendered into a small in-memory grayscale cache and alpha-blended
+  into the RGB565 framebuffer.
+- If FreeType, the font file, or a glyph load fails, the existing bitmap font
+  path is used.
+
+Commands from repository root:
+
+```powershell
+New-Item -ItemType Directory -Force .\homebrew\tiny_mc\fonts
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/JetBrains/JetBrainsMono/v2.304/fonts/ttf/JetBrainsMonoNL-Regular.ttf -OutFile .\homebrew\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/JetBrains/JetBrainsMono/v2.304/OFL.txt -OutFile .\homebrew\tiny_mc\fonts\JetBrainsMono-OFL.txt
+.\tools\scan-download.ps1 .\homebrew\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf
+.\tools\scan-download.ps1 .\homebrew\tiny_mc\fonts\JetBrainsMono-OFL.txt
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force .\disk_image\MIPS_NATIVE\tiny_mc\fonts
+Copy-Item -LiteralPath .\homebrew\tiny_mc\tiny_mc -Destination .\disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath .\homebrew\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf -Destination .\disk_image\MIPS_NATIVE\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf -Force
+Copy-Item -LiteralPath .\homebrew\tiny_mc\fonts\JetBrainsMono-OFL.txt -Destination .\disk_image\MIPS_NATIVE\tiny_mc\fonts\JetBrainsMono-OFL.txt -Force
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_049
+```
+
+Verification:
+
+```text
+Tiny MC size: 46712 bytes
+Tiny MC SHA256: 67560BCC8983DDE6306238CD19204881D90BF82E697E8FBCE85ACA8932E4040A
+
+JetBrainsMonoNL-Regular.ttf size: 208576 bytes
+JetBrainsMonoNL-Regular.ttf SHA256: FB3B2575D7B0657359707993288F12A7360344D39387BB26050E276D61F6BD2A
+
+JetBrainsMono-OFL.txt size: 4399 bytes
+JetBrainsMono-OFL.txt SHA256: 60D55F23C6CE05A81099A762CB67CA2C9B6EA251C7912720998B4C89EBFD4FAA
+
+Contains strings: libfreetype.so.6, FT_Init_FreeType, FT_New_Face,
+FT_Load_Char, JetBrainsMonoNL-Regular.ttf
+Still contains dynamic dependencies: libdl.so.2, libc.so.6
+
+Defender scan homebrew\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf: found no threats
+Defender scan homebrew\tiny_mc\fonts\JetBrainsMono-OFL.txt: found no threats
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf: found no threats
+Defender scan patches\disk_image_patch_049: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc: found no threats
+```

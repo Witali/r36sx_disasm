@@ -34,6 +34,10 @@ The program uses:
 - `cubegm/driver.so` for short button-click audio, via the same
   `sound_driver_init()` / `sound_driver_playframe()` path used by stock
   `rkgame` LibRetro audio;
+- `cubegm/lib/libfreetype.so.6` for TrueType text rendering when available,
+  loaded with `dlopen()` so the built-in 5x7 bitmap font remains a fallback;
+- `MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf` as the preferred
+  FreeType font;
 - an internal RGB565 640x480 framebuffer;
 - `/dev/fb0` direct drawing only as fallback if `driver.so` is unavailable;
 - `/dev/input/js0..js3` for Linux joystick input;
@@ -104,6 +108,8 @@ For the current SD-card integration, copy the rebuilt executable as:
 
 ```text
 MIPS_NATIVE\tiny_mc\tiny_mc
+MIPS_NATIVE\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf
+MIPS_NATIVE\tiny_mc\fonts\JetBrainsMono-OFL.txt
 ```
 
 restore the stock binary as:

@@ -341,6 +341,8 @@ Notable patch history:
   the standard `Select + Start` exit gesture.
 - `disk_image_patch_048`: rebuilds both libretro and native Pong so
   end-of-game messages render as large 5x5 pixel text: `You win` / `You lose`.
+- `disk_image_patch_049`: rebuilds Tiny MC with optional FreeType text
+  rendering and bundles JetBrains Mono NL Regular under `MIPS_NATIVE/tiny_mc/fonts`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -358,6 +360,8 @@ Tracked or intentionally small project files:
   boot enters `cubegm/icube.sh`, not `icube_start.sh`.
 - `RELATED_PROJECTS.md`: public project links and research references.
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
+- `homebrew/tiny_mc/FONT_RESEARCH.md`: monospaced open-font candidates and the
+  JetBrains Mono NL selection notes for Tiny MC FreeType rendering.
 - `homebrew/`: source and build logs for custom modules.
   - `homebrew/pong/pong.c`: unified Pong source compiled as either libretro
     (`R36SX_PONG_TARGET=1`) or native Tiny MC

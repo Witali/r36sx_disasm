@@ -32,6 +32,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "../common/hardware.h"
 
 #ifndef PATH_MAX
@@ -58,7 +61,10 @@ enum {
     LIST_BOTTOM_PAD = 8,
     SCROLLBAR_WIDTH = 5,
     SCROLLBAR_RIGHT_PAD = 8,
-    SCROLLBAR_MIN_THUMB = 14
+    SCROLLBAR_MIN_THUMB = 14,
+    TINY_FT_SMALL_PX = 10,
+    TINY_FT_LARGE_PX = 16,
+    TINY_FT_CACHE_SLOTS = 192
 };
 
 #define LOG_LINE_MAX 768
@@ -198,6 +204,13 @@ typedef void (*sound_driver_init_fn)(int, int, int);
 typedef int (*sound_driver_playframe_fn)(const int16_t *, int);
 typedef void (*sound_driver_flush_fn)(void);
 typedef void (*sound_driver_deinit_fn)(void);
+typedef FT_Error (*ft_init_free_type_fn)(FT_Library *);
+typedef FT_Error (*ft_new_face_fn)(FT_Library, const char *, FT_Long, FT_Face *);
+typedef FT_Error (*ft_done_face_fn)(FT_Face);
+typedef FT_Error (*ft_done_free_type_fn)(FT_Library);
+typedef FT_Error (*ft_select_charmap_fn)(FT_Face, FT_Encoding);
+typedef FT_Error (*ft_set_pixel_sizes_fn)(FT_Face, FT_UInt, FT_UInt);
+typedef FT_Error (*ft_load_char_fn)(FT_Face, FT_ULong, FT_Int32);
 
 struct driver_display_state {
     void *handle;
@@ -213,6 +226,37 @@ struct driver_display_state {
     sound_driver_deinit_fn sound_deinit;
     int active;
     int sound_active;
+};
+
+struct ft_glyph_cache_entry {
+    uint32_t codepoint;
+    int pixel_height;
+    int bitmap_left;
+    int bitmap_top;
+    int width;
+    int rows;
+    int pitch;
+    int advance;
+    uint8_t *buffer;
+    uint32_t age;
+    int valid;
+};
+
+struct font_state {
+    void *handle;
+    FT_Library library;
+    FT_Face face;
+    ft_init_free_type_fn init_free_type;
+    ft_new_face_fn new_face;
+    ft_done_face_fn done_face;
+    ft_done_free_type_fn done_free_type;
+    ft_select_charmap_fn select_charmap;
+    ft_set_pixel_sizes_fn set_pixel_sizes;
+    ft_load_char_fn load_char;
+    struct ft_glyph_cache_entry cache[TINY_FT_CACHE_SLOTS];
+    uint32_t cache_age;
+    int active;
+    char font_path[PATH_MAX];
 };
 
 #if USE_ICUBE_HEARTBEAT
@@ -291,6 +335,7 @@ static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
 static struct click_audio_state g_audio;
+static struct font_state g_font;
 #if ENABLE_FN_ICUBE_SHORTCUT
 static int g_fn_shortcut_armed;
 #endif
@@ -776,6 +821,54 @@ static void put_pixel(int x, int y, uint16_t color)
     }
 }
 
+static uint16_t get_pixel(int x, int y)
+{
+    if (!g_fb.mem || x < 0 || y < 0 || x >= g_fb.width || y >= g_fb.height) {
+        return 0;
+    }
+
+    uint8_t *row = g_fb.mem + (size_t)y * (size_t)g_fb.stride;
+    if (g_fb.bpp == 16) {
+        return ((uint16_t *)row)[x];
+    }
+    if (g_fb.bpp == 32) {
+        uint32_t c = ((uint32_t *)row)[x];
+        return rgb565((c >> 16) & 0xffu, (c >> 8) & 0xffu, c & 0xffu);
+    }
+    if (g_fb.bpp == 24) {
+        uint8_t *p = row + (size_t)x * 3u;
+        return rgb565(p[2], p[1], p[0]);
+    }
+    return 0;
+}
+
+static uint16_t blend_rgb565(uint16_t dst, uint16_t src, unsigned alpha)
+{
+    unsigned inv = 255u - alpha;
+    unsigned dr = ((dst >> 11) & 0x1fu) * 255u / 31u;
+    unsigned dg = ((dst >> 5) & 0x3fu) * 255u / 63u;
+    unsigned db = (dst & 0x1fu) * 255u / 31u;
+    unsigned sr = ((src >> 11) & 0x1fu) * 255u / 31u;
+    unsigned sg = ((src >> 5) & 0x3fu) * 255u / 63u;
+    unsigned sb = (src & 0x1fu) * 255u / 31u;
+
+    return rgb565((sr * alpha + dr * inv) / 255u,
+                  (sg * alpha + dg * inv) / 255u,
+                  (sb * alpha + db * inv) / 255u);
+}
+
+static void put_pixel_alpha(int x, int y, uint16_t color, unsigned alpha)
+{
+    if (alpha == 0) {
+        return;
+    }
+    if (alpha >= 255u) {
+        put_pixel(x, y, color);
+    } else {
+        put_pixel(x, y, blend_rgb565(get_pixel(x, y), color, alpha));
+    }
+}
+
 static void fill_rect(int x, int y, int w, int h, uint16_t color)
 {
     if (!g_fb.mem || w <= 0 || h <= 0) {
@@ -804,6 +897,295 @@ static void fill_rect(int x, int y, int w, int h, uint16_t color)
             put_pixel(xx, yy, color);
         }
     }
+}
+
+static void font_cache_clear(void)
+{
+    for (int i = 0; i < TINY_FT_CACHE_SLOTS; i++) {
+        free(g_font.cache[i].buffer);
+        memset(&g_font.cache[i], 0, sizeof(g_font.cache[i]));
+    }
+}
+
+static void font_close(void)
+{
+    font_cache_clear();
+    if (g_font.face && g_font.done_face) {
+        g_font.done_face(g_font.face);
+    }
+    if (g_font.library && g_font.done_free_type) {
+        g_font.done_free_type(g_font.library);
+    }
+    if (g_font.handle) {
+        dlclose(g_font.handle);
+    }
+    memset(&g_font, 0, sizeof(g_font));
+}
+
+static int font_bind_symbols(void)
+{
+    g_font.init_free_type = (ft_init_free_type_fn)dlsym(g_font.handle, "FT_Init_FreeType");
+    g_font.new_face = (ft_new_face_fn)dlsym(g_font.handle, "FT_New_Face");
+    g_font.done_face = (ft_done_face_fn)dlsym(g_font.handle, "FT_Done_Face");
+    g_font.done_free_type = (ft_done_free_type_fn)dlsym(g_font.handle, "FT_Done_FreeType");
+    g_font.select_charmap = (ft_select_charmap_fn)dlsym(g_font.handle, "FT_Select_Charmap");
+    g_font.set_pixel_sizes = (ft_set_pixel_sizes_fn)dlsym(g_font.handle, "FT_Set_Pixel_Sizes");
+    g_font.load_char = (ft_load_char_fn)dlsym(g_font.handle, "FT_Load_Char");
+    return g_font.init_free_type && g_font.new_face && g_font.done_face &&
+           g_font.done_free_type && g_font.set_pixel_sizes && g_font.load_char;
+}
+
+static int font_open(void)
+{
+    static const char *library_paths[] = {
+        "/mnt/sdcard/cubegm/lib/libfreetype.so.6",
+        "/mnt/sdcard/cubegm/lib/libfreetype.so",
+        "libfreetype.so.6"
+    };
+    static const char *font_paths[] = {
+        "/mnt/sdcard/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf",
+        "/mnt/sdcard/MIPS_NATIVE/tiny_mc/JetBrainsMonoNL-Regular.ttf",
+        "fonts/JetBrainsMonoNL-Regular.ttf",
+        "JetBrainsMonoNL-Regular.ttf",
+        "/mnt/sdcard/cubegm/usr/share/directfb-1.7.7/decker.ttf",
+        "/mnt/sdcard/cubegm/Tahoma.ttf",
+        "/mnt/sdcard/cubegm/Arial_en.ttf"
+    };
+
+    if (g_font.active) {
+        return 0;
+    }
+
+    memset(&g_font, 0, sizeof(g_font));
+    for (size_t i = 0; i < ARRAY_COUNT(library_paths); i++) {
+        g_font.handle = dlopen(library_paths[i], RTLD_NOW);
+        if (g_font.handle) {
+            log_msg("FreeType loaded: %s", library_paths[i]);
+            break;
+        }
+        const char *err = dlerror();
+        log_msg("FreeType dlopen failed for %s: %s", library_paths[i],
+                err ? err : "unknown error");
+    }
+    if (!g_font.handle || !font_bind_symbols()) {
+        log_msg("FreeType unavailable; using bitmap font fallback");
+        font_close();
+        return -1;
+    }
+    if (g_font.init_free_type(&g_font.library) != 0) {
+        log_msg("FT_Init_FreeType failed; using bitmap font fallback");
+        font_close();
+        return -1;
+    }
+
+    for (size_t i = 0; i < ARRAY_COUNT(font_paths); i++) {
+        if (access(font_paths[i], R_OK) != 0) {
+            continue;
+        }
+        if (g_font.new_face(g_font.library, font_paths[i], 0, &g_font.face) == 0) {
+            snprintf(g_font.font_path, sizeof(g_font.font_path), "%s", font_paths[i]);
+            break;
+        }
+        log_msg("FT_New_Face failed for %s", font_paths[i]);
+    }
+    if (!g_font.face) {
+        log_msg("No usable TrueType font found; using bitmap font fallback");
+        font_close();
+        return -1;
+    }
+
+    if (g_font.select_charmap) {
+        g_font.select_charmap(g_font.face, FT_ENCODING_UNICODE);
+    }
+    g_font.active = 1;
+    log_msg("FreeType font active: %s", g_font.font_path);
+    return 0;
+}
+
+static struct ft_glyph_cache_entry *font_cache_lookup(uint32_t codepoint, int pixel_height)
+{
+    for (int i = 0; i < TINY_FT_CACHE_SLOTS; i++) {
+        if (g_font.cache[i].valid &&
+            g_font.cache[i].codepoint == codepoint &&
+            g_font.cache[i].pixel_height == pixel_height) {
+            g_font.cache[i].age = ++g_font.cache_age;
+            return &g_font.cache[i];
+        }
+    }
+    return NULL;
+}
+
+static struct ft_glyph_cache_entry *font_cache_alloc_slot(void)
+{
+    int slot = 0;
+    uint32_t oldest = UINT32_MAX;
+
+    for (int i = 0; i < TINY_FT_CACHE_SLOTS; i++) {
+        if (!g_font.cache[i].valid) {
+            slot = i;
+            break;
+        }
+        if (g_font.cache[i].age < oldest) {
+            oldest = g_font.cache[i].age;
+            slot = i;
+        }
+    }
+
+    free(g_font.cache[slot].buffer);
+    memset(&g_font.cache[slot], 0, sizeof(g_font.cache[slot]));
+    return &g_font.cache[slot];
+}
+
+static struct ft_glyph_cache_entry *font_load_glyph(uint32_t codepoint, int pixel_height)
+{
+    struct ft_glyph_cache_entry *entry = font_cache_lookup(codepoint, pixel_height);
+    if (entry) {
+        return entry;
+    }
+    if (!g_font.active || !g_font.face) {
+        return NULL;
+    }
+    if (g_font.set_pixel_sizes(g_font.face, 0, (FT_UInt)pixel_height) != 0) {
+        return NULL;
+    }
+    if (g_font.load_char(g_font.face, (FT_ULong)codepoint,
+                         FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0) {
+        if (codepoint != '?') {
+            return font_load_glyph('?', pixel_height);
+        }
+        return NULL;
+    }
+
+    FT_GlyphSlot slot = g_font.face->glyph;
+    FT_Bitmap *bitmap = &slot->bitmap;
+    if (bitmap->pixel_mode != FT_PIXEL_MODE_GRAY) {
+        return NULL;
+    }
+
+    entry = font_cache_alloc_slot();
+    entry->codepoint = codepoint;
+    entry->pixel_height = pixel_height;
+    entry->bitmap_left = slot->bitmap_left;
+    entry->bitmap_top = slot->bitmap_top;
+    entry->width = (int)bitmap->width;
+    entry->rows = (int)bitmap->rows;
+    entry->pitch = entry->width;
+    entry->advance = (int)(slot->advance.x >> 6);
+    if (entry->advance <= 0) {
+        entry->advance = entry->width + 1;
+    }
+
+    if (entry->width > 0 && entry->rows > 0) {
+        size_t bytes = (size_t)entry->width * (size_t)entry->rows;
+        entry->buffer = (uint8_t *)malloc(bytes);
+        if (!entry->buffer) {
+            memset(entry, 0, sizeof(*entry));
+            return NULL;
+        }
+        for (int row = 0; row < entry->rows; row++) {
+            int pitch = bitmap->pitch < 0 ? -bitmap->pitch : bitmap->pitch;
+            const uint8_t *src = bitmap->pitch >= 0
+                ? bitmap->buffer + (size_t)row * (size_t)pitch
+                : bitmap->buffer + (size_t)(entry->rows - 1 - row) * (size_t)pitch;
+            memcpy(entry->buffer + (size_t)row * (size_t)entry->pitch,
+                   src, (size_t)entry->width);
+        }
+    }
+
+    entry->age = ++g_font.cache_age;
+    entry->valid = 1;
+    return entry;
+}
+
+static uint32_t utf8_next_codepoint(const char **text)
+{
+    const unsigned char *p = (const unsigned char *)*text;
+    uint32_t cp;
+
+    if (*p < 0x80u) {
+        *text = (const char *)(p + 1);
+        return *p;
+    }
+    if ((p[0] & 0xe0u) == 0xc0u && (p[1] & 0xc0u) == 0x80u) {
+        cp = ((uint32_t)(p[0] & 0x1fu) << 6) | (uint32_t)(p[1] & 0x3fu);
+        *text = (const char *)(p + 2);
+        return cp;
+    }
+    if ((p[0] & 0xf0u) == 0xe0u &&
+        (p[1] & 0xc0u) == 0x80u &&
+        (p[2] & 0xc0u) == 0x80u) {
+        cp = ((uint32_t)(p[0] & 0x0fu) << 12) |
+             ((uint32_t)(p[1] & 0x3fu) << 6) |
+             (uint32_t)(p[2] & 0x3fu);
+        *text = (const char *)(p + 3);
+        return cp;
+    }
+    if ((p[0] & 0xf8u) == 0xf0u &&
+        (p[1] & 0xc0u) == 0x80u &&
+        (p[2] & 0xc0u) == 0x80u &&
+        (p[3] & 0xc0u) == 0x80u) {
+        cp = ((uint32_t)(p[0] & 0x07u) << 18) |
+             ((uint32_t)(p[1] & 0x3fu) << 12) |
+             ((uint32_t)(p[2] & 0x3fu) << 6) |
+             (uint32_t)(p[3] & 0x3fu);
+        *text = (const char *)(p + 4);
+        return cp;
+    }
+
+    *text = (const char *)(p + 1);
+    return '?';
+}
+
+static void draw_freetype_glyph(const struct ft_glyph_cache_entry *glyph,
+                                int x, int y, uint16_t color, unsigned alpha_mul)
+{
+    for (int row = 0; row < glyph->rows; row++) {
+        for (int col = 0; col < glyph->width; col++) {
+            unsigned alpha = glyph->buffer[(size_t)row * (size_t)glyph->pitch + (size_t)col];
+            alpha = (alpha * alpha_mul) / 255u;
+            put_pixel_alpha(x + col, y + row, color, alpha);
+        }
+    }
+}
+
+static int draw_text_freetype(int x, int y, const char *text,
+                              uint16_t color, int scale, int max_px)
+{
+    if (!g_font.active || !text) {
+        return 0;
+    }
+
+    int pixel_height = scale <= 1 ? TINY_FT_SMALL_PX : TINY_FT_LARGE_PX;
+    int baseline = y + (scale <= 1 ? 9 : 15);
+    int limit = max_px > 0 ? x + max_px : g_fb.width;
+    const char *p = text;
+
+    while (*p != '\0') {
+        uint32_t cp = utf8_next_codepoint(&p);
+        if (cp == '\n' || cp == '\r') {
+            break;
+        }
+        if (cp == '\t') {
+            cp = ' ';
+        }
+
+        struct ft_glyph_cache_entry *glyph = font_load_glyph(cp, pixel_height);
+        if (!glyph) {
+            return 0;
+        }
+        if (x + glyph->advance > limit) {
+            break;
+        }
+
+        int gx = x + glyph->bitmap_left;
+        int gy = baseline - glyph->bitmap_top;
+        if (glyph->buffer) {
+            draw_freetype_glyph(glyph, gx + 1, gy + 1, rgb565(0, 0, 0), 150);
+            draw_freetype_glyph(glyph, gx, gy, color, 255);
+        }
+        x += glyph->advance;
+    }
+    return 1;
 }
 
 static uint8_t glyph_row(char c, int row)
@@ -924,7 +1306,7 @@ static void draw_char(int x, int y, char c, uint16_t color, int scale)
     }
 }
 
-static void draw_text(int x, int y, const char *text, uint16_t color, int scale, int max_px)
+static void draw_text_bitmap(int x, int y, const char *text, uint16_t color, int scale, int max_px)
 {
     int advance = 6 * scale;
     int limit = max_px > 0 ? x + max_px : g_fb.width;
@@ -937,6 +1319,14 @@ static void draw_text(int x, int y, const char *text, uint16_t color, int scale,
         draw_char(x, y, *p, color, scale);
         x += advance;
     }
+}
+
+static void draw_text(int x, int y, const char *text, uint16_t color, int scale, int max_px)
+{
+    if (draw_text_freetype(x, y, text, color, scale, max_px)) {
+        return;
+    }
+    draw_text_bitmap(x, y, text, color, scale, max_px);
 }
 
 static void join_path(char *out, size_t out_size, const char *dir, const char *name)
@@ -1729,6 +2119,7 @@ int main(int argc, char **argv)
         log_close();
         return 1;
     }
+    font_open();
     input_open_devices();
 
     for (;;) {
@@ -1743,6 +2134,7 @@ int main(int argc, char **argv)
 
     display_close();
     input_close_devices();
+    font_close();
     log_msg("tiny_mc exit");
     heartbeat_close();
     log_close();

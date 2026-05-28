@@ -7,7 +7,8 @@ Date: 2026-05-28
 This named patch is the consolidated overlay needed to boot into Tiny MC on the
 device and still allow returning to the stock `icube`/`rkgame` frontend. Tiny
 MC also plays short button-click sounds through the same `driver.so` sound path
-used by stock LibRetro cores.
+used by stock LibRetro cores and renders text through the stock FreeType
+library when available.
 
 It combines the current working Tiny MC route from the numbered patch history:
 
@@ -31,6 +32,8 @@ E:/cubegm/icubemp_start.sh
 E:/cubegm/rkgame
 E:/MIPS_NATIVE/tiny_mc/tiny_mc
 E:/MIPS_NATIVE/tiny_mc/README.txt
+E:/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf
+E:/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMono-OFL.txt
 ```
 
 ## Files
@@ -42,6 +45,8 @@ cubegm/icubemp_start.sh
 cubegm/rkgame
 MIPS_NATIVE/tiny_mc/tiny_mc
 MIPS_NATIVE/tiny_mc/README.txt
+MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf
+MIPS_NATIVE/tiny_mc/fonts/JetBrainsMono-OFL.txt
 ```
 
 ## Behavior
@@ -76,6 +81,10 @@ Tiny MC:
 - uses `/mnt/sdcard/cubegm/driver.so` for display and built-in controls;
 - uses `/mnt/sdcard/cubegm/driver.so` `sound_driver_init()` and
   `sound_driver_playframe()` for short button-click sounds;
+- tries `/mnt/sdcard/cubegm/lib/libfreetype.so.6` for TrueType text rendering;
+- uses `/mnt/sdcard/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf`
+  as the preferred monospaced font, with the built-in 5x7 bitmap font as
+  fallback;
 - has `DEBUG=1`, so it writes `tiny_mc.log` to the first writable path:
   `/mnt/sdcard/cubegm/tiny_mc.log`, `/mnt/sdcard/tiny_mc.log`, or
   `tiny_mc.log`;
@@ -92,12 +101,21 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 41640 bytes
-  SHA256: E43432F1800BDF7049E825CE471063E82694A1972523D50B799E0A3210B7E660
+  Size: 46712 bytes
+  SHA256: 67560BCC8983DDE6306238CD19204881D90BF82E697E8FBCE85ACA8932E4040A
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
-            sound_driver_init, sound_driver_playframe
+            sound_driver_init, sound_driver_playframe, libfreetype.so.6,
+            FT_Init_FreeType, JetBrainsMonoNL-Regular.ttf
   Does not contain: icube heartbeat, shmget
+
+Tiny MC font:
+  JetBrainsMonoNL-Regular.ttf size: 208576 bytes
+  JetBrainsMonoNL-Regular.ttf SHA256:
+    FB3B2575D7B0657359707993288F12A7360344D39387BB26050E276D61F6BD2A
+  JetBrainsMono-OFL.txt size: 4399 bytes
+  JetBrainsMono-OFL.txt SHA256:
+    60D55F23C6CE05A81099A762CB67CA2C9B6EA251C7912720998B4C89EBFD4FAA
 
 rkgame:
   Size: 1178732 bytes
@@ -111,10 +129,11 @@ Scripts and README:
   cubegm/icubemp_start.sh SHA256:
     BE313D3917BA5E355ECFC1818A6F42A6644ECE5724A098C507DDE2C7149F0EE9
   MIPS_NATIVE/tiny_mc/README.txt SHA256:
-    2E5D8855BD8AC8851C48C38DEA6FDE20330924805A9F07655F293B0837E22BAD
+    A6BEF02DDBA15DE781FBAAF1549E6340A7FBA930C47A924CA492229649BF85F9
 
 Defender scan:
   disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+  disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc: found no threats
   disk_image_patch_tiny_mc\cubegm\rkgame: found no threats
 ```
 
