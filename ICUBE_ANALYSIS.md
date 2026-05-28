@@ -132,3 +132,35 @@ They append route diagnostics to:
 Each event records `$0`, `$$`, `$PPID`, current directory, and a `ps` snapshot.
 This should show whether the device is entering through `icube_start.sh`,
 `icube.sh`, or the return-to-projector `icubemp_start.sh` path.
+
+## Observed Device Route
+
+`E:/cubegm/boot_route.log` from the device showed:
+
+```text
+script=/mnt/sdcard/cubegm/icube.sh pid=548 ppid=1 event=start args=
+script=/mnt/sdcard/cubegm/icube.sh ... event=launching /mnt/sdcard/cubegm/icube ...
+script=/mnt/sdcard/cubegm/icube.sh ... event=started /mnt/sdcard/cubegm/icube child=556
+script=/mnt/sdcard/cubegm/icube.sh ... event=calling init -q
+```
+
+The process snapshot contained:
+
+```text
+hcdaemon
+{icube.sh} /bin/sh /mnt/sdcard/cubegm/icube.sh
+/mnt/sdcard/cubegm/icube
+rkgame
+```
+
+So the cold boot path is not `hcprojector -> icube_start.sh`. It is
+`init/rcS -> S41hcdaemon -> hcdaemon -> /mnt/sdcard/cubegm/icube.sh`, with
+the script process parented to `init` by the time it logs.
+
+`disk_image_patch_039` therefore changes `icube.sh` itself to launch:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE &
+```
+
+instead of `/mnt/sdcard/cubegm/icube &`.
