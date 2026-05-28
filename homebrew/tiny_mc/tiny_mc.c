@@ -20,8 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/ipc.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -77,6 +79,9 @@ enum rkgame_key_bits {
 
 #define CUBE_IOCTL_GAME_STATUS 0x40050208
 #define CUBE_IOCTL_JOY_KEY_PTR 0x40050209
+#define ICUBE_HEARTBEAT_KEY 0x4d2
+#define ICUBE_HEARTBEAT_SIZE 0x1c4
+#define ICUBE_HEARTBEAT_FLAGS (IPC_CREAT | 0666)
 
 struct fb_bitfield_local {
     uint32_t offset;
@@ -209,6 +214,13 @@ struct driver_display_state {
     int active;
 };
 
+struct heartbeat_state {
+    int shmid;
+    volatile uint32_t *shm;
+    uint32_t counter;
+    long next_log_ms;
+};
+
 struct input_state {
     int fds[MAX_INPUT_FDS];
     int fd_count;
@@ -235,6 +247,7 @@ struct entry {
 
 static struct fb_state g_fb = {-1, NULL, 0, TINY_MC_WIDTH, TINY_MC_HEIGHT, 16, TINY_MC_WIDTH * 2};
 static struct driver_display_state g_driver;
+static struct heartbeat_state g_heartbeat = {-1, NULL, 0, 0};
 static struct input_state g_input;
 static struct entry g_entries[MAX_ENTRIES];
 static int g_entry_count;
@@ -338,6 +351,59 @@ static void log_msg(const char *fmt, ...)
     (void)fmt;
 }
 #endif
+
+static void heartbeat_tick(void)
+{
+    long ms;
+
+    if (!g_heartbeat.shm) {
+        return;
+    }
+
+    g_heartbeat.counter++;
+    g_heartbeat.shm[0] = 1;
+    g_heartbeat.shm[1] = g_heartbeat.counter;
+
+    ms = now_ms();
+    if (ms >= g_heartbeat.next_log_ms) {
+        log_msg("icube heartbeat counter=%u", g_heartbeat.counter);
+        g_heartbeat.next_log_ms = ms + 5000;
+    }
+}
+
+static void heartbeat_open(void)
+{
+    void *mem;
+
+    g_heartbeat.shmid = shmget(ICUBE_HEARTBEAT_KEY, ICUBE_HEARTBEAT_SIZE,
+                               ICUBE_HEARTBEAT_FLAGS);
+    if (g_heartbeat.shmid < 0) {
+        log_msg("icube heartbeat shmget failed: %s", strerror(errno));
+        return;
+    }
+
+    mem = shmat(g_heartbeat.shmid, NULL, 0);
+    if (mem == (void *)-1) {
+        log_msg("icube heartbeat shmat failed: %s", strerror(errno));
+        g_heartbeat.shmid = -1;
+        return;
+    }
+
+    g_heartbeat.shm = (volatile uint32_t *)mem;
+    g_heartbeat.counter = 0;
+    g_heartbeat.next_log_ms = now_ms() + 5000;
+    heartbeat_tick();
+    log_msg("icube heartbeat attached shmid=%d", g_heartbeat.shmid);
+}
+
+static void heartbeat_close(void)
+{
+    if (g_heartbeat.shm) {
+        shmdt((void *)g_heartbeat.shm);
+        g_heartbeat.shm = NULL;
+    }
+    g_heartbeat.shmid = -1;
+}
 
 static uint16_t rgb565(unsigned r, unsigned g, unsigned b)
 {
@@ -1232,11 +1298,26 @@ static void launch_selected(void)
 
     log_msg("waiting child pid=%ld", (long)pid);
     int status = 0;
-    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+    int wait_error = 0;
+    for (;;) {
+        pid_t wait_rc = waitpid(pid, &status, WNOHANG);
+        if (wait_rc == pid) {
+            break;
+        }
+        if (wait_rc < 0 && errno != EINTR) {
+            snprintf(g_status, sizeof(g_status), "waitpid failed: %s", strerror(errno));
+            log_msg("%s", g_status);
+            wait_error = errno;
+            break;
+        }
+        heartbeat_tick();
+        usleep(REFRESH_USEC);
     }
 
     char result[sizeof(g_status)];
-    if (WIFEXITED(status)) {
+    if (wait_error != 0) {
+        snprintf(result, sizeof(result), "%s wait failed: %s", e->name, strerror(wait_error));
+    } else if (WIFEXITED(status)) {
         snprintf(result, sizeof(result), "%s exited: %d", e->name, WEXITSTATUS(status));
     } else if (WIFSIGNALED(status)) {
         snprintf(result, sizeof(result), "%s signaled: %d", e->name, WTERMSIG(status));
@@ -1314,12 +1395,14 @@ int main(int argc, char **argv)
 {
     log_open();
     log_msg("tiny_mc start argc=%d", argc);
+    heartbeat_open();
     choose_start_dir(argc, argv);
     scan_directory();
 
     if (display_open() != 0) {
         fprintf(stderr, "tiny_mc: %s\n", g_status);
         log_msg("fatal display_open failed: %s", g_status);
+        heartbeat_close();
         log_close();
         return 1;
     }
@@ -1330,12 +1413,14 @@ int main(int argc, char **argv)
         uint32_t buttons = input_buttons();
         handle_buttons(buttons);
         draw_ui();
+        heartbeat_tick();
         usleep(REFRESH_USEC);
     }
 
     display_close();
     input_close_devices();
     log_msg("tiny_mc exit");
+    heartbeat_close();
     log_close();
     return 0;
 }

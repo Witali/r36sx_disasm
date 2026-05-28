@@ -28,6 +28,11 @@ The program uses:
 
 No SDL, DirectFB, ncurses, or Midnight Commander runtime is required.
 
+Tiny MC also mirrors the stock `rkgame` heartbeat expected by the `icube`
+supervisor. It attaches SysV shared memory key `0x4d2`, size `0x1c4`, and
+updates `shm[0]=1` / `shm[1]++` from the main loop. Without this heartbeat,
+`icube` treats `rkgame` as hung and restarts it after roughly 5-6 seconds.
+
 The `driver.so` path is important on the real device: stock `rkgame` relies on
 that library to configure the framebuffer, rotation/scaling, blank/unblank
 state, HCGE, and render/painter threads. Tiny MC closes its display and input

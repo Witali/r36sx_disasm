@@ -343,3 +343,74 @@ SHA256: 91F96858C58AA6D2E4DFBA7539A0C01061DE39F195174C9EB80AA6541E9D1037
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_025\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 icube heartbeat rebuild
+
+Device test result:
+
+Tiny MC rendered correctly and buttons worked, but about every 5 seconds it
+returned to its initial state.
+
+Reverse engineering result:
+
+Ghidra analysis of `cubegm/icube` showed that this is not a kernel watchdog.
+`icube` is a small userspace supervisor:
+
+- It calls `ShareMemCreat()`, using `shmget(0x4d2, 0x1c4, IPC_CREAT | 0666)`.
+- It starts `/mnt/sdcard/cubegm/rkgame` with `fork()` + `execl()`.
+- After an initial `sleep(6)`, it checks `shm[1]` once per second.
+- If `shm[1]` is unchanged or zero, it runs `system("killall rkgame")` and
+  starts `rkgame` again.
+
+Stock `rkgame` has `ShareMemCreat()` and `XintiaoThread`; the thread runs every
+20 ms and updates:
+
+```text
+shm[0] = 1
+shm[1]++
+```
+
+Analysis command:
+
+```powershell
+.\ghidra_12.0.4_PUBLIC\support\analyzeHeadless.bat .\ghidra_projects icube_supervisor -import .\disk_image\cubegm\icube -scriptPath .\ghidra_scripts -postScript ExportDisasmAndDecompile.java .\ghidra_exports\icube -deleteProject
+```
+
+Code change:
+
+- Tiny MC now attaches the same SysV shared memory segment.
+- It updates the `icube` heartbeat from the main loop.
+- It also updates the heartbeat while waiting for a launched child process with
+  `waitpid(..., WNOHANG)`, so a long-running child does not make `icube`
+  restart Tiny MC.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_026
+```
+
+Patch files:
+
+```text
+disk_image_patch_026\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings: icube heartbeat, tiny_mc.log, cube_ioctl
+Size: 38676 bytes
+SHA256: AD81FE4356DE2B49FF505256FB233614557AD1EA518447C84821BCC005925BC0
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_026\cubegm\rkgame: found no threats
+```

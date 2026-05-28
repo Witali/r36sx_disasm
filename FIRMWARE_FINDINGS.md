@@ -302,6 +302,25 @@ FN     0x00010000
 логирует `raw0/raw1/state/buttons` в `tiny_mc.log`, и только затем дополняет
 результат fallback-источниками `/dev/input/js*` и evdev.
 
+## `icube` перезапускает `rkgame`, если нет heartbeat
+
+Ghidra-анализ `cubegm/icube` показал, что это userspace-супервизор штатного
+лаунчера, а не просто вспомогательная утилита:
+
+1. `icube` создает/подключает SysV shared memory:
+   `shmget(0x4d2, 0x1c4, IPC_CREAT | 0666)`.
+2. Запускает `/mnt/sdcard/cubegm/rkgame` через `fork()` + `execl()`.
+3. После первого `sleep(6)` раз в секунду проверяет `shm[1]`.
+4. Если `shm[1]` не меняется или равен нулю, вызывает
+   `system("killall rkgame")` и запускает `rkgame` снова.
+
+У штатного `rkgame` это обслуживает `XintiaoThread`: он каждые 20 мс вызывает
+`xintiao()`, где выставляется `shm[0] = 1` и увеличивается `shm[1]`.
+
+Следствие: любой replacement для `cubegm/rkgame` должен повторять этот
+heartbeat, иначе `icube` будет перезапускать его примерно через 5-6 секунд.
+Tiny MC делает это начиная с `disk_image_patch_026`.
+
 ## Найденные публичные исходники/SDK
 
 В `internet_sources\hcrtos` лежит найденный публичный SDK/исходники HCRTOS.
