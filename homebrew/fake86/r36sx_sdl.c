@@ -69,6 +69,7 @@ struct r36sx_display {
     uint16_t *frame;
     int active;
     uint64_t last_present_us;
+    uint32_t present_count;
     uint32_t cube_key_addr;
     volatile uint32_t *cube_key_mem;
 };
@@ -598,6 +599,12 @@ void SDL_RenderPresent(SDL_Renderer *renderer)
     int dst_x;
     int dst_y;
     uint64_t now;
+    uint32_t present_no;
+    uint32_t sample_count = 0;
+    uint32_t sample_nonzero = 0;
+    uint32_t checksum = 0;
+    uint32_t first_pixel = 0;
+    int have_first_pixel = 0;
 
     if (!renderer || !renderer->copy_texture || !g_display.active ||
         !g_display.disp_frame) {
@@ -608,6 +615,7 @@ void SDL_RenderPresent(SDL_Renderer *renderer)
     if (src.w <= 0 || src.h <= 0) {
         return;
     }
+    present_no = ++g_display.present_count;
 
     dst_w = R36SX_SCREEN_WIDTH;
     dst_h = (src.h * dst_w) / src.w;
@@ -628,9 +636,31 @@ void SDL_RenderPresent(SDL_Renderer *renderer)
             (size_t)dst_x;
         for (int x = 0; x < dst_w; x++) {
             int sx = src.x + (x * src.w) / dst_w;
-            dst_row[x] = r36sx_argb8888_to_rgb565(
-                tex->pixels[(size_t)sy * (size_t)tex->w + (size_t)sx]);
+            uint32_t color =
+                tex->pixels[(size_t)sy * (size_t)tex->w + (size_t)sx];
+            if (((x | y) & 31) == 0) {
+                if (!have_first_pixel) {
+                    first_pixel = color;
+                    have_first_pixel = 1;
+                }
+                if ((color & 0x00ffffffu) != 0) {
+                    sample_nonzero++;
+                }
+                checksum = (checksum * 33u) ^ color;
+                sample_count++;
+            }
+            dst_row[x] = r36sx_argb8888_to_rgb565(color);
         }
+    }
+    if (present_no <= 12u || (present_no % 60u) == 0u) {
+        r36sx_fake86_log("present #%u src=%d,%d %dx%d dst=%dx%d+%d+%d samples=%u nonzero=%u checksum=0x%08x first=0x%08x",
+                         (unsigned int)present_no,
+                         src.x, src.y, src.w, src.h,
+                         dst_w, dst_h, dst_x, dst_y,
+                         (unsigned int)sample_count,
+                         (unsigned int)sample_nonzero,
+                         (unsigned int)checksum,
+                         (unsigned int)first_pixel);
     }
 
     now = r36sx_now_us();

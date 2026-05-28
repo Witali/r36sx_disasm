@@ -112,12 +112,12 @@ int main ( int argc, char *argv[] )
 	r36sx_fake86_debug_log("main start argc=%d", argc);
 	if (argc < 2) {
 		static char *default_argv[] = {
-			"fake86", "-internalbios", "-boot", "rom", "-nosound",
+			"fake86", "-boot", "rom", "-nosound",
 			"-speed", "4770000", "-delay", "16", NULL
 		};
 		argc = 8;
 		argv = default_argv;
-		r36sx_fake86_debug_log("using default args: -internalbios -boot rom -nosound -speed 4770000 -delay 16");
+		r36sx_fake86_debug_log("using default args: -boot rom -nosound -speed 4770000 -delay 16");
 	}
 	puts(FAKE86_BANNER_STRING);')
             $Text = $Text.Replace('	while (running) {

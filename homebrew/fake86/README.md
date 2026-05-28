@@ -34,12 +34,12 @@ The executable expects this layout on the SD card:
 When Fake86 is launched without arguments, the patched main function injects:
 
 ```text
-fake86 -internalbios -boot rom -nosound -speed 4770000 -delay 16
+fake86 -boot rom -nosound -speed 4770000 -delay 16
 ```
 
-This should boot into ROM BASIC using the internal BIOS/data files. Floppy or
-hard-disk boot can be enabled later by passing upstream Fake86 arguments such
-as `-fd0` or `-hd0`.
+This should boot into ROM BASIC using the external BIOS/data files shipped in
+`data/`. Floppy or hard-disk boot can be enabled later by passing upstream
+Fake86 arguments such as `-fd0` or `-hd0`.
 
 ## Device Logs
 
@@ -70,3 +70,5 @@ If the main path is unavailable, `fake86.log` falls back to `/mnt/sdcard/`.
 - Audio is disabled in the first build with `-nosound`.
 - This is an experimental native port and still needs device-side testing.
 - The current default launch path does not mount a floppy or HDD image.
+- `fake86.log` records early `SDL_RenderPresent()` diagnostics, including
+  sampled non-black pixels and a simple checksum for displayed frames.

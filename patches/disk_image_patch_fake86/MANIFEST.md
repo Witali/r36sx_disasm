@@ -21,7 +21,7 @@ Run `/mnt/sdcard/MIPS_NATIVE/fake86/fake86` from TinyMC.
 When no arguments are provided, it starts with:
 
 ```text
--internalbios -boot rom -nosound -speed 4770000 -delay 16
+-boot rom -nosound -speed 4770000 -delay 16
 ```
 
 ## Logs
@@ -33,3 +33,5 @@ Device logs are written to:
 /mnt/sdcard/MIPS_NATIVE/fake86/fake86.stdout.log
 /mnt/sdcard/MIPS_NATIVE/fake86/fake86.stderr.log
 ```
+
+`fake86.log` also includes sampled frame diagnostics from `SDL_RenderPresent()`.

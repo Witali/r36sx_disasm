@@ -35,11 +35,20 @@ The build script:
 - compiles the local `r36sx_sdl.c` SDL compatibility layer;
 - links a native MIPS executable named `homebrew/fake86/fake86`.
 
+Default no-argument launch command:
+
+```text
+fake86 -boot rom -nosound -speed 4770000 -delay 16
+```
+
+The native SDL shim logs early `SDL_RenderPresent()` calls to help distinguish
+an emulator-side black frame from a display-driver problem.
+
 Current output:
 
 ```text
 homebrew/fake86/fake86
-size: 440856 bytes
+size: 441616 bytes
 ```
 
 ## Install Commands Used
