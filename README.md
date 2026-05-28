@@ -261,6 +261,8 @@ Notable patch history:
   shared hardware constants into `homebrew/common/hardware.h`.
 - `disk_image_patch_028`: creates root-level `MIPS_NATIVE` for standalone MIPS
   programs launched directly from Tiny MC.
+- `disk_image_patch_029`: Tiny MC rebuild with a right-side scrollbar for
+  directories that contain more entries than fit on screen.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

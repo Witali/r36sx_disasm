@@ -460,3 +460,50 @@ SHA256: 122FA794691B1BDA725E8F85411499C324C7127142AD9EF657B8E9E8463FEF7F
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_027\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 scrollbar rebuild
+
+Purpose:
+
+Show a visual scrollbar in Tiny MC when the current directory has more entries
+than fit on screen.
+
+Code change:
+
+- Added list and scrollbar UI constants.
+- Added `draw_scrollbar()`.
+- Scrollbar is rendered only when `g_entry_count > visible_rows()`.
+- Reduced list text and selection highlight width while the scrollbar is shown.
+- Clamped `g_scroll` to the maximum valid scroll offset in
+  `ensure_selection_visible()`.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_029
+```
+
+Patch file:
+
+```text
+disk_image_patch_029\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings: icube heartbeat, tiny_mc.log, cube_ioctl
+Size: 39636 bytes
+SHA256: 3B50D99E3F450205D83015FF5D99D6F30D04207E8E641DF8D112940B81FE9150
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_029\cubegm\rkgame: found no threats
+```

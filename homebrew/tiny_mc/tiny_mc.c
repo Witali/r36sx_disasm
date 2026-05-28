@@ -49,7 +49,13 @@ enum {
     REFRESH_USEC = 50000,
     JS_DEADZONE = 16000,
     HEADER_H = 48,
-    FOOTER_H = 40
+    FOOTER_H = 40,
+    LIST_ROW_H = 18,
+    LIST_TOP_OFFSET = 20,
+    LIST_BOTTOM_PAD = 8,
+    SCROLLBAR_WIDTH = 5,
+    SCROLLBAR_RIGHT_PAD = 8,
+    SCROLLBAR_MIN_THUMB = 14
 };
 
 #define LOG_LINE_MAX 768
@@ -1105,10 +1111,9 @@ static uint32_t input_buttons(void)
 
 static int visible_rows(void)
 {
-    int row_h = 18;
-    int top = HEADER_H + 20;
-    int bottom = g_fb.height - FOOTER_H - 8;
-    int rows = (bottom - top) / row_h;
+    int top = HEADER_H + LIST_TOP_OFFSET;
+    int bottom = g_fb.height - FOOTER_H - LIST_BOTTOM_PAD;
+    int rows = (bottom - top) / LIST_ROW_H;
     return rows > 1 ? rows : 1;
 }
 
@@ -1130,6 +1135,13 @@ static void ensure_selection_visible(void)
     if (g_scroll < 0) {
         g_scroll = 0;
     }
+    int max_scroll = g_entry_count - rows;
+    if (max_scroll < 0) {
+        max_scroll = 0;
+    }
+    if (g_scroll > max_scroll) {
+        g_scroll = max_scroll;
+    }
 }
 
 static void format_entry(char *out, size_t out_size, const struct entry *e)
@@ -1145,6 +1157,44 @@ static void format_entry(char *out, size_t out_size, const struct entry *e)
     }
 }
 
+static void draw_scrollbar(int top, int rows)
+{
+    int track_h;
+    int thumb_h;
+    int max_scroll;
+    int movable;
+    int thumb_y;
+    int x;
+
+    if (g_entry_count <= rows || rows <= 0) {
+        return;
+    }
+
+    track_h = rows * LIST_ROW_H;
+    x = g_fb.width - SCROLLBAR_RIGHT_PAD - SCROLLBAR_WIDTH;
+    max_scroll = g_entry_count - rows;
+    thumb_h = (rows * track_h) / g_entry_count;
+    if (thumb_h < SCROLLBAR_MIN_THUMB) {
+        thumb_h = SCROLLBAR_MIN_THUMB;
+    }
+    if (thumb_h > track_h) {
+        thumb_h = track_h;
+    }
+
+    movable = track_h - thumb_h;
+    thumb_y = top;
+    if (max_scroll > 0 && movable > 0) {
+        thumb_y += (g_scroll * movable + max_scroll / 2) / max_scroll;
+    }
+    if (thumb_y + thumb_h > top + track_h) {
+        thumb_y = top + track_h - thumb_h;
+    }
+
+    fill_rect(x, top, SCROLLBAR_WIDTH, track_h, rgb565(32, 42, 48));
+    fill_rect(x, thumb_y, SCROLLBAR_WIDTH, thumb_h, rgb565(105, 138, 146));
+    fill_rect(x, thumb_y, SCROLLBAR_WIDTH, 1, rgb565(170, 205, 205));
+}
+
 static void draw_ui(void)
 {
     uint16_t bg = rgb565(14, 18, 24);
@@ -1154,9 +1204,11 @@ static void draw_ui(void)
     uint16_t text = rgb565(220, 235, 230);
     uint16_t muted = rgb565(150, 165, 170);
     uint16_t black = rgb565(0, 0, 0);
-    int row_h = 18;
-    int top = HEADER_H + 20;
+    int top = HEADER_H + LIST_TOP_OFFSET;
     int rows = visible_rows();
+    int has_scrollbar = g_entry_count > rows;
+    int selection_w = g_fb.width - (has_scrollbar ? 34 : 16);
+    int text_max_w = g_fb.width - (has_scrollbar ? 64 : 44);
 
     fill_rect(0, 0, g_fb.width, g_fb.height, bg);
     fill_rect(0, 0, g_fb.width, HEADER_H, band);
@@ -1176,17 +1228,19 @@ static void draw_ui(void)
         if (idx >= g_entry_count) {
             break;
         }
-        int y = top + row * row_h;
+        int y = top + row * LIST_ROW_H;
         char label[320];
         format_entry(label, sizeof(label), &g_entries[idx]);
         if (idx == g_selected) {
-            fill_rect(8, y - 2, g_fb.width - 16, row_h, rgb565(50, 78, 92));
-            fill_rect(10, y, 4, row_h - 4, hi);
-            draw_text(22, y, label, rgb565(255, 246, 220), 2, g_fb.width - 44);
+            fill_rect(8, y - 2, selection_w, LIST_ROW_H, rgb565(50, 78, 92));
+            fill_rect(10, y, 4, LIST_ROW_H - 4, hi);
+            draw_text(22, y, label, rgb565(255, 246, 220), 2, text_max_w);
         } else {
-            draw_text(22, y, label, text, 2, g_fb.width - 44);
+            draw_text(22, y, label, text, 2, text_max_w);
         }
     }
+
+    draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
               "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK",

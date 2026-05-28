@@ -13,6 +13,9 @@ while preserving the original launcher as `cubegm/rkgame.stock`.
 - Right: enter the selected directory.
 - A or Start: enter a directory or run the selected file.
 
+Directories with more entries than fit on screen show a thin scrollbar on the
+right side of the file list.
+
 ## Runtime model
 
 The program uses:
