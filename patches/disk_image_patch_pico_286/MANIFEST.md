@@ -26,3 +26,12 @@ Optional PC disk images should be placed in the same directory:
 The current binary is an unstripped ELF32 little-endian MIPS executable.  Zig
 0.16.0 `objcopy --strip-all` reports `error: unimplemented` for this file, so
 the build keeps symbols for now.
+
+This patch was rebuilt after the first device log showed:
+
+- `main: pthread_create sound=0 ticks=0`
+- `main: fatal signal 11`
+
+The new binary adds first-iteration logs for `sound_thread`, `ticks_thread`,
+`exec86()`, and `mfb_update()`.  It also avoids the upstream audio cast from
+`int16_t *` to `int32_t *` in `get_sound_sample()`.

@@ -154,3 +154,47 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 device log follow-up build
+
+Device log received from `/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log`:
+
+```text
+main: pthread_create sound=0 ticks=0
+main: fatal signal 11
+```
+
+That means `driver.so` video, joypad shared memory, OPL allocation, emulator
+reset, and `driver.so` audio initialization all completed.  The crash happens
+immediately after the sound and timer threads start, before the previous build
+could prove whether the first `exec86()` or one of the helper threads caused
+the segmentation fault.
+
+Changes in this build:
+
+- Added early logs at the start of `sound_thread()` and `ticks_thread()`.
+- Added first-iteration logs before and after `exec86()` and `mfb_update()`.
+- Added first audio-buffer write logs from `sound_thread()`.
+- Added `-fno-strict-aliasing` to reduce risk from upstream host pointer casts.
+- Added generated `obj/r36sx_ports.c`, replacing `get_sound_sample()` so OPL
+  audio renders into an `int32_t` temporary and is clamped into the `int16_t`
+  stereo buffer.  The upstream host code casts `int16_t *` to `int32_t *`,
+  which is fragile on MIPS.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,894,916 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Next device test expectation: if it still crashes, the log should now show
+whether the last successful point was `ticks_thread`, `sound_thread`, first
+`exec86()`, or first `mfb_update()`.

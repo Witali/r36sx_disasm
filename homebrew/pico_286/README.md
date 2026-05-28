@@ -23,10 +23,14 @@ The build script leaves upstream source files untouched.  It writes temporary
 patched copies into `homebrew/pico_286/obj/`:
 
 - `r36sx_linux-main.cpp` adds byte-pointer casts for renderer `VIDEORAM`
-  arithmetic that Clang refuses in C++.
+  arithmetic that Clang refuses in C++ and adds early startup/thread/main-loop
+  debug logs.
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
   directory, matching TinyMC's `chdir()` before launch.
+- `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
+  before clamping to the emulator's `int16_t` stereo buffer, avoiding the
+  upstream host cast from `int16_t *` to `int32_t *` on MIPS.
 
 Input mapping for the first build:
 

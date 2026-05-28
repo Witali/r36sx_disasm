@@ -76,6 +76,7 @@ $CommonArgs = @(
     "-fPIC",
     "-fms-extensions",
     "-fno-sanitize=undefined",
+    "-fno-strict-aliasing",
     "-fno-builtin-memset",
     "-fno-builtin-memcpy",
     "-Wall",
@@ -194,6 +195,53 @@ void fatal_signal_handler(int sig) {
     r36sx_pico286_debug_log("main: sn76489_reset done");
     reset86();
     r36sx_pico286_debug_log("main: reset86 done");')
+    $Text = $Text.Replace('void *sound_thread(void *arg) {
+    while (running) {',
+'void *sound_thread(void *arg) {
+    r36sx_pico286_debug_log("sound_thread: start arg=%p", arg);
+    unsigned int sound_loop_count = 0;
+    while (running) {')
+    $Text = $Text.Replace('        // Send audio buffer to Linux audio system
+        if (linux_audio_write(audio_buffer, AUDIO_BUFFER_LENGTH) != 0) {',
+'        // Send audio buffer to Linux audio system
+        if (++sound_loop_count <= 4u) {
+            r36sx_pico286_debug_log("sound_thread: write #%u sample_index=%d",
+                                    sound_loop_count, sample_index);
+        }
+        if (linux_audio_write(audio_buffer, AUDIO_BUFFER_LENGTH) != 0) {')
+    $Text = $Text.Replace('    return NULL;
+}
+
+void *ticks_thread(void *arg) {
+    struct timespec start, current;
+    clock_gettime(CLOCK_MONOTONIC, &start);',
+'    r36sx_pico286_debug_log("sound_thread: exit loops=%u", sound_loop_count);
+    return NULL;
+}
+
+void *ticks_thread(void *arg) {
+    r36sx_pico286_debug_log("ticks_thread: start arg=%p timer_period=%d",
+                            arg, timer_period);
+    struct timespec start, current;
+    clock_gettime(CLOCK_MONOTONIC, &start);')
+    $Text = $Text.Replace('    while (running) {
+        clock_gettime(CLOCK_MONOTONIC, &current);',
+'    unsigned int ticks_loop_count = 0;
+    while (running) {
+        clock_gettime(CLOCK_MONOTONIC, &current);
+        if (++ticks_loop_count <= 4u) {
+            r36sx_pico286_debug_log("ticks_thread: loop #%u timer_period=%d sample_index=%d",
+                                    ticks_loop_count, timer_period, sample_index);
+        }')
+    $Text = $Text.Replace('    return NULL;
+}
+
+int main() {',
+'    r36sx_pico286_debug_log("ticks_thread: exit loops=%u", ticks_loop_count);
+    return NULL;
+}
+
+int main() {')
     $Text = $Text.Replace('    pthread_t sound_tid, ticks_tid;
     pthread_create(&sound_tid, NULL, sound_thread, NULL);
     pthread_create(&ticks_tid, NULL, ticks_thread, NULL);',
@@ -213,15 +261,31 @@ void fatal_signal_handler(int sig) {
     }',
 '    unsigned int main_loop_count = 0;
     while (running) {
+        if (main_loop_count < 8u) {
+            r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",
+                                    main_loop_count, videomode);
+        }
         exec86(32768);  // Reduced from 32768 to allow more frequent audio updates
+        if (main_loop_count < 8u) {
+            r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
+                                    main_loop_count, videomode);
+        }
         if ((++main_loop_count % 300u) == 0u) {
             r36sx_pico286_debug_log("main: alive loops=%u videomode=0x%x",
                                     main_loop_count, videomode);
+        }
+        if (main_loop_count <= 8u) {
+            r36sx_pico286_debug_log("main: before mfb_update loop=%u",
+                                    main_loop_count);
         }
         if (mfb_update(SCREEN, 0) < 0) {
             r36sx_pico286_debug_log("main: mfb_update requested stop");
             running = 0;
             break;
+        }
+        if (main_loop_count <= 8u) {
+            r36sx_pico286_debug_log("main: after mfb_update loop=%u",
+                                    main_loop_count);
         }
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);')
@@ -283,15 +347,71 @@ function New-Patched-Cpu {
     return $Dest
 }
 
+function New-Patched-Ports {
+    $Source = Join-Path $PicoRoot "src\emulator\ports.c"
+    $Dest = Join-Path $ObjDir "r36sx_ports.c"
+    $Text = Get-Content -Raw -Path $Source
+    $Text = $Text.Replace("`r`n", "`n")
+    $Text = $Text.Replace('void get_sound_sample(const int16_t other_sample, int16_t *samples) {
+#if HARDWARE_SOUND
+    const int32_t sample = (speaker_sample() + other_sample + covox_sample + midi_sample());
+    pwm_set_gpio_level(PCM_PIN, (uint16_t) ((int32_t) sample + 0x8000L) >> 4);
+#else
+    OPL_calc_buffer_linear(emu8950_opl, (int32_t *)samples, 1);
+
+    samples[1] = samples[0] += (int32_t)(speaker_sample() + other_sample + covox_sample + sn76489_sample() + midi_sample());
+    cms_samples(samples);
+#endif
+
+}',
+'static int16_t r36sx_clamp_i16(int32_t sample)
+{
+    if (sample > 32767) {
+        return 32767;
+    }
+    if (sample < -32768) {
+        return -32768;
+    }
+    return (int16_t)sample;
+}
+
+void get_sound_sample(const int16_t other_sample, int16_t *samples) {
+#if HARDWARE_SOUND
+    const int32_t sample = (speaker_sample() + other_sample + covox_sample + midi_sample());
+    pwm_set_gpio_level(PCM_PIN, (uint16_t) ((int32_t) sample + 0x8000L) >> 4);
+#else
+    int32_t opl_sample[1] = {0};
+    int16_t cms_mix[2] = {0, 0};
+    int32_t mixed;
+
+    if (emu8950_opl) {
+        OPL_calc_buffer_linear(emu8950_opl, opl_sample, 1);
+    }
+
+    mixed = opl_sample[0] + (int32_t)(speaker_sample() + other_sample +
+            covox_sample + sn76489_sample() + midi_sample());
+    cms_mix[0] = r36sx_clamp_i16(mixed);
+    cms_mix[1] = cms_mix[0];
+    cms_samples(cms_mix);
+    samples[0] = cms_mix[0];
+    samples[1] = cms_mix[1];
+#endif
+
+}')
+    Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
+    return $Dest
+}
+
 $CFiles = @()
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "src\emulator") -Recurse -File -Filter "*.c" |
-    Where-Object { $_.Name -ne "cpu.c" }
+    Where-Object { $_.Name -ne "cpu.c" -and $_.Name -ne "ports.c" }
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "src\emu8950") -File -Filter "*.c"
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "findfirst") -File -Filter "*.c"
 $CFiles += Get-Item (Join-Path $PicoRoot "src\printf\printf.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_minifb.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_linux_audio.c")
 $CFiles += Get-Item (New-Patched-Cpu)
+$CFiles += Get-Item (New-Patched-Ports)
 
 foreach ($File in $CFiles) {
     Compile-C $File.FullName
