@@ -99,8 +99,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 46900 bytes
-  SHA256: DFC466EFEBFA07E4A0E8DEC6A0C4BCA3B18E5A1B028B5F8664633E169FD88D07
+  Size: 46916 bytes
+  SHA256: 845CE784ECDE9241C509C67F305895C43A997326BF070F783AC632261CD84A09
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,

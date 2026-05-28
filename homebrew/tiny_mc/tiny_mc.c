@@ -56,14 +56,14 @@ enum {
     JS_DEADZONE = 16000,
     HEADER_H = 48,
     FOOTER_H = 40,
-    LIST_ROW_H = 18,
+    LIST_ROW_H = 22,
     LIST_TOP_OFFSET = 20,
     LIST_BOTTOM_PAD = 8,
     SCROLLBAR_WIDTH = 5,
     SCROLLBAR_RIGHT_PAD = 8,
     SCROLLBAR_MIN_THUMB = 14,
-    TINY_FT_SMALL_PX = 10,
-    TINY_FT_LARGE_PX = 16,
+    TINY_FT_SMALL_PX = 12,
+    TINY_FT_LARGE_PX = 19,
     TINY_FT_CACHE_SLOTS = 192
 };
 
@@ -1163,7 +1163,7 @@ static int draw_text_freetype(int x, int y, const char *text,
     }
 
     int pixel_height = scale <= 1 ? TINY_FT_SMALL_PX : TINY_FT_LARGE_PX;
-    int baseline = y + (scale <= 1 ? 9 : 15);
+    int baseline = y + (scale <= 1 ? 11 : 18);
     int limit = max_px > 0 ? x + max_px : g_fb.width;
     const char *p = text;
 

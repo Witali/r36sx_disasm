@@ -347,6 +347,8 @@ Notable patch history:
   `MIPS_NATIVE/common/fonts`, adds Liberation Mono, DejaVu Sans Mono,
   Noto Sans Mono, Source Code Pro, Hack, and Roboto Mono, and rebuilds Tiny MC
   to prefer the common font directory.
+- `disk_image_patch_051`: rebuilds Tiny MC with FreeType text about 20 percent
+  larger and increases file-list row height to match.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

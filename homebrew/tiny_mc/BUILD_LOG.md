@@ -1169,3 +1169,44 @@ Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan patches\disk_image_patch_050: found no threats
 Defender scan patches\disk_image_patch_tiny_mc: found no threats
 ```
+
+## 2026-05-28 larger FreeType UI text rebuild
+
+Purpose:
+
+Make Tiny MC's FreeType text roughly 20 percent larger for readability on the
+device screen.
+
+Source changes:
+
+- `TINY_FT_SMALL_PX`: 10 -> 12
+- `TINY_FT_LARGE_PX`: 16 -> 19
+- FreeType baseline offsets: 9/15 -> 11/18
+- `LIST_ROW_H`: 18 -> 22, so file-list rows keep enough vertical room.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_051
+```
+
+Verification:
+
+```text
+Tiny MC size: 46916 bytes
+Tiny MC SHA256: 845CE784ECDE9241C509C67F305895C43A997326BF070F783AC632261CD84A09
+
+Contains strings: MIPS_NATIVE/common/fonts, libfreetype.so.6,
+JetBrainsMonoNL-Regular.ttf, LiberationMono-Regular.ttf, RobotoMono-Regular.ttf
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_051: found no threats
+Defender scan patches\disk_image_patch_tiny_mc: found no threats
+```
