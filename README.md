@@ -179,6 +179,19 @@ Unlike the older `libemu_pong.so`, this is a normal MIPS executable with
 `main()`. It uses `driver.so` for display/input and exits back to Tiny MC on
 Select or Fn.
 
+### Native Button Demo
+
+A standalone Button Demo executable was added for direct launch from Tiny MC:
+
+- Source: [`homebrew/native_button_demo/native_button_demo.c`](homebrew/native_button_demo/native_button_demo.c)
+- Notes: [`homebrew/native_button_demo/README.md`](homebrew/native_button_demo/README.md)
+- Build log: [`homebrew/native_button_demo/BUILD_LOG.md`](homebrew/native_button_demo/BUILD_LOG.md)
+- Build script: `homebrew/native_button_demo/build_native_button_demo.ps1`
+- Built executable: `homebrew/native_button_demo/button_demo`
+
+Unlike the older `libemu_buttondemo.so`, this is a normal MIPS executable with
+`main()`. It uses `driver.so` for display/input and exits back to Tiny MC on Fn.
+
 Important discoveries from these homebrew experiments:
 
 - A dummy ROM with a stock extension such as `.gb` was more reliable than a new
@@ -311,6 +324,8 @@ Notable patch history:
   end-of-game messages.
 - `disk_image_patch_042`: restores Tiny MC Fn shortcut to start stock
   `/mnt/sdcard/cubegm/icube` directly, with startup Fn-release arming.
+- `disk_image_patch_043`: adds native Button Demo under
+  `MIPS_NATIVE/button_demo/button_demo` for launch directly from Tiny MC.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
