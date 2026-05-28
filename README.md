@@ -251,6 +251,8 @@ Notable patch history:
   initialization/present path after the first white/black-screen device test.
 - `disk_image_patch_023`: Tiny MC rebuild with `tiny_mc.log` debug logging and
   cleanup of non-working `.demo`/`.pong` Game Boy menu rows.
+- `disk_image_patch_024`: Tiny MC rebuild that reads built-in buttons through
+  the same `driver.so` `cube_ioctl` + `/tmp/joy_key` path used by `rkgame`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

@@ -60,6 +60,23 @@ enum button_bits {
     BTN_SELECT_BIT = 1u << 7
 };
 
+enum rkgame_key_bits {
+    RKGAME_KEY_SELECT = 0x00000001u,
+    RKGAME_KEY_START = 0x00000008u,
+    RKGAME_KEY_UP = 0x00000010u,
+    RKGAME_KEY_RIGHT = 0x00000020u,
+    RKGAME_KEY_DOWN = 0x00000040u,
+    RKGAME_KEY_LEFT = 0x00000080u,
+    RKGAME_KEY_X = 0x00001000u,
+    RKGAME_KEY_A = 0x00002000u,
+    RKGAME_KEY_B = 0x00004000u,
+    RKGAME_KEY_Y = 0x00008000u,
+    RKGAME_KEY_FN = 0x00010000u
+};
+
+#define CUBE_IOCTL_GAME_STATUS 0x40050208
+#define CUBE_IOCTL_JOY_KEY_PTR 0x40050209
+
 struct fb_bitfield_local {
     uint32_t offset;
     uint32_t length;
@@ -178,6 +195,7 @@ typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
 typedef void (*video_driver_disp_frame_fn)(void *, int, int, int);
 typedef void (*video_driver_deinit_fn)(void);
+typedef int (*cube_ioctl_fn)(int, uint32_t *, uint32_t, uint32_t);
 
 struct driver_display_state {
     void *handle;
@@ -186,6 +204,7 @@ struct driver_display_state {
     video_drivers_init_fn init;
     video_driver_disp_frame_fn disp_frame;
     video_driver_deinit_fn deinit;
+    cube_ioctl_fn cube_ioctl;
     int active;
 };
 
@@ -198,6 +217,12 @@ struct input_state {
     uint8_t ev_key[768];
     int ev_abs_x;
     int ev_abs_y;
+    uint32_t cube_key_addr;
+    volatile uint32_t *cube_key_mem;
+    uint32_t cube_buttons;
+    uint32_t cube_raw0;
+    uint32_t cube_raw1;
+    uint32_t cube_state;
 };
 
 struct entry {
@@ -367,6 +392,7 @@ static int driver_open_display(void)
     g_driver.init = (video_drivers_init_fn)dlsym(g_driver.handle, "video_drivers_init");
     g_driver.disp_frame = (video_driver_disp_frame_fn)dlsym(g_driver.handle, "video_driver_disp_frame");
     g_driver.deinit = (video_driver_deinit_fn)dlsym(g_driver.handle, "video_driver_deinit");
+    g_driver.cube_ioctl = (cube_ioctl_fn)dlsym(g_driver.handle, "cube_ioctl");
     if (!g_driver.setting || !g_driver.init || !g_driver.disp_frame || !g_driver.deinit) {
         snprintf(g_status, sizeof(g_status), "driver.so display symbols missing");
         log_msg("%s setting=%p init=%p frame=%p deinit=%p", g_status,
@@ -374,6 +400,7 @@ static int driver_open_display(void)
         driver_close_display();
         return -1;
     }
+    log_msg("driver.so cube_ioctl=%p", g_driver.cube_ioctl);
 
     g_fb.width = TINY_MC_WIDTH;
     g_fb.height = TINY_MC_HEIGHT;
@@ -844,8 +871,75 @@ static void input_close_devices(void)
     g_input.fd_count = 0;
 }
 
+static uint32_t input_translate_rkgame_keys(uint32_t raw)
+{
+    uint32_t b = 0;
+
+    if ((raw & RKGAME_KEY_UP) != 0) {
+        b |= BTN_UP_BIT;
+    }
+    if ((raw & RKGAME_KEY_DOWN) != 0) {
+        b |= BTN_DOWN_BIT;
+    }
+    if ((raw & RKGAME_KEY_LEFT) != 0) {
+        b |= BTN_LEFT_BIT;
+    }
+    if ((raw & RKGAME_KEY_RIGHT) != 0) {
+        b |= BTN_RIGHT_BIT;
+    }
+    if ((raw & (RKGAME_KEY_A | RKGAME_KEY_X)) != 0) {
+        b |= BTN_A_BIT;
+    }
+    if ((raw & (RKGAME_KEY_B | RKGAME_KEY_Y)) != 0) {
+        b |= BTN_B_BIT;
+    }
+    if ((raw & RKGAME_KEY_START) != 0) {
+        b |= BTN_START_BIT;
+    }
+    if ((raw & RKGAME_KEY_SELECT) != 0) {
+        b |= BTN_SELECT_BIT;
+    }
+
+    return b;
+}
+
+static void input_poll_cube(void)
+{
+    if (!g_driver.cube_ioctl) {
+        return;
+    }
+
+    if (g_input.cube_key_addr == 0) {
+        uint32_t addr = 0;
+        int rc = g_driver.cube_ioctl(CUBE_IOCTL_JOY_KEY_PTR, &addr, 0, 0);
+        g_input.cube_key_addr = addr;
+        g_input.cube_key_mem = (volatile uint32_t *)(uintptr_t)addr;
+        log_msg("cube_ioctl joy key shm rc=%d addr=0x%08x", rc, addr);
+    }
+
+    if (!g_input.cube_key_mem) {
+        return;
+    }
+
+    uint32_t raw0 = g_input.cube_key_mem[0];
+    uint32_t raw1 = g_input.cube_key_mem[1];
+    uint32_t state = 0;
+    g_driver.cube_ioctl(CUBE_IOCTL_GAME_STATUS, &state, 0, 0);
+
+    g_input.cube_buttons = input_translate_rkgame_keys(raw0) | input_translate_rkgame_keys(raw1);
+    if (raw0 != g_input.cube_raw0 || raw1 != g_input.cube_raw1 || state != g_input.cube_state) {
+        log_msg("cube input raw0=0x%08x raw1=0x%08x state=0x%08x buttons=0x%08x",
+                raw0, raw1, state, g_input.cube_buttons);
+        g_input.cube_raw0 = raw0;
+        g_input.cube_raw1 = raw1;
+        g_input.cube_state = state;
+    }
+}
+
 static void input_poll_devices(void)
 {
+    input_poll_cube();
+
     for (int i = 0; i < g_input.fd_count; i++) {
         if (g_input.fds[i] < 0) {
             continue;
@@ -880,7 +974,7 @@ static void input_poll_devices(void)
 
 static uint32_t input_buttons(void)
 {
-    uint32_t b = 0;
+    uint32_t b = g_input.cube_buttons;
 
     if (g_input.js_axis[0] < -JS_DEADZONE) {
         b |= BTN_LEFT_BIT;

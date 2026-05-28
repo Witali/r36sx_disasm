@@ -225,3 +225,74 @@ Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_023\cubegm\rkgame: found no threats
 Removed-menu check for button.demo/pong.pong in patch_023: no matches
 ```
+
+## 2026-05-28 rkgame-style input rebuild
+
+Device test result:
+
+Tiny MC rendered correctly through the `driver.so` display path, but built-in
+buttons did not respond.
+
+Reverse engineering result:
+
+`rkgame` reads built-in controls through `driver.so` `cube_ioctl` and the
+`/tmp/joy_key` shared memory area:
+
+```text
+cube_ioctl(0x40050209, &KEY_VALUE_Addr)
+KEY_VALUE_Addr[0] -> joy_key
+KEY_VALUE_Addr[1] -> second joy word
+cube_ioctl(0x40050208, &Cube_State_Reg)
+```
+
+The `joykey_explaned()` mapping in `rkgame` is:
+
+```text
+SELECT 0x00000001
+START  0x00000008
+UP     0x00000010
+RIGHT  0x00000020
+DOWN   0x00000040
+LEFT   0x00000080
+X      0x00001000
+A      0x00002000
+B      0x00004000
+Y      0x00008000
+FN     0x00010000
+```
+
+Code change:
+
+- Tiny MC now `dlsym()`s `cube_ioctl` from `driver.so`.
+- It obtains the `/tmp/joy_key` shared memory pointer with command
+  `0x40050209`.
+- It polls raw words and the game/status register every frame.
+- It translates `rkgame` masks to Tiny MC navigation bits.
+- It keeps `/dev/input/js*` and evdev as fallback input paths.
+- `tiny_mc.log` records raw input changes as:
+  `cube input raw0=... raw1=... state=... buttons=...`.
+
+Patch directory:
+
+```text
+disk_image_patch_024
+```
+
+Patch files:
+
+```text
+disk_image_patch_024\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings: cube_ioctl, cube input raw, joy key shm, tiny_mc.log
+Size: 37040 bytes
+SHA256: 91F96858C58AA6D2E4DFBA7539A0C01061DE39F195174C9EB80AA6541E9D1037
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_024\cubegm\rkgame: found no threats
+```

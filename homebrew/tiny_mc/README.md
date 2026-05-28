@@ -48,6 +48,22 @@ It logs startup, display initialization, input device opens, directory scans,
 button state changes, launched executables, and child exit status. The render
 loop does not log every frame.
 
+## Input model
+
+Built-in controls are read through the same path used by stock `rkgame`: Tiny
+MC resolves `cube_ioctl` from `cubegm/driver.so`, obtains the `/tmp/joy_key`
+shared memory pointer with command `0x40050209`, and polls the game/status
+register with command `0x40050208`.
+
+The known `rkgame` masks are:
+
+```text
+SELECT=0x1 START=0x8 UP=0x10 RIGHT=0x20 DOWN=0x40 LEFT=0x80
+X=0x1000 A=0x2000 B=0x4000 Y=0x8000 FN=0x10000
+```
+
+`/dev/input/js*` and `/dev/input/event*` remain as fallback sources.
+
 ## Build
 
 From the repository root:

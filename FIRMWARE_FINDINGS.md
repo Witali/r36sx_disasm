@@ -266,6 +266,42 @@ HCGE/rotation/blanking инициализацию. Первый Tiny MC проп
 path - input, потому что stock `rkgame` читает кнопки не только через Linux
 evdev/js, но и через `cube_ioctl`.
 
+## `rkgame` button masks and `/tmp/joy_key`
+
+После теста Tiny MC с работающей картинкой, но без реакции на кнопки, стало
+понятно, что встроенный контроллер надо читать как `rkgame`, а не через
+обычный `/dev/input/js*` первым делом.
+
+`ReadJoystickProc()` в `rkgame` делает следующее:
+
+1. Если `KEY_VALUE_Addr == NULL`, вызывает `cube_ioctl(0x40050209,
+   &KEY_VALUE_Addr)`. В `driver.so` эта команда делает
+   `cube_shmget_init("/tmp/joy_key", 8)` и возвращает адрес shared memory.
+2. Читает `KEY_VALUE_Addr[0]` в `joy_key`.
+3. Читает `KEY_VALUE_Addr[1]` во второй joy word.
+4. Вызывает `cube_ioctl(0x40050208, &Cube_State_Reg)`.
+
+`joykey_explaned()` показывает такие маски:
+
+```text
+SELECT 0x00000001
+START  0x00000008
+UP     0x00000010
+RIGHT  0x00000020
+DOWN   0x00000040
+LEFT   0x00000080
+X      0x00001000
+A      0x00002000
+B      0x00004000
+Y      0x00008000
+FN     0x00010000
+```
+
+`disk_image_patch_024` меняет Tiny MC: теперь он `dlsym()`ит `cube_ioctl`,
+получает `/tmp/joy_key` через `0x40050209`, читает raw masks каждый кадр,
+логирует `raw0/raw1/state/buttons` в `tiny_mc.log`, и только затем дополняет
+результат fallback-источниками `/dev/input/js*` и evdev.
+
 ## Найденные публичные исходники/SDK
 
 В `internet_sources\hcrtos` лежит найденный публичный SDK/исходники HCRTOS.
