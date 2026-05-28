@@ -273,6 +273,36 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-28 BIOS video mode aliases
+
+Device test with the FreeDOS disk images showed text in the debug area:
+
+```text
+unsupported video mode 30
+unsupported video mode 20
+```
+
+The renderer prints video mode numbers as hexadecimal, so these are BIOS modes
+`0x30` and `0x20`.  The local build patch now aliases both modes to the normal
+80x25 text renderer (`0x03`), which draws B800-style text memory into the
+640x480 framebuffer.  This should remove the unsupported-mode spam and make the
+DOS boot text visible while keeping the existing debug area below the main
+400-line text output.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,896,908 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-28 FreeDOS disk images
 
 Device test reached the BIOS disk attach stage and reported missing disk image

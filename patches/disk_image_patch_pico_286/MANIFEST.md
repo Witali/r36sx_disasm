@@ -63,3 +63,6 @@ them to the same `*_ob` memory backend used by upstream `win32-main.cpp`.
 Current build also includes an on-screen disk activity indicator: a small
 blinking red circle appears in the lower-right corner when Pico-286 reads from
 or writes to disk image sectors.
+
+It also maps BIOS video modes `0x20` and `0x30` to the 80x25 text renderer so
+FreeDOS/BIOS boot text can be shown instead of `unsupported video mode 20/30`.

@@ -323,6 +323,12 @@ int main() {')
     mfb_close();
     r36sx_pico286_debug_log("main: exit 0");
     return 0;')
+    $Text = $Text.Replace('                case 0x02:
+                case 0x03: {',
+'                case 0x02:
+                case 0x03:
+                case 0x20:
+                case 0x30: {')
     $Text = $Text.Replace("VIDEORAM + ", "(uint8_t *)VIDEORAM + ")
     $Text = $Text.Replace("vram_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + vram_offset")
     $Text = $Text.Replace("tga_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + tga_offset")
