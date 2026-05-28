@@ -1210,3 +1210,68 @@ Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan patches\disk_image_patch_051: found no threats
 Defender scan patches\disk_image_patch_tiny_mc: found no threats
 ```
+
+## 2026-05-28 runtime font config rebuild
+
+Purpose:
+
+Add `MIPS_NATIVE\tiny_mc\tiny_mc.conf` next to the Tiny MC executable and make
+the FreeType font path and text sizes configurable at runtime.
+
+Config file:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf
+```
+
+Default contents:
+
+```text
+font=/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf
+small_px=12
+large_px=19
+list_row_h=22
+```
+
+Behavior:
+
+- Tiny MC tries the absolute config path first, then `tiny_mc.conf` from the
+  current working directory.
+- Supported aliases include `font_path`, `font_small_px`, `font_large_px`,
+  `font_size`, and `row_h`.
+- Integer values are clamped to conservative ranges.
+- If `list_row_h` is omitted, Tiny MC keeps it at least `large_px + 3`.
+- If the configured font cannot be read or opened by FreeType, Tiny MC falls
+  back through the common mono font pool and then stock firmware fonts.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_052
+```
+
+Verification:
+
+```text
+Tiny MC size: 54208 bytes
+Tiny MC SHA256: FEA903CABAEFEE5CB8871512903C821A0ABC2A67248C5FC6827A9C7CEBAD16C8
+
+tiny_mc.conf size: 452 bytes
+tiny_mc.conf SHA256: 06F53A12D7B4EBC88B587FABF0CB531FB601041E78D025AC0F58CECF443F5D70
+
+Contains strings: tiny_mc.conf, config loaded, font_size, small_px, large_px,
+list_row_h, MIPS_NATIVE/common/fonts, libfreetype.so.6
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan homebrew\tiny_mc\tiny_mc.conf: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc.conf: found no threats
+Defender scan patches\disk_image_patch_052: found no threats
+Defender scan patches\disk_image_patch_tiny_mc: found no threats
+```

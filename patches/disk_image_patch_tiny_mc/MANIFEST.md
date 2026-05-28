@@ -31,6 +31,7 @@ E:/cubegm/icube_start.sh
 E:/cubegm/icubemp_start.sh
 E:/cubegm/rkgame
 E:/MIPS_NATIVE/tiny_mc/tiny_mc
+E:/MIPS_NATIVE/tiny_mc/tiny_mc.conf
 E:/MIPS_NATIVE/tiny_mc/README.txt
 E:/MIPS_NATIVE/common/fonts/
 ```
@@ -43,6 +44,7 @@ cubegm/icube_start.sh
 cubegm/icubemp_start.sh
 cubegm/rkgame
 MIPS_NATIVE/tiny_mc/tiny_mc
+MIPS_NATIVE/tiny_mc/tiny_mc.conf
 MIPS_NATIVE/tiny_mc/README.txt
 MIPS_NATIVE/common/fonts/
 ```
@@ -83,6 +85,8 @@ Tiny MC:
 - uses `/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf`
   as the preferred monospaced font, with other common mono fonts and the
   built-in 5x7 bitmap font as fallbacks;
+- reads `/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf` for the runtime font
+  path and text-size settings;
 - has `DEBUG=1`, so it writes `tiny_mc.log` to the first writable path:
   `/mnt/sdcard/cubegm/tiny_mc.log`, `/mnt/sdcard/tiny_mc.log`, or
   `tiny_mc.log`;
@@ -99,8 +103,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 46916 bytes
-  SHA256: 845CE784ECDE9241C509C67F305895C43A997326BF070F783AC632261CD84A09
+  Size: 54208 bytes
+  SHA256: FEA903CABAEFEE5CB8871512903C821A0ABC2A67248C5FC6827A9C7CEBAD16C8
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -108,8 +112,13 @@ Tiny MC:
             JetBrainsMonoNL-Regular.ttf, LiberationMono-Regular.ttf,
             DejaVuSansMono.ttf, NotoSansMono-Regular.ttf,
             SourceCodePro-Regular.ttf, Hack-Regular.ttf,
-            RobotoMono-Regular.ttf
+            RobotoMono-Regular.ttf, tiny_mc.conf, config loaded
   Does not contain: icube heartbeat, shmget
+
+Tiny MC config:
+  tiny_mc.conf size: 452 bytes
+  tiny_mc.conf SHA256:
+    06F53A12D7B4EBC88B587FABF0CB531FB601041E78D025AC0F58CECF443F5D70
 
 Tiny MC common fonts:
   JetBrainsMonoNL-Regular.ttf size: 208576 bytes
@@ -140,7 +149,7 @@ Scripts and README:
   cubegm/icubemp_start.sh SHA256:
     BE313D3917BA5E355ECFC1818A6F42A6644ECE5724A098C507DDE2C7149F0EE9
   MIPS_NATIVE/tiny_mc/README.txt SHA256:
-    473520DB4E8A87B799703A80541D6959BE508E7C80AAE2650E6C2FA0FDE95CE9
+    24FC02117F37648231C9F6BE829BB5BC335915E5B61A2799363BED1253980395
   MIPS_NATIVE/common/fonts/README.md SHA256:
     6F1042BB337FB27FEF841F5DB370B6878AB24B0139C53BC497DA6C008DE79ACB
 

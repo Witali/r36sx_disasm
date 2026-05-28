@@ -349,6 +349,8 @@ Notable patch history:
   to prefer the common font directory.
 - `disk_image_patch_051`: rebuilds Tiny MC with FreeType text about 20 percent
   larger and increases file-list row height to match.
+- `disk_image_patch_052`: adds `MIPS_NATIVE/tiny_mc/tiny_mc.conf` and rebuilds
+  Tiny MC so the font path and text sizes are configurable at runtime.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

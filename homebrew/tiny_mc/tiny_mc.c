@@ -56,18 +56,20 @@ enum {
     JS_DEADZONE = 16000,
     HEADER_H = 48,
     FOOTER_H = 40,
-    LIST_ROW_H = 22,
+    DEFAULT_LIST_ROW_H = 22,
     LIST_TOP_OFFSET = 20,
     LIST_BOTTOM_PAD = 8,
     SCROLLBAR_WIDTH = 5,
     SCROLLBAR_RIGHT_PAD = 8,
     SCROLLBAR_MIN_THUMB = 14,
-    TINY_FT_SMALL_PX = 12,
-    TINY_FT_LARGE_PX = 19,
+    DEFAULT_TINY_FT_SMALL_PX = 12,
+    DEFAULT_TINY_FT_LARGE_PX = 19,
     TINY_FT_CACHE_SLOTS = 192
 };
 
 #define LOG_LINE_MAX 768
+#define TINY_MC_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf"
+#define TINY_MC_CONFIG_LOCAL_PATH "tiny_mc.conf"
 
 enum button_bits {
     BTN_UP_BIT = 1u << 0,
@@ -313,6 +315,13 @@ struct dir_state {
     int scroll;
 };
 
+struct app_config {
+    char font_path[PATH_MAX];
+    int font_small_px;
+    int font_large_px;
+    int list_row_h;
+};
+
 static struct fb_state g_fb = {
     -1, NULL, 0, R36SX_SCREEN_WIDTH, R36SX_SCREEN_HEIGHT,
     R36SX_RGB565_BITS_PER_PIXEL, R36SX_RGB565_FRAME_STRIDE
@@ -336,6 +345,12 @@ static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
 static struct click_audio_state g_audio;
 static struct font_state g_font;
+static struct app_config g_config = {
+    R36SX_DEFAULT_MONO_FONT_PATH,
+    DEFAULT_TINY_FT_SMALL_PX,
+    DEFAULT_TINY_FT_LARGE_PX,
+    DEFAULT_LIST_ROW_H
+};
 #if ENABLE_FN_ICUBE_SHORTCUT
 static int g_fn_shortcut_armed;
 #endif
@@ -432,6 +447,127 @@ static void log_msg(const char *fmt, ...)
     (void)fmt;
 }
 #endif
+
+static char *strip_space(char *s)
+{
+    char *end;
+
+    while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') {
+        s++;
+    }
+    end = s + strlen(s);
+    while (end > s &&
+           (end[-1] == ' ' || end[-1] == '\t' ||
+            end[-1] == '\r' || end[-1] == '\n')) {
+        *--end = '\0';
+    }
+    return s;
+}
+
+static int parse_bounded_int(const char *text, int min_value, int max_value, int fallback)
+{
+    char *end = NULL;
+    long value;
+
+    errno = 0;
+    value = strtol(text, &end, 10);
+    if (errno != 0 || end == text) {
+        return fallback;
+    }
+    while (*end == ' ' || *end == '\t') {
+        end++;
+    }
+    if (*end != '\0') {
+        return fallback;
+    }
+    if (value < min_value) {
+        value = min_value;
+    }
+    if (value > max_value) {
+        value = max_value;
+    }
+    return (int)value;
+}
+
+static void config_load(void)
+{
+    static const char *paths[] = {
+        TINY_MC_CONFIG_PATH,
+        TINY_MC_CONFIG_LOCAL_PATH
+    };
+    FILE *fp = NULL;
+    const char *loaded_path = NULL;
+    char line[512];
+    int row_h_set = 0;
+
+    for (size_t i = 0; i < ARRAY_COUNT(paths); i++) {
+        fp = fopen(paths[i], "r");
+        if (fp) {
+            loaded_path = paths[i];
+            break;
+        }
+    }
+    if (!fp) {
+        log_msg("config not found; defaults font=%s small=%d large=%d row=%d",
+                g_config.font_path, g_config.font_small_px,
+                g_config.font_large_px, g_config.list_row_h);
+        return;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        char *hash = strchr(line, '#');
+        char *eq;
+        char *key;
+        char *value;
+
+        if (hash) {
+            *hash = '\0';
+        }
+        key = strip_space(line);
+        if (*key == '\0') {
+            continue;
+        }
+        eq = strchr(key, '=');
+        if (!eq) {
+            continue;
+        }
+        *eq = '\0';
+        value = strip_space(eq + 1);
+        key = strip_space(key);
+
+        if (strcmp(key, "font") == 0 || strcmp(key, "font_path") == 0) {
+            if (*value != '\0' && strcmp(value, "default") != 0) {
+                snprintf(g_config.font_path, sizeof(g_config.font_path), "%s", value);
+            } else {
+                snprintf(g_config.font_path, sizeof(g_config.font_path), "%s",
+                         R36SX_DEFAULT_MONO_FONT_PATH);
+            }
+        } else if (strcmp(key, "small_px") == 0 ||
+                   strcmp(key, "font_small_px") == 0) {
+            g_config.font_small_px =
+                parse_bounded_int(value, 6, 32, g_config.font_small_px);
+        } else if (strcmp(key, "large_px") == 0 ||
+                   strcmp(key, "font_large_px") == 0 ||
+                   strcmp(key, "font_size") == 0) {
+            g_config.font_large_px =
+                parse_bounded_int(value, 8, 48, g_config.font_large_px);
+        } else if (strcmp(key, "list_row_h") == 0 ||
+                   strcmp(key, "row_h") == 0) {
+            g_config.list_row_h =
+                parse_bounded_int(value, 10, 64, g_config.list_row_h);
+            row_h_set = 1;
+        }
+    }
+    fclose(fp);
+
+    if (!row_h_set && g_config.list_row_h < g_config.font_large_px + 3) {
+        g_config.list_row_h = g_config.font_large_px + 3;
+    }
+
+    log_msg("config loaded: %s font=%s small=%d large=%d row=%d",
+            loaded_path, g_config.font_path, g_config.font_small_px,
+            g_config.font_large_px, g_config.list_row_h);
+}
 
 static void audio_driver_open(void)
 {
@@ -942,7 +1078,7 @@ static int font_open(void)
         "/mnt/sdcard/cubegm/lib/libfreetype.so",
         "libfreetype.so.6"
     };
-    static const char *font_paths[] = {
+    static const char *fallback_font_paths[] = {
         R36SX_DEFAULT_MONO_FONT_PATH,
         R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/LiberationMono-Regular.ttf",
         R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/DejaVuSansMono.ttf",
@@ -985,15 +1121,25 @@ static int font_open(void)
         return -1;
     }
 
-    for (size_t i = 0; i < ARRAY_COUNT(font_paths); i++) {
-        if (access(font_paths[i], R_OK) != 0) {
+    if (g_config.font_path[0] != '\0' && access(g_config.font_path, R_OK) == 0) {
+        if (g_font.new_face(g_font.library, g_config.font_path, 0, &g_font.face) == 0) {
+            snprintf(g_font.font_path, sizeof(g_font.font_path), "%s", g_config.font_path);
+        } else {
+            log_msg("FT_New_Face failed for configured font %s", g_config.font_path);
+        }
+    } else if (g_config.font_path[0] != '\0') {
+        log_msg("configured font is not readable: %s", g_config.font_path);
+    }
+
+    for (size_t i = 0; !g_font.face && i < ARRAY_COUNT(fallback_font_paths); i++) {
+        if (access(fallback_font_paths[i], R_OK) != 0) {
             continue;
         }
-        if (g_font.new_face(g_font.library, font_paths[i], 0, &g_font.face) == 0) {
-            snprintf(g_font.font_path, sizeof(g_font.font_path), "%s", font_paths[i]);
+        if (g_font.new_face(g_font.library, fallback_font_paths[i], 0, &g_font.face) == 0) {
+            snprintf(g_font.font_path, sizeof(g_font.font_path), "%s", fallback_font_paths[i]);
             break;
         }
-        log_msg("FT_New_Face failed for %s", font_paths[i]);
+        log_msg("FT_New_Face failed for %s", fallback_font_paths[i]);
     }
     if (!g_font.face) {
         log_msg("No usable TrueType font found; using bitmap font fallback");
@@ -1162,8 +1308,8 @@ static int draw_text_freetype(int x, int y, const char *text,
         return 0;
     }
 
-    int pixel_height = scale <= 1 ? TINY_FT_SMALL_PX : TINY_FT_LARGE_PX;
-    int baseline = y + (scale <= 1 ? 11 : 18);
+    int pixel_height = scale <= 1 ? g_config.font_small_px : g_config.font_large_px;
+    int baseline = y + pixel_height - 1;
     int limit = max_px > 0 ? x + max_px : g_fb.width;
     const char *p = text;
 
@@ -1731,7 +1877,7 @@ static int visible_rows(void)
 {
     int top = HEADER_H + LIST_TOP_OFFSET;
     int bottom = g_fb.height - FOOTER_H - LIST_BOTTOM_PAD;
-    int rows = (bottom - top) / LIST_ROW_H;
+    int rows = (bottom - top) / g_config.list_row_h;
     return rows > 1 ? rows : 1;
 }
 
@@ -1788,7 +1934,7 @@ static void draw_scrollbar(int top, int rows)
         return;
     }
 
-    track_h = rows * LIST_ROW_H;
+    track_h = rows * g_config.list_row_h;
     x = g_fb.width - SCROLLBAR_RIGHT_PAD - SCROLLBAR_WIDTH;
     max_scroll = g_entry_count - rows;
     thumb_h = (rows * track_h) / g_entry_count;
@@ -1846,12 +1992,12 @@ static void draw_ui(void)
         if (idx >= g_entry_count) {
             break;
         }
-        int y = top + row * LIST_ROW_H;
+        int y = top + row * g_config.list_row_h;
         char label[320];
         format_entry(label, sizeof(label), &g_entries[idx]);
         if (idx == g_selected) {
-            fill_rect(8, y - 2, selection_w, LIST_ROW_H, rgb565(50, 78, 92));
-            fill_rect(10, y, 4, LIST_ROW_H - 4, hi);
+            fill_rect(8, y - 2, selection_w, g_config.list_row_h, rgb565(50, 78, 92));
+            fill_rect(10, y, 4, g_config.list_row_h - 4, hi);
             draw_text(22, y, label, rgb565(255, 246, 220), 2, text_max_w);
         } else {
             draw_text(22, y, label, text, 2, text_max_w);
@@ -2115,6 +2261,7 @@ int main(int argc, char **argv)
 {
     log_open();
     log_msg("tiny_mc start argc=%d", argc);
+    config_load();
     heartbeat_open();
     choose_start_dir(argc, argv);
     scan_directory();

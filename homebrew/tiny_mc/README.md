@@ -38,6 +38,8 @@ The program uses:
   loaded with `dlopen()` so the built-in 5x7 bitmap font remains a fallback;
 - `MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf` as the preferred
   FreeType font, with the other common mono fonts as fallbacks;
+- `MIPS_NATIVE/tiny_mc/tiny_mc.conf` for the runtime font path and text-size
+  settings;
 - an internal RGB565 640x480 framebuffer;
 - `/dev/fb0` direct drawing only as fallback if `driver.so` is unavailable;
 - `/dev/input/js0..js3` for Linux joystick input;
@@ -74,6 +76,28 @@ button state changes, launched executables, and child exit status. The render
 loop does not log every frame. Set `#define DEBUG 0` and rebuild to disable log
 file creation and log writes.
 
+## Runtime config
+
+Tiny MC reads this optional config file at startup:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf
+```
+
+The format is simple `key=value`, with `#` comments. Current keys:
+
+```text
+font=/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf
+small_px=12
+large_px=19
+list_row_h=22
+```
+
+`font` can point at any TTF file readable by FreeType. `small_px` controls the
+header/path/footer text, `large_px` controls the file-list text, and
+`list_row_h` controls the file-list row height. If `list_row_h` is omitted,
+Tiny MC keeps it at least `large_px + 3`.
+
 ## Input model
 
 Built-in controls are read through the same path used by stock `rkgame`: Tiny
@@ -108,6 +132,7 @@ For the current SD-card integration, copy the rebuilt executable as:
 
 ```text
 MIPS_NATIVE\tiny_mc\tiny_mc
+MIPS_NATIVE\tiny_mc\tiny_mc.conf
 MIPS_NATIVE\common\fonts\
 ```
 
