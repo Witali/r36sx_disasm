@@ -8,6 +8,14 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 
+This debug build writes a startup/runtime log to:
+
+- `MIPS_NATIVE/pico_286/pico_286.log`
+
+If that path cannot be opened on the device, it falls back to:
+
+- `pico_286.log` in the SD-card root
+
 Optional PC disk images should be placed in the same directory:
 
 - `MIPS_NATIVE/pico_286/fdd0.img`

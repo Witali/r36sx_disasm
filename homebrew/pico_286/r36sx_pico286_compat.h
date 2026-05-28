@@ -14,12 +14,53 @@
 #endif
 
 #include <dirent.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
+
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
+#define R36SX_PICO286_LOG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log"
+#define R36SX_PICO286_FALLBACK_LOG_PATH "/mnt/sdcard/pico_286.log"
+
+static inline void r36sx_pico286_debug_log(const char *format, ...)
+{
+#if DEBUG
+    FILE *fp = fopen(R36SX_PICO286_LOG_PATH, "a");
+    if (!fp) {
+        fp = fopen(R36SX_PICO286_FALLBACK_LOG_PATH, "a");
+    }
+    if (fp) {
+        struct timeval tv;
+        va_list args;
+        gettimeofday(&tv, NULL);
+        fprintf(fp, "[%ld.%03ld] ", (long)tv.tv_sec, (long)(tv.tv_usec / 1000));
+        va_start(args, format);
+        vfprintf(fp, format, args);
+        va_end(args);
+        fputc('\n', fp);
+        fclose(fp);
+    }
+#else
+    (void)format;
+#endif
+}
+
+static inline void r36sx_pico286_debug_reset(void)
+{
+#if DEBUG
+    unlink(R36SX_PICO286_LOG_PATH);
+    unlink(R36SX_PICO286_FALLBACK_LOG_PATH);
+    r36sx_pico286_debug_log("log reset");
+#endif
+}
 
 /*
  * The host build uses normal arrays for RAM/EMS.  Some upstream branches still

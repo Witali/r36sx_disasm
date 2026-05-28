@@ -104,3 +104,53 @@ Result:
   `hdd.img`, and `hdd2.img`, with no `../` disk paths left.
 - Binary string checks also confirm `driver.so`, `cube_ioctl`,
   `video_driver_disp_frame`, and `sound_driver_playframe`.
+
+## 2026-05-28 debug logging build
+
+Device test result: the first `pico_286` build returned to TinyMC/shell without
+showing enough information in `tiny_mc.log`.
+
+Added DEBUG logging to the R36SX port layer and rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+The build script now passes:
+
+```text
+-DDEBUG=1
+```
+
+The application writes its own log to:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log
+```
+
+If that path cannot be opened, it falls back to:
+
+```text
+/mnt/sdcard/pico_286.log
+```
+
+New log coverage:
+
+- early `main()` start and normal cleanup;
+- fatal signals: `SIGSEGV`, `SIGBUS`, `SIGILL`, `SIGABRT`;
+- MiniFB/driver.so path loading and resolved display symbols;
+- framebuffer initialization return code;
+- `/tmp/joy_key` shared-memory address returned by `cube_ioctl`;
+- raw key state changes and Select+Start exit;
+- audio `driver.so` loading, bind/start/close, and early write failures;
+- upstream `printf`/`printf_` output line capture through `_putchar`;
+- int 19h disk image attach results for `fdd0.img`, `fdd1.img`, `hdd.img`,
+  and `hdd2.img`.
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,893,192 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

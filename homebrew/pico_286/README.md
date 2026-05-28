@@ -52,6 +52,18 @@ Build:
 .\homebrew\pico_286\build_pico_286.ps1
 ```
 
+The current build is a debug build.  On the device it writes:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log
+```
+
+If that file cannot be opened, it writes:
+
+```text
+/mnt/sdcard/pico_286.log
+```
+
 `zig objcopy --strip-all` currently reports `error: unimplemented` for this
 MIPS ELF.  The script therefore leaves the executable unstripped by default.
 Pass `-TryStrip` only when testing a newer Zig that supports stripping it.

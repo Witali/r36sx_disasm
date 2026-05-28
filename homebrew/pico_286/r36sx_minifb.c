@@ -21,10 +21,6 @@
 #include "MiniFB.h"
 #include "../common/hardware.h"
 
-#ifndef DEBUG
-#define DEBUG 0
-#endif
-
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_PICO286_FRAME_USEC 16666u
 
@@ -62,20 +58,6 @@ static uint32_t g_palette[256];
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 
-static void r36sx_mfb_log(const char *message)
-{
-#if DEBUG
-    FILE *fp = fopen("/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log", "a");
-    if (fp) {
-        fputs(message, fp);
-        fputc('\n', fp);
-        fclose(fp);
-    }
-#else
-    (void)message;
-#endif
-}
-
 static uint64_t r36sx_mfb_now_us(void)
 {
     struct timespec ts;
@@ -102,11 +84,15 @@ static int r36sx_mfb_load_driver(void)
     for (size_t i = 0; i < R36SX_PICO286_ARRAY_COUNT(paths); i++) {
         g_mfb.handle = dlopen(paths[i], RTLD_NOW);
         if (g_mfb.handle) {
+            r36sx_pico286_debug_log("minifb: dlopen ok path=%s handle=%p",
+                                    paths[i], g_mfb.handle);
             break;
         }
+        r36sx_pico286_debug_log("minifb: dlopen failed path=%s err=%s",
+                                paths[i], dlerror());
     }
     if (!g_mfb.handle) {
-        r36sx_mfb_log("dlopen driver.so failed");
+        r36sx_pico286_debug_log("minifb: all driver.so dlopen attempts failed");
         return -1;
     }
 
@@ -123,9 +109,16 @@ static int r36sx_mfb_load_driver(void)
 
     if (!g_mfb.setting || !g_mfb.init || !g_mfb.disp_frame ||
         !g_mfb.deinit) {
-        r36sx_mfb_log("driver.so display symbols missing");
+        r36sx_pico286_debug_log(
+            "minifb: driver symbols missing setting=%p init=%p disp=%p deinit=%p ioctl=%p",
+            g_mfb.setting, g_mfb.init, g_mfb.disp_frame, g_mfb.deinit,
+            g_mfb.cube_ioctl);
         return -1;
     }
+    r36sx_pico286_debug_log(
+        "minifb: driver symbols ok setting=%p init=%p disp=%p deinit=%p ioctl=%p",
+        g_mfb.setting, g_mfb.init, g_mfb.disp_frame, g_mfb.deinit,
+        g_mfb.cube_ioctl);
     return 0;
 }
 
@@ -138,9 +131,10 @@ static uint32_t r36sx_mfb_read_raw_keys(void)
     }
     if (g_mfb.cube_key_addr == 0) {
         uint32_t addr = 0;
-        g_mfb.cube_ioctl(R36SX_CUBE_IOCTL_GET_JOY_KEY_PTR, &addr, 0, 0);
+        int rc = g_mfb.cube_ioctl(R36SX_CUBE_IOCTL_GET_JOY_KEY_PTR, &addr, 0, 0);
         g_mfb.cube_key_addr = addr;
         g_mfb.cube_key_mem = (volatile uint32_t *)(uintptr_t)addr;
+        r36sx_pico286_debug_log("minifb: joy shm rc=%d addr=0x%08x", rc, addr);
     }
     if (!g_mfb.cube_key_mem) {
         return 0;
@@ -172,9 +166,16 @@ static int r36sx_mfb_poll_input(void)
     };
     uint8_t new_down[256];
     uint32_t raw = r36sx_mfb_read_raw_keys();
+    static uint32_t last_raw = UINT32_MAX;
+
+    if (raw != last_raw) {
+        r36sx_pico286_debug_log("minifb: raw keys=0x%08x", raw);
+        last_raw = raw;
+    }
 
     if ((raw & (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_START)) ==
         (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_START)) {
+        r36sx_pico286_debug_log("minifb: Select+Start exit requested");
         return -1;
     }
 
@@ -196,8 +197,14 @@ static int r36sx_mfb_poll_input(void)
 
 int mfb_open(const char *name, int width, int height, int scale)
 {
-    (void)name;
     (void)scale;
+    char cwd[256];
+
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        strcpy(cwd, "?");
+    }
+    r36sx_pico286_debug_log("minifb: open name=%s size=%dx%d scale=%d cwd=%s",
+                            name ? name : "(null)", width, height, scale, cwd);
 
     setenv("LD_LIBRARY_PATH",
            "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",
@@ -210,6 +217,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_mfb.frame = (uint16_t *)calloc((size_t)width * (size_t)height,
                                      sizeof(g_mfb.frame[0]));
     if (!g_mfb.frame) {
+        r36sx_pico286_debug_log("minifb: framebuffer allocation failed");
         return 0;
     }
     if (r36sx_mfb_load_driver() != 0) {
@@ -225,17 +233,39 @@ int mfb_open(const char *name, int width, int height, int scale)
             R36SX_DRIVER_SETTING_WIDTH,
             R36SX_DRIVER_SETTING_HEIGHT
         };
+        r36sx_pico286_debug_log("minifb: video_driver_setting cfg={%d,%d,%d,%d,%d}",
+                                cfg[0], cfg[1], cfg[2], cfg[3], cfg[4]);
         g_mfb.setting(cfg);
     }
-    if (g_mfb.init() < 0) {
-        r36sx_mfb_log("video_drivers_init failed");
+    {
+        int rc = g_mfb.init();
+        r36sx_pico286_debug_log("minifb: video_drivers_init rc=%d", rc);
+        if (rc < 0) {
+            r36sx_pico286_debug_log("minifb: video_drivers_init failed");
+            mfb_close();
+            return 0;
+        }
+    }
+
+    if (g_mfb.cube_ioctl) {
+        uint32_t joy = 0;
+        int rc = g_mfb.cube_ioctl(R36SX_CUBE_IOCTL_GET_JOY_KEY_PTR, &joy, 0, 0);
+        g_mfb.cube_key_addr = joy;
+        g_mfb.cube_key_mem = (volatile uint32_t *)(uintptr_t)joy;
+        r36sx_pico286_debug_log("minifb: initial joy shm rc=%d addr=0x%08x", rc, joy);
+    } else {
+        r36sx_pico286_debug_log("minifb: cube_ioctl unavailable, input disabled");
+    }
+
+    if (!g_mfb.disp_frame) {
+        r36sx_pico286_debug_log("minifb: no display frame function after init");
         mfb_close();
         return 0;
     }
 
     g_mfb.active = 1;
     g_mfb.last_present_us = 0;
-    r36sx_mfb_log("pico_286 MiniFB opened");
+    r36sx_pico286_debug_log("minifb: opened");
     return 1;
 }
 
@@ -246,6 +276,8 @@ int mfb_update(void *buffer, int fps_limit)
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
+        r36sx_pico286_debug_log("minifb: update rejected active=%d disp=%p src=%p",
+                                g_mfb.active, g_mfb.disp_frame, src);
         return -1;
     }
     if (r36sx_mfb_poll_input() != 0) {
@@ -289,6 +321,8 @@ void mfb_set_pallete(const uint8_t color_index, const uint32_t color)
 
 void mfb_close(void)
 {
+    r36sx_pico286_debug_log("minifb: close active=%d handle=%p frame=%p",
+                            g_mfb.active, g_mfb.handle, g_mfb.frame);
     if (g_mfb.active && g_mfb.deinit) {
         g_mfb.deinit();
     }

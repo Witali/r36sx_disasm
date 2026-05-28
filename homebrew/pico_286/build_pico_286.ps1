@@ -54,6 +54,7 @@ $CommonArgs = @(
     "--sysroot=$Sysroot",
     "-DPICO_RP2040=0",
     "-DPICO_RP2350=0",
+    "-DDEBUG=1",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",
@@ -121,6 +122,135 @@ function New-Patched-LinuxMain {
     $Source = Join-Path $PicoRoot "src\linux-main.cpp"
     $Dest = Join-Path $ObjDir "r36sx_linux-main.cpp"
     $Text = Get-Content -Raw -Path $Source
+    $Text = $Text.Replace("`r`n", "`n")
+    $Text = $Text.Replace('extern "C" void _putchar(char character) {
+    putchar(character);
+    static int x = 0, y = 0;',
+'extern "C" void _putchar(char character) {
+    putchar(character);
+#if DEBUG
+    static char log_line[160];
+    static int log_pos = 0;
+    if (character == ''\n'' || character == ''\r'') {
+        if (log_pos > 0) {
+            log_line[log_pos] = 0;
+            r36sx_pico286_debug_log("stdout: %s", log_line);
+            log_pos = 0;
+        }
+    } else if ((unsigned char)character >= 32 &&
+               log_pos < (int)sizeof(log_line) - 1) {
+        log_line[log_pos++] = character;
+    }
+#endif
+    static int x = 0, y = 0;')
+    $Text = $Text.Replace('void signal_handler(int sig) {
+    running = 0;
+}',
+'void signal_handler(int sig) {
+    r36sx_pico286_debug_log("main: signal %d, stopping", sig);
+    running = 0;
+}
+
+void fatal_signal_handler(int sig) {
+    r36sx_pico286_debug_log("main: fatal signal %d", sig);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}')
+    $Text = $Text.Replace('int main() {
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);',
+'int main() {
+    r36sx_pico286_debug_reset();
+    r36sx_pico286_debug_log("main: start");
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGSEGV, fatal_signal_handler);
+    signal(SIGBUS, fatal_signal_handler);
+    signal(SIGILL, fatal_signal_handler);
+    signal(SIGABRT, fatal_signal_handler);')
+    $Text = $Text.Replace('    if (!mfb_open("Pico-286 Emulator", 640, 480, 1)) {
+        printf("Failed to open window\n");
+        return -1;
+    }',
+'    r36sx_pico286_debug_log("main: opening MiniFB");
+    if (!mfb_open("Pico-286 Emulator", 640, 480, 1)) {
+        r36sx_pico286_debug_log("main: mfb_open failed");
+        printf("Failed to open window\n");
+        return -1;
+    }
+    r36sx_pico286_debug_log("main: MiniFB opened");')
+    $Text = $Text.Replace('    memset(SCREEN, 0, sizeof(SCREEN));
+    emu8950_opl = OPL_new(3579552, SOUND_FREQUENCY);
+    blaster_reset();
+    sn76489_reset();
+    reset86();',
+'    memset(SCREEN, 0, sizeof(SCREEN));
+    r36sx_pico286_debug_log("main: screen cleared");
+    emu8950_opl = OPL_new(3579552, SOUND_FREQUENCY);
+    r36sx_pico286_debug_log("main: OPL_new=%p", emu8950_opl);
+    blaster_reset();
+    r36sx_pico286_debug_log("main: blaster_reset done");
+    sn76489_reset();
+    r36sx_pico286_debug_log("main: sn76489_reset done");
+    reset86();
+    r36sx_pico286_debug_log("main: reset86 done");')
+    $Text = $Text.Replace('    pthread_t sound_tid, ticks_tid;
+    pthread_create(&sound_tid, NULL, sound_thread, NULL);
+    pthread_create(&ticks_tid, NULL, ticks_thread, NULL);',
+'    pthread_t sound_tid = 0, ticks_tid = 0;
+    int sound_thread_rc = pthread_create(&sound_tid, NULL, sound_thread, NULL);
+    int ticks_thread_rc = pthread_create(&ticks_tid, NULL, ticks_thread, NULL);
+    int sound_thread_started = sound_thread_rc == 0;
+    int ticks_thread_started = ticks_thread_rc == 0;
+    r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=%d",
+                            sound_thread_rc, ticks_thread_rc);')
+    $Text = $Text.Replace('    while (running) {
+        exec86(32768);  // Reduced from 32768 to allow more frequent audio updates
+        if (mfb_update(SCREEN, 0) < 0) {
+            running = 0;
+            break;
+        }
+    }',
+'    unsigned int main_loop_count = 0;
+    while (running) {
+        exec86(32768);  // Reduced from 32768 to allow more frequent audio updates
+        if ((++main_loop_count % 300u) == 0u) {
+            r36sx_pico286_debug_log("main: alive loops=%u videomode=0x%x",
+                                    main_loop_count, videomode);
+        }
+        if (mfb_update(SCREEN, 0) < 0) {
+            r36sx_pico286_debug_log("main: mfb_update requested stop");
+            running = 0;
+            break;
+        }
+    }
+    r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);')
+    $Text = $Text.Replace('    pthread_cancel(sound_tid);
+    pthread_cancel(ticks_tid);
+    pthread_join(sound_tid, NULL);
+    pthread_join(ticks_tid, NULL);',
+'    if (sound_thread_started) {
+        r36sx_pico286_debug_log("main: cancel sound thread");
+        pthread_cancel(sound_tid);
+        pthread_join(sound_tid, NULL);
+    }
+    if (ticks_thread_started) {
+        r36sx_pico286_debug_log("main: cancel ticks thread");
+        pthread_cancel(ticks_tid);
+        pthread_join(ticks_tid, NULL);
+    }')
+    $Text = $Text.Replace('    // Clean up audio
+    linux_audio_close();
+
+    mfb_close();
+    return 0;',
+'    // Clean up audio
+    r36sx_pico286_debug_log("main: cleanup begin");
+    linux_audio_close();
+
+    mfb_close();
+    r36sx_pico286_debug_log("main: exit 0");
+    return 0;')
     $Text = $Text.Replace("VIDEORAM + ", "(uint8_t *)VIDEORAM + ")
     $Text = $Text.Replace("vram_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + vram_offset")
     $Text = $Text.Replace("tga_offset + (uint8_t *)VIDEORAM", "(uint8_t *)VIDEORAM + tga_offset")
@@ -132,10 +262,23 @@ function New-Patched-Cpu {
     $Source = Join-Path $PicoRoot "src\emulator\cpu.c"
     $Dest = Join-Path $ObjDir "r36sx_cpu.c"
     $Text = Get-Content -Raw -Path $Source
+    $Text = $Text.Replace("`r`n", "`n")
     $Text = $Text.Replace("""../fdd0.img""", """fdd0.img""")
     $Text = $Text.Replace("""../fdd1.img""", """fdd1.img""")
     $Text = $Text.Replace("""../hdd.img""", """hdd.img""")
     $Text = $Text.Replace("""../hdd2.img""", """hdd2.img""")
+    $Text = $Text.Replace('            insertdisk(0, "fdd0.img");
+            insertdisk(1, "fdd1.img");
+            insertdisk(128, "hdd.img");
+            insertdisk(129, "hdd2.img");',
+'            {
+                uint8_t fdd0_ok = insertdisk(0, "fdd0.img");
+                uint8_t fdd1_ok = insertdisk(1, "fdd1.img");
+                uint8_t hdd0_ok = insertdisk(128, "hdd.img");
+                uint8_t hdd1_ok = insertdisk(129, "hdd2.img");
+                r36sx_pico286_debug_log("cpu: int19 disk attach fdd0=%u fdd1=%u hdd=%u hdd2=%u",
+                                        fdd0_ok, fdd1_ok, hdd0_ok, hdd1_ok);
+            }')
     Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
     return $Dest
 }
