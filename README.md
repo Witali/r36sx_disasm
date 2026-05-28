@@ -8,6 +8,10 @@ hardware and software platform, reverse engineering the game launcher, and
 building small homebrew libretro-style modules for the stock `cubegm/rkgame`
 environment.
 
+Project video:
+
+- [R36SX / SF3000 firmware research video](https://youtu.be/LYrICpUo6_A?si=NqGBL9BxAsdRZkY5)
+
 ## Current Findings
 
 The inspected image is not a single monolithic firmware blob. It looks like the
