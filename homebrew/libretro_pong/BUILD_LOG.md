@@ -239,3 +239,49 @@ Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
 Defender scan disk_image\cubegm\cores\libemu_pong.so: found no threats
 Defender scan patches\disk_image_patch_047: found no threats
 ```
+
+## 2026-05-28 large 5x5 game-over text rebuild
+
+Purpose:
+
+Render the Pong end-of-game messages as large 5x5 pixel text, roughly matching
+the score digit height. The messages now use mixed case: `You win` and
+`You lose`.
+
+Source layout:
+
+```text
+homebrew\pong\pong.c
+```
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -DR36SX_PONG_TARGET=1 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\pong\pong.c
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_048
+```
+
+Patch file:
+
+```text
+patches\disk_image_patch_048\cubegm\cores\libemu_pong.so
+```
+
+Verification:
+
+```text
+Game-over font: 5x5 source pixels, variable width, scale 13
+ELF: MIPS little-endian shared object for libretro/rkgame
+Size: 39460 bytes
+SHA256: BEE64253C023BFDDC5D539808F8257477AAABB874D1350225881970C1238FE1F
+Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
+Defender scan disk_image\cubegm\cores\libemu_pong.so: found no threats
+Defender scan patches\disk_image_patch_048: found no threats
+```

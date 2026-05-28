@@ -339,6 +339,8 @@ Notable patch history:
 - `disk_image_patch_047`: rebuilds both libretro and native Pong from the
   single shared source under `homebrew/pong/pong.c` and changes native Pong to
   the standard `Select + Start` exit gesture.
+- `disk_image_patch_048`: rebuilds both libretro and native Pong so
+  end-of-game messages render as large 5x5 pixel text: `You win` / `You lose`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

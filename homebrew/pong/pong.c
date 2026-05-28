@@ -54,10 +54,11 @@ enum {
     R36SX_PONG_BALL_BASE_SPEED_Y = 3,
     R36SX_PONG_SCORE_LIMIT = 9,
     R36SX_PONG_SERVE_FRAMES = 40,
-    R36SX_PONG_FONT_SCALE = 5,
-    R36SX_PONG_FONT_W = 5,
-    R36SX_PONG_FONT_H = 7,
-    R36SX_PONG_FONT_SPACING = 2
+    R36SX_PONG_BIG_FONT_SCALE = 13,
+    R36SX_PONG_BIG_FONT_W = 5,
+    R36SX_PONG_BIG_FONT_H = 5,
+    R36SX_PONG_BIG_FONT_SPACING = 1,
+    R36SX_PONG_BIG_FONT_SPACE_W = 3
 };
 
 enum r36sx_pong_button_bits {
@@ -446,98 +447,137 @@ static void r36sx_pong_draw_pause_icon(uint16_t *frame, uint16_t color)
                          R36SX_PONG_FB_HEIGHT / 2 - 28, 14, 56, color);
 }
 
-static const uint8_t *r36sx_pong_glyph_rows(char ch)
+static const uint8_t *r36sx_pong_big_glyph_rows(char ch, int *width)
 {
-    static const uint8_t glyph_e[R36SX_PONG_FONT_H] =
-        { 0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f };
-    static const uint8_t glyph_i[R36SX_PONG_FONT_H] =
-        { 0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1f };
-    static const uint8_t glyph_l[R36SX_PONG_FONT_H] =
-        { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f };
-    static const uint8_t glyph_n[R36SX_PONG_FONT_H] =
-        { 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 };
-    static const uint8_t glyph_o[R36SX_PONG_FONT_H] =
-        { 0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
-    static const uint8_t glyph_s[R36SX_PONG_FONT_H] =
-        { 0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e };
-    static const uint8_t glyph_u[R36SX_PONG_FONT_H] =
-        { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
-    static const uint8_t glyph_w[R36SX_PONG_FONT_H] =
-        { 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a };
-    static const uint8_t glyph_y[R36SX_PONG_FONT_H] =
-        { 0x11, 0x11, 0x0a, 0x04, 0x04, 0x04, 0x04 };
+    static const uint8_t glyph_y[R36SX_PONG_BIG_FONT_H] =
+        { 0x11, 0x0a, 0x04, 0x04, 0x04 };
+    static const uint8_t glyph_o[R36SX_PONG_BIG_FONT_H] =
+        { 0x0e, 0x11, 0x11, 0x11, 0x0e };
+    static const uint8_t glyph_u[R36SX_PONG_BIG_FONT_H] =
+        { 0x11, 0x11, 0x11, 0x13, 0x0d };
+    static const uint8_t glyph_w[R36SX_PONG_BIG_FONT_H] =
+        { 0x11, 0x11, 0x15, 0x15, 0x0a };
+    static const uint8_t glyph_i[R36SX_PONG_BIG_FONT_H] =
+        { 0x1c, 0x08, 0x08, 0x08, 0x1c };
+    static const uint8_t glyph_n[R36SX_PONG_BIG_FONT_H] =
+        { 0x16, 0x19, 0x11, 0x11, 0x11 };
+    static const uint8_t glyph_l[R36SX_PONG_BIG_FONT_H] =
+        { 0x10, 0x10, 0x10, 0x10, 0x1f };
+    static const uint8_t glyph_s[R36SX_PONG_BIG_FONT_H] =
+        { 0x0f, 0x10, 0x0e, 0x01, 0x1e };
+    static const uint8_t glyph_e[R36SX_PONG_BIG_FONT_H] =
+        { 0x0e, 0x11, 0x1e, 0x10, 0x0f };
 
+    *width = R36SX_PONG_BIG_FONT_W;
     switch (ch) {
-    case 'E': return glyph_e;
-    case 'I': return glyph_i;
-    case 'L': return glyph_l;
-    case 'N': return glyph_n;
-    case 'O': return glyph_o;
-    case 'S': return glyph_s;
-    case 'U': return glyph_u;
-    case 'W': return glyph_w;
-    case 'Y': return glyph_y;
-    default: return NULL;
+    case 'Y':
+    case 'y':
+        return glyph_y;
+    case 'O':
+    case 'o':
+        return glyph_o;
+    case 'U':
+    case 'u':
+        return glyph_u;
+    case 'W':
+    case 'w':
+        return glyph_w;
+    case 'I':
+    case 'i':
+        *width = 3;
+        return glyph_i;
+    case 'N':
+    case 'n':
+        return glyph_n;
+    case 'L':
+    case 'l':
+        return glyph_l;
+    case 'S':
+    case 's':
+        return glyph_s;
+    case 'E':
+    case 'e':
+        return glyph_e;
+    default:
+        return NULL;
     }
 }
 
-static int r36sx_pong_text_width(const char *text, int scale)
+static int r36sx_pong_big_text_width(const char *text)
 {
     int width = 0;
 
     while (*text) {
-        width += R36SX_PONG_FONT_W * scale;
+        int glyph_width = R36SX_PONG_BIG_FONT_W;
+
+        if (*text == ' ') {
+            glyph_width = R36SX_PONG_BIG_FONT_SPACE_W;
+        } else {
+            (void)r36sx_pong_big_glyph_rows(*text, &glyph_width);
+        }
+
+        width += glyph_width * R36SX_PONG_BIG_FONT_SCALE;
         text++;
         if (*text) {
-            width += R36SX_PONG_FONT_SPACING * scale;
+            width += R36SX_PONG_BIG_FONT_SPACING *
+                     R36SX_PONG_BIG_FONT_SCALE;
         }
     }
 
     return width;
 }
 
-static void r36sx_pong_draw_text(uint16_t *frame, int x, int y,
-                                 const char *text, int scale,
-                                 uint16_t color)
+static void r36sx_pong_draw_big_text(uint16_t *frame, int x, int y,
+                                     const char *text, uint16_t color)
 {
     while (*text) {
-        const uint8_t *rows = r36sx_pong_glyph_rows(*text);
+        int glyph_width = R36SX_PONG_BIG_FONT_W;
+        const uint8_t *rows = r36sx_pong_big_glyph_rows(*text, &glyph_width);
 
-        if (rows) {
-            for (int row = 0; row < R36SX_PONG_FONT_H; row++) {
-                for (int col = 0; col < R36SX_PONG_FONT_W; col++) {
+        if (*text == ' ') {
+            glyph_width = R36SX_PONG_BIG_FONT_SPACE_W;
+        } else if (rows) {
+            for (int row = 0; row < R36SX_PONG_BIG_FONT_H; row++) {
+                for (int col = 0; col < glyph_width; col++) {
                     if ((rows[row] &
-                         (1u << (R36SX_PONG_FONT_W - 1 - col))) != 0) {
-                        r36sx_pong_draw_rect(frame, x + col * scale,
-                                             y + row * scale,
-                                             scale, scale, color);
+                         (1u << (R36SX_PONG_BIG_FONT_W - 1 - col))) != 0) {
+                        r36sx_pong_draw_rect(frame,
+                                             x + col *
+                                             R36SX_PONG_BIG_FONT_SCALE,
+                                             y + row *
+                                             R36SX_PONG_BIG_FONT_SCALE,
+                                             R36SX_PONG_BIG_FONT_SCALE,
+                                             R36SX_PONG_BIG_FONT_SCALE,
+                                             color);
                     }
                 }
             }
         }
 
-        x += (R36SX_PONG_FONT_W + R36SX_PONG_FONT_SPACING) * scale;
+        x += (glyph_width + R36SX_PONG_BIG_FONT_SPACING) *
+             R36SX_PONG_BIG_FONT_SCALE;
         text++;
     }
 }
 
-static void r36sx_pong_draw_centered_text(uint16_t *frame, int y,
-                                          const char *text, int scale,
-                                          uint16_t color)
+static void r36sx_pong_draw_centered_big_text(uint16_t *frame, int y,
+                                              const char *text,
+                                              uint16_t color)
 {
-    r36sx_pong_draw_text(frame,
-                         (R36SX_PONG_FB_WIDTH -
-                          r36sx_pong_text_width(text, scale)) / 2,
-                         y, text, scale, color);
+    r36sx_pong_draw_big_text(frame,
+                             (R36SX_PONG_FB_WIDTH -
+                              r36sx_pong_big_text_width(text)) / 2,
+                             y, text, color);
 }
 
 static void r36sx_pong_draw_game_over(const struct r36sx_pong_state *state,
                                       uint16_t *frame, uint16_t white,
                                       uint16_t accent)
 {
-    const char *message = state->player_won ? "YOU WIN" : "YOU LOSE";
-    int box_w = 330;
-    int box_h = 104;
+    const char *message = state->player_won ? "You win" : "You lose";
+    int text_h = R36SX_PONG_BIG_FONT_H * R36SX_PONG_BIG_FONT_SCALE;
+    int box_w = r36sx_pong_big_text_width(message) + 48;
+    int box_h = text_h + 56;
     int box_x = (R36SX_PONG_FB_WIDTH - box_w) / 2;
     int box_y = (R36SX_PONG_FB_HEIGHT - box_h) / 2;
 
@@ -549,8 +589,8 @@ static void r36sx_pong_draw_game_over(const struct r36sx_pong_state *state,
     r36sx_pong_draw_rect(frame, box_x, box_y, 4, box_h, accent);
     r36sx_pong_draw_rect(frame, box_x + box_w - 4, box_y, 4, box_h,
                          accent);
-    r36sx_pong_draw_centered_text(frame, box_y + 34, message,
-                                  R36SX_PONG_FONT_SCALE, white);
+    r36sx_pong_draw_centered_big_text(frame, box_y + (box_h - text_h) / 2,
+                                      message, white);
 }
 
 static void r36sx_pong_draw_frame(const struct r36sx_pong_state *state,

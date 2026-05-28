@@ -259,3 +259,53 @@ Defender scan homebrew\native_pong\pong: found no threats
 Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
 Defender scan patches\disk_image_patch_047: found no threats
 ```
+
+## 2026-05-28 large 5x5 game-over text rebuild
+
+Purpose:
+
+Render the Pong end-of-game messages as large 5x5 pixel text, roughly matching
+the score digit height. The messages now use mixed case: `You win` and
+`You lose`.
+
+Source layout:
+
+```text
+homebrew\pong\pong.c
+```
+
+Target selection:
+
+```text
+R36SX_PONG_TARGET=2  native Tiny MC executable using driver.so
+```
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_048
+```
+
+Patch file:
+
+```text
+patches\disk_image_patch_048\MIPS_NATIVE\pong\pong
+```
+
+Verification:
+
+```text
+Game-over font: 5x5 source pixels, variable width, scale 13
+ELF: MIPS little-endian native executable, interpreter /lib/ld.so.1
+Size: 19188 bytes
+SHA256: A84DA563B8DE044F0CB686CC11FE7983985B232733AC9A72BA80A15872E1B2DF
+Defender scan homebrew\native_pong\pong: found no threats
+Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
+Defender scan patches\disk_image_patch_048: found no threats
+```
