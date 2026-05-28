@@ -195,6 +195,22 @@ dependencies, `disk_image_patch_013` switched to a smaller no-`NEEDED` build,
 and `disk_image_patch_015` adds a guard for the device-side `Loading` hang by
 bounding Fuse's audio-driven `retro_run()` loop.
 
+### Tiny MC Launcher
+
+A small one-panel file manager / launcher was added as the first standalone
+replacement candidate for `cubegm/rkgame`:
+
+- Source: [`homebrew/tiny_mc/tiny_mc.c`](homebrew/tiny_mc/tiny_mc.c)
+- Notes: [`homebrew/tiny_mc/README.md`](homebrew/tiny_mc/README.md)
+- Build log: [`homebrew/tiny_mc/BUILD_LOG.md`](homebrew/tiny_mc/BUILD_LOG.md)
+- Build commands: [`homebrew/tiny_mc/BUILD_COMMANDS.md`](homebrew/tiny_mc/BUILD_COMMANDS.md)
+- Built executable: `homebrew/tiny_mc/tiny_mc`
+
+It draws directly to `/dev/fb0`, reads `/dev/input/js*` and
+`/dev/input/event*`, and launches selected files with `fork()` plus `execl()`.
+`disk_image_patch_021` copies Tiny MC as `cubegm/rkgame` and preserves the
+stock launcher as `cubegm/rkgame.stock`.
+
 ## Patch Sets
 
 Patch directories are used to record changes that can be copied onto the SD
@@ -223,6 +239,11 @@ Notable patch history:
 - `disk_image_patch_016`: Pong Demo core based on the working Button Demo shell.
 - `disk_image_patch_017`: Pong Demo compatibility patch using a stock
   `GB/pong.gb` launch file plus an explicit `filelist.xml` core override.
+- `disk_image_patch_018`: first libretro PRBoom core with Freedoom test files.
+- `disk_image_patch_019`: PRBoom rebuild with R36SX vendor hook exports.
+- `disk_image_patch_020`: PRBoom WAD adjacency and Doom shareware test files.
+- `disk_image_patch_021`: Tiny MC standalone file manager replacing `rkgame`
+  while preserving stock `rkgame.stock`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
