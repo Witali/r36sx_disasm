@@ -154,3 +154,35 @@ No NEEDED/UND/__ubsan/GLIBC/ld-linux/libc.so/libm.so/memset strings found.
 Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
 Defender scan disk_image_patch_027\cubegm\cores\libemu_pong.so: found no threats
 ```
+
+## 2026-05-28 libretro hardware header split
+
+Reason:
+
+Split the shared hardware constants into a native/common layer and a
+libretro-specific layer.
+
+Source change:
+
+- Moved libretro-only audio/video cadence constants out of
+  `homebrew/common/hardware.h`.
+- Added `homebrew/common/libretro_hardware.h`, which includes `hardware.h`.
+- `pong.c` now includes `../common/libretro_hardware.h`.
+- Audio timing now uses the `R36SX_LIBRETRO_*` macro names.
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\libretro_pong\pong.c
+```
+
+Verification:
+
+```text
+Size: 41512 bytes
+SHA256: A769CA8D5710D4863D0348E7ECC8F41C9CD28CC3F14505F4E934014AFC782EA4
+Binary contents remained identical to the previous shared-header rebuild.
+Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
+```

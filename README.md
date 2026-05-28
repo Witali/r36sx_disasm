@@ -349,6 +349,8 @@ Tracked or intentionally small project files:
 - `homebrew/`: source and build logs for custom modules.
   - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
     firmware constants used by homebrew programs.
+  - `homebrew/common/libretro_hardware.h`: libretro-specific screen/audio
+    cadence constants layered on top of `hardware.h`.
 - `patches/`: copyable patch overlays and patch application notes.
 - `patches/disk_image_patch_tiny_mc`: consolidated install overlay for the
   current Tiny MC boot route and Fn-to-iCube behavior.

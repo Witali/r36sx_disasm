@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../common/hardware.h"
+#include "../common/libretro_hardware.h"
 
 #define RETRO_API_VERSION 1
 
@@ -95,8 +95,8 @@ enum {
     BALL_BASE_SPEED_Y = 3,
     SCORE_LIMIT = 9,
     SERVE_FRAMES = 40,
-    AUDIO_RATE = R36SX_AUDIO_SAMPLE_RATE,
-    AUDIO_FRAMES_PER_VIDEO_FRAME = R36SX_AUDIO_FRAMES_PER_VIDEO_FRAME
+    AUDIO_RATE = R36SX_LIBRETRO_AUDIO_SAMPLE_RATE,
+    AUDIO_FRAMES_PER_VIDEO_FRAME = R36SX_LIBRETRO_AUDIO_FRAMES_PER_VIDEO_FRAME
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];

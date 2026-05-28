@@ -82,10 +82,4 @@
 #define R36SX_ICUBE_CHECK_INTERVAL_SECONDS 1
 #define R36SX_RKGAME_HEARTBEAT_USEC 20000
 
-/* Audio/video timing used by the small libretro demos. */
-#define R36SX_VIDEO_FPS 60
-#define R36SX_AUDIO_SAMPLE_RATE 44100
-#define R36SX_AUDIO_FRAMES_PER_VIDEO_FRAME \
-    (R36SX_AUDIO_SAMPLE_RATE / R36SX_VIDEO_FPS)
-
 #endif
