@@ -331,6 +331,11 @@ Notable patch history:
   `MIPS_NATIVE/button_demo/button_demo` for launch directly from Tiny MC.
 - `disk_image_patch_044`: restores sound in native Pong and native Button Demo
   through the stock `/dev/auddec` audio packet path.
+- `disk_image_patch_045`: adds short Tiny MC button click sounds through
+  `driver.so` audio symbols.
+- `disk_image_patch_046`: rebuilds native Pong and native Button Demo so their
+  generated sounds use `driver.so` `sound_driver_playframe`, matching the stock
+  `rkgame` LibRetro audio path instead of writing to `/dev/auddec` directly.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -353,6 +358,8 @@ Tracked or intentionally small project files:
     firmware constants used by homebrew programs.
   - `homebrew/common/libretro_hardware.h`: libretro-specific screen/audio
     cadence constants layered on top of `hardware.h`.
+  - `homebrew/common/driver_audio.h`: documented `driver.so` audio helper for
+    standalone native programs that already load `driver.so`.
   - `homebrew/common/native_audio.h`: minimal `/dev/auddec` PCM packet helper
     for standalone Tiny MC programs.
 - `patches/`: copyable patch overlays and patch application notes.

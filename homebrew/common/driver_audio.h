@@ -53,11 +53,17 @@ struct r36sx_driver_audio_state {
                   R36SX_DRIVER_AUDIO_CHANNELS];
 };
 
+/* Reset the helper state without touching driver.so by itself. */
 static void r36sx_driver_audio_init(struct r36sx_driver_audio_state *audio)
 {
     memset(audio, 0, sizeof(*audio));
 }
 
+/*
+ * Resolve the stock driver.so audio entry points and initialize 44.1 kHz
+ * stereo PCM output. The caller owns the dlopen() handle and must keep it
+ * alive until r36sx_driver_audio_close().
+ */
 static int r36sx_driver_audio_bind(struct r36sx_driver_audio_state *audio,
                                    void *driver_handle)
 {
@@ -85,6 +91,7 @@ static int r36sx_driver_audio_bind(struct r36sx_driver_audio_state *audio,
     return 0;
 }
 
+/* Flush/deinitialize driver.so audio if it was successfully bound. */
 static void r36sx_driver_audio_close(struct r36sx_driver_audio_state *audio)
 {
     if (audio->active) {
@@ -98,12 +105,17 @@ static void r36sx_driver_audio_close(struct r36sx_driver_audio_state *audio)
     r36sx_driver_audio_init(audio);
 }
 
+/* Return nonzero while a generated tone still has samples or gaps left. */
 static int r36sx_driver_audio_tone_active(
     const struct r36sx_driver_audio_state *audio)
 {
     return audio->segment_index < audio->segment_count;
 }
 
+/*
+ * Generate one signed 16-bit mono sample from the current tone segment.
+ * Segments are simple fading square waves with optional silent gaps.
+ */
 static int16_t
 r36sx_driver_audio_next_sample(struct r36sx_driver_audio_state *audio)
 {
@@ -148,6 +160,7 @@ r36sx_driver_audio_next_sample(struct r36sx_driver_audio_state *audio)
     return 0;
 }
 
+/* Replace the queued tone with a new short sequence of generated segments. */
 static void
 r36sx_driver_audio_play_segments(struct r36sx_driver_audio_state *audio,
                                  const struct r36sx_driver_audio_segment *segments,
@@ -163,6 +176,7 @@ r36sx_driver_audio_play_segments(struct r36sx_driver_audio_state *audio,
     audio->phase = 0;
 }
 
+/* Queue the two-part "button/click" sound used by Button Demo and pause UI. */
 static void R36SX_DRIVER_AUDIO_MAYBE_UNUSED
 r36sx_driver_audio_play_button(struct r36sx_driver_audio_state *audio)
 {
@@ -174,6 +188,7 @@ r36sx_driver_audio_play_button(struct r36sx_driver_audio_state *audio)
         audio, segments, (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue a short paddle/wall bounce sound. */
 static void R36SX_DRIVER_AUDIO_MAYBE_UNUSED
 r36sx_driver_audio_play_bounce(struct r36sx_driver_audio_state *audio)
 {
@@ -183,6 +198,7 @@ r36sx_driver_audio_play_bounce(struct r36sx_driver_audio_state *audio)
     r36sx_driver_audio_play_segments(audio, segments, 1);
 }
 
+/* Queue a descending score-change sound. */
 static void R36SX_DRIVER_AUDIO_MAYBE_UNUSED
 r36sx_driver_audio_play_score(struct r36sx_driver_audio_state *audio)
 {
@@ -194,6 +210,7 @@ r36sx_driver_audio_play_score(struct r36sx_driver_audio_state *audio)
         audio, segments, (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue an ascending win fanfare. */
 static void R36SX_DRIVER_AUDIO_MAYBE_UNUSED
 r36sx_driver_audio_play_win(struct r36sx_driver_audio_state *audio)
 {
@@ -206,6 +223,7 @@ r36sx_driver_audio_play_win(struct r36sx_driver_audio_state *audio)
         audio, segments, (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue a low descending lose sound. */
 static void R36SX_DRIVER_AUDIO_MAYBE_UNUSED
 r36sx_driver_audio_play_lose(struct r36sx_driver_audio_state *audio)
 {
@@ -217,6 +235,10 @@ r36sx_driver_audio_play_lose(struct r36sx_driver_audio_state *audio)
         audio, segments, (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/*
+ * Emit one video-frame worth of stereo PCM through driver.so. Call this once
+ * per main-loop tick after any play_* function has queued a tone.
+ */
 static void r36sx_driver_audio_update(struct r36sx_driver_audio_state *audio)
 {
     if (!audio->active || !audio->playframe ||

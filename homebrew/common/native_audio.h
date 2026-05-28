@@ -67,6 +67,7 @@ struct r36sx_audio_state {
     int16_t frame[R36SX_AUDIO_SAMPLES_PER_FRAME * R36SX_AUDIO_CHANNELS];
 };
 
+/* Store a 32-bit integer in the little-endian layout expected by auddec. */
 static void r36sx_audio_put_u32(uint8_t *dst, uint32_t value)
 {
     dst[0] = (uint8_t)value;
@@ -75,12 +76,17 @@ static void r36sx_audio_put_u32(uint8_t *dst, uint32_t value)
     dst[3] = (uint8_t)(value >> 24);
 }
 
+/* Reset helper state and mark the audio device as unopened. */
 static void r36sx_audio_init(struct r36sx_audio_state *audio)
 {
     memset(audio, 0, sizeof(*audio));
     audio->fd = -1;
 }
 
+/*
+ * Open /dev/auddec and configure it for freerun 44.1 kHz stereo S16LE PCM.
+ * On failure it disables future open attempts for this helper instance.
+ */
 static int r36sx_audio_open(struct r36sx_audio_state *audio)
 {
     uint8_t cfg[R36SX_AUDDEC_CONFIG_SIZE];
@@ -118,6 +124,7 @@ static int r36sx_audio_open(struct r36sx_audio_state *audio)
     return 0;
 }
 
+/* Write a whole buffer to the device, retrying short waits on transient stalls. */
 static int r36sx_audio_write_all(int fd, const void *data, size_t size)
 {
     const uint8_t *ptr = (const uint8_t *)data;
@@ -144,6 +151,7 @@ static int r36sx_audio_write_all(int fd, const void *data, size_t size)
     return 0;
 }
 
+/* Wrap raw PCM in the AvPktHd shape used by the firmware audio decoder. */
 static int r36sx_audio_write_packet(struct r36sx_audio_state *audio,
                                     const int16_t *samples, size_t sample_count)
 {
@@ -168,11 +176,16 @@ static int r36sx_audio_write_packet(struct r36sx_audio_state *audio,
     return 0;
 }
 
+/* Return nonzero while a generated tone still has samples or gaps left. */
 static int r36sx_audio_active(const struct r36sx_audio_state *audio)
 {
     return audio->segment_index < audio->segment_count;
 }
 
+/*
+ * Generate one signed 16-bit mono sample from the current tone segment.
+ * Segments are simple fading square waves with optional silent gaps.
+ */
 static int16_t r36sx_audio_next_sample(struct r36sx_audio_state *audio)
 {
     while (r36sx_audio_active(audio)) {
@@ -214,6 +227,7 @@ static int16_t r36sx_audio_next_sample(struct r36sx_audio_state *audio)
     return 0;
 }
 
+/* Replace the queued tone with a new short sequence of generated segments. */
 static void r36sx_audio_play_segments(struct r36sx_audio_state *audio,
                                       const struct r36sx_audio_segment *segments,
                                       uint32_t count)
@@ -228,6 +242,7 @@ static void r36sx_audio_play_segments(struct r36sx_audio_state *audio,
     audio->phase = 0;
 }
 
+/* Queue the two-part "button/click" sound used by Button Demo and pause UI. */
 static void R36SX_AUDIO_MAYBE_UNUSED
 r36sx_audio_play_button(struct r36sx_audio_state *audio)
 {
@@ -239,6 +254,7 @@ r36sx_audio_play_button(struct r36sx_audio_state *audio)
                               (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue a short paddle/wall bounce sound. */
 static void R36SX_AUDIO_MAYBE_UNUSED
 r36sx_audio_play_bounce(struct r36sx_audio_state *audio)
 {
@@ -248,6 +264,7 @@ r36sx_audio_play_bounce(struct r36sx_audio_state *audio)
     r36sx_audio_play_segments(audio, segments, 1);
 }
 
+/* Queue a descending score-change sound. */
 static void R36SX_AUDIO_MAYBE_UNUSED
 r36sx_audio_play_score(struct r36sx_audio_state *audio)
 {
@@ -259,6 +276,7 @@ r36sx_audio_play_score(struct r36sx_audio_state *audio)
                               (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue an ascending win fanfare. */
 static void R36SX_AUDIO_MAYBE_UNUSED
 r36sx_audio_play_win(struct r36sx_audio_state *audio)
 {
@@ -271,6 +289,7 @@ r36sx_audio_play_win(struct r36sx_audio_state *audio)
                               (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/* Queue a low descending lose sound. */
 static void R36SX_AUDIO_MAYBE_UNUSED
 r36sx_audio_play_lose(struct r36sx_audio_state *audio)
 {
@@ -282,6 +301,10 @@ r36sx_audio_play_lose(struct r36sx_audio_state *audio)
                               (uint32_t)(sizeof(segments) / sizeof(segments[0])));
 }
 
+/*
+ * Emit one video-frame worth of stereo PCM through /dev/auddec. Call this once
+ * per main-loop tick after any play_* function has queued a tone.
+ */
 static void r36sx_audio_update(struct r36sx_audio_state *audio)
 {
     if (!r36sx_audio_active(audio)) {
@@ -302,6 +325,7 @@ static void r36sx_audio_update(struct r36sx_audio_state *audio)
                                    R36SX_AUDIO_CHANNELS);
 }
 
+/* Close the raw auddec device if this helper opened it. */
 static void r36sx_audio_close(struct r36sx_audio_state *audio)
 {
     if (audio->fd >= 0) {
