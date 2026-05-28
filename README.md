@@ -206,13 +206,18 @@ replacement candidate for `cubegm/rkgame`:
 - Build commands: [`homebrew/tiny_mc/BUILD_COMMANDS.md`](homebrew/tiny_mc/BUILD_COMMANDS.md)
 - Built executable: `homebrew/tiny_mc/tiny_mc`
 
-It now follows the stock `rkgame` display path by loading `cubegm/driver.so`,
+It follows the stock `rkgame` display path by loading `cubegm/driver.so`,
 drawing to an internal RGB565 640x480 buffer, and presenting frames through
 `video_driver_disp_frame()`. Direct `/dev/fb0` rendering remains as fallback.
-It reads `/dev/input/js*` and `/dev/input/event*`, and launches selected files
-with `fork()` plus `execl()`. `disk_image_patch_022` copies the rebuilt Tiny MC
-as `cubegm/rkgame`; the stock launcher should be preserved as
-`cubegm/rkgame.stock`.
+It reads the built-in controls through the same `driver.so` `cube_ioctl` path as
+stock `rkgame`, maintains the `icube` shared-memory heartbeat, and launches
+selected files with `fork()` plus `execl()`.
+
+The current `icube`-compatible integration keeps `icube_start.sh` launching
+`/mnt/sdcard/cubegm/icube`; `icube` then launches `/mnt/sdcard/cubegm/rkgame`
+with no extra arguments. The rebuilt Tiny MC is installed as that `rkgame`
+entrypoint and also copied to `MIPS_NATIVE/tiny_mc/tiny_mc`. When no start
+directory argument is passed, Tiny MC now opens `/mnt/sdcard/MIPS_NATIVE`.
 
 ## Patch Sets
 
@@ -268,6 +273,9 @@ Notable patch history:
 - `disk_image_patch_031`: moves Tiny MC to `MIPS_NATIVE/tiny_mc/tiny_mc`,
   restores stock `cubegm/rkgame`, and routes `cubegm/icube_start.sh` directly
   to Tiny MC.
+- `disk_image_patch_032`: restores the stock `icube` launch chain, installs
+  Tiny MC as the `cubegm/rkgame` compatibility entrypoint, and makes no-arg
+  Tiny MC startup open `/mnt/sdcard/MIPS_NATIVE`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

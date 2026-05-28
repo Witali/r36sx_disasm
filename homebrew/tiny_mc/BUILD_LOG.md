@@ -605,3 +605,73 @@ Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_031\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_031\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 icube-compatible MIPS_NATIVE startup
+
+Purpose:
+
+Restore the stock `icube` launch chain while still making Tiny MC open the
+root-level native program directory.
+
+`ghidra_exports/icube/decompiled_all.c` shows the relevant `icube` contract:
+
+```c
+ShareMemCreat();
+fork();
+execl("/mnt/sdcard/cubegm/rkgame", "rkgame", 0);
+sleep(6);
+/* then compare shm[1] once per second and run system("killall rkgame") on stall */
+```
+
+So a direct `icube_start.sh -> MIPS_NATIVE/tiny_mc/tiny_mc` jump bypasses the
+supervisor. The compatible setup is:
+
+```text
+hcprojector
+  -> cubegm/icube_start.sh
+  -> cubegm/icube
+  -> cubegm/rkgame        # Tiny MC compatibility entrypoint
+  -> default directory /mnt/sdcard/MIPS_NATIVE
+```
+
+Code change:
+
+- `choose_start_dir()` now prefers `R36SX_MIPS_NATIVE_DIR` when no valid
+  command-line directory is supplied.
+- `cubegm/icube_start.sh` again launches `/mnt/sdcard/cubegm/icube &`.
+
+File changes:
+
+- Copied the rebuilt Tiny MC to `disk_image\MIPS_NATIVE\tiny_mc\tiny_mc`.
+- Copied the same rebuilt Tiny MC to `disk_image\cubegm\rkgame`.
+- Created overlay directory `disk_image_patch_032` with the same changed files.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force -Path disk_image\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_032\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_032\cubegm
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\cubegm\rkgame -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image_patch_032\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image_patch_032\cubegm\rkgame -Force
+Copy-Item -LiteralPath disk_image\cubegm\icube_start.sh -Destination disk_image_patch_032\cubegm\icube_start.sh -Force
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_032\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_032\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS, interpreter /lib/ld.so.1
+Contains string: /mnt/sdcard/MIPS_NATIVE
+Size: 40940 bytes
+SHA256: F7D7E26864F247B01EC1660AE1DF91F12E49E3A41F21F7ABDB6B473602ECA0E8
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_032\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_032\cubegm\rkgame: found no threats
+```

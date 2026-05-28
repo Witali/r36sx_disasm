@@ -66,8 +66,9 @@ After building, scan the generated executable:
 powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\tiny_mc\tiny_mc
 ```
 
-For the patch copy, scan the patch binary too:
+For the patch copies, scan the patch binaries too:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_022\cubegm\rkgame
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_032\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_032\cubegm\rkgame
 ```

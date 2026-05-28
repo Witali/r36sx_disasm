@@ -1,10 +1,10 @@
 /*
  * Tiny one-panel file manager / launcher for the R36SX/SF3000-like firmware.
  *
- * This is intended to be copied over cubegm/rkgame, with the stock launcher
- * preserved as cubegm/rkgame.stock. It normally uses cubegm/driver.so for
- * display setup, matching rkgame's framebuffer/rotation path. Direct /dev/fb0
- * rendering remains as fallback.
+ * This can run either as MIPS_NATIVE/tiny_mc/tiny_mc or as the icube-launched
+ * cubegm/rkgame compatibility entrypoint. It normally uses cubegm/driver.so
+ * for display setup, matching rkgame's framebuffer/rotation path. Direct
+ * /dev/fb0 rendering remains as fallback.
  */
 
 #define _GNU_SOURCE
@@ -1460,6 +1460,8 @@ static void choose_start_dir(int argc, char **argv)
 {
     if (argc > 1 && access(argv[1], R_OK | X_OK) == 0) {
         snprintf(g_cwd, sizeof(g_cwd), "%s", argv[1]);
+    } else if (access(R36SX_MIPS_NATIVE_DIR, R_OK | X_OK) == 0) {
+        snprintf(g_cwd, sizeof(g_cwd), "%s", R36SX_MIPS_NATIVE_DIR);
     } else if (access("/mnt/sdcard", R_OK | X_OK) == 0) {
         snprintf(g_cwd, sizeof(g_cwd), "%s", "/mnt/sdcard");
     } else if (access("/media", R_OK | X_OK) == 0) {

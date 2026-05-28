@@ -3,10 +3,11 @@
 Tiny MC is a small one-panel framebuffer file manager / launcher for the
 R36SX/SF3000-like firmware.
 
-The current integration model keeps the stock `cubegm/rkgame` binary intact and
-places Tiny MC in the native application area as
-`MIPS_NATIVE/tiny_mc/tiny_mc`. The stock transition script
-`cubegm/icube_start.sh` launches Tiny MC directly.
+The current integration model keeps the stock `icube` supervisor in the launch
+chain. `icube` hardcodes `execl("/mnt/sdcard/cubegm/rkgame", "rkgame", 0)`, so
+Tiny MC is installed both as `MIPS_NATIVE/tiny_mc/tiny_mc` and as the
+`cubegm/rkgame` compatibility entrypoint. With no start directory argument,
+Tiny MC opens `/mnt/sdcard/MIPS_NATIVE`.
 
 ## Controls
 
@@ -95,20 +96,27 @@ The output file is:
 homebrew\tiny_mc\tiny_mc
 ```
 
-For the current SD-card integration, copy it as:
+For the current SD-card integration, copy the rebuilt executable as both:
 
 ```text
 MIPS_NATIVE\tiny_mc\tiny_mc
+cubegm\rkgame
 ```
 
-and route `cubegm\icube_start.sh` to:
+preserving the stock binary as:
 
 ```text
-/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE
+cubegm\rkgame.stock
 ```
 
-Older patches copied Tiny MC over `cubegm\rkgame`; keep
-`cubegm\rkgame.stock` as the stock backup if switching back to that model.
+and keep `cubegm\icube_start.sh` launching the stock supervisor:
+
+```sh
+/mnt/sdcard/cubegm/icube &
+```
+
+`icube` passes no arguments to `rkgame`, so Tiny MC chooses
+`/mnt/sdcard/MIPS_NATIVE` as its default start directory.
 
 ## Native Program Folder
 
