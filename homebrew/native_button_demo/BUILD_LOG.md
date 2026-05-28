@@ -177,3 +177,54 @@ Defender scan homebrew\native_button_demo\button_demo: found no threats
 Defender scan patches\disk_image_patch_046: found no threats
 Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
 ```
+
+## 2026-05-28 Arial FreeType button log rebuild
+
+Purpose:
+
+Render the scrolling pressed-button log with the stock firmware TrueType Arial
+font and remove the static instruction labels from the top of the screen.
+
+Implementation:
+
+- Added a small dynamic FreeType loader to `native_button_demo.c`.
+- The program tries `/mnt/sdcard/cubegm/lib/libfreetype.so.6`, then
+  `/mnt/sdcard/cubegm/usr/lib/libfreetype.so.6`, then `libfreetype.so.6`.
+- The preferred font is `/mnt/sdcard/cubegm/Arial_en.ttf`, with
+  `/mnt/sdcard/cubegm/Arial_kr.ttf` and `/mnt/sdcard/cubegm/font.ttf` as
+  fallbacks.
+- The old built-in bitmap text path remains as a fallback if FreeType or Arial
+  cannot be opened.
+- Removed the top `BUTTON DEMO` and control-help strings from `draw_frame()`.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_button_demo\build_native_button_demo.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_053
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_053\MIPS_NATIVE\button_demo\button_demo
+patches\disk_image_patch_053\MIPS_NATIVE\button_demo\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: /mnt/sdcard/cubegm/Arial_en.ttf, libfreetype.so.6,
+FT_Init_FreeType, sound_driver_playframe
+Does not contain strings: BUTTON DEMO, DPAD MOVE
+Size: 19400 bytes
+SHA256: 17010FEB9EC4C674DB0E79482B61C2FA7E2D57142AAB38038BB4E7DC916FA2A4
+Defender scan homebrew\native_button_demo\button_demo: found no threats
+Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
+Defender scan patches\disk_image_patch_053: found no threats
+```

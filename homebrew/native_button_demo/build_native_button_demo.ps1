@@ -8,6 +8,7 @@ $Obj = Join-Path $PSScriptRoot "native_button_demo.o"
 $Src = Join-Path $PSScriptRoot "native_button_demo.c"
 $Sysroot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot"
 $SysrootInclude = Join-Path $Sysroot "usr\include"
+$SysrootFreetypeInclude = Join-Path $SysrootInclude "freetype2"
 $SysrootLib = Join-Path $Sysroot "lib"
 $SysrootUsrLib = Join-Path $Sysroot "usr\lib"
 $Crt1 = Join-Path $Sysroot "usr\lib\crt1.o"
@@ -24,6 +25,7 @@ $env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path (Join-Path $Root "tools\zig-cache")).Pa
     -nostdinc `
     "-isystem$ZigInclude" `
     "-isystem$SysrootInclude" `
+    "-isystem$SysrootFreetypeInclude" `
     -O2 `
     -fno-pic `
     -fno-sanitize=undefined `

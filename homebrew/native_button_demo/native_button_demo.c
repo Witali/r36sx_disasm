@@ -16,6 +16,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "../common/driver_audio.h"
 #include "../common/hardware.h"
 
@@ -26,11 +29,13 @@ enum {
     FB_HEIGHT = R36SX_SCREEN_HEIGHT,
     SQUARE_SIZE = 48,
     LOG_LINES = 5,
-    LOG_TEXT_LEN = 18,
+    LOG_TEXT_LEN = 24,
     LOG_X = 20,
-    LOG_Y = 370,
+    LOG_Y = 342,
+    LOG_FONT_PX = 22,
     FONT_SCALE = 2,
-    LOG_LINE_STEP = 20,
+    LOG_LINE_STEP = 24,
+    FONT_CACHE_SLOTS = 96,
     FRAME_USEC = 16666
 };
 
@@ -53,6 +58,13 @@ typedef int (*video_drivers_init_fn)(void);
 typedef void (*video_driver_disp_frame_fn)(void *, int, int, int);
 typedef void (*video_driver_deinit_fn)(void);
 typedef int (*cube_ioctl_fn)(int, uint32_t *, uint32_t, uint32_t);
+typedef FT_Error (*ft_init_free_type_fn)(FT_Library *);
+typedef FT_Error (*ft_new_face_fn)(FT_Library, const char *, FT_Long, FT_Face *);
+typedef FT_Error (*ft_done_face_fn)(FT_Face);
+typedef FT_Error (*ft_done_free_type_fn)(FT_Library);
+typedef FT_Error (*ft_select_charmap_fn)(FT_Face, FT_Encoding);
+typedef FT_Error (*ft_set_pixel_sizes_fn)(FT_Face, FT_UInt, FT_UInt);
+typedef FT_Error (*ft_load_char_fn)(FT_Face, FT_ULong, FT_Int32);
 
 struct driver_state {
     void *handle;
@@ -66,7 +78,35 @@ struct driver_state {
     int active;
 };
 
+struct ft_glyph_cache_entry {
+    uint32_t codepoint;
+    int valid;
+    int width;
+    int rows;
+    int pitch;
+    int bitmap_left;
+    int bitmap_top;
+    int advance;
+    uint8_t *buffer;
+};
+
+struct font_state {
+    void *handle;
+    FT_Library library;
+    FT_Face face;
+    ft_init_free_type_fn init_free_type;
+    ft_new_face_fn new_face;
+    ft_done_face_fn done_face;
+    ft_done_free_type_fn done_free_type;
+    ft_select_charmap_fn select_charmap;
+    ft_set_pixel_sizes_fn set_pixel_sizes;
+    ft_load_char_fn load_char;
+    struct ft_glyph_cache_entry cache[FONT_CACHE_SLOTS];
+    int active;
+};
+
 static struct driver_state g_driver;
+static struct font_state g_font;
 static uint16_t g_frame[FB_WIDTH * FB_HEIGHT];
 static int g_square_x = (FB_WIDTH - SQUARE_SIZE) / 2;
 static int g_square_y = (FB_HEIGHT - SQUARE_SIZE) / 2;
@@ -76,6 +116,7 @@ static uint32_t g_prev_buttons;
 static char g_button_log[LOG_LINES][LOG_TEXT_LEN];
 static struct r36sx_driver_audio_state g_audio;
 
+static void font_close(void);
 static void display_close(void);
 
 static uint16_t rgb565(unsigned r, unsigned g, unsigned b)
@@ -125,11 +166,246 @@ static void draw_rect(int x, int y, int w, int h, uint16_t color)
     }
 }
 
+static void put_pixel_alpha(int x, int y, uint16_t color, unsigned alpha)
+{
+    if (x < 0 || y < 0 || x >= FB_WIDTH || y >= FB_HEIGHT || alpha == 0) {
+        return;
+    }
+    if (alpha >= 255) {
+        g_frame[(size_t)y * FB_WIDTH + x] = color;
+        return;
+    }
+
+    uint16_t dst = g_frame[(size_t)y * FB_WIDTH + x];
+    unsigned inv = 255u - alpha;
+    unsigned sr = (color >> 11) & 0x1fu;
+    unsigned sg = (color >> 5) & 0x3fu;
+    unsigned sb = color & 0x1fu;
+    unsigned dr = (dst >> 11) & 0x1fu;
+    unsigned dg = (dst >> 5) & 0x3fu;
+    unsigned db = dst & 0x1fu;
+    unsigned r = (sr * alpha + dr * inv) / 255u;
+    unsigned g = (sg * alpha + dg * inv) / 255u;
+    unsigned b = (sb * alpha + db * inv) / 255u;
+
+    g_frame[(size_t)y * FB_WIDTH + x] =
+        (uint16_t)((r << 11) | (g << 5) | b);
+}
+
+static void font_cache_clear(void)
+{
+    for (int i = 0; i < FONT_CACHE_SLOTS; i++) {
+        free(g_font.cache[i].buffer);
+        memset(&g_font.cache[i], 0, sizeof(g_font.cache[i]));
+    }
+}
+
+static void font_close(void)
+{
+    font_cache_clear();
+    if (g_font.face && g_font.done_face) {
+        g_font.done_face(g_font.face);
+    }
+    if (g_font.library && g_font.done_free_type) {
+        g_font.done_free_type(g_font.library);
+    }
+    if (g_font.handle) {
+        dlclose(g_font.handle);
+    }
+    memset(&g_font, 0, sizeof(g_font));
+}
+
+static int font_bind_symbols(void)
+{
+    g_font.init_free_type = (ft_init_free_type_fn)dlsym(g_font.handle, "FT_Init_FreeType");
+    g_font.new_face = (ft_new_face_fn)dlsym(g_font.handle, "FT_New_Face");
+    g_font.done_face = (ft_done_face_fn)dlsym(g_font.handle, "FT_Done_Face");
+    g_font.done_free_type = (ft_done_free_type_fn)dlsym(g_font.handle, "FT_Done_FreeType");
+    g_font.select_charmap = (ft_select_charmap_fn)dlsym(g_font.handle, "FT_Select_Charmap");
+    g_font.set_pixel_sizes = (ft_set_pixel_sizes_fn)dlsym(g_font.handle, "FT_Set_Pixel_Sizes");
+    g_font.load_char = (ft_load_char_fn)dlsym(g_font.handle, "FT_Load_Char");
+    return g_font.init_free_type && g_font.new_face && g_font.done_face &&
+           g_font.done_free_type && g_font.set_pixel_sizes && g_font.load_char;
+}
+
+static int font_open(void)
+{
+    static const char *library_paths[] = {
+        R36SX_CUBEGM_DIR "/lib/libfreetype.so.6",
+        R36SX_CUBEGM_DIR "/usr/lib/libfreetype.so.6",
+        "libfreetype.so.6"
+    };
+    static const char *font_paths[] = {
+        R36SX_CUBEGM_DIR "/Arial_en.ttf",
+        R36SX_CUBEGM_DIR "/Arial_kr.ttf",
+        R36SX_CUBEGM_DIR "/font.ttf"
+    };
+
+    if (g_font.active) {
+        return 0;
+    }
+
+    memset(&g_font, 0, sizeof(g_font));
+    for (size_t i = 0; i < ARRAY_COUNT(library_paths); i++) {
+        g_font.handle = dlopen(library_paths[i], RTLD_NOW);
+        if (g_font.handle) {
+            break;
+        }
+    }
+    if (!g_font.handle || !font_bind_symbols()) {
+        font_close();
+        return -1;
+    }
+    if (g_font.init_free_type(&g_font.library) != 0) {
+        font_close();
+        return -1;
+    }
+    for (size_t i = 0; i < ARRAY_COUNT(font_paths); i++) {
+        if (access(font_paths[i], R_OK) != 0) {
+            continue;
+        }
+        if (g_font.new_face(g_font.library, font_paths[i], 0, &g_font.face) == 0) {
+            break;
+        }
+    }
+    if (!g_font.face) {
+        font_close();
+        return -1;
+    }
+    if (g_font.select_charmap) {
+        g_font.select_charmap(g_font.face, FT_ENCODING_UNICODE);
+    }
+
+    g_font.active = 1;
+    return 0;
+}
+
+static struct ft_glyph_cache_entry *font_cache_slot(uint32_t codepoint)
+{
+    unsigned slot = codepoint >= 32u && codepoint < 128u
+        ? codepoint - 32u
+        : codepoint % FONT_CACHE_SLOTS;
+    struct ft_glyph_cache_entry *entry = &g_font.cache[slot];
+
+    if (entry->valid && entry->codepoint == codepoint) {
+        return entry;
+    }
+
+    free(entry->buffer);
+    memset(entry, 0, sizeof(*entry));
+    return entry;
+}
+
+static struct ft_glyph_cache_entry *font_load_glyph(uint32_t codepoint)
+{
+    if (!g_font.active || !g_font.face) {
+        return NULL;
+    }
+
+    struct ft_glyph_cache_entry *entry = font_cache_slot(codepoint);
+    if (entry->valid) {
+        return entry;
+    }
+
+    if (g_font.set_pixel_sizes(g_font.face, 0, LOG_FONT_PX) != 0) {
+        return NULL;
+    }
+    if (g_font.load_char(g_font.face, codepoint,
+                         FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0) {
+        if (codepoint != '?') {
+            return font_load_glyph('?');
+        }
+        return NULL;
+    }
+
+    FT_GlyphSlot slot = g_font.face->glyph;
+    FT_Bitmap *bitmap = &slot->bitmap;
+    if (bitmap->pixel_mode != FT_PIXEL_MODE_GRAY) {
+        return NULL;
+    }
+
+    entry->codepoint = codepoint;
+    entry->bitmap_left = slot->bitmap_left;
+    entry->bitmap_top = slot->bitmap_top;
+    entry->width = (int)bitmap->width;
+    entry->rows = (int)bitmap->rows;
+    entry->pitch = entry->width;
+    entry->advance = (int)(slot->advance.x >> 6);
+    if (entry->advance <= 0) {
+        entry->advance = entry->width + 1;
+    }
+
+    if (entry->width > 0 && entry->rows > 0) {
+        size_t bytes = (size_t)entry->width * (size_t)entry->rows;
+        int pitch = bitmap->pitch < 0 ? -bitmap->pitch : bitmap->pitch;
+
+        entry->buffer = (uint8_t *)malloc(bytes);
+        if (!entry->buffer) {
+            memset(entry, 0, sizeof(*entry));
+            return NULL;
+        }
+        for (int row = 0; row < entry->rows; row++) {
+            const uint8_t *src = bitmap->pitch >= 0
+                ? bitmap->buffer + (size_t)row * (size_t)pitch
+                : bitmap->buffer + (size_t)(entry->rows - 1 - row) * (size_t)pitch;
+            memcpy(entry->buffer + (size_t)row * (size_t)entry->pitch,
+                   src, (size_t)entry->width);
+        }
+    }
+
+    entry->valid = 1;
+    return entry;
+}
+
+static void draw_freetype_glyph(const struct ft_glyph_cache_entry *glyph,
+                                int x, int y, uint16_t color, unsigned alpha_mul)
+{
+    for (int row = 0; row < glyph->rows; row++) {
+        for (int col = 0; col < glyph->width; col++) {
+            unsigned alpha = glyph->buffer[(size_t)row * (size_t)glyph->pitch + (size_t)col];
+            alpha = (alpha * alpha_mul) / 255u;
+            put_pixel_alpha(x + col, y + row, color, alpha);
+        }
+    }
+}
+
+static int draw_text_freetype(int x, int y, const char *text, uint16_t color)
+{
+    if (!g_font.active || !text) {
+        return 0;
+    }
+
+    int baseline = y + LOG_FONT_PX - 2;
+    int limit = FB_WIDTH - LOG_X;
+    const unsigned char *p = (const unsigned char *)text;
+
+    while (*p != '\0') {
+        uint32_t cp = *p++;
+        struct ft_glyph_cache_entry *glyph = font_load_glyph(cp);
+        if (!glyph) {
+            return 0;
+        }
+        if (x + glyph->advance > limit) {
+            break;
+        }
+        if (glyph->buffer) {
+            int gx = x + glyph->bitmap_left;
+            int gy = baseline - glyph->bitmap_top;
+            draw_freetype_glyph(glyph, gx + 1, gy + 1, rgb565(0, 0, 0), 150);
+            draw_freetype_glyph(glyph, gx, gy, color, 255);
+        }
+        x += glyph->advance;
+    }
+
+    return 1;
+}
+
 static uint8_t glyph_row(char c, unsigned row)
 {
     static const uint8_t blank[7] = { 0, 0, 0, 0, 0, 0, 0 };
     static const uint8_t glyph_a[7] = { 14, 17, 17, 31, 17, 17, 17 };
     static const uint8_t glyph_b[7] = { 30, 17, 17, 30, 17, 17, 30 };
+    static const uint8_t glyph_c[7] = { 14, 17, 16, 16, 16, 17, 14 };
     static const uint8_t glyph_d[7] = { 30, 17, 17, 17, 17, 17, 30 };
     static const uint8_t glyph_e[7] = { 31, 16, 16, 30, 16, 16, 31 };
     static const uint8_t glyph_f[7] = { 31, 16, 16, 30, 16, 16, 16 };
@@ -152,6 +428,7 @@ static uint8_t glyph_row(char c, unsigned row)
     switch (c) {
     case 'A': glyph = glyph_a; break;
     case 'B': glyph = glyph_b; break;
+    case 'C': glyph = glyph_c; break;
     case 'D': glyph = glyph_d; break;
     case 'E': glyph = glyph_e; break;
     case 'F': glyph = glyph_f; break;
@@ -189,11 +466,19 @@ static void draw_char(int x, int y, char c, uint16_t color)
     }
 }
 
-static void draw_text(int x, int y, const char *text, uint16_t color)
+static void draw_text_bitmap(int x, int y, const char *text, uint16_t color)
 {
     for (unsigned i = 0; text[i] != '\0'; i++) {
         draw_char(x + (int)(i * 6 * FONT_SCALE), y, text[i], color);
     }
+}
+
+static void draw_text(int x, int y, const char *text, uint16_t color)
+{
+    if (draw_text_freetype(x, y, text, color)) {
+        return;
+    }
+    draw_text_bitmap(x, y, text, color);
 }
 
 static void copy_label(char *dst, const char *src)
@@ -274,16 +559,12 @@ static void draw_frame(void)
     draw_rect(0, FB_HEIGHT - 1, FB_WIDTH, 1, rgb565(255, 255, 255));
     draw_rect(FB_WIDTH / 2, 0, 1, FB_HEIGHT, rgb565(80, 120, 140));
     draw_rect(0, FB_HEIGHT / 2, FB_WIDTH, 1, rgb565(80, 120, 140));
-    draw_rect(0, LOG_Y - 8, FB_WIDTH, 104, rgb565(4, 10, 14));
+    draw_rect(0, LOG_Y - 8, FB_WIDTH, 132, rgb565(4, 10, 14));
     draw_rect(0, LOG_Y - 10, FB_WIDTH, 2, rgb565(40, 160, 180));
 
     draw_rect(g_square_x, g_square_y, SQUARE_SIZE, SQUARE_SIZE,
               square_colors[g_color_index % ARRAY_COUNT(square_colors)]);
     draw_rect(g_square_x + 12, g_square_y + 12, 24, 24, rgb565(0, 0, 0));
-
-    draw_text(20, 18, "BUTTON DEMO", rgb565(220, 240, 245));
-    draw_text(20, 42, "DPAD MOVE  A B X Y COLOR  START BG  SELECT RESET  FN EXIT",
-              rgb565(180, 210, 220));
 
     for (unsigned row = 0; row < LOG_LINES; row++) {
         draw_text(LOG_X, LOG_Y + (int)(row * LOG_LINE_STEP),
@@ -347,6 +628,7 @@ static int display_open(void)
 static void display_close(void)
 {
     r36sx_driver_audio_close(&g_audio);
+    font_close();
     if (g_driver.active && g_driver.deinit) {
         g_driver.deinit();
     }
@@ -490,6 +772,7 @@ int main(void)
         display_close();
         return 1;
     }
+    (void)font_open();
     memset(g_button_log, 0, sizeof(g_button_log));
     copy_label(g_button_log[0], "PRESS BUTTONS");
 

@@ -15,7 +15,9 @@ directly with `fork()` + `execl()`.
 - Fn: exit back to Tiny MC.
 
 The lower part of the screen shows a small scrolling log of newly pressed
-buttons.
+buttons. The log is rendered with FreeType using the stock firmware Arial font
+at `/mnt/sdcard/cubegm/Arial_en.ttf`; if FreeType or the font is unavailable,
+the program falls back to its built-in bitmap font.
 
 ## Build
 
