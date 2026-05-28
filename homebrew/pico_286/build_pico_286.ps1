@@ -545,6 +545,17 @@ int main() {')
                         uint8_t charcode = (uint8_t)(text_row[column * 2] & 0xffu); // Character code
                         uint8_t glyph_row = font_8x16[charcode * 16 + glyph_line]; // Glyph row from font
                         uint8_t color = (uint8_t)(text_row[column * 2 + 1] & 0xffu); // Color attribute')
+    $Text = [regex]::Replace($Text,
+'(?s)        else \{\n            uint8_t ydebug = y - 400;.*?        \}\n    \}\n\}\n\nextern "C" void HandleInput',
+'        else {
+            for (int x = 0; x < 640; x++) {
+                *pixels++ = 0;
+            }
+        }
+    }
+}
+
+extern "C" void HandleInput')
     Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
     return $Dest
 }

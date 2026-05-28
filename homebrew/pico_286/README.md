@@ -100,6 +100,10 @@ useful tags are:
 - `screen_text:logical-small-text` and `screen_text:renderer-byte-small-text`:
   the same comparison for Pico-286's small text modes `0x77` and `0x78`.
 
+The old on-screen debug text area is disabled.  Runtime diagnostics still go to
+`pico_286.log`, but the lower part of the framebuffer is cleared instead of
+drawing `DEBUG_VRAM` contents.
+
 `zig objcopy --strip-all` currently reports `error: unimplemented` for this
 MIPS ELF.  The script therefore leaves the executable unstripped by default.
 Pass `-TryStrip` only when testing a newer Zig that supports stripping it.

@@ -84,3 +84,7 @@ read/write character and attribute, teletype output, mode query, active page
 selection, and write string.  It also fixes the normal text-mode renderer to
 read from logical `VIDEORAM` cells so text printed by those BIOS calls can be
 shown on screen.
+
+The on-screen debug overlay has been disabled.  Diagnostics still go to
+`MIPS_NATIVE/pico_286/pico_286.log`, but `DEBUG_VRAM` is no longer drawn into
+the bottom of the framebuffer.

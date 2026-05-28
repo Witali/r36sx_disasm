@@ -422,3 +422,24 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 disable on-screen debug overlay
+
+Disabled the renderer path that drew `DEBUG_VRAM` into the bottom 80 pixels of
+the 640x480 framebuffer.  The debug messages are still collected in
+`pico_286.log`; only the on-screen overlay is removed.  The bottom area is now
+filled with black when the emulated mode itself uses only the top 400 lines.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,916,620 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
