@@ -736,3 +736,59 @@ Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_033\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_033\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 FN shortcut to icube
+
+Purpose:
+
+Let the direct-launch Tiny MC build jump back into the stock `icube` supervisor
+without relying on the `icube` heartbeat contract.
+
+Code change:
+
+- Added `R36SX_ICUBE_PATH` to `homebrew/common/hardware.h`.
+- Added `BTN_FN_BIT` and mapped `R36SX_RKGAME_KEY_FN` to it through the
+  existing `driver.so` `cube_ioctl` input path.
+- Added `launch_icube()`: saves Tiny MC state, draws a status update, closes
+  display and input devices, sets the stock `LD_LIBRARY_PATH`, changes to
+  `/mnt/sdcard/cubegm`, and runs:
+
+```c
+execl("/mnt/sdcard/cubegm/icube", "icube", (char *)NULL);
+```
+
+- If `execl()` fails, Tiny MC reopens display/input and shows the error.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force -Path disk_image\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_034\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_034\cubegm
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image_patch_034\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\cubegm\icube_start.sh -Destination disk_image_patch_034\cubegm\icube_start.sh -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame.stock -Destination disk_image\cubegm\rkgame -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame -Destination disk_image_patch_034\cubegm\rkgame -Force
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_034\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_034\cubegm\rkgame
+```
+
+Verification:
+
+```text
+Tiny MC ELF: ELF32 little-endian executable, machine=MIPS, interpreter /lib/ld.so.1
+Tiny MC contains strings: /mnt/sdcard/MIPS_NATIVE, /mnt/sdcard/cubegm/icube, FN iCube
+Tiny MC does not contain strings: shmget, heartbeat
+Tiny MC size: 40512 bytes
+Tiny MC SHA256: 3AE2ED9DD32E1053310F2E10612A474568E4E92092B8D4C86D283A3C490582B5
+
+Restored stock rkgame size: 1178732 bytes
+Restored stock rkgame SHA256: 57D8B4FD85E0AAB44D17A51D209879C3F98130D066B622142736B42AD08DDCB9
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_034\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_034\cubegm\rkgame: found no threats
+```

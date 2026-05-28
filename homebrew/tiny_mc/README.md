@@ -14,6 +14,7 @@ is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 - Left, B, or Select: parent directory.
 - Right: enter the selected directory.
 - A or Start: enter a directory or run the selected file.
+- Fn: close Tiny MC and start the stock `icube` supervisor.
 
 Directories with more entries than fit on screen show a thin scrollbar on the
 right side of the file list.
@@ -115,6 +116,8 @@ and route `cubegm\icube_start.sh` directly to:
 ```
 
 This bypasses `icube`; if Tiny MC hangs, there is no `icube` supervisor restart.
+Pressing Fn from Tiny MC closes Tiny MC and starts `/mnt/sdcard/cubegm/icube`,
+which in turn launches the stock `cubegm/rkgame`.
 
 ## Native Program Folder
 

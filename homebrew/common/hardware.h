@@ -29,6 +29,7 @@
 #define R36SX_DIS_DEVICE_PATH "/dev/dis"
 #define R36SX_JOY_KEY_SHM_PATH "/tmp/joy_key"
 #define R36SX_GAME_STATUS_SHM_PATH "/tmp/cubegame_status"
+#define R36SX_ICUBE_PATH "/mnt/sdcard/cubegm/icube"
 
 /*
  * Stock rkgame calls video_driver_setting() with these five words before

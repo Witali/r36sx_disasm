@@ -70,7 +70,8 @@ enum button_bits {
     BTN_A_BIT = 1u << 4,
     BTN_B_BIT = 1u << 5,
     BTN_START_BIT = 1u << 6,
-    BTN_SELECT_BIT = 1u << 7
+    BTN_SELECT_BIT = 1u << 7,
+    BTN_FN_BIT = 1u << 8
 };
 
 struct fb_bitfield_local {
@@ -258,7 +259,7 @@ static int g_entry_count;
 static int g_selected;
 static int g_scroll;
 static char g_cwd[PATH_MAX] = "/mnt/sdcard";
-static char g_status[256] = "A/Start runs a file. Right/A enters a directory.";
+static char g_status[256] = "A/Start runs a file. FN starts iCube.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
@@ -1080,6 +1081,9 @@ static uint32_t input_translate_rkgame_keys(uint32_t raw)
     if ((raw & R36SX_RKGAME_KEY_SELECT) != 0) {
         b |= BTN_SELECT_BIT;
     }
+    if ((raw & R36SX_RKGAME_KEY_FN) != 0) {
+        b |= BTN_FN_BIT;
+    }
 
     return b;
 }
@@ -1344,7 +1348,7 @@ static void draw_ui(void)
     draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
-              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK",
+              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK  FN iCube",
               rgb565(230, 240, 220), 1, g_fb.width - 24);
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 
@@ -1476,6 +1480,31 @@ static void launch_selected(void)
     scan_directory();
 }
 
+static void launch_icube(void)
+{
+    int err;
+
+    save_dir_state(g_cwd);
+    snprintf(g_status, sizeof(g_status), "Starting iCube");
+    log_msg("FN pressed: launching %s", R36SX_ICUBE_PATH);
+    draw_ui();
+    display_close();
+    input_close_devices();
+    heartbeat_close();
+
+    setenv("LD_LIBRARY_PATH",
+           "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",
+           1);
+    chdir(R36SX_CUBEGM_DIR);
+    execl(R36SX_ICUBE_PATH, "icube", (char *)NULL);
+
+    err = errno;
+    snprintf(g_status, sizeof(g_status), "iCube failed: %s", strerror(err));
+    log_msg("icube exec failed: %s", strerror(err));
+    display_open();
+    input_open_devices();
+}
+
 static void choose_start_dir(int argc, char **argv)
 {
     if (argc > 1 && access(argv[1], R_OK | X_OK) == 0) {
@@ -1501,6 +1530,12 @@ static void handle_buttons(uint32_t buttons)
     if (buttons != g_prev_buttons) {
         log_msg("buttons state=0x%08x changed_down=0x%08x changed_any=0x%08x",
                 buttons, changed, buttons ^ g_prev_buttons);
+    }
+
+    if ((changed & BTN_FN_BIT) != 0) {
+        launch_icube();
+        g_prev_buttons = buttons;
+        return;
     }
 
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {

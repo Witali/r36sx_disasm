@@ -69,6 +69,6 @@ powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\ti
 For the patch copies, scan the patch binaries too:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_033\MIPS_NATIVE\tiny_mc\tiny_mc
-powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_033\cubegm\rkgame
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_034\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_034\cubegm\rkgame
 ```

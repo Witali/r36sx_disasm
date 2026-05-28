@@ -277,6 +277,9 @@ Notable patch history:
 - `disk_image_patch_033`: switches Tiny MC back to direct launch from
   `cubegm/icube_start.sh`, disables the `icube` heartbeat contract at compile
   time, and restores stock `cubegm/rkgame`.
+- `disk_image_patch_034`: adds a Tiny MC FN shortcut that closes Tiny MC and
+  `exec`s `/mnt/sdcard/cubegm/icube`, while keeping direct launch and stock
+  `cubegm/rkgame`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
