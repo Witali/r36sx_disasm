@@ -275,3 +275,65 @@ Defender scan homebrew\native_button_demo\button_demo: found no threats
 Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
 Defender scan patches\disk_image_patch_054: found no threats
 ```
+
+## 2026-05-28 rear trigger mask rebuild
+
+Purpose:
+
+Find why the console rear triggers were not logged in Button Demo, then add the
+missing raw key masks.
+
+Reverse-engineering note:
+
+- `rkgame` `ReadJoystickProc()` reads `/tmp/joy_key` through
+  `driver.so` `cube_ioctl(0x40050209)`: `KEY_VALUE_Addr[0]` becomes
+  `joy_key`, and `KEY_VALUE_Addr[1]` becomes the second joy word.
+- `driver.so` maps `/tmp/joy_key` as 8 bytes, so both words are available to
+  native programs.
+- The `rkgame` `joy_key_mask` table at virtual address `0x004f3548` maps
+  extra libretro joypad IDs:
+
+```text
+L  -> 0x00000400
+R  -> 0x00000800
+L2 -> 0x00000100
+R2 -> 0x00000200
+L3 -> 0x00000002
+R3 -> 0x00000004
+```
+
+Implementation:
+
+- Added these masks to `homebrew/common/hardware.h`.
+- Button Demo now translates and logs `L`, `R`, `L2`, `R2`, `L3`, and `R3`.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_button_demo\build_native_button_demo.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_055
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_055\MIPS_NATIVE\button_demo\button_demo
+patches\disk_image_patch_055\MIPS_NATIVE\button_demo\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: L2, R2, L3, R3, FT_Init_FreeType, Arial_en,
+sound_driver_playframe
+Size: 19816 bytes
+SHA256: A602363BDA172E20BB0FBE70E83F68AB37D5D040661FA1249CCEE1C237D40A8A
+Defender scan homebrew\native_button_demo\button_demo: found no threats
+Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
+Defender scan patches\disk_image_patch_055: found no threats
+```

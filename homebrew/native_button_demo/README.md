@@ -10,6 +10,7 @@ directly with `fork()` + `execl()`.
 
 - D-pad: move the square.
 - A, B, X, Y: change square color.
+- L, R, L2, R2, L3, R3: logged when pressed.
 - Start: toggle checkerboard background.
 - Select: reset square position.
 - Fn: exit back to Tiny MC.

@@ -307,17 +307,40 @@ evdev/js, но и через `cube_ioctl`.
 
 ```text
 SELECT 0x00000001
+L3     0x00000002
+R3     0x00000004
 START  0x00000008
 UP     0x00000010
 RIGHT  0x00000020
 DOWN   0x00000040
 LEFT   0x00000080
+L2     0x00000100
+R2     0x00000200
+L      0x00000400
+R      0x00000800
 X      0x00001000
 A      0x00002000
 B      0x00004000
 Y      0x00008000
 FN     0x00010000
 ```
+
+Дополнительная проверка `rkgame` `joy_key_mask` по адресу `0x004f3548`
+показала, что задние кнопки/триггеры есть в штатной libretro-карте:
+
+```text
+retro id 10 L  -> 0x00000400
+retro id 11 R  -> 0x00000800
+retro id 12 L2 -> 0x00000100
+retro id 13 R2 -> 0x00000200
+retro id 14 L3 -> 0x00000002
+retro id 15 R3 -> 0x00000004
+```
+
+Это объясняет, почему ранний native Button Demo не видел задние кнопки: в
+`homebrew/common/hardware.h` были сохранены только D-pad, A/B/X/Y,
+Start/Select и Fn. Начиная со следующей сборки Button Demo эти маски добавлены
+и логируются как `L`, `R`, `L2`, `R2`, `L3`, `R3`.
 
 `disk_image_patch_024` меняет Tiny MC: теперь он `dlsym()`ит `cube_ioctl`,
 получает `/tmp/joy_key` через `0x40050209`, читает raw masks каждый кадр,

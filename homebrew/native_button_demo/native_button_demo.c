@@ -50,7 +50,13 @@ enum button_bits {
     BTN_Y_BIT = 1u << 7,
     BTN_START_BIT = 1u << 8,
     BTN_SELECT_BIT = 1u << 9,
-    BTN_FN_BIT = 1u << 10
+    BTN_FN_BIT = 1u << 10,
+    BTN_L_BIT = 1u << 11,
+    BTN_R_BIT = 1u << 12,
+    BTN_L2_BIT = 1u << 13,
+    BTN_R2_BIT = 1u << 14,
+    BTN_L3_BIT = 1u << 15,
+    BTN_R3_BIT = 1u << 16
 };
 
 typedef int (*video_driver_setting_fn)(int *);
@@ -535,6 +541,24 @@ static void log_pressed_buttons(uint32_t changed)
     if ((changed & BTN_FN_BIT) != 0) {
         log_button("FN EXIT");
     }
+    if ((changed & BTN_L_BIT) != 0) {
+        log_button("L");
+    }
+    if ((changed & BTN_R_BIT) != 0) {
+        log_button("R");
+    }
+    if ((changed & BTN_L2_BIT) != 0) {
+        log_button("L2");
+    }
+    if ((changed & BTN_R2_BIT) != 0) {
+        log_button("R2");
+    }
+    if ((changed & BTN_L3_BIT) != 0) {
+        log_button("L3");
+    }
+    if ((changed & BTN_R3_BIT) != 0) {
+        log_button("R3");
+    }
 }
 
 static void draw_frame(void)
@@ -681,6 +705,24 @@ static uint32_t translate_rkgame_keys(uint32_t raw)
     }
     if ((raw & R36SX_RKGAME_KEY_FN) != 0) {
         buttons |= BTN_FN_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_L) != 0) {
+        buttons |= BTN_L_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_R) != 0) {
+        buttons |= BTN_R_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_L2) != 0) {
+        buttons |= BTN_L2_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_R2) != 0) {
+        buttons |= BTN_R2_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_L3) != 0) {
+        buttons |= BTN_L3_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_R3) != 0) {
+        buttons |= BTN_R3_BIT;
     }
 
     return buttons;
