@@ -347,6 +347,8 @@ Tracked or intentionally small project files:
   - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
     firmware constants used by homebrew programs.
 - `disk_image_patch_*`: copyable patch overlays.
+- `disk_image_patch_tiny_mc`: consolidated install overlay for the current
+  Tiny MC boot route and Fn-to-iCube behavior.
 - `disk_image_patch_028/MIPS_NATIVE/README.txt`: native-program folder layout
   convention for direct Tiny MC launches.
 - `tools/*.md` and `tools/scan-download.ps1`: local rules, notes, and helper
