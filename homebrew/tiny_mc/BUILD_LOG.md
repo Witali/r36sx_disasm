@@ -1363,3 +1363,51 @@ Defender scan patches\disk_image_patch_057: found no threats
 Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
 found no threats
 ```
+
+## 2026-05-28 directory-enter debounce rebuild
+
+Purpose:
+
+Fix a regression from the child-return input/display rebuild: pressing `A` to
+enter a directory could enter it and immediately return to the parent. The
+cause was that `launch_selected()` also handles directories, but the new early
+`return` after `launch_selected()` skipped updating `g_prev_buttons` for the
+non-child directory case. A held `A` was therefore seen as a fresh press on the
+next frame, often selecting `..`.
+
+Implementation:
+
+- Added `finish_button_frame()` to keep the common end-of-input-frame state
+  update in one place.
+- `launch_selected()` now returns whether it actually ran/recovered from a
+  child process. Directory navigation returns `0`; child launch/reopen returns
+  `1`.
+- Directory enter/back actions now update `g_prev_buttons` before returning, so
+  held buttons cannot immediately trigger the opposite navigation.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_058
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 56420 bytes
+Tiny MC SHA256: FA262555F116BE3E5C37E386B519D5C70EDDF7D1619766BEED71B9BBBF153CC0
+Contains strings: suppressing post-launch buttons, post-launch buttons
+released, display reopened after child
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_058: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+```

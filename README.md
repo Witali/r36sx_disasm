@@ -364,6 +364,9 @@ Notable patch history:
 - `disk_image_patch_057`: rebuilds Tiny MC so returning from native apps
   reopens/redraws the display and suppresses held `Select + Start`/`Start`
   input until all buttons are released once.
+- `disk_image_patch_058`: fixes the Tiny MC directory-enter regression from
+  patch 057 by updating normal navigation button state even when `A` enters a
+  directory instead of launching a child process.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

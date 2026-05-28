@@ -96,6 +96,8 @@ Tiny MC:
   SysV heartbeat;
 - after a launched native app exits, reopens/redraws the display and ignores
   held post-launch buttons until all buttons are released once;
+- normal directory navigation updates its previous-button state before
+  returning, so a held `A` cannot immediately activate `..`;
 - has Fn shortcut enabled. It ignores an initially raised Fn bit until Fn is
   released once, then a later Fn press executes `/mnt/sdcard/cubegm/icube`
   directly.
@@ -107,8 +109,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 55780 bytes
-  SHA256: B5E01B7DAFF20C0D82867702F6664A55E969EFDB60A13593F5962A49D14E40B0
+  Size: 56420 bytes
+  SHA256: FA262555F116BE3E5C37E386B519D5C70EDDF7D1619766BEED71B9BBBF153CC0
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,

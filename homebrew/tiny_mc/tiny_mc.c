@@ -2106,16 +2106,23 @@ static void split_dir_base(const char *path, char *dir, size_t dir_size, const c
     }
 }
 
-static void launch_selected(void)
+static void finish_button_frame(uint32_t buttons)
+{
+    ensure_selection_visible();
+    save_dir_state(g_cwd);
+    g_prev_buttons = buttons;
+}
+
+static int launch_selected(void)
 {
     if (g_entry_count <= 0) {
-        return;
+        return 0;
     }
 
     struct entry *e = &g_entries[g_selected];
     if (e->is_dir || strcmp(e->name, "..") == 0) {
         change_dir_to_selected();
-        return;
+        return 0;
     }
     save_dir_state(g_cwd);
 
@@ -2139,7 +2146,7 @@ static void launch_selected(void)
         input_open_devices();
         input_reset_after_child();
         draw_ui();
-        return;
+        return 1;
     }
 
     if (pid == 0) {
@@ -2193,6 +2200,7 @@ static void launch_selected(void)
     scan_directory();
     snprintf(g_status, sizeof(g_status), "%s", result);
     draw_ui();
+    return 1;
 }
 
 #if ENABLE_FN_ICUBE_SHORTCUT
@@ -2313,20 +2321,24 @@ static void handle_buttons(uint32_t buttons)
         save_dir_state(g_cwd);
         parent_path(g_cwd);
         scan_directory();
+        finish_button_frame(buttons);
+        return;
     }
     if ((changed & BTN_RIGHT_BIT) != 0) {
         if (g_entry_count > 0 && (g_entries[g_selected].is_dir || strcmp(g_entries[g_selected].name, "..") == 0)) {
             change_dir_to_selected();
+            finish_button_frame(buttons);
+            return;
         }
     }
     if ((changed & (BTN_A_BIT | BTN_START_BIT)) != 0) {
-        launch_selected();
+        if (!launch_selected()) {
+            finish_button_frame(buttons);
+        }
         return;
     }
 
-    ensure_selection_visible();
-    save_dir_state(g_cwd);
-    g_prev_buttons = buttons;
+    finish_button_frame(buttons);
 }
 
 int main(int argc, char **argv)
