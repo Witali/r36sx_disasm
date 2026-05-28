@@ -44,6 +44,7 @@
 
 enum {
     MAX_ENTRIES = 512,
+    MAX_DIR_STATES = 64,
     MAX_NAME = 256,
     MAX_INPUT_FDS = 16,
     REFRESH_USEC = 50000,
@@ -230,6 +231,13 @@ struct entry {
     off_t size;
 };
 
+struct dir_state {
+    char path[PATH_MAX];
+    char selected_name[MAX_NAME];
+    int selected;
+    int scroll;
+};
+
 static struct fb_state g_fb = {
     -1, NULL, 0, R36SX_SCREEN_WIDTH, R36SX_SCREEN_HEIGHT,
     R36SX_RGB565_BITS_PER_PIXEL, R36SX_RGB565_FRAME_STRIDE
@@ -238,6 +246,9 @@ static struct driver_display_state g_driver;
 static struct heartbeat_state g_heartbeat = {-1, NULL, 0, 0};
 static struct input_state g_input;
 static struct entry g_entries[MAX_ENTRIES];
+static struct dir_state g_dir_states[MAX_DIR_STATES];
+static int g_dir_state_count;
+static int g_dir_state_next;
 static int g_entry_count;
 static int g_selected;
 static int g_scroll;
@@ -836,6 +847,74 @@ static int has_script_suffix(const char *name)
     return n > 3 && strcasecmp(name + n - 3, ".sh") == 0;
 }
 
+static int find_dir_state(const char *path)
+{
+    for (int i = 0; i < g_dir_state_count; i++) {
+        if (strcmp(g_dir_states[i].path, path) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void save_dir_state(const char *path)
+{
+    int idx;
+    struct dir_state *state;
+
+    if (!path || path[0] == '\0') {
+        return;
+    }
+
+    idx = find_dir_state(path);
+    if (idx < 0) {
+        if (g_dir_state_count < MAX_DIR_STATES) {
+            idx = g_dir_state_count++;
+        } else {
+            idx = g_dir_state_next;
+            g_dir_state_next = (g_dir_state_next + 1) % MAX_DIR_STATES;
+        }
+    }
+
+    state = &g_dir_states[idx];
+    snprintf(state->path, sizeof(state->path), "%s", path);
+    state->selected = g_selected;
+    state->scroll = g_scroll;
+    state->selected_name[0] = '\0';
+    if (g_selected >= 0 && g_selected < g_entry_count) {
+        snprintf(state->selected_name, sizeof(state->selected_name), "%s",
+                 g_entries[g_selected].name);
+    }
+}
+
+static void restore_dir_state_after_scan(const char *path)
+{
+    int idx = find_dir_state(path);
+    int selected = 0;
+    int scroll = 0;
+
+    if (idx >= 0) {
+        struct dir_state *state = &g_dir_states[idx];
+        selected = state->selected;
+        scroll = state->scroll;
+        if (state->selected_name[0] != '\0') {
+            for (int i = 0; i < g_entry_count; i++) {
+                if (strcmp(g_entries[i].name, state->selected_name) == 0) {
+                    selected = i;
+                    break;
+                }
+            }
+        }
+        log_msg("dir state restore: path=%s selected=%d scroll=%d name=%s",
+                path, selected, scroll, state->selected_name);
+    }
+
+    g_selected = selected;
+    g_scroll = scroll;
+}
+
+static void ensure_selection_visible(void);
+
 static void scan_directory(void)
 {
     DIR *dir;
@@ -899,6 +978,8 @@ static void scan_directory(void)
     if (g_scroll > g_selected) {
         g_scroll = g_selected;
     }
+    restore_dir_state_after_scan(g_cwd);
+    ensure_selection_visible();
     log_msg("scan_directory done entries=%d selected=%d scroll=%d", g_entry_count, g_selected, g_scroll);
 }
 
@@ -1258,6 +1339,7 @@ static void change_dir_to_selected(void)
     }
 
     struct entry *e = &g_entries[g_selected];
+    save_dir_state(g_cwd);
     if (strcmp(e->name, "..") == 0) {
         parent_path(g_cwd);
     } else if (e->is_dir) {
@@ -1268,8 +1350,6 @@ static void change_dir_to_selected(void)
         return;
     }
 
-    g_selected = 0;
-    g_scroll = 0;
     scan_directory();
 }
 
@@ -1304,6 +1384,7 @@ static void launch_selected(void)
         change_dir_to_selected();
         return;
     }
+    save_dir_state(g_cwd);
 
     char path[PATH_MAX];
     char dir[PATH_MAX];
@@ -1417,9 +1498,8 @@ static void handle_buttons(uint32_t buttons)
     }
 
     if ((changed & (BTN_LEFT_BIT | BTN_B_BIT | BTN_SELECT_BIT)) != 0) {
+        save_dir_state(g_cwd);
         parent_path(g_cwd);
-        g_selected = 0;
-        g_scroll = 0;
         scan_directory();
     }
     if ((changed & BTN_RIGHT_BIT) != 0) {
@@ -1432,6 +1512,7 @@ static void handle_buttons(uint32_t buttons)
     }
 
     ensure_selection_visible();
+    save_dir_state(g_cwd);
     g_prev_buttons = buttons;
 }
 

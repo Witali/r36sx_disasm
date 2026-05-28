@@ -16,6 +16,10 @@ while preserving the original launcher as `cubegm/rkgame.stock`.
 Directories with more entries than fit on screen show a thin scrollbar on the
 right side of the file list.
 
+Tiny MC remembers the selected entry and scroll offset for recently visited
+directories. When you return to a directory, it restores the previous position
+by filename first and by index as fallback.
+
 ## Runtime model
 
 The program uses:

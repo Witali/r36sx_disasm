@@ -263,6 +263,8 @@ Notable patch history:
   programs launched directly from Tiny MC.
 - `disk_image_patch_029`: Tiny MC rebuild with a right-side scrollbar for
   directories that contain more entries than fit on screen.
+- `disk_image_patch_030`: Tiny MC rebuild that remembers selected entry and
+  scroll offset per visited directory.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

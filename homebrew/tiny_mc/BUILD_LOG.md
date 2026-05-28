@@ -507,3 +507,49 @@ SHA256: 3B50D99E3F450205D83015FF5D99D6F30D04207E8E641DF8D112940B81FE9150
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_029\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 per-directory list state rebuild
+
+Purpose:
+
+Remember Tiny MC selection and scroll offset when moving between directories.
+
+Code change:
+
+- Added a small in-memory directory state cache.
+- The cache stores directory path, selected entry index, selected entry name,
+  and scroll offset.
+- Before leaving a directory, Tiny MC saves its current list state.
+- After scanning a directory, Tiny MC restores the previous state for that path.
+- Selection is restored by filename first, with the saved index as fallback.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_030
+```
+
+Patch file:
+
+```text
+disk_image_patch_030\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings: dir state restore, icube heartbeat, tiny_mc.log, cube_ioctl
+Size: 40768 bytes
+SHA256: D6F2FAD29C234F200D7BE73825935BE49F29085ECE96F1B3A0EF7B70A6334949
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_030\cubegm\rkgame: found no threats
+```
