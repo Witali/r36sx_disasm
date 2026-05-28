@@ -5,6 +5,11 @@ Adds the first native pico-286 port build for TinyMC.
 Copy this patch over the original SD-card filesystem root.  It installs:
 
 - `MIPS_NATIVE/pico_286/pico_286`
+- `MIPS_NATIVE/pico_286/fdd0.img`
+- `MIPS_NATIVE/pico_286/fdd1.img`
+- `MIPS_NATIVE/pico_286/fdd2.img`
+- `MIPS_NATIVE/pico_286/hdd.img`
+- `MIPS_NATIVE/pico_286/hdd2.img`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 
@@ -22,6 +27,20 @@ Optional PC disk images should be placed in the same directory:
 - `MIPS_NATIVE/pico_286/fdd1.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
+- `MIPS_NATIVE/pico_286/fdd2.img` for older test builds that request a third
+  floppy image
+
+The included image set is based on official FreeDOS 1.4 Floppy Edition:
+
+- `fdd0.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
+- `fdd1.img`: `144m/x86DSK01.img`.
+- `fdd2.img`: `144m/x86DSK02.img`.
+- `hdd.img` and `hdd2.img`: blank raw hard disk images, 65/16/63 CHS,
+  33,546,240 bytes each.
+
+The downloaded FreeDOS archive, extracted files, and final copied image
+directories were scanned with `tools/scan-download.ps1`; Microsoft Defender
+reported no threats.
 
 The current binary is an unstripped ELF32 little-endian MIPS executable.  Zig
 0.16.0 `objcopy --strip-all` reports `error: unimplemented` for this file, so

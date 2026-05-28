@@ -47,9 +47,18 @@ Input mapping for the first build:
 - Select+Start: exit back to TinyMC.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
-put optional images next to the executable as `fdd0.img`, `fdd1.img`, `hdd.img`,
-and `hdd2.img`.  The upstream network redirector still maps DOS drive H: to
-`/tmp/`.
+put images next to the executable as `fdd0.img`, `fdd1.img`, `hdd.img`, and
+`hdd2.img`.  A compatibility `fdd2.img` can also be placed there for older
+test builds that tried to attach a third floppy image.  The upstream network
+redirector still maps DOS drive H: to `/tmp/`.
+
+The local test image set uses official FreeDOS 1.4 Floppy Edition images:
+
+- `fdd0.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
+- `fdd1.img`: `144m/x86DSK01.img`, first FreeDOS package floppy.
+- `fdd2.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
+- `hdd.img`: blank raw hard disk image, 65 cylinders, 16 heads, 63 sectors.
+- `hdd2.img`: blank raw hard disk image with the same geometry.
 
 Build:
 
@@ -78,3 +87,6 @@ Before using an updated `internet_sources/pico-286` checkout, scan it with:
 ```powershell
 .\tools\scan-download.ps1 .\internet_sources\pico-286
 ```
+
+Downloaded FreeDOS archives/images should also be scanned before copying them
+into `disk_image`.

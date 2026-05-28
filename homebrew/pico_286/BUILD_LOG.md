@@ -245,3 +245,53 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 FreeDOS disk images
+
+Device test reached the BIOS disk attach stage and reported missing disk image
+files:
+
+```text
+disk error: cannot open disk file fdd0.img for drive 00h
+disk error: cannot open disk file fdd1.img for drive 01h
+disk error: cannot open disk file hdd.img for drive 02h
+disk error: cannot open disk file fdd2.img for drive 03h
+```
+
+Downloaded the official FreeDOS 1.4 Floppy Edition archive:
+
+```powershell
+Invoke-WebRequest -Uri "https://download.freedos.org/1.4/FD14-FloppyEdition.zip" -OutFile ".tmp\FD14-FloppyEdition.zip"
+```
+
+Scanned the downloaded archive and the extracted files:
+
+```powershell
+.\tools\scan-download.ps1 .\.tmp\FD14-FloppyEdition.zip
+Expand-Archive -Path .\.tmp\FD14-FloppyEdition.zip -DestinationPath .\.tmp\FD14-FloppyEdition -Force
+.\tools\scan-download.ps1 .\.tmp\FD14-FloppyEdition
+```
+
+Result: Microsoft Defender reported no threats.
+
+Created and copied these images into both `disk_image/MIPS_NATIVE/pico_286/`
+and `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/`:
+
+- `fdd0.img`: copied from FreeDOS `144m/x86BOOT.img`, 1,474,560 bytes.
+- `fdd1.img`: copied from FreeDOS `144m/x86DSK01.img`, 1,474,560 bytes.
+- `fdd2.img`: copied from FreeDOS `144m/x86DSK02.img`, 1,474,560 bytes.
+- `hdd.img`: blank raw image, 33,546,240 bytes.
+- `hdd2.img`: blank raw image, 33,546,240 bytes.
+
+The blank hard disk size is exactly `65 * 16 * 63 * 512` bytes, matching the
+host disk geometry Pico-286 calculates for hard disk images.  The copied
+`fdd0.img` boot sector ends with `55 AA`.
+
+Scanned the final image directories:
+
+```powershell
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286
+```
+
+Result: Microsoft Defender reported no threats.
