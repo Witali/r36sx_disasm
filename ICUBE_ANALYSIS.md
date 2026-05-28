@@ -5,6 +5,8 @@ Date: 2026-05-28
 This note summarizes the original `cubegm/icube` launch structure as observed in
 the firmware image and Ghidra exports.
 
+For the latest device-side boot-route result, see `BOOT_ROUTE_FINDINGS.md`.
+
 ## Files
 
 ```text

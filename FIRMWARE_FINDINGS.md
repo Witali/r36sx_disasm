@@ -145,6 +145,28 @@ ARM `.so` выбиваются из общей архитектуры и, ско
 - `/etc/init.d/rcS`
 - `/usr/bin/cubevol > /dev/console 2>&1` в respawn
 
+Последняя проверка реального устройства через `boot_route.log` показала, что
+холодный старт входит не через `icube_start.sh`, а напрямую через:
+
+- `/mnt/sdcard/cubegm/icube.sh`
+
+Ключевые строки из лога:
+
+- `script=/mnt/sdcard/cubegm/icube.sh pid=548 ppid=1 event=start args=`
+- `event=launching /mnt/sdcard/cubegm/icube`
+- `event=started /mnt/sdcard/cubegm/icube child=556`
+- в `ps` рядом были `hcdaemon`, `/mnt/sdcard/cubegm/icube` и `rkgame`
+
+С учетом `rootfs/etc/init.d/S41hcdaemon`, где записано только `hcdaemon&`,
+наиболее вероятная цепочка холодного старта:
+
+- `init -> /etc/init.d/rcS -> /etc/init.d/S41hcdaemon -> hcdaemon -> /mnt/sdcard/cubegm/icube.sh`
+
+Практический вывод: для замены frontend при холодной загрузке нужно патчить
+именно `cubegm/icube.sh`; `icube_start.sh` остается важен для переходов из
+`hcprojector`, но не был задействован в зафиксированном boot-route. Подробно:
+`BOOT_ROUTE_FINDINGS.md`.
+
 В `cubegm` есть скрипты переключения:
 
 - `disk_image\cubegm\icube.sh`

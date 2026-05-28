@@ -25,6 +25,7 @@ Important platform facts:
 The most important summary file is:
 
 - [`FIRMWARE_FINDINGS.md`](FIRMWARE_FINDINGS.md)
+- [`BOOT_ROUTE_FINDINGS.md`](BOOT_ROUTE_FINDINGS.md)
 
 ## Hidden Boot Artifacts
 
@@ -317,6 +318,8 @@ Tracked or intentionally small project files:
 - `POWER_MANAGEMENT_ANALYSIS.md`: power management, `usleep`, standby, and idle
   behavior notes.
 - `ICUBE_ANALYSIS.md`: original `icube` launch and watchdog structure.
+- `BOOT_ROUTE_FINDINGS.md`: device-side `boot_route.log` result showing cold
+  boot enters `cubegm/icube.sh`, not `icube_start.sh`.
 - `RELATED_PROJECTS.md`: public project links and research references.
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/`: source and build logs for custom modules.
