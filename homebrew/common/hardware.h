@@ -19,6 +19,7 @@
 
 /* Common runtime paths on the SD-card firmware. */
 #define R36SX_CUBEGM_DIR "/mnt/sdcard/cubegm"
+#define R36SX_MIPS_NATIVE_DIR "/mnt/sdcard/MIPS_NATIVE"
 #define R36SX_DRIVER_SO_PATH "/mnt/sdcard/cubegm/driver.so"
 #define R36SX_DRIVER_SO_LOCAL_PATH "./driver.so"
 #define R36SX_DRIVER_SO_NAME "driver.so"

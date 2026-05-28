@@ -259,6 +259,8 @@ Notable patch history:
   heartbeat shared memory so the launcher is not restarted every 5-6 seconds.
 - `disk_image_patch_027`: Tiny MC, Button Demo, and Pong rebuild after moving
   shared hardware constants into `homebrew/common/hardware.h`.
+- `disk_image_patch_028`: creates root-level `MIPS_NATIVE` for standalone MIPS
+  programs launched directly from Tiny MC.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -277,6 +279,8 @@ Tracked or intentionally small project files:
   - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
     firmware constants used by homebrew programs.
 - `disk_image_patch_*`: copyable patch overlays.
+- `disk_image_patch_028/MIPS_NATIVE/README.txt`: native-program folder layout
+  convention for direct Tiny MC launches.
 - `tools/*.md` and `tools/scan-download.ps1`: local rules, notes, and helper
   scripts.
 

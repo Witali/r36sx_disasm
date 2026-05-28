@@ -97,3 +97,25 @@ and preserve the stock binary as:
 ```text
 cubegm\rkgame.stock
 ```
+
+## Native Program Folder
+
+Standalone MIPS programs launched directly by Tiny MC should live under:
+
+```text
+/mnt/sdcard/MIPS_NATIVE
+```
+
+Recommended layout:
+
+```text
+MIPS_NATIVE/
+  program_name/
+    program_name
+    README.txt
+    data/
+```
+
+Each program gets its own directory named after the program. Tiny MC runs
+executable files directly with `fork()` + `execl()`, and runs `.sh` files
+through `/bin/sh`.
