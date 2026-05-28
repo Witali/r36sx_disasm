@@ -265,6 +265,9 @@ Notable patch history:
   directories that contain more entries than fit on screen.
 - `disk_image_patch_030`: Tiny MC rebuild that remembers selected entry and
   scroll offset per visited directory.
+- `disk_image_patch_031`: moves Tiny MC to `MIPS_NATIVE/tiny_mc/tiny_mc`,
+  restores stock `cubegm/rkgame`, and routes `cubegm/icube_start.sh` directly
+  to Tiny MC.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

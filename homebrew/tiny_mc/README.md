@@ -3,8 +3,10 @@
 Tiny MC is a small one-panel framebuffer file manager / launcher for the
 R36SX/SF3000-like firmware.
 
-It is meant to test replacing `cubegm/rkgame` with a standalone MIPS executable
-while preserving the original launcher as `cubegm/rkgame.stock`.
+The current integration model keeps the stock `cubegm/rkgame` binary intact and
+places Tiny MC in the native application area as
+`MIPS_NATIVE/tiny_mc/tiny_mc`. The stock transition script
+`cubegm/icube_start.sh` launches Tiny MC directly.
 
 ## Controls
 
@@ -93,17 +95,20 @@ The output file is:
 homebrew\tiny_mc\tiny_mc
 ```
 
-For SD-card testing, copy it as:
+For the current SD-card integration, copy it as:
 
 ```text
-cubegm\rkgame
+MIPS_NATIVE\tiny_mc\tiny_mc
 ```
 
-and preserve the stock binary as:
+and route `cubegm\icube_start.sh` to:
 
 ```text
-cubegm\rkgame.stock
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE
 ```
+
+Older patches copied Tiny MC over `cubegm\rkgame`; keep
+`cubegm\rkgame.stock` as the stock backup if switching back to that model.
 
 ## Native Program Folder
 

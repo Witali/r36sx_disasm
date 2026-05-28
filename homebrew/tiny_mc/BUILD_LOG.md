@@ -553,3 +553,55 @@ SHA256: D6F2FAD29C234F200D7BE73825935BE49F29085ECE96F1B3A0EF7B70A6334949
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_030\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 MIPS_NATIVE integration
+
+Purpose:
+
+Move Tiny MC out of `cubegm/rkgame` and into the root-level native application
+area, then make the stock game transition script enter Tiny MC directly.
+
+File changes:
+
+- Copied `homebrew\tiny_mc\tiny_mc` to
+  `disk_image\MIPS_NATIVE\tiny_mc\tiny_mc`.
+- Restored `disk_image\cubegm\rkgame` from `disk_image\cubegm\rkgame.stock`.
+- Changed `disk_image\cubegm\icube_start.sh` to run:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE &
+```
+
+- Added `disk_image\MIPS_NATIVE\tiny_mc\README.txt`.
+- Created overlay directory `disk_image_patch_031` with the same changed files.
+
+Commands from repository root:
+
+```powershell
+New-Item -ItemType Directory -Force -Path disk_image\MIPS_NATIVE\tiny_mc
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame.stock -Destination disk_image\cubegm\rkgame -Force
+New-Item -ItemType Directory -Force -Path disk_image_patch_031\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_031\cubegm
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image_patch_031\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame -Destination disk_image_patch_031\cubegm\rkgame -Force
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_031\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_031\cubegm\rkgame
+```
+
+Verification:
+
+```text
+Tiny MC ELF: ELF32 little-endian executable, machine=MIPS, interpreter /lib/ld.so.1
+Tiny MC size: 40768 bytes
+Tiny MC SHA256: D6F2FAD29C234F200D7BE73825935BE49F29085ECE96F1B3A0EF7B70A6334949
+
+Restored stock rkgame ELF: ELF32 little-endian executable, machine=MIPS, interpreter /lib/ld.so.1
+Restored stock rkgame size: 1178732 bytes
+Restored stock rkgame SHA256: 57D8B4FD85E0AAB44D17A51D209879C3F98130D066B622142736B42AD08DDCB9
+
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_031\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_031\cubegm\rkgame: found no threats
+```
