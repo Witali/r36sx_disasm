@@ -206,10 +206,13 @@ replacement candidate for `cubegm/rkgame`:
 - Build commands: [`homebrew/tiny_mc/BUILD_COMMANDS.md`](homebrew/tiny_mc/BUILD_COMMANDS.md)
 - Built executable: `homebrew/tiny_mc/tiny_mc`
 
-It draws directly to `/dev/fb0`, reads `/dev/input/js*` and
-`/dev/input/event*`, and launches selected files with `fork()` plus `execl()`.
-`disk_image_patch_021` copies Tiny MC as `cubegm/rkgame` and preserves the
-stock launcher as `cubegm/rkgame.stock`.
+It now follows the stock `rkgame` display path by loading `cubegm/driver.so`,
+drawing to an internal RGB565 640x480 buffer, and presenting frames through
+`video_driver_disp_frame()`. Direct `/dev/fb0` rendering remains as fallback.
+It reads `/dev/input/js*` and `/dev/input/event*`, and launches selected files
+with `fork()` plus `execl()`. `disk_image_patch_022` copies the rebuilt Tiny MC
+as `cubegm/rkgame`; the stock launcher should be preserved as
+`cubegm/rkgame.stock`.
 
 ## Patch Sets
 
@@ -244,6 +247,8 @@ Notable patch history:
 - `disk_image_patch_020`: PRBoom WAD adjacency and Doom shareware test files.
 - `disk_image_patch_021`: Tiny MC standalone file manager replacing `rkgame`
   while preserving stock `rkgame.stock`.
+- `disk_image_patch_022`: Tiny MC rebuild using the stock `driver.so` display
+  initialization/present path after the first white/black-screen device test.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

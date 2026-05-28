@@ -225,6 +225,47 @@ frontend/system-модификатора, а не как обычной libretro
 отдельным raw-scanner модулем: возможно, launcher перехватывает Fn-комбинации
 до вызова `retro_input_state()`.
 
+## `rkgame` display path: что пропустил первый Tiny MC
+
+После первого теста Tiny MC на устройстве был белый экран на несколько секунд,
+потом черный экран с видимым значком батареи. Декомпиляция `rkgame` и
+`driver.so` показала, что stock launcher не рисует в `/dev/fb0` напрямую как
+обычное Linux framebuffer-приложение.
+
+Важная последовательность `rkgame`:
+
+1. `main` вызывает `InitDisplay()` до `InitSound()` и `InitJoystick()`.
+2. `InitDisplay()` делает `dlopen("%s/driver.so", work_path, RTLD_NOW)`.
+3. Затем `dlsym()` ищет `video_driver_setting`, `video_drivers_init`,
+   `video_driver_disp_frame`, `video_driver_setmode`,
+   `video_driver_get_size`, `api_cube_malloc`, `api_cube_free`,
+   `check_exit_game`, `api_cube_send_msg` и `cube_ioctl`.
+4. `video_driver_setting()` вызывается с блоком из пяти int, фактически
+   `{1, 1, 1, 0x356, 0x1e0}`.
+5. После этого запускается `video_drivers_init()`, а кадры выводятся через
+   `video_driver_disp_frame()`.
+
+Что делает `driver.so`:
+
+- `video_drivers_init()` создает frame-структуру и вызывает `fbdev_init()`.
+- `fbdev_init()` открывает `/dev/dis` и `/dev/fb0`, делает blank/unblank ioctl
+  (`0x4611`), читает/меняет framebuffer geometry, открывает HCGE, настраивает
+  rotate/aspect/fullscreen state и запускает render/painter threads.
+- `video_driver_disp_frame(ptr, w, h, pitch)` при смене размера может заново
+  инициализировать framebuffer, затем вызывает `fbdev_draw_frame()`.
+- `ReadJoystickProc()` в `rkgame` тоже завязан на `driver.so`: если shared key
+  memory не подключена, он вызывает `cube_ioctl(0x40050209)`, затем всегда
+  `cube_ioctl(0x40050208, &Cube_State_Reg)`.
+
+Практический вывод: standalone-замена `rkgame` должна либо пользоваться
+`driver.so`, либо почти полностью повторять его `/dev/dis` + `/dev/fb0` +
+HCGE/rotation/blanking инициализацию. Первый Tiny MC пропустил этот слой, что
+хорошо объясняет белый/черный экран при живом overlay батареи.
+`disk_image_patch_022` пересобирает Tiny MC так, чтобы кадры 640x480 отдавались
+через `video_driver_disp_frame()`. Следующий риск после исправления display
+path - input, потому что stock `rkgame` читает кнопки не только через Linux
+evdev/js, но и через `cube_ioctl`.
+
 ## Найденные публичные исходники/SDK
 
 В `internet_sources\hcrtos` лежит найденный публичный SDK/исходники HCRTOS.

@@ -2,13 +2,15 @@
  * Tiny one-panel file manager / launcher for the R36SX/SF3000-like firmware.
  *
  * This is intended to be copied over cubegm/rkgame, with the stock launcher
- * preserved as cubegm/rkgame.stock. It draws directly to /dev/fb0 and reads
- * Linux joystick/evdev input directly, so it does not depend on rkgame.
+ * preserved as cubegm/rkgame.stock. It normally uses cubegm/driver.so for
+ * display setup, matching rkgame's framebuffer/rotation path. Direct /dev/fb0
+ * rendering remains as fallback.
  */
 
 #define _GNU_SOURCE
 
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -113,6 +115,10 @@ struct fb_var_screeninfo_local {
 
 #define FBIOGET_VSCREENINFO_LOCAL 0x4600
 #define FBIOGET_FSCREENINFO_LOCAL 0x4602
+#define FBIOBLANK_LOCAL 0x4611
+
+#define TINY_MC_WIDTH 640
+#define TINY_MC_HEIGHT 480
 
 struct js_event_local {
     uint32_t time;
@@ -165,6 +171,21 @@ struct fb_state {
     int stride;
 };
 
+typedef int (*video_driver_setting_fn)(int *);
+typedef int (*video_drivers_init_fn)(void);
+typedef void (*video_driver_disp_frame_fn)(void *, int, int, int);
+typedef void (*video_driver_deinit_fn)(void);
+
+struct driver_display_state {
+    void *handle;
+    uint16_t *framebuf;
+    video_driver_setting_fn setting;
+    video_drivers_init_fn init;
+    video_driver_disp_frame_fn disp_frame;
+    video_driver_deinit_fn deinit;
+    int active;
+};
+
 struct input_state {
     int fds[MAX_INPUT_FDS];
     int fd_count;
@@ -183,7 +204,8 @@ struct entry {
     off_t size;
 };
 
-static struct fb_state g_fb = {-1, NULL, 0, 640, 480, 16, 640 * 2};
+static struct fb_state g_fb = {-1, NULL, 0, TINY_MC_WIDTH, TINY_MC_HEIGHT, 16, TINY_MC_WIDTH * 2};
+static struct driver_display_state g_driver;
 static struct input_state g_input;
 static struct entry g_entries[MAX_ENTRIES];
 static int g_entry_count;
@@ -228,6 +250,88 @@ static uint32_t rgb888_from_565(uint16_t c)
     return (r << 16) | (g << 8) | b;
 }
 
+static void driver_close_display(void)
+{
+    if (g_driver.active && g_driver.deinit) {
+        g_driver.deinit();
+    }
+    if (g_driver.handle) {
+        dlclose(g_driver.handle);
+    }
+    free(g_driver.framebuf);
+    memset(&g_driver, 0, sizeof(g_driver));
+    g_fb.fd = -1;
+    g_fb.mem = NULL;
+    g_fb.mem_len = 0;
+    g_fb.width = TINY_MC_WIDTH;
+    g_fb.height = TINY_MC_HEIGHT;
+    g_fb.bpp = 16;
+    g_fb.stride = TINY_MC_WIDTH * 2;
+}
+
+static int driver_open_display(void)
+{
+    static const char *paths[] = {
+        "/mnt/sdcard/cubegm/driver.so",
+        "./driver.so",
+        "driver.so"
+    };
+
+    if (g_driver.active) {
+        return 0;
+    }
+
+    memset(&g_driver, 0, sizeof(g_driver));
+    for (size_t i = 0; i < ARRAY_COUNT(paths); i++) {
+        g_driver.handle = dlopen(paths[i], RTLD_NOW);
+        if (g_driver.handle) {
+            break;
+        }
+    }
+    if (!g_driver.handle) {
+        snprintf(g_status, sizeof(g_status), "driver.so open failed: %s", dlerror());
+        return -1;
+    }
+
+    g_driver.setting = (video_driver_setting_fn)dlsym(g_driver.handle, "video_driver_setting");
+    g_driver.init = (video_drivers_init_fn)dlsym(g_driver.handle, "video_drivers_init");
+    g_driver.disp_frame = (video_driver_disp_frame_fn)dlsym(g_driver.handle, "video_driver_disp_frame");
+    g_driver.deinit = (video_driver_deinit_fn)dlsym(g_driver.handle, "video_driver_deinit");
+    if (!g_driver.setting || !g_driver.init || !g_driver.disp_frame || !g_driver.deinit) {
+        snprintf(g_status, sizeof(g_status), "driver.so display symbols missing");
+        driver_close_display();
+        return -1;
+    }
+
+    g_fb.width = TINY_MC_WIDTH;
+    g_fb.height = TINY_MC_HEIGHT;
+    g_fb.bpp = 16;
+    g_fb.stride = TINY_MC_WIDTH * 2;
+    g_fb.mem_len = (size_t)g_fb.stride * (size_t)g_fb.height;
+    g_driver.framebuf = (uint16_t *)calloc((size_t)TINY_MC_WIDTH * (size_t)TINY_MC_HEIGHT,
+                                           sizeof(uint16_t));
+    if (!g_driver.framebuf) {
+        snprintf(g_status, sizeof(g_status), "Cannot allocate display buffer");
+        driver_close_display();
+        return -1;
+    }
+    g_fb.mem = (uint8_t *)g_driver.framebuf;
+
+    {
+        int cfg[5] = {1, 1, 1, 0x356, 0x1e0};
+        g_driver.setting(cfg);
+    }
+    if (g_driver.init() < 0) {
+        snprintf(g_status, sizeof(g_status), "video_drivers_init failed");
+        driver_close_display();
+        return -1;
+    }
+
+    g_driver.active = 1;
+    snprintf(g_status, sizeof(g_status), "Display via driver.so 640x480");
+    return 0;
+}
+
 static int fb_open_device(void)
 {
     struct fb_fix_screeninfo_local fix;
@@ -262,6 +366,8 @@ static int fb_open_device(void)
         g_fb.mem_len = (size_t)(g_fb.stride * g_fb.height);
     }
 
+    ioctl(g_fb.fd, FBIOBLANK_LOCAL, 0);
+
     g_fb.mem = mmap(NULL, g_fb.mem_len, PROT_READ | PROT_WRITE, MAP_SHARED, g_fb.fd, 0);
     if (g_fb.mem == MAP_FAILED) {
         g_fb.mem = NULL;
@@ -271,6 +377,7 @@ static int fb_open_device(void)
         return -1;
     }
 
+    snprintf(g_status, sizeof(g_status), "Display via direct /dev/fb0 fallback");
     return 0;
 }
 
@@ -283,6 +390,30 @@ static void fb_close_device(void)
     if (g_fb.fd >= 0) {
         close(g_fb.fd);
         g_fb.fd = -1;
+    }
+}
+
+static int display_open(void)
+{
+    if (driver_open_display() == 0) {
+        return 0;
+    }
+    return fb_open_device();
+}
+
+static void display_close(void)
+{
+    if (g_driver.active || g_driver.handle) {
+        driver_close_display();
+    } else {
+        fb_close_device();
+    }
+}
+
+static void present_frame(void)
+{
+    if (g_driver.active && g_driver.disp_frame && g_driver.framebuf) {
+        g_driver.disp_frame(g_driver.framebuf, g_fb.width, g_fb.height, g_fb.stride);
     }
 }
 
@@ -802,6 +933,7 @@ static void draw_ui(void)
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 
     fill_rect(0, g_fb.height - 1, g_fb.width, 1, black);
+    present_frame();
 }
 
 static void change_dir_to_selected(void)
@@ -866,10 +998,14 @@ static void launch_selected(void)
 
     snprintf(g_status, sizeof(g_status), "Running %s", e->name);
     draw_ui();
+    display_close();
+    input_close_devices();
 
     pid_t pid = fork();
     if (pid < 0) {
         snprintf(g_status, sizeof(g_status), "fork failed: %s", strerror(errno));
+        display_open();
+        input_open_devices();
         return;
     }
 
@@ -890,13 +1026,17 @@ static void launch_selected(void)
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
     }
 
+    char result[sizeof(g_status)];
     if (WIFEXITED(status)) {
-        snprintf(g_status, sizeof(g_status), "%s exited: %d", e->name, WEXITSTATUS(status));
+        snprintf(result, sizeof(result), "%s exited: %d", e->name, WEXITSTATUS(status));
     } else if (WIFSIGNALED(status)) {
-        snprintf(g_status, sizeof(g_status), "%s signaled: %d", e->name, WTERMSIG(status));
+        snprintf(result, sizeof(result), "%s signaled: %d", e->name, WTERMSIG(status));
     } else {
-        snprintf(g_status, sizeof(g_status), "%s returned", e->name);
+        snprintf(result, sizeof(result), "%s returned", e->name);
     }
+    display_open();
+    input_open_devices();
+    snprintf(g_status, sizeof(g_status), "%s", result);
     scan_directory();
 }
 
@@ -958,13 +1098,12 @@ int main(int argc, char **argv)
 {
     choose_start_dir(argc, argv);
     scan_directory();
-    input_open_devices();
 
-    if (fb_open_device() != 0) {
+    if (display_open() != 0) {
         fprintf(stderr, "tiny_mc: %s\n", g_status);
-        input_close_devices();
         return 1;
     }
+    input_open_devices();
 
     for (;;) {
         input_poll_devices();
@@ -974,7 +1113,7 @@ int main(int argc, char **argv)
         usleep(REFRESH_USEC);
     }
 
-    fb_close_device();
+    display_close();
     input_close_devices();
     return 0;
 }

@@ -47,5 +47,6 @@ $env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path (Join-Path $Root "tools\zig-cache")).Pa
     $Crt1 `
     $Crti `
     $Obj `
+    "-ldl" `
     "-lc" `
     $Crtn
