@@ -300,6 +300,8 @@ Notable patch history:
   Fn bit is ignored until Fn has been released once.
 - `disk_image_patch_037`: disables Tiny MC Fn handling entirely and documents
   the original `icube` supervisor structure.
+- `disk_image_patch_038`: adds `boot_route.log` tracing to `icube.sh`,
+  `icube_start.sh`, and `icubemp_start.sh` to discover the real shell route.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

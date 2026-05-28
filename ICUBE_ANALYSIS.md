@@ -111,3 +111,24 @@ likely explanations are:
   Tiny MC version;
 - another boot/menu path is launching `cubegm/icube` or `icube.sh` instead of
   the `icube_start.sh` file we patched.
+
+## Shell Route Trace
+
+`disk_image_patch_038` instruments these scripts:
+
+```text
+cubegm/icube.sh
+cubegm/icube_start.sh
+cubegm/icubemp_start.sh
+```
+
+They append route diagnostics to:
+
+```text
+/mnt/sdcard/cubegm/boot_route.log
+/mnt/sdcard/boot_route.log
+```
+
+Each event records `$0`, `$$`, `$PPID`, current directory, and a `ps` snapshot.
+This should show whether the device is entering through `icube_start.sh`,
+`icube.sh`, or the return-to-projector `icubemp_start.sh` path.
