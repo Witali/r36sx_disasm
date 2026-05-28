@@ -164,6 +164,20 @@ optional face-button right-paddle control, simple AI when the right paddle is
 not controlled manually, Start pause/resume, Select reset, score display, and
 generated tones.
 
+### Native Pong
+
+A standalone Pong executable was added for direct launch from Tiny MC:
+
+- Source: [`homebrew/native_pong/native_pong.c`](homebrew/native_pong/native_pong.c)
+- Notes: [`homebrew/native_pong/README.md`](homebrew/native_pong/README.md)
+- Build log: [`homebrew/native_pong/BUILD_LOG.md`](homebrew/native_pong/BUILD_LOG.md)
+- Build script: `homebrew/native_pong/build_native_pong.ps1`
+- Built executable: `homebrew/native_pong/pong`
+
+Unlike the older `libemu_pong.so`, this is a normal MIPS executable with
+`main()`. It uses `driver.so` for display/input and exits back to Tiny MC on
+Select or Fn.
+
 Important discoveries from these homebrew experiments:
 
 - A dummy ROM with a stock extension such as `.gb` was more reliable than a new
@@ -280,6 +294,8 @@ Notable patch history:
 - `disk_image_patch_034`: adds a Tiny MC FN shortcut that closes Tiny MC and
   `exec`s `/mnt/sdcard/cubegm/icube`, while keeping direct launch and stock
   `cubegm/rkgame`.
+- `disk_image_patch_035`: adds standalone native Pong under
+  `MIPS_NATIVE/pong/pong` for launch directly from Tiny MC.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
