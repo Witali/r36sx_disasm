@@ -257,6 +257,8 @@ Notable patch history:
   the top-of-file `#define DEBUG 1` / `#define DEBUG 0` switch.
 - `disk_image_patch_026`: Tiny MC rebuild that feeds the `icube` supervisor
   heartbeat shared memory so the launcher is not restarted every 5-6 seconds.
+- `disk_image_patch_027`: Tiny MC, Button Demo, and Pong rebuild after moving
+  shared hardware constants into `homebrew/common/hardware.h`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -272,6 +274,8 @@ Tracked or intentionally small project files:
 - `RELATED_PROJECTS.md`: public project links and research references.
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/`: source and build logs for custom modules.
+  - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
+    firmware constants used by homebrew programs.
 - `disk_image_patch_*`: copyable patch overlays.
 - `tools/*.md` and `tools/scan-download.ps1`: local rules, notes, and helper
   scripts.

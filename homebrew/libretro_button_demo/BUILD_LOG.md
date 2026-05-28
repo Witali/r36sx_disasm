@@ -586,3 +586,35 @@ Installed copy:
 disk_image\cubegm\cores\libemu_buttondemo.so
 disk_image_patch_014\cubegm\cores\libemu_buttondemo.so
 ```
+
+## 2026-05-28 shared hardware header rebuild
+
+Reason:
+
+Move shared R36SX/SF3000-like hardware constants into
+`homebrew/common/hardware.h`.
+
+Source change:
+
+- `button_demo.c` now includes `../common/hardware.h`.
+- The 640x480 framebuffer size and 44.1 kHz / 60 Hz audio timing now come from
+  the shared header.
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_buttondemo.so' -o .\homebrew\libretro_button_demo\libemu_buttondemo.so .\homebrew\libretro_button_demo\button_demo.c
+```
+
+Verification:
+
+```text
+ELF32 little-endian DYN(shared object), machine=MIPS.
+Size: 30220 bytes
+SHA256: 748A21F27385AF0A22DD6CB27869AD729660F8BA415C0860328EF7C1115977BE
+No NEEDED/UND/__ubsan/GLIBC/ld-linux/libc.so/libm.so/memset strings found.
+Defender scan homebrew\libretro_button_demo\libemu_buttondemo.so: found no threats
+Defender scan disk_image_patch_027\cubegm\cores\libemu_buttondemo.so: found no threats
+```

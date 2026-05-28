@@ -11,6 +11,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../common/hardware.h"
+
 #define RETRO_API_VERSION 1
 enum retro_device {
     RETRO_DEVICE_JOYPAD = 1
@@ -79,11 +81,11 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 enum {
-    FB_WIDTH = 640,
-    FB_HEIGHT = 480,
+    FB_WIDTH = R36SX_SCREEN_WIDTH,
+    FB_HEIGHT = R36SX_SCREEN_HEIGHT,
     SQUARE_SIZE = 48,
-    AUDIO_RATE = 44100,
-    AUDIO_FRAMES_PER_VIDEO_FRAME = 735,
+    AUDIO_RATE = R36SX_AUDIO_SAMPLE_RATE,
+    AUDIO_FRAMES_PER_VIDEO_FRAME = R36SX_AUDIO_FRAMES_PER_VIDEO_FRAME,
     PEW_CHIRP_SAMPLES = 4410,
     PEW_GAP_SAMPLES = 1470,
     PEW_TOTAL_SAMPLES = (PEW_CHIRP_SAMPLES * 2) + PEW_GAP_SAMPLES

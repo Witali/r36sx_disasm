@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../common/hardware.h"
+
 #define RETRO_API_VERSION 1
 
 enum retro_device {
@@ -78,8 +80,8 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 enum {
-    FB_WIDTH = 640,
-    FB_HEIGHT = 480,
+    FB_WIDTH = R36SX_SCREEN_WIDTH,
+    FB_HEIGHT = R36SX_SCREEN_HEIGHT,
     PLAY_TOP = 30,
     PLAY_BOTTOM = 470,
     PLAY_LEFT = 12,
@@ -93,8 +95,8 @@ enum {
     BALL_BASE_SPEED_Y = 3,
     SCORE_LIMIT = 9,
     SERVE_FRAMES = 40,
-    AUDIO_RATE = 44100,
-    AUDIO_FRAMES_PER_VIDEO_FRAME = 735
+    AUDIO_RATE = R36SX_AUDIO_SAMPLE_RATE,
+    AUDIO_FRAMES_PER_VIDEO_FRAME = R36SX_AUDIO_FRAMES_PER_VIDEO_FRAME
 };
 
 static uint16_t frame[FB_WIDTH * FB_HEIGHT];

@@ -122,3 +122,35 @@ Patch directory:
 ```text
 disk_image_patch_017
 ```
+
+## 2026-05-28 shared hardware header rebuild
+
+Reason:
+
+Move shared R36SX/SF3000-like hardware constants into
+`homebrew/common/hardware.h`.
+
+Source change:
+
+- `pong.c` now includes `../common/hardware.h`.
+- The 640x480 framebuffer size and 44.1 kHz / 60 Hz audio timing now come from
+  the shared header.
+
+Build command from repository root:
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR=(Resolve-Path .\tools\zig-global-cache).Path
+$env:ZIG_LOCAL_CACHE_DIR=(Resolve-Path .\tools\zig-cache).Path
+.\tools\zig-x86_64-windows-0.16.0\zig.exe cc -target mipsel-linux-gnu -march=mips32r2 -O2 -fno-sanitize=undefined -fno-builtin -fPIC -Wall -Wextra -std=c99 -shared -nostdlib '-Wl,-soname,libemu_pong.so' -o .\homebrew\libretro_pong\libemu_pong.so .\homebrew\libretro_pong\pong.c
+```
+
+Verification:
+
+```text
+ELF32 little-endian DYN(shared object), machine=MIPS.
+Size: 41512 bytes
+SHA256: A769CA8D5710D4863D0348E7ECC8F41C9CD28CC3F14505F4E934014AFC782EA4
+No NEEDED/UND/__ubsan/GLIBC/ld-linux/libc.so/libm.so/memset strings found.
+Defender scan homebrew\libretro_pong\libemu_pong.so: found no threats
+Defender scan disk_image_patch_027\cubegm\cores\libemu_pong.so: found no threats
+```

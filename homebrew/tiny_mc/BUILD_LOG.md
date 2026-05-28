@@ -414,3 +414,49 @@ SHA256: AD81FE4356DE2B49FF505256FB233614557AD1EA518447C84821BCC005925BC0
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_026\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 shared hardware header rebuild
+
+Purpose:
+
+Move device-specific constants into `homebrew/common/hardware.h` so Tiny MC and
+other homebrew programs use one shared source of truth.
+
+Code change:
+
+- Tiny MC now includes `../common/hardware.h`.
+- Moved 640x480 RGB565 geometry, `driver.so` paths, `cube_ioctl` command IDs,
+  raw `rkgame` joy_key masks, and `icube` heartbeat constants out of
+  `tiny_mc.c`.
+- Runtime behavior is intended to remain the same as `disk_image_patch_026`.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_027
+```
+
+Patch file:
+
+```text
+disk_image_patch_027\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings: icube heartbeat, tiny_mc.log, cube_ioctl
+Size: 38484 bytes
+SHA256: 122FA794691B1BDA725E8F85411499C324C7127142AD9EF657B8E9E8463FEF7F
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_027\cubegm\rkgame: found no threats
+```
