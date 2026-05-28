@@ -29,7 +29,8 @@ patched copies into `homebrew/pico_286/obj/`:
   debug logs.  It also initializes the host memory backend pointers before
   `reset86()`, matching the upstream Win32 entrypoint.  BIOS video modes
   `0x20` and `0x30` are aliased to the normal 80x25 text renderer and scaled
-  into the 640x480 output.
+  into the 640x480 output.  The debug build also logs changed text rows from
+  the emulated screen area with `screen_text:*` prefixes.
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
   directory, matching TinyMC's `chdir()` before launch.
@@ -83,6 +84,16 @@ If that file cannot be opened, it writes:
 ```text
 /mnt/sdcard/pico_286.log
 ```
+
+Screen text diagnostics appear only when the text contents change.  The most
+useful tags are:
+
+- `screen_text:logical-b800`: characters read from logical B800-style
+  `VIDEORAM` cells.
+- `screen_text:renderer-byte-view`: characters read the same way the current
+  renderer sees them.
+- `screen_text:logical-small-text` and `screen_text:renderer-byte-small-text`:
+  the same comparison for Pico-286's small text modes `0x77` and `0x78`.
 
 `zig objcopy --strip-all` currently reports `error: unimplemented` for this
 MIPS ELF.  The script therefore leaves the executable unstripped by default.

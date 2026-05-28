@@ -352,3 +352,35 @@ Scanned the final image directories:
 ```
 
 Result: Microsoft Defender reported no threats.
+
+## 2026-05-28 screen text diagnostics
+
+Added debug logging for text written into Pico-286's emulated screen area.
+The logger runs from the renderer and emits rows only when the visible text
+contents change, with a per-view suppression limit to avoid filling the SD card.
+
+The log now includes these diagnostic views:
+
+- `screen_text:logical-b800`: logical B800-style `VIDEORAM` cells.
+- `screen_text:renderer-byte-view`: the byte view used by the current renderer.
+- `screen_text:logical-small-text`: logical cells for small text modes
+  `0x77`/`0x78`.
+- `screen_text:renderer-byte-small-text`: renderer byte view for small text
+  modes `0x77`/`0x78`.
+
+This should show whether BIOS messages such as the boot prompt are present in
+logical video memory even when the current renderer does not display them.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,904,292 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

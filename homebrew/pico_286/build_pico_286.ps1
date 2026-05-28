@@ -144,6 +144,192 @@ function New-Patched-LinuxMain {
     }
 #endif
     static int x = 0, y = 0;')
+    $ScreenTextLogger = @'
+#if DEBUG
+static int r36sx_pico286_make_cell_text_line(char *line, size_t line_size,
+                                             const uint32_t *row, int cols)
+{
+    int out = 0;
+    if (line_size == 0) {
+        return 0;
+    }
+    for (int col = 0; col < cols && out < (int)line_size - 1; col++) {
+        unsigned char ch = (unsigned char)(row[col * 2] & 0xffu);
+        line[out++] = (ch >= 32 && ch <= 126) ? (char)ch : ' ';
+    }
+    while (out > 0 && line[out - 1] == ' ') {
+        out--;
+    }
+    line[out] = 0;
+    return out;
+}
+
+static int r36sx_pico286_make_byte_text_line(char *line, size_t line_size,
+                                             const uint8_t *row, int cols)
+{
+    int out = 0;
+    if (line_size == 0) {
+        return 0;
+    }
+    for (int col = 0; col < cols && out < (int)line_size - 1; col++) {
+        unsigned char ch = row[col * 2];
+        line[out++] = (ch >= 32 && ch <= 126) ? (char)ch : ' ';
+    }
+    while (out > 0 && line[out - 1] == ' ') {
+        out--;
+    }
+    line[out] = 0;
+    return out;
+}
+
+static uint32_t r36sx_pico286_hash_cell_text(const uint32_t *base, int cols,
+                                             int rows, int stride)
+{
+    uint32_t hash = 2166136261u;
+    for (int row = 0; row < rows; row++) {
+        const uint32_t *line = base + row * stride;
+        for (int col = 0; col < cols; col++) {
+            hash ^= (uint8_t)(line[col * 2] & 0xffu);
+            hash *= 16777619u;
+        }
+        hash ^= 0xffu;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static uint32_t r36sx_pico286_hash_byte_text(const uint8_t *base, int cols,
+                                             int rows, int stride)
+{
+    uint32_t hash = 2166136261u;
+    for (int row = 0; row < rows; row++) {
+        const uint8_t *line = base + row * stride;
+        for (int col = 0; col < cols; col++) {
+            hash ^= line[col * 2];
+            hash *= 16777619u;
+        }
+        hash ^= 0xffu;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static void r36sx_pico286_log_cell_text(int slot, const char *tag,
+                                        const uint32_t *base, int cols,
+                                        int rows, int stride, uint8_t mode,
+                                        uint32_t offset)
+{
+    static uint32_t last_hash[4] = {0, 0, 0, 0};
+    static unsigned int change_count[4] = {0, 0, 0, 0};
+    char line[161];
+    int emitted = 0;
+    uint32_t hash = r36sx_pico286_hash_cell_text(base, cols, rows, stride);
+
+    slot &= 3;
+    if (hash == last_hash[slot]) {
+        return;
+    }
+    last_hash[slot] = hash;
+    change_count[slot]++;
+    if (change_count[slot] > 64u) {
+        if (change_count[slot] == 65u) {
+            r36sx_pico286_debug_log("screen_text:%s further changes suppressed",
+                                    tag);
+        }
+        return;
+    }
+
+    r36sx_pico286_debug_log(
+        "screen_text:%s change=%u mode=0x%02x offset=0x%04x cols=%d rows=%d",
+        tag, change_count[slot], mode, offset, cols, rows);
+    for (int row = 0; row < rows; row++) {
+        if (r36sx_pico286_make_cell_text_line(
+                line, sizeof(line), base + row * stride, cols) > 0) {
+            r36sx_pico286_debug_log("screen_text:%s[%02d]: %s", tag, row,
+                                    line);
+            emitted = 1;
+        }
+    }
+    if (!emitted) {
+        r36sx_pico286_debug_log("screen_text:%s blank", tag);
+    }
+}
+
+static void r36sx_pico286_log_byte_text(int slot, const char *tag,
+                                        const uint8_t *base, int cols,
+                                        int rows, int stride, uint8_t mode,
+                                        uint32_t offset)
+{
+    static uint32_t last_hash[4] = {0, 0, 0, 0};
+    static unsigned int change_count[4] = {0, 0, 0, 0};
+    char line[161];
+    int emitted = 0;
+    uint32_t hash = r36sx_pico286_hash_byte_text(base, cols, rows, stride);
+
+    slot &= 3;
+    if (hash == last_hash[slot]) {
+        return;
+    }
+    last_hash[slot] = hash;
+    change_count[slot]++;
+    if (change_count[slot] > 64u) {
+        if (change_count[slot] == 65u) {
+            r36sx_pico286_debug_log("screen_text:%s further changes suppressed",
+                                    tag);
+        }
+        return;
+    }
+
+    r36sx_pico286_debug_log(
+        "screen_text:%s change=%u mode=0x%02x offset=0x%04x cols=%d rows=%d",
+        tag, change_count[slot], mode, offset, cols, rows);
+    for (int row = 0; row < rows; row++) {
+        if (r36sx_pico286_make_byte_text_line(
+                line, sizeof(line), base + row * stride, cols) > 0) {
+            r36sx_pico286_debug_log("screen_text:%s[%02d]: %s", tag, row,
+                                    line);
+            emitted = 1;
+        }
+    }
+    if (!emitted) {
+        r36sx_pico286_debug_log("screen_text:%s blank", tag);
+    }
+}
+
+static void r36sx_pico286_log_visible_text(uint8_t mode, uint32_t offset,
+                                           const uint8_t *renderer_bytes)
+{
+    uint32_t logical_offset =
+        (0x8000u + (((uint32_t)offset & 0xffffu) << 1)) & 0xffffu;
+
+    if (mode == 0x02 || mode == 0x03 || mode == 0x20 || mode == 0x30) {
+        r36sx_pico286_log_cell_text(0, "logical-b800",
+                                    &VIDEORAM[logical_offset], 80, 25, 160,
+                                    mode, logical_offset);
+        r36sx_pico286_log_byte_text(1, "renderer-byte-view", renderer_bytes,
+                                    80, 25, 160, mode, logical_offset);
+    } else if (mode == 0x77 || mode == 0x78) {
+        int cols = mode == 0x78 ? 40 : 80;
+        r36sx_pico286_log_cell_text(2, "logical-small-text",
+                                    &VIDEORAM[0x8000], cols, 25, 160, mode,
+                                    0x8000);
+        r36sx_pico286_log_byte_text(
+            3, "renderer-byte-small-text",
+            (const uint8_t *)&VIDEORAM[0] + 0x8000,
+            cols, 25, 160, mode, 0x8000);
+    }
+}
+#endif
+'@
+    $Text = $Text.Replace('static inline void renderer() {',
+        $ScreenTextLogger + "`nstatic inline void renderer() {")
+    $Text = $Text.Replace('    uint8_t cols = 80;
+    for (int y = 0; y < 480; y++) {',
+'    uint8_t cols = 80;
+#if DEBUG
+    r36sx_pico286_log_visible_text(videomode, vram_offset, vidramptr);
+#endif
+    for (int y = 0; y < 480; y++) {')
     $Text = $Text.Replace('void signal_handler(int sig) {
     running = 0;
 }',

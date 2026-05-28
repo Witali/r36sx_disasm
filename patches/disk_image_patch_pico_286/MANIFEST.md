@@ -66,3 +66,14 @@ or writes to disk image sectors.
 
 It also maps BIOS video modes `0x20` and `0x30` to the 80x25 text renderer so
 FreeDOS/BIOS boot text can be shown instead of `unsupported video mode 20/30`.
+
+Current debug build additionally logs changed text rows from Pico-286's
+emulated screen area.  Look in `MIPS_NATIVE/pico_286/pico_286.log` for:
+
+- `screen_text:logical-b800`
+- `screen_text:renderer-byte-view`
+- `screen_text:logical-small-text`
+- `screen_text:renderer-byte-small-text`
+
+The paired logical/renderer views help diagnose whether BIOS text exists in
+video memory but is not visible because the renderer reads a different layout.
