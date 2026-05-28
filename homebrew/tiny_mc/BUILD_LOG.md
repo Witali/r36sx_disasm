@@ -296,3 +296,50 @@ SHA256: 91F96858C58AA6D2E4DFBA7539A0C01061DE39F195174C9EB80AA6541E9D1037
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_024\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 DEBUG-gated logging rebuild
+
+Purpose:
+
+Make Tiny MC debug logging conditional on a compile-time flag at the beginning
+of the program.
+
+Code change:
+
+- Added `#define DEBUG 1` near the top of `tiny_mc.c`.
+- Wrapped the `tiny_mc.log` file descriptor/path and logging implementation in
+  `#if DEBUG`.
+- Added no-op `log_open()`, `log_close()`, and `log_msg()` implementations for
+  `DEBUG=0`, so setting `#define DEBUG 0` and rebuilding disables log file
+  creation and log writes.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_025
+```
+
+Patch files:
+
+```text
+disk_image_patch_025\cubegm\rkgame
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains strings in DEBUG=1 build: tiny_mc.log, cube_ioctl
+Size: 37040 bytes
+SHA256: 91F96858C58AA6D2E4DFBA7539A0C01061DE39F195174C9EB80AA6541E9D1037
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_025\cubegm\rkgame: found no threats
+```

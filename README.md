@@ -253,6 +253,8 @@ Notable patch history:
   cleanup of non-working `.demo`/`.pong` Game Boy menu rows.
 - `disk_image_patch_024`: Tiny MC rebuild that reads built-in buttons through
   the same `driver.so` `cube_ioctl` + `/tmp/joy_key` path used by `rkgame`.
+- `disk_image_patch_025`: Tiny MC rebuild with `tiny_mc.log` writes gated by
+  the top-of-file `#define DEBUG 1` / `#define DEBUG 0` switch.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

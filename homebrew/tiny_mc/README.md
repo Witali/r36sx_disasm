@@ -36,7 +36,9 @@ the vendor driver cleanly.
 
 ## Debug log
 
-Tiny MC appends a debug log to the first writable path:
+Logging is controlled at compile time by the `DEBUG` macro at the top of
+`tiny_mc.c`. With `#define DEBUG 1`, Tiny MC appends a debug log to the first
+writable path:
 
 ```text
 /mnt/sdcard/cubegm/tiny_mc.log
@@ -46,7 +48,8 @@ tiny_mc.log
 
 It logs startup, display initialization, input device opens, directory scans,
 button state changes, launched executables, and child exit status. The render
-loop does not log every frame.
+loop does not log every frame. Set `#define DEBUG 0` and rebuild to disable log
+file creation and log writes.
 
 ## Input model
 

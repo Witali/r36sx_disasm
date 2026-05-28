@@ -8,6 +8,7 @@
  */
 
 #define _GNU_SOURCE
+#define DEBUG 1
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -244,8 +245,10 @@ static char g_status[256] = "A/Start runs a file. Right/A enters a directory.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+#if DEBUG
 static int g_log_fd = -1;
 static char g_log_path[PATH_MAX];
+#endif
 
 static long now_ms(void)
 {
@@ -266,6 +269,7 @@ static void set_close_on_exec(int fd)
 
 static void log_msg(const char *fmt, ...);
 
+#if DEBUG
 static void log_open(void)
 {
     static const char *paths[] = {
@@ -320,6 +324,20 @@ static void log_msg(const char *fmt, ...)
         write(g_log_fd, line, len);
     }
 }
+#else
+static void log_open(void)
+{
+}
+
+static void log_close(void)
+{
+}
+
+static void log_msg(const char *fmt, ...)
+{
+    (void)fmt;
+}
+#endif
 
 static uint16_t rgb565(unsigned r, unsigned g, unsigned b)
 {
