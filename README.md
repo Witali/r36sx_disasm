@@ -215,7 +215,7 @@ An experimental ZX Spectrum 48K core was built from `libretro/fuse-libretro`:
 
 The ready integration patch is:
 
-- [`disk_image_patch_011/MANIFEST.md`](disk_image_patch_011/MANIFEST.md)
+- [`patches/disk_image_patch_011/MANIFEST.md`](patches/disk_image_patch_011/MANIFEST.md)
 
 This is still experimental. The first device tests returned to the launcher
 after a black screen. `disk_image_patch_012` tried explicit runtime
@@ -247,8 +247,11 @@ does not call `shmget()`/`shmat()` or update the old supervisor heartbeat.
 
 ## Patch Sets
 
-Patch directories are used to record changes that can be copied onto the SD
-image/card without committing the full original image to git.
+Patch directories live under `patches/` and are used to record changes that can
+be copied onto the SD image/card without committing the full original image to
+git. See [`patches/README.md`](patches/README.md) for the overlay-copy rule.
+
+Names below omit the `patches/` prefix for readability.
 
 Notable patch history:
 
@@ -346,11 +349,11 @@ Tracked or intentionally small project files:
 - `homebrew/`: source and build logs for custom modules.
   - `homebrew/common/hardware.h`: shared R36SX/SF3000-like hardware and
     firmware constants used by homebrew programs.
-- `disk_image_patch_*`: copyable patch overlays.
-- `disk_image_patch_tiny_mc`: consolidated install overlay for the current
-  Tiny MC boot route and Fn-to-iCube behavior.
-- `disk_image_patch_028/MIPS_NATIVE/README.txt`: native-program folder layout
-  convention for direct Tiny MC launches.
+- `patches/`: copyable patch overlays and patch application notes.
+- `patches/disk_image_patch_tiny_mc`: consolidated install overlay for the
+  current Tiny MC boot route and Fn-to-iCube behavior.
+- `patches/disk_image_patch_028/MIPS_NATIVE/README.txt`: native-program folder
+  layout convention for direct Tiny MC launches.
 - `tools/*.md` and `tools/scan-download.ps1`: local rules, notes, and helper
   scripts.
 
