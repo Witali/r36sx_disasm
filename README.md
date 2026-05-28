@@ -249,6 +249,8 @@ Notable patch history:
   while preserving stock `rkgame.stock`.
 - `disk_image_patch_022`: Tiny MC rebuild using the stock `driver.so` display
   initialization/present path after the first white/black-screen device test.
+- `disk_image_patch_023`: Tiny MC rebuild with `tiny_mc.log` debug logging and
+  cleanup of non-working `.demo`/`.pong` Game Boy menu rows.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

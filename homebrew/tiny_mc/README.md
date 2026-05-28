@@ -34,6 +34,20 @@ state, HCGE, and render/painter threads. Tiny MC closes its display and input
 devices before launching a selected executable, so the child process can acquire
 the vendor driver cleanly.
 
+## Debug log
+
+Tiny MC appends a debug log to the first writable path:
+
+```text
+/mnt/sdcard/cubegm/tiny_mc.log
+/mnt/sdcard/tiny_mc.log
+tiny_mc.log
+```
+
+It logs startup, display initialization, input device opens, directory scans,
+button state changes, launched executables, and child exit status. The render
+loop does not log every frame.
+
 ## Build
 
 From the repository root:

@@ -13,6 +13,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +46,8 @@ enum {
     HEADER_H = 48,
     FOOTER_H = 40
 };
+
+#define LOG_LINE_MAX 768
 
 enum button_bits {
     BTN_UP_BIT = 1u << 0,
@@ -216,6 +219,8 @@ static char g_status[256] = "A/Start runs a file. Right/A enters a directory.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+static int g_log_fd = -1;
+static char g_log_path[PATH_MAX];
 
 static long now_ms(void)
 {
@@ -231,6 +236,63 @@ static void set_close_on_exec(int fd)
         if (flags >= 0) {
             fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
         }
+    }
+}
+
+static void log_msg(const char *fmt, ...);
+
+static void log_open(void)
+{
+    static const char *paths[] = {
+        "/mnt/sdcard/cubegm/tiny_mc.log",
+        "/mnt/sdcard/tiny_mc.log",
+        "tiny_mc.log"
+    };
+
+    for (size_t i = 0; i < ARRAY_COUNT(paths); i++) {
+        int fd = open(paths[i], O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+        if (fd >= 0) {
+            g_log_fd = fd;
+            set_close_on_exec(g_log_fd);
+            snprintf(g_log_path, sizeof(g_log_path), "%s", paths[i]);
+            log_msg("log opened: %s", g_log_path);
+            break;
+        }
+    }
+}
+
+static void log_close(void)
+{
+    if (g_log_fd >= 0) {
+        close(g_log_fd);
+        g_log_fd = -1;
+    }
+}
+
+static void log_msg(const char *fmt, ...)
+{
+    char body[LOG_LINE_MAX / 2];
+    char line[LOG_LINE_MAX];
+    va_list ap;
+    long ms;
+    int n;
+
+    if (g_log_fd < 0) {
+        return;
+    }
+
+    va_start(ap, fmt);
+    vsnprintf(body, sizeof(body), fmt, ap);
+    va_end(ap);
+
+    ms = now_ms();
+    n = snprintf(line, sizeof(line), "[%ld.%03ld] %s\n", ms / 1000L, ms % 1000L, body);
+    if (n > 0) {
+        size_t len = (size_t)n;
+        if (len >= sizeof(line)) {
+            len = sizeof(line) - 1;
+        }
+        write(g_log_fd, line, len);
     }
 }
 
@@ -252,6 +314,7 @@ static uint32_t rgb888_from_565(uint16_t c)
 
 static void driver_close_display(void)
 {
+    log_msg("driver display close active=%d handle=%p", g_driver.active, g_driver.handle);
     if (g_driver.active && g_driver.deinit) {
         g_driver.deinit();
     }
@@ -276,6 +339,7 @@ static int driver_open_display(void)
         "./driver.so",
         "driver.so"
     };
+    char last_dlerror[256] = "unknown dlopen error";
 
     if (g_driver.active) {
         return 0;
@@ -283,15 +347,21 @@ static int driver_open_display(void)
 
     memset(&g_driver, 0, sizeof(g_driver));
     for (size_t i = 0; i < ARRAY_COUNT(paths); i++) {
+        log_msg("trying display driver: %s", paths[i]);
         g_driver.handle = dlopen(paths[i], RTLD_NOW);
         if (g_driver.handle) {
             break;
         }
+        const char *err = dlerror();
+        snprintf(last_dlerror, sizeof(last_dlerror), "%s", err ? err : "unknown dlopen error");
+        log_msg("dlopen failed for %s: %s", paths[i], last_dlerror);
     }
     if (!g_driver.handle) {
-        snprintf(g_status, sizeof(g_status), "driver.so open failed: %s", dlerror());
+        snprintf(g_status, sizeof(g_status), "driver.so open failed: %s", last_dlerror);
+        log_msg("%s", g_status);
         return -1;
     }
+    log_msg("driver.so loaded");
 
     g_driver.setting = (video_driver_setting_fn)dlsym(g_driver.handle, "video_driver_setting");
     g_driver.init = (video_drivers_init_fn)dlsym(g_driver.handle, "video_drivers_init");
@@ -299,6 +369,8 @@ static int driver_open_display(void)
     g_driver.deinit = (video_driver_deinit_fn)dlsym(g_driver.handle, "video_driver_deinit");
     if (!g_driver.setting || !g_driver.init || !g_driver.disp_frame || !g_driver.deinit) {
         snprintf(g_status, sizeof(g_status), "driver.so display symbols missing");
+        log_msg("%s setting=%p init=%p frame=%p deinit=%p", g_status,
+                g_driver.setting, g_driver.init, g_driver.disp_frame, g_driver.deinit);
         driver_close_display();
         return -1;
     }
@@ -319,16 +391,22 @@ static int driver_open_display(void)
 
     {
         int cfg[5] = {1, 1, 1, 0x356, 0x1e0};
+        log_msg("video_driver_setting cfg={%d,%d,%d,%d,%d}",
+                cfg[0], cfg[1], cfg[2], cfg[3], cfg[4]);
         g_driver.setting(cfg);
     }
-    if (g_driver.init() < 0) {
+    int init_rc = g_driver.init();
+    log_msg("video_drivers_init returned %d", init_rc);
+    if (init_rc < 0) {
         snprintf(g_status, sizeof(g_status), "video_drivers_init failed");
+        log_msg("%s", g_status);
         driver_close_display();
         return -1;
     }
 
     g_driver.active = 1;
     snprintf(g_status, sizeof(g_status), "Display via driver.so 640x480");
+    log_msg("%s", g_status);
     return 0;
 }
 
@@ -343,6 +421,7 @@ static int fb_open_device(void)
     g_fb.fd = open("/dev/fb0", O_RDWR | O_CLOEXEC);
     if (g_fb.fd < 0) {
         snprintf(g_status, sizeof(g_status), "Cannot open /dev/fb0: %s", strerror(errno));
+        log_msg("%s", g_status);
         return -1;
     }
     set_close_on_exec(g_fb.fd);
@@ -360,6 +439,7 @@ static int fb_open_device(void)
         g_fb.bpp = 16;
         g_fb.stride = g_fb.width * 2;
         g_fb.mem_len = (size_t)(g_fb.stride * g_fb.height);
+        log_msg("FBIOGET info failed, using fallback geometry: %s", strerror(errno));
     }
 
     if (g_fb.mem_len == 0 || g_fb.mem_len > 64u * 1024u * 1024u) {
@@ -372,12 +452,16 @@ static int fb_open_device(void)
     if (g_fb.mem == MAP_FAILED) {
         g_fb.mem = NULL;
         snprintf(g_status, sizeof(g_status), "mmap /dev/fb0 failed: %s", strerror(errno));
+        log_msg("%s", g_status);
         close(g_fb.fd);
         g_fb.fd = -1;
         return -1;
     }
 
     snprintf(g_status, sizeof(g_status), "Display via direct /dev/fb0 fallback");
+    log_msg("%s width=%d height=%d bpp=%d stride=%d mem_len=%lu",
+            g_status, g_fb.width, g_fb.height, g_fb.bpp, g_fb.stride,
+            (unsigned long)g_fb.mem_len);
     return 0;
 }
 
@@ -395,9 +479,11 @@ static void fb_close_device(void)
 
 static int display_open(void)
 {
+    log_msg("display_open");
     if (driver_open_display() == 0) {
         return 0;
     }
+    log_msg("driver display unavailable, trying /dev/fb0 fallback");
     return fb_open_device();
 }
 
@@ -648,6 +734,7 @@ static void scan_directory(void)
     DIR *dir;
     struct dirent *de;
 
+    log_msg("scan_directory: %s", g_cwd);
     g_entry_count = 0;
     if (strcmp(g_cwd, "/") != 0) {
         strcpy(g_entries[g_entry_count].name, "..");
@@ -660,6 +747,7 @@ static void scan_directory(void)
     dir = opendir(g_cwd);
     if (!dir) {
         snprintf(g_status, sizeof(g_status), "Cannot open %s: %s", g_cwd, strerror(errno));
+        log_msg("%s", g_status);
         parent_path(g_cwd);
         g_selected = 0;
         g_scroll = 0;
@@ -704,6 +792,7 @@ static void scan_directory(void)
     if (g_scroll > g_selected) {
         g_scroll = g_selected;
     }
+    log_msg("scan_directory done entries=%d selected=%d scroll=%d", g_entry_count, g_selected, g_scroll);
 }
 
 static void input_open_devices(void)
@@ -722,6 +811,7 @@ static void input_open_devices(void)
             g_input.fds[g_input.fd_count] = fd;
             g_input.is_js[g_input.fd_count] = 1;
             g_input.fd_count++;
+            log_msg("input opened: %s", path);
         }
     }
 
@@ -734,14 +824,17 @@ static void input_open_devices(void)
             g_input.fds[g_input.fd_count] = fd;
             g_input.is_js[g_input.fd_count] = 0;
             g_input.fd_count++;
+            log_msg("input opened: %s", path);
         }
     }
 
     snprintf(g_status, sizeof(g_status), "Input devices opened: %d", g_input.fd_count);
+    log_msg("%s", g_status);
 }
 
 static void input_close_devices(void)
 {
+    log_msg("input_close_devices count=%d", g_input.fd_count);
     for (int i = 0; i < g_input.fd_count; i++) {
         if (g_input.fds[i] >= 0) {
             close(g_input.fds[i]);
@@ -997,6 +1090,7 @@ static void launch_selected(void)
     split_dir_base(path, dir, sizeof(dir), &base);
 
     snprintf(g_status, sizeof(g_status), "Running %s", e->name);
+    log_msg("launch requested: path=%s dir=%s base=%s", path, dir, base);
     draw_ui();
     display_close();
     input_close_devices();
@@ -1004,6 +1098,7 @@ static void launch_selected(void)
     pid_t pid = fork();
     if (pid < 0) {
         snprintf(g_status, sizeof(g_status), "fork failed: %s", strerror(errno));
+        log_msg("%s", g_status);
         display_open();
         input_open_devices();
         return;
@@ -1019,9 +1114,11 @@ static void launch_selected(void)
         } else {
             execl(path, base, (char *)NULL);
         }
+        log_msg("exec failed in child: %s: %s", path, strerror(errno));
         _exit(127);
     }
 
+    log_msg("waiting child pid=%ld", (long)pid);
     int status = 0;
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
     }
@@ -1034,6 +1131,7 @@ static void launch_selected(void)
     } else {
         snprintf(result, sizeof(result), "%s returned", e->name);
     }
+    log_msg("launch result: %s raw_status=0x%x", result, status);
     display_open();
     input_open_devices();
     snprintf(g_status, sizeof(g_status), "%s", result);
@@ -1051,6 +1149,7 @@ static void choose_start_dir(int argc, char **argv)
     } else if (getcwd(g_cwd, sizeof(g_cwd)) == NULL) {
         snprintf(g_cwd, sizeof(g_cwd), "%s", "/");
     }
+    log_msg("start dir: %s", g_cwd);
 }
 
 static void handle_buttons(uint32_t buttons)
@@ -1058,6 +1157,11 @@ static void handle_buttons(uint32_t buttons)
     uint32_t changed = buttons & ~g_prev_buttons;
     uint32_t nav = buttons & (BTN_UP_BIT | BTN_DOWN_BIT);
     long now = now_ms();
+
+    if (buttons != g_prev_buttons) {
+        log_msg("buttons state=0x%08x changed_down=0x%08x changed_any=0x%08x",
+                buttons, changed, buttons ^ g_prev_buttons);
+    }
 
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {
         if (g_selected > 0) {
@@ -1096,11 +1200,15 @@ static void handle_buttons(uint32_t buttons)
 
 int main(int argc, char **argv)
 {
+    log_open();
+    log_msg("tiny_mc start argc=%d", argc);
     choose_start_dir(argc, argv);
     scan_directory();
 
     if (display_open() != 0) {
         fprintf(stderr, "tiny_mc: %s\n", g_status);
+        log_msg("fatal display_open failed: %s", g_status);
+        log_close();
         return 1;
     }
     input_open_devices();
@@ -1115,5 +1223,7 @@ int main(int argc, char **argv)
 
     display_close();
     input_close_devices();
+    log_msg("tiny_mc exit");
+    log_close();
     return 0;
 }

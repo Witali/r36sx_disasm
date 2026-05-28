@@ -156,3 +156,72 @@ SHA256: A6B1755B19D5882C11D6203D73CA30B9DE64A8742C60168347C53E3623C37B41
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_022\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 debug log rebuild and menu cleanup
+
+Purpose:
+
+Add on-device debug logging to Tiny MC and remove known non-working duplicate
+menu entries for `.demo` and `.pong` launch routes.
+
+Code change:
+
+- Added append-only log output with fallback paths:
+  - `/mnt/sdcard/cubegm/tiny_mc.log`
+  - `/mnt/sdcard/tiny_mc.log`
+  - `tiny_mc.log`
+- Logged startup, start directory selection, display driver load attempts,
+  `video_drivers_init()` return value, fallback framebuffer setup, input device
+  opens/closes, directory scans, button state changes, launched path, child wait,
+  and child exit status.
+- The render loop intentionally does not log every frame.
+
+Menu cleanup:
+
+- Removed `button.demo,Button Demo,Button Demo` from `GB\filelist.csv`.
+- Removed `pong.pong,Pong Demo,Pong Demo` from `GB\filelist.csv`.
+- Removed matching `GB/button.demo` and `GB/pong.pong` overrides from
+  `cubegm\cores\filelist.xml`.
+- Kept the working `button.gb` and `pong.gb` routes.
+
+Extension decision:
+
+- Fuse already uses the proper Spectrum tape extension through
+  `ATARI\R36SX_ZX48.tap` and an explicit `libemu_fuse.so` override.
+- Doom/PRBoom should use `.wad`/`.m3u`, as in `disk_image_patch_020`, but those
+  files are not present in the current local `disk_image`, so this patch does
+  not add new Doom menu rows.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_023
+```
+
+Patch files:
+
+```text
+disk_image_patch_023\cubegm\rkgame
+disk_image_patch_023\cubegm\cores\filelist.xml
+disk_image_patch_023\GB\filelist.csv
+```
+
+Verification:
+
+```text
+ELF32 little-endian executable, machine=MIPS.
+Program interpreter string: /lib/ld.so.1
+Dynamic dependency strings: libc.so.6, libdl.so.2, GLIBC_2.0, GLIBC_2.2
+Contains log path string: tiny_mc.log
+Size: 36332 bytes
+SHA256: BB7EC1F3D97A283DD8C1D80E078A20120A694D51E0A11F11C2E3536E8B076E9B
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_023\cubegm\rkgame: found no threats
+Removed-menu check for button.demo/pong.pong in patch_023: no matches
+```
