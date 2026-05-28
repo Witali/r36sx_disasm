@@ -1,14 +1,15 @@
 /*
  * Tiny one-panel file manager / launcher for the R36SX/SF3000-like firmware.
  *
- * This can run either as MIPS_NATIVE/tiny_mc/tiny_mc or as the icube-launched
- * cubegm/rkgame compatibility entrypoint. It normally uses cubegm/driver.so
- * for display setup, matching rkgame's framebuffer/rotation path. Direct
- * /dev/fb0 rendering remains as fallback.
+ * This direct-launch build runs as MIPS_NATIVE/tiny_mc/tiny_mc from
+ * cubegm/icube_start.sh. It normally uses cubegm/driver.so for display setup,
+ * matching rkgame's framebuffer/rotation path. Direct /dev/fb0 rendering
+ * remains as fallback.
  */
 
 #define _GNU_SOURCE
 #define DEBUG 1
+#define USE_ICUBE_HEARTBEAT 0
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -200,12 +201,14 @@ struct driver_display_state {
     int active;
 };
 
+#if USE_ICUBE_HEARTBEAT
 struct heartbeat_state {
     int shmid;
     volatile uint32_t *shm;
     uint32_t counter;
     long next_log_ms;
 };
+#endif
 
 struct input_state {
     int fds[MAX_INPUT_FDS];
@@ -243,7 +246,9 @@ static struct fb_state g_fb = {
     R36SX_RGB565_BITS_PER_PIXEL, R36SX_RGB565_FRAME_STRIDE
 };
 static struct driver_display_state g_driver;
+#if USE_ICUBE_HEARTBEAT
 static struct heartbeat_state g_heartbeat = {-1, NULL, 0, 0};
+#endif
 static struct input_state g_input;
 static struct entry g_entries[MAX_ENTRIES];
 static struct dir_state g_dir_states[MAX_DIR_STATES];
@@ -351,6 +356,7 @@ static void log_msg(const char *fmt, ...)
 }
 #endif
 
+#if USE_ICUBE_HEARTBEAT
 static void heartbeat_tick(void)
 {
     long ms;
@@ -403,6 +409,20 @@ static void heartbeat_close(void)
     }
     g_heartbeat.shmid = -1;
 }
+#else
+static void heartbeat_tick(void)
+{
+}
+
+static void heartbeat_open(void)
+{
+    log_msg("direct launch mode");
+}
+
+static void heartbeat_close(void)
+{
+}
+#endif
 
 static uint16_t rgb565(unsigned r, unsigned g, unsigned b)
 {

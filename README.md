@@ -210,14 +210,12 @@ It follows the stock `rkgame` display path by loading `cubegm/driver.so`,
 drawing to an internal RGB565 640x480 buffer, and presenting frames through
 `video_driver_disp_frame()`. Direct `/dev/fb0` rendering remains as fallback.
 It reads the built-in controls through the same `driver.so` `cube_ioctl` path as
-stock `rkgame`, maintains the `icube` shared-memory heartbeat, and launches
-selected files with `fork()` plus `execl()`.
+stock `rkgame`, and launches selected files with `fork()` plus `execl()`.
 
-The current `icube`-compatible integration keeps `icube_start.sh` launching
-`/mnt/sdcard/cubegm/icube`; `icube` then launches `/mnt/sdcard/cubegm/rkgame`
-with no extra arguments. The rebuilt Tiny MC is installed as that `rkgame`
-entrypoint and also copied to `MIPS_NATIVE/tiny_mc/tiny_mc`. When no start
-directory argument is passed, Tiny MC now opens `/mnt/sdcard/MIPS_NATIVE`.
+The current direct-launch integration makes `icube_start.sh` run
+`/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE` directly,
+without starting `icube`. The Tiny MC build has `USE_ICUBE_HEARTBEAT 0`, so it
+does not call `shmget()`/`shmat()` or update the old supervisor heartbeat.
 
 ## Patch Sets
 
@@ -276,6 +274,9 @@ Notable patch history:
 - `disk_image_patch_032`: restores the stock `icube` launch chain, installs
   Tiny MC as the `cubegm/rkgame` compatibility entrypoint, and makes no-arg
   Tiny MC startup open `/mnt/sdcard/MIPS_NATIVE`.
+- `disk_image_patch_033`: switches Tiny MC back to direct launch from
+  `cubegm/icube_start.sh`, disables the `icube` heartbeat contract at compile
+  time, and restores stock `cubegm/rkgame`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

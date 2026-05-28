@@ -675,3 +675,64 @@ Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_032\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_032\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 direct launch without icube heartbeat
+
+Purpose:
+
+Bypass `icube` completely and remove the Tiny MC dependency on the
+`icube`/heartbeat watchdog contract.
+
+Code change:
+
+- Added `#define USE_ICUBE_HEARTBEAT 0`.
+- Wrapped the heartbeat state and SysV shared-memory implementation in
+  `#if USE_ICUBE_HEARTBEAT`.
+- In the direct build, `heartbeat_open()`, `heartbeat_tick()`, and
+  `heartbeat_close()` are no-op helpers, so the main loop can keep the same
+  shape without calling `shmget()` or `shmat()`.
+- `cubegm/icube_start.sh` now runs Tiny MC directly:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE &
+```
+
+File changes:
+
+- Copied the direct Tiny MC build to `disk_image\MIPS_NATIVE\tiny_mc\tiny_mc`.
+- Restored `disk_image\cubegm\rkgame` from `disk_image\cubegm\rkgame.stock`.
+- Created overlay directory `disk_image_patch_033` with the same changed files.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force -Path disk_image\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_033\MIPS_NATIVE\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_033\cubegm
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame.stock -Destination disk_image\cubegm\rkgame -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image_patch_033\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\cubegm\rkgame -Destination disk_image_patch_033\cubegm\rkgame -Force
+Copy-Item -LiteralPath disk_image\cubegm\icube_start.sh -Destination disk_image_patch_033\cubegm\icube_start.sh -Force
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_033\MIPS_NATIVE\tiny_mc\tiny_mc
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image_patch_033\cubegm\rkgame
+```
+
+Verification:
+
+```text
+Tiny MC ELF: ELF32 little-endian executable, machine=MIPS, interpreter /lib/ld.so.1
+Tiny MC contains string: /mnt/sdcard/MIPS_NATIVE
+Tiny MC does not contain strings: shmget, heartbeat
+Tiny MC size: 39572 bytes
+Tiny MC SHA256: F8DECFD3C397D1783FC64E505C6091D6013CA8514C03AB11ACAA73FBB52BB30A
+
+Restored stock rkgame size: 1178732 bytes
+Restored stock rkgame SHA256: 57D8B4FD85E0AAB44D17A51D209879C3F98130D066B622142736B42AD08DDCB9
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_033\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_033\cubegm\rkgame: found no threats
+```

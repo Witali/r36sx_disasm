@@ -3,11 +3,10 @@
 Tiny MC is a small one-panel framebuffer file manager / launcher for the
 R36SX/SF3000-like firmware.
 
-The current integration model keeps the stock `icube` supervisor in the launch
-chain. `icube` hardcodes `execl("/mnt/sdcard/cubegm/rkgame", "rkgame", 0)`, so
-Tiny MC is installed both as `MIPS_NATIVE/tiny_mc/tiny_mc` and as the
-`cubegm/rkgame` compatibility entrypoint. With no start directory argument,
-Tiny MC opens `/mnt/sdcard/MIPS_NATIVE`.
+The current integration model launches Tiny MC directly from
+`cubegm/icube_start.sh`, without starting the stock `icube` supervisor. Tiny MC
+is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
+`/mnt/sdcard/MIPS_NATIVE` as its start directory argument.
 
 ## Controls
 
@@ -38,10 +37,10 @@ The program uses:
 
 No SDL, DirectFB, ncurses, or Midnight Commander runtime is required.
 
-Tiny MC also mirrors the stock `rkgame` heartbeat expected by the `icube`
-supervisor. It attaches SysV shared memory key `0x4d2`, size `0x1c4`, and
-updates `shm[0]=1` / `shm[1]++` from the main loop. Without this heartbeat,
-`icube` treats `rkgame` as hung and restarts it after roughly 5-6 seconds.
+The current direct-launch build sets `USE_ICUBE_HEARTBEAT 0`, so Tiny MC does
+not attach the old `icube` SysV shared memory heartbeat and does not depend on
+the `icube` watchdog contract. The older icube-compatible build used SysV
+shared memory key `0x4d2`, size `0x1c4`, and updated `shm[0]=1` / `shm[1]++`.
 
 The `driver.so` path is important on the real device: stock `rkgame` relies on
 that library to configure the framebuffer, rotation/scaling, blank/unblank
@@ -96,27 +95,26 @@ The output file is:
 homebrew\tiny_mc\tiny_mc
 ```
 
-For the current SD-card integration, copy the rebuilt executable as both:
+For the current SD-card integration, copy the rebuilt executable as:
 
 ```text
 MIPS_NATIVE\tiny_mc\tiny_mc
-cubegm\rkgame
 ```
 
-preserving the stock binary as:
+restore the stock binary as:
 
 ```text
 cubegm\rkgame.stock
+cubegm\rkgame
 ```
 
-and keep `cubegm\icube_start.sh` launching the stock supervisor:
+and route `cubegm\icube_start.sh` directly to:
 
 ```sh
-/mnt/sdcard/cubegm/icube &
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE &
 ```
 
-`icube` passes no arguments to `rkgame`, so Tiny MC chooses
-`/mnt/sdcard/MIPS_NATIVE` as its default start directory.
+This bypasses `icube`; if Tiny MC hangs, there is no `icube` supervisor restart.
 
 ## Native Program Folder
 
