@@ -1100,3 +1100,72 @@ Defender scan disk_image\MIPS_NATIVE\tiny_mc\fonts\JetBrainsMonoNL-Regular.ttf: 
 Defender scan patches\disk_image_patch_049: found no threats
 Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc: found no threats
 ```
+
+## 2026-05-28 common font pool rebuild
+
+Purpose:
+
+Move bundled TrueType fonts from Tiny MC's private directory to the shared
+native-app path `MIPS_NATIVE/common/fonts`, then add additional free
+monospaced fallback fonts.
+
+Downloaded fonts:
+
+```text
+JetBrainsMonoNL-Regular.ttf  208576 bytes  FB3B2575D7B0657359707993288F12A7360344D39387BB26050E276D61F6BD2A
+LiberationMono-Regular.ttf   319508 bytes  F2B83C763E8AFD21709333370BED4774337FAE82267937E2B5AEA7E2FBD922C1
+DejaVuSansMono.ttf           340712 bytes  B4A6C3E4FAAB8773F4FF761D56451646409F29ABEDD68F05D38C2DF667D3C582
+NotoSansMono-Regular.ttf     512836 bytes  D9E2B23D19F8230BE7146F409A52B1D23117E635E28F2E2892CF91B7382F325B
+SourceCodePro-Regular.ttf    210312 bytes  74BD80D3E42A08517CD7E1108BA3D86F2DA29AC0F3065BE95E0357956AB9DB37
+Hack-Regular.ttf             309408 bytes  15F55CC0C85A2988D2B4B3A8CDB5D77FDFBAF319E1BB5309D725DB9818FB7125
+RobotoMono-Regular.ttf       125748 bytes  AF0BFF7599C3DF3831755C16E39B3C496DF74B8C8D8A1161B14DC8461BE17CB4
+```
+
+Source layout:
+
+```text
+homebrew\common\fonts
+disk_image\MIPS_NATIVE\common\fonts
+```
+
+Build changes:
+
+- Added `R36SX_MIPS_NATIVE_COMMON_DIR`,
+  `R36SX_MIPS_NATIVE_COMMON_FONTS_DIR`, and `R36SX_DEFAULT_MONO_FONT_PATH` to
+  `homebrew\common\hardware.h`.
+- Tiny MC now searches common fonts first, then falls back to the old
+  `MIPS_NATIVE/tiny_mc/fonts` location and stock firmware fonts.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force .\disk_image\MIPS_NATIVE\common\fonts
+Copy-Item -Path .\homebrew\common\fonts\* -Destination .\disk_image\MIPS_NATIVE\common\fonts -Force
+Copy-Item -LiteralPath .\homebrew\tiny_mc\tiny_mc -Destination .\disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_050
+```
+
+Verification:
+
+```text
+Tiny MC size: 46900 bytes
+Tiny MC SHA256: DFC466EFEBFA07E4A0E8DEC6A0C4BCA3B18E5A1B028B5F8664633E169FD88D07
+
+Contains strings: MIPS_NATIVE/common/fonts, LiberationMono-Regular.ttf,
+DejaVuSansMono.ttf, NotoSansMono-Regular.ttf, SourceCodePro-Regular.ttf,
+Hack-Regular.ttf, RobotoMono-Regular.ttf, libfreetype.so.6
+
+Defender scan downloaded archives/raw files: found no threats
+Defender scan homebrew\common\fonts: found no threats
+Defender scan disk_image\MIPS_NATIVE\common\fonts: found no threats
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_050: found no threats
+Defender scan patches\disk_image_patch_tiny_mc: found no threats
+```

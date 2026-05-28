@@ -343,6 +343,10 @@ Notable patch history:
   end-of-game messages render as large 5x5 pixel text: `You win` / `You lose`.
 - `disk_image_patch_049`: rebuilds Tiny MC with optional FreeType text
   rendering and bundles JetBrains Mono NL Regular under `MIPS_NATIVE/tiny_mc/fonts`.
+- `disk_image_patch_050`: moves bundled mono fonts to
+  `MIPS_NATIVE/common/fonts`, adds Liberation Mono, DejaVu Sans Mono,
+  Noto Sans Mono, Source Code Pro, Hack, and Roboto Mono, and rebuilds Tiny MC
+  to prefer the common font directory.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
@@ -362,6 +366,8 @@ Tracked or intentionally small project files:
 - `MOST_SIMILAR_REPOSITORY.md`: closest public repository comparison.
 - `homebrew/tiny_mc/FONT_RESEARCH.md`: monospaced open-font candidates and the
   JetBrains Mono NL selection notes for Tiny MC FreeType rendering.
+- `homebrew/common/fonts/`: common redistributable monospaced TTF pool for
+  native apps, with license files and hashes.
 - `homebrew/`: source and build logs for custom modules.
   - `homebrew/pong/pong.c`: unified Pong source compiled as either libretro
     (`R36SX_PONG_TARGET=1`) or native Tiny MC

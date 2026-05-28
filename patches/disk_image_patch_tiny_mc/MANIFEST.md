@@ -32,8 +32,7 @@ E:/cubegm/icubemp_start.sh
 E:/cubegm/rkgame
 E:/MIPS_NATIVE/tiny_mc/tiny_mc
 E:/MIPS_NATIVE/tiny_mc/README.txt
-E:/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf
-E:/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMono-OFL.txt
+E:/MIPS_NATIVE/common/fonts/
 ```
 
 ## Files
@@ -45,8 +44,7 @@ cubegm/icubemp_start.sh
 cubegm/rkgame
 MIPS_NATIVE/tiny_mc/tiny_mc
 MIPS_NATIVE/tiny_mc/README.txt
-MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf
-MIPS_NATIVE/tiny_mc/fonts/JetBrainsMono-OFL.txt
+MIPS_NATIVE/common/fonts/
 ```
 
 ## Behavior
@@ -82,9 +80,9 @@ Tiny MC:
 - uses `/mnt/sdcard/cubegm/driver.so` `sound_driver_init()` and
   `sound_driver_playframe()` for short button-click sounds;
 - tries `/mnt/sdcard/cubegm/lib/libfreetype.so.6` for TrueType text rendering;
-- uses `/mnt/sdcard/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf`
-  as the preferred monospaced font, with the built-in 5x7 bitmap font as
-  fallback;
+- uses `/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf`
+  as the preferred monospaced font, with other common mono fonts and the
+  built-in 5x7 bitmap font as fallbacks;
 - has `DEBUG=1`, so it writes `tiny_mc.log` to the first writable path:
   `/mnt/sdcard/cubegm/tiny_mc.log`, `/mnt/sdcard/tiny_mc.log`, or
   `tiny_mc.log`;
@@ -101,21 +99,34 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 46712 bytes
-  SHA256: 67560BCC8983DDE6306238CD19204881D90BF82E697E8FBCE85ACA8932E4040A
+  Size: 46900 bytes
+  SHA256: DFC466EFEBFA07E4A0E8DEC6A0C4BCA3B18E5A1B028B5F8664633E169FD88D07
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
-            FT_Init_FreeType, JetBrainsMonoNL-Regular.ttf
+            FT_Init_FreeType, MIPS_NATIVE/common/fonts,
+            JetBrainsMonoNL-Regular.ttf, LiberationMono-Regular.ttf,
+            DejaVuSansMono.ttf, NotoSansMono-Regular.ttf,
+            SourceCodePro-Regular.ttf, Hack-Regular.ttf,
+            RobotoMono-Regular.ttf
   Does not contain: icube heartbeat, shmget
 
-Tiny MC font:
+Tiny MC common fonts:
   JetBrainsMonoNL-Regular.ttf size: 208576 bytes
   JetBrainsMonoNL-Regular.ttf SHA256:
     FB3B2575D7B0657359707993288F12A7360344D39387BB26050E276D61F6BD2A
-  JetBrainsMono-OFL.txt size: 4399 bytes
-  JetBrainsMono-OFL.txt SHA256:
-    60D55F23C6CE05A81099A762CB67CA2C9B6EA251C7912720998B4C89EBFD4FAA
+  LiberationMono-Regular.ttf SHA256:
+    F2B83C763E8AFD21709333370BED4774337FAE82267937E2B5AEA7E2FBD922C1
+  DejaVuSansMono.ttf SHA256:
+    B4A6C3E4FAAB8773F4FF761D56451646409F29ABEDD68F05D38C2DF667D3C582
+  NotoSansMono-Regular.ttf SHA256:
+    D9E2B23D19F8230BE7146F409A52B1D23117E635E28F2E2892CF91B7382F325B
+  SourceCodePro-Regular.ttf SHA256:
+    74BD80D3E42A08517CD7E1108BA3D86F2DA29AC0F3065BE95E0357956AB9DB37
+  Hack-Regular.ttf SHA256:
+    15F55CC0C85A2988D2B4B3A8CDB5D77FDFBAF319E1BB5309D725DB9818FB7125
+  RobotoMono-Regular.ttf SHA256:
+    AF0BFF7599C3DF3831755C16E39B3C496DF74B8C8D8A1161B14DC8461BE17CB4
 
 rkgame:
   Size: 1178732 bytes
@@ -129,10 +140,13 @@ Scripts and README:
   cubegm/icubemp_start.sh SHA256:
     BE313D3917BA5E355ECFC1818A6F42A6644ECE5724A098C507DDE2C7149F0EE9
   MIPS_NATIVE/tiny_mc/README.txt SHA256:
-    A6BEF02DDBA15DE781FBAAF1549E6340A7FBA930C47A924CA492229649BF85F9
+    473520DB4E8A87B799703A80541D6959BE508E7C80AAE2650E6C2FA0FDE95CE9
+  MIPS_NATIVE/common/fonts/README.md SHA256:
+    6F1042BB337FB27FEF841F5DB370B6878AB24B0139C53BC497DA6C008DE79ACB
 
 Defender scan:
   disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+  disk_image_patch_tiny_mc\MIPS_NATIVE\common\fonts: found no threats
   disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc: found no threats
   disk_image_patch_tiny_mc\cubegm\rkgame: found no threats
 ```

@@ -943,6 +943,13 @@ static int font_open(void)
         "libfreetype.so.6"
     };
     static const char *font_paths[] = {
+        R36SX_DEFAULT_MONO_FONT_PATH,
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/LiberationMono-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/DejaVuSansMono.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/NotoSansMono-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/SourceCodePro-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/Hack-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/RobotoMono-Regular.ttf",
         "/mnt/sdcard/MIPS_NATIVE/tiny_mc/fonts/JetBrainsMonoNL-Regular.ttf",
         "/mnt/sdcard/MIPS_NATIVE/tiny_mc/JetBrainsMonoNL-Regular.ttf",
         "fonts/JetBrainsMonoNL-Regular.ttf",

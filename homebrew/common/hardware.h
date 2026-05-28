@@ -20,6 +20,10 @@
 /* Common runtime paths on the SD-card firmware. */
 #define R36SX_CUBEGM_DIR "/mnt/sdcard/cubegm"
 #define R36SX_MIPS_NATIVE_DIR "/mnt/sdcard/MIPS_NATIVE"
+#define R36SX_MIPS_NATIVE_COMMON_DIR "/mnt/sdcard/MIPS_NATIVE/common"
+#define R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/mnt/sdcard/MIPS_NATIVE/common/fonts"
+#define R36SX_DEFAULT_MONO_FONT_PATH \
+    "/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf"
 #define R36SX_DRIVER_SO_PATH "/mnt/sdcard/cubegm/driver.so"
 #define R36SX_DRIVER_SO_LOCAL_PATH "./driver.so"
 #define R36SX_DRIVER_SO_NAME "driver.so"

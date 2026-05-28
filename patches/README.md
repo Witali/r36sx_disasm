@@ -14,6 +14,8 @@ Example:
   `cubegm/icube.sh` on the original disk.
 - `disk_image_patch_tiny_mc/MIPS_NATIVE/tiny_mc/tiny_mc` should be copied to
   `MIPS_NATIVE/tiny_mc/tiny_mc` on the original disk.
+- `disk_image_patch_tiny_mc/MIPS_NATIVE/common/fonts/*` should be copied to
+  `MIPS_NATIVE/common/fonts/` on the original disk.
 
 Make a backup of the original disk before applying patches. Numbered patch
 directories are the experiment history; `disk_image_patch_tiny_mc` is the
