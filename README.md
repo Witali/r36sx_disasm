@@ -307,6 +307,8 @@ Notable patch history:
   Tiny MC directly after `boot_route.log` showed `icube_start.sh` is skipped.
 - `disk_image_patch_040`: removes temporary `boot_route.log` tracing while
   keeping the confirmed Tiny MC boot route through `icube.sh`.
+- `disk_image_patch_041`: rebuilds native Pong with `YOU WIN` / `YOU LOSE`
+  end-of-game messages.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

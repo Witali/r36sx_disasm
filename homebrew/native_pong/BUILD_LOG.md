@@ -55,3 +55,47 @@ SHA256: E2BB7EF51806085202B92B97837079E67BB4174997BD4DFF3AC18F694EAADBFF
 Defender scan homebrew\native_pong\pong: found no threats
 Defender scan disk_image_patch_035\MIPS_NATIVE\pong\pong: found no threats
 ```
+
+## 2026-05-28 win/lose message rebuild
+
+Purpose:
+
+Add explicit English result messages to native Pong.
+
+Implementation:
+
+- Added a small built-in 5x7 pixel font for the required uppercase letters.
+- Added game-over state when either side reaches score `9`.
+- Shows `YOU WIN` when the left/player score reaches `9`.
+- Shows `YOU LOSE` when the right/opponent score reaches `9`.
+- Pressing A or Start after the result starts a new game.
+- Select or Fn still exits back to Tiny MC.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+disk_image_patch_041
+```
+
+Patch files:
+
+```text
+disk_image_patch_041\MIPS_NATIVE\pong\pong
+disk_image_patch_041\MIPS_NATIVE\pong\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: YOU WIN, YOU LOSE, /mnt/sdcard/cubegm/driver.so, cube_ioctl
+Size: 16540 bytes
+SHA256: 9C9FBA430AFB47B1685BEC13B524CC877C6BB4CE301816AAA33619C30AB8C650
+Defender scan homebrew\native_pong\pong: found no threats
+Defender scan disk_image_patch_041\MIPS_NATIVE\pong\pong: found no threats
+```

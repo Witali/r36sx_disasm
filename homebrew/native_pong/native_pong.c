@@ -36,7 +36,11 @@ enum {
     BALL_BASE_SPEED_Y = 3,
     SCORE_LIMIT = 9,
     SERVE_FRAMES = 40,
-    FRAME_USEC = 16666
+    FRAME_USEC = 16666,
+    FONT_SCALE = 5,
+    FONT_W = 5,
+    FONT_H = 7,
+    FONT_SPACING = 2
 };
 
 enum button_bits {
@@ -82,6 +86,8 @@ static unsigned g_right_score;
 static unsigned g_serve_wait;
 static unsigned g_frame_counter;
 static int g_paused;
+static int g_game_over;
+static int g_player_won;
 static uint32_t g_prev_buttons;
 
 static void display_close(void);
@@ -192,6 +198,98 @@ static void draw_pause_icon(uint16_t color)
     draw_rect(FB_WIDTH / 2 + 8, FB_HEIGHT / 2 - 28, 14, 56, color);
 }
 
+static const uint8_t *glyph_rows(char ch)
+{
+    static const uint8_t glyph_e[FONT_H] = { 0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f };
+    static const uint8_t glyph_i[FONT_H] = { 0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1f };
+    static const uint8_t glyph_l[FONT_H] = { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f };
+    static const uint8_t glyph_n[FONT_H] = { 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 };
+    static const uint8_t glyph_o[FONT_H] = { 0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
+    static const uint8_t glyph_s[FONT_H] = { 0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e };
+    static const uint8_t glyph_u[FONT_H] = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
+    static const uint8_t glyph_w[FONT_H] = { 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a };
+    static const uint8_t glyph_y[FONT_H] = { 0x11, 0x11, 0x0a, 0x04, 0x04, 0x04, 0x04 };
+
+    switch (ch) {
+    case 'E':
+        return glyph_e;
+    case 'I':
+        return glyph_i;
+    case 'L':
+        return glyph_l;
+    case 'N':
+        return glyph_n;
+    case 'O':
+        return glyph_o;
+    case 'S':
+        return glyph_s;
+    case 'U':
+        return glyph_u;
+    case 'W':
+        return glyph_w;
+    case 'Y':
+        return glyph_y;
+    default:
+        return NULL;
+    }
+}
+
+static int text_width(const char *text, int scale)
+{
+    int width = 0;
+
+    while (*text) {
+        width += (*text == ' ') ? FONT_W * scale : FONT_W * scale;
+        text++;
+        if (*text) {
+            width += FONT_SPACING * scale;
+        }
+    }
+
+    return width;
+}
+
+static void draw_text(int x, int y, const char *text, int scale, uint16_t color)
+{
+    while (*text) {
+        const uint8_t *rows = glyph_rows(*text);
+
+        if (rows) {
+            for (int row = 0; row < FONT_H; row++) {
+                for (int col = 0; col < FONT_W; col++) {
+                    if ((rows[row] & (1u << (FONT_W - 1 - col))) != 0) {
+                        draw_rect(x + col * scale, y + row * scale, scale, scale, color);
+                    }
+                }
+            }
+        }
+
+        x += (FONT_W + FONT_SPACING) * scale;
+        text++;
+    }
+}
+
+static void draw_centered_text(int y, const char *text, int scale, uint16_t color)
+{
+    draw_text((FB_WIDTH - text_width(text, scale)) / 2, y, text, scale, color);
+}
+
+static void draw_game_over(uint16_t white, uint16_t accent)
+{
+    const char *message = g_player_won ? "YOU WIN" : "YOU LOSE";
+    int box_w = 330;
+    int box_h = 104;
+    int box_x = (FB_WIDTH - box_w) / 2;
+    int box_y = (FB_HEIGHT - box_h) / 2;
+
+    draw_rect(box_x, box_y, box_w, box_h, rgb565(0, 0, 0));
+    draw_rect(box_x, box_y, box_w, 4, accent);
+    draw_rect(box_x, box_y + box_h - 4, box_w, 4, accent);
+    draw_rect(box_x, box_y, 4, box_h, accent);
+    draw_rect(box_x + box_w - 4, box_y, 4, box_h, accent);
+    draw_centered_text(box_y + 34, message, FONT_SCALE, white);
+}
+
 static void draw_frame(void)
 {
     uint16_t black = rgb565(0, 0, 0);
@@ -217,6 +315,10 @@ static void draw_frame(void)
 
     if ((g_serve_wait & 8u) == 0 || g_serve_wait == 0) {
         draw_rect(g_ball_x, g_ball_y, BALL_SIZE, BALL_SIZE, white);
+    }
+
+    if (g_game_over) {
+        draw_game_over(white, accent);
     }
 
     if (g_paused) {
@@ -370,6 +472,8 @@ static void reset_game(void)
     g_left_score = 0;
     g_right_score = 0;
     g_paused = 0;
+    g_game_over = 0;
+    g_player_won = 0;
     g_prev_buttons = 0;
     reset_round(1);
 }
@@ -469,17 +573,23 @@ static void update_ball(void)
     if (g_ball_x + BALL_SIZE < PLAY_LEFT) {
         if (g_right_score < SCORE_LIMIT) {
             g_right_score++;
-        } else {
-            g_right_score = 0;
-            g_left_score = 0;
+        }
+        if (g_right_score >= SCORE_LIMIT) {
+            g_game_over = 1;
+            g_player_won = 0;
+            g_paused = 0;
+            return;
         }
         reset_round(-1);
     } else if (g_ball_x > PLAY_RIGHT) {
         if (g_left_score < SCORE_LIMIT) {
             g_left_score++;
-        } else {
-            g_right_score = 0;
-            g_left_score = 0;
+        }
+        if (g_left_score >= SCORE_LIMIT) {
+            g_game_over = 1;
+            g_player_won = 1;
+            g_paused = 0;
+            return;
         }
         reset_round(1);
     }
@@ -488,6 +598,14 @@ static void update_ball(void)
 static void tick_game(uint32_t buttons)
 {
     uint32_t pressed = buttons & ~g_prev_buttons;
+
+    if (g_game_over) {
+        if ((pressed & (BTN_A_BIT | BTN_START_BIT)) != 0) {
+            reset_game();
+            g_prev_buttons = buttons;
+        }
+        return;
+    }
 
     if ((pressed & BTN_START_BIT) != 0) {
         g_paused = !g_paused;
