@@ -125,6 +125,47 @@
   - Multicore cores для SF2000.
   - Если репозиторий доступен, смотреть как пример сборки/адаптации cores.
 
+## PC / DOS / x86 эмуляторы
+
+- https://github.com/xrip/pico-286
+  - Компактный PC 8086/8088/80186/286 эмулятор для RP2040/RP2350/Murmulator.
+  - Важно для нас: есть Linux/Windows host frontends, поэтому ядро эмулятора
+    можно пытаться портировать как MIPS native app с нашим framebuffer/input/audio.
+  - Локальная копия: `internet_sources\pico-286`, commit
+    `2ba88bf17de8e69c86f9256e22a241e8d31e8c96`, Defender scan без угроз.
+  - Подробная оценка: `PC_EMULATION_RESEARCH.md`.
+
+- https://github.com/hchunhui/tiny386
+  - C99 i386 PC emulator: CPU core плюс PIC/PIT/keyboard/CMOS/VGA/IDE/NE2000/DMA,
+    PC speaker, optional AdLib OPL2 и Sound Blaster 16.
+  - Интересен как наиболее близкий 386-кандидат, но тяжелее `pico-286` по RAM,
+    BIOS/VGABIOS, storage и общей сложности.
+  - Локальная копия: `internet_sources\tiny386`, commit
+    `5cad7585d7a9e3081e8c5f50e3865fdbf09f5ebb`, Defender scan без угроз.
+  - Подробная оценка: `PC_EMULATION_RESEARCH.md`.
+
+- https://github.com/schellingb/dosbox-pure
+  - Libretro DOSBox fork with controller-friendly DOS game UX.
+  - Может быть полезен как источник идей по gamepad mapper/on-screen keyboard,
+    но прямой порт на наш stock/libretro путь выглядит рискованнее, чем native app.
+
+- https://github.com/dosbox-staging/dosbox-staging
+  - Современный DOSBox fork/continuation.
+  - Хороший upstream для standalone DOSBox, но порт на нашу MIPS/Linux консоль
+    будет существенно тяжелее `pico-286`.
+
+- https://github.com/joncampbell123/dosbox-x
+  - Очень полный DOSBox fork с большим охватом DOS/Windows 3.x/9x сценариев.
+  - Полезен как reference, но слишком крупный и сложный для первого порта.
+
+- https://github.com/copy/v86
+  - Browser/WASM x86 PC emulator.
+  - Полезен как reference, но не как прямой MIPS native port target.
+
+- https://github.com/86Box/86Box
+  - Полноценная эмуляция x86-машин с фокусом на точность.
+  - Скорее reference-проект; для нашей консоли слишком большой первый шаг.
+
 ## Темы, ресурсы, музыка, картинки
 
 - https://github.com/zerter555/SF2000_BGM
