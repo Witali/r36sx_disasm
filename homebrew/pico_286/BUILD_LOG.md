@@ -198,3 +198,50 @@ Result:
 Next device test expectation: if it still crashes, the log should now show
 whether the last successful point was `ticks_thread`, `sound_thread`, first
 `exec86()`, or first `mfb_update()`.
+
+## 2026-05-28 memory backend fix
+
+Device log after the follow-up build:
+
+```text
+main: pthread_create sound=0 ticks=0
+main: before exec loop=0 videomode=0x3
+main: fatal signal 11
+```
+
+This narrowed the crash to the first `exec86()` call.  Inspecting upstream
+entrypoints showed the cause: `win32-main.cpp` and `pico-main.c` initialize the
+memory backend function pointers before `reset86()`:
+
+```c
+write86 = write86_ob;
+writew86 = writew86_ob;
+writedw86 = writedw86_ob;
+read86 = read86_ob;
+readw86 = readw86_ob;
+readdw86 = readdw86_ob;
+```
+
+The Linux entrypoint we reuse did not do that, leaving `read86` and friends as
+null pointers.  The first BIOS opcode fetch inside `exec86()` then jumped
+through `read86 == NULL` and produced `SIGSEGV`.
+
+Fix:
+
+- Patch generated `obj/r36sx_linux-main.cpp` to initialize the same host memory
+  backend pointers before clearing the screen and calling `reset86()`.
+- Add a log line showing the resolved `read86` and `write86` pointer values.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,895,136 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

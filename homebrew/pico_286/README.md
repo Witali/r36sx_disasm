@@ -24,7 +24,8 @@ patched copies into `homebrew/pico_286/obj/`:
 
 - `r36sx_linux-main.cpp` adds byte-pointer casts for renderer `VIDEORAM`
   arithmetic that Clang refuses in C++ and adds early startup/thread/main-loop
-  debug logs.
+  debug logs.  It also initializes the host memory backend pointers before
+  `reset86()`, matching the upstream Win32 entrypoint.
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
   directory, matching TinyMC's `chdir()` before launch.

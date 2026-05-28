@@ -35,3 +35,8 @@ This patch was rebuilt after the first device log showed:
 The new binary adds first-iteration logs for `sound_thread`, `ticks_thread`,
 `exec86()`, and `mfb_update()`.  It also avoids the upstream audio cast from
 `int16_t *` to `int32_t *` in `get_sound_sample()`.
+
+Follow-up fix: the first diagnostic run reached `main: before exec loop=0` and
+then crashed.  The Linux entrypoint had not initialized `read86`, `write86`,
+`readw86`, `writew86`, `readdw86`, or `writedw86`; the new binary initializes
+them to the same `*_ob` memory backend used by upstream `win32-main.cpp`.

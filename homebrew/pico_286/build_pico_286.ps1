@@ -185,7 +185,15 @@ void fatal_signal_handler(int sig) {
     blaster_reset();
     sn76489_reset();
     reset86();',
-'    memset(SCREEN, 0, sizeof(SCREEN));
+'    write86 = write86_ob;
+    writew86 = writew86_ob;
+    writedw86 = writedw86_ob;
+    read86 = read86_ob;
+    readw86 = readw86_ob;
+    readdw86 = readdw86_ob;
+    r36sx_pico286_debug_log("main: memory backend read=%p write=%p",
+                            read86, write86);
+    memset(SCREEN, 0, sizeof(SCREEN));
     r36sx_pico286_debug_log("main: screen cleared");
     emu8950_opl = OPL_new(3579552, SOUND_FREQUENCY);
     r36sx_pico286_debug_log("main: OPL_new=%p", emu8950_opl);
