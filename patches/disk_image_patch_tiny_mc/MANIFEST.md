@@ -5,7 +5,9 @@ Date: 2026-05-28
 ## Purpose
 
 This named patch is the consolidated overlay needed to boot into Tiny MC on the
-device and still allow returning to the stock `icube`/`rkgame` frontend.
+device and still allow returning to the stock `icube`/`rkgame` frontend. Tiny
+MC also plays short button-click sounds through the same `driver.so` sound path
+used by stock LibRetro cores.
 
 It combines the current working Tiny MC route from the numbered patch history:
 
@@ -72,6 +74,8 @@ Tiny MC:
 - starts in `/mnt/sdcard/MIPS_NATIVE`;
 - launches normal MIPS executables with `fork()` + `execl()`;
 - uses `/mnt/sdcard/cubegm/driver.so` for display and built-in controls;
+- uses `/mnt/sdcard/cubegm/driver.so` `sound_driver_init()` and
+  `sound_driver_playframe()` for short button-click sounds;
 - has `DEBUG=1`, so it writes `tiny_mc.log` to the first writable path:
   `/mnt/sdcard/cubegm/tiny_mc.log`, `/mnt/sdcard/tiny_mc.log`, or
   `tiny_mc.log`;
@@ -88,10 +92,11 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 40776 bytes
-  SHA256: 1C01D7B90C58FBB3ADCDA99AC18C6BB5D8AA666AFEA34D09FC8F2B1360A21B5F
+  Size: 41640 bytes
+  SHA256: E43432F1800BDF7049E825CE471063E82694A1972523D50B799E0A3210B7E660
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
-            FN startup state ignored until release
+            FN startup state ignored until release, click audio,
+            sound_driver_init, sound_driver_playframe
   Does not contain: icube heartbeat, shmget
 
 rkgame:
@@ -106,7 +111,7 @@ Scripts and README:
   cubegm/icubemp_start.sh SHA256:
     BE313D3917BA5E355ECFC1818A6F42A6644ECE5724A098C507DDE2C7149F0EE9
   MIPS_NATIVE/tiny_mc/README.txt SHA256:
-    93D344A5CC0E5B4FD2E48D376AC6DA52C0D74E47D9CF7B1FD8E2E8562F1367EA
+    2E5D8855BD8AC8851C48C38DEA6FDE20330924805A9F07655F293B0837E22BAD
 
 Defender scan:
   disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats

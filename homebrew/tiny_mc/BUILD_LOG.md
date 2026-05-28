@@ -956,3 +956,79 @@ Tiny MC SHA256: 1C01D7B90C58FBB3ADCDA99AC18C6BB5D8AA666AFEA34D09FC8F2B1360A21B5F
 Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_042\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 ```
+
+## 2026-05-28 button click audio rebuild
+
+Purpose:
+
+Add short audible clicks to Tiny MC when buttons are newly pressed.
+
+Design:
+
+- Tiny MC now resolves `sound_driver_init`, `sound_driver_playframe`,
+  `sound_driver_flush`, and `sound_driver_deinit` from the already loaded
+  `cubegm/driver.so`.
+- This follows the stock `rkgame` LibRetro audio route documented in
+  `AUDIO_PATH_ANALYSIS.md`, instead of writing directly to `/dev/auddec`.
+- `sound_driver_init(0, 44100, 2)` is called after `driver.so` loads.
+- A new button press starts a short decaying 2200 Hz stereo click.
+- The click is mixed into the 50 ms Tiny MC loop buffer and submitted through
+  `sound_driver_playframe(samples, frames)`.
+- The first raised Fn state during startup is still ignored until release, so it
+  does not create a startup click.
+- Audio is flushed/deinitialized before `driver.so` is closed, including before
+  launching child programs or returning to stock `icube`.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+New-Item -ItemType Directory -Force -Path disk_image\MIPS_NATIVE\tiny_mc,patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination disk_image\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath homebrew\tiny_mc\tiny_mc -Destination patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc -Force
+Copy-Item -LiteralPath disk_image\MIPS_NATIVE\tiny_mc\README.txt -Destination patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\README.txt -Force
+New-Item -ItemType Directory -Force -Path patches\disk_image_patch_045
+Copy-Item -LiteralPath patches\disk_image_patch_tiny_mc\cubegm -Destination patches\disk_image_patch_045\cubegm -Recurse -Force
+Copy-Item -LiteralPath patches\disk_image_patch_tiny_mc\MIPS_NATIVE -Destination patches\disk_image_patch_045\MIPS_NATIVE -Recurse -Force
+.\tools\scan-download.ps1 .\homebrew\tiny_mc\tiny_mc
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\tiny_mc\tiny_mc
+.\tools\scan-download.ps1 .\patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc
+.\tools\scan-download.ps1 .\patches\disk_image_patch_045\MIPS_NATIVE\tiny_mc\tiny_mc
+.\tools\scan-download.ps1 .\patches\disk_image_patch_tiny_mc\cubegm\rkgame
+.\tools\scan-download.ps1 .\patches\disk_image_patch_045\cubegm\rkgame
+```
+
+Verification:
+
+```text
+Tiny MC ELF: class=1 (ELF32), data=1 (little-endian), machine=0x0008 (MIPS)
+Tiny MC size: 41640 bytes
+Tiny MC SHA256: E43432F1800BDF7049E825CE471063E82694A1972523D50B799E0A3210B7E660
+
+Contains strings:
+  /mnt/sdcard/cubegm/icube
+  click audio
+  driver.so sound
+  sound_driver_init
+  sound_driver_playframe
+  sound_driver_flush
+  sound_driver_deinit
+
+Does not contain strings:
+  icube heartbeat
+  shmget
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_045\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\cubegm\rkgame: found no threats
+Defender scan patches\disk_image_patch_045\cubegm\rkgame: found no threats
+```
+
+Note:
+
+An initial `zig objdump -f` / `zig objdump --file-headers` check failed because
+this bundled Zig objdump wrapper did not accept those arguments. The ELF header
+was then verified with a PowerShell byte read: `e_ident[4]=1`, `e_ident[5]=1`,
+`e_machine=0x0008`.

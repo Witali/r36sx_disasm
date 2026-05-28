@@ -31,6 +31,9 @@ The program uses:
 - `cubegm/driver.so` for the normal display path, via `dlopen()`,
   `video_driver_setting()`, `video_drivers_init()`, and
   `video_driver_disp_frame()`;
+- `cubegm/driver.so` for short button-click audio, via the same
+  `sound_driver_init()` / `sound_driver_playframe()` path used by stock
+  `rkgame` LibRetro audio;
 - an internal RGB565 640x480 framebuffer;
 - `/dev/fb0` direct drawing only as fallback if `driver.so` is unavailable;
 - `/dev/input/js0..js3` for Linux joystick input;

@@ -194,6 +194,10 @@ typedef int (*video_drivers_init_fn)(void);
 typedef void (*video_driver_disp_frame_fn)(void *, int, int, int);
 typedef void (*video_driver_deinit_fn)(void);
 typedef int (*cube_ioctl_fn)(int, uint32_t *, uint32_t, uint32_t);
+typedef void (*sound_driver_init_fn)(int, int, int);
+typedef int (*sound_driver_playframe_fn)(const int16_t *, int);
+typedef void (*sound_driver_flush_fn)(void);
+typedef void (*sound_driver_deinit_fn)(void);
 
 struct driver_display_state {
     void *handle;
@@ -203,7 +207,12 @@ struct driver_display_state {
     video_driver_disp_frame_fn disp_frame;
     video_driver_deinit_fn deinit;
     cube_ioctl_fn cube_ioctl;
+    sound_driver_init_fn sound_init;
+    sound_driver_playframe_fn sound_playframe;
+    sound_driver_flush_fn sound_flush;
+    sound_driver_deinit_fn sound_deinit;
     int active;
+    int sound_active;
 };
 
 #if USE_ICUBE_HEARTBEAT
@@ -239,6 +248,20 @@ struct entry {
     off_t size;
 };
 
+enum {
+    TINY_CLICK_AUDIO_RATE = 44100,
+    TINY_CLICK_AUDIO_CHANNELS = 2,
+    TINY_CLICK_AUDIO_FRAMES =
+        TINY_CLICK_AUDIO_RATE / (1000000 / REFRESH_USEC),
+    TINY_CLICK_SAMPLES = 520
+};
+
+struct click_audio_state {
+    int remaining;
+    uint32_t phase;
+    int16_t frame[TINY_CLICK_AUDIO_FRAMES * TINY_CLICK_AUDIO_CHANNELS];
+};
+
 struct dir_state {
     char path[PATH_MAX];
     char selected_name[MAX_NAME];
@@ -267,6 +290,7 @@ static char g_status[256] = "A/Start runs a file. Right/A enters a directory. Fn
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+static struct click_audio_state g_audio;
 #if ENABLE_FN_ICUBE_SHORTCUT
 static int g_fn_shortcut_armed;
 #endif
@@ -364,6 +388,87 @@ static void log_msg(const char *fmt, ...)
 }
 #endif
 
+static void audio_driver_open(void)
+{
+    if (!g_driver.handle || g_driver.sound_active) {
+        return;
+    }
+
+    g_driver.sound_init = (sound_driver_init_fn)dlsym(g_driver.handle, "sound_driver_init");
+    g_driver.sound_playframe =
+        (sound_driver_playframe_fn)dlsym(g_driver.handle, "sound_driver_playframe");
+    g_driver.sound_flush = (sound_driver_flush_fn)dlsym(g_driver.handle, "sound_driver_flush");
+    g_driver.sound_deinit = (sound_driver_deinit_fn)dlsym(g_driver.handle, "sound_driver_deinit");
+
+    log_msg("driver.so sound init=%p playframe=%p flush=%p deinit=%p",
+            g_driver.sound_init, g_driver.sound_playframe,
+            g_driver.sound_flush, g_driver.sound_deinit);
+
+    if (!g_driver.sound_init || !g_driver.sound_playframe || !g_driver.sound_deinit) {
+        log_msg("driver.so sound symbols missing; click audio disabled");
+        return;
+    }
+
+    g_driver.sound_init(0, TINY_CLICK_AUDIO_RATE, TINY_CLICK_AUDIO_CHANNELS);
+    g_driver.sound_active = 1;
+    log_msg("click audio initialized through driver.so");
+}
+
+static void audio_driver_close(void)
+{
+    if (!g_driver.sound_active) {
+        return;
+    }
+    if (g_driver.sound_flush) {
+        g_driver.sound_flush();
+    }
+    if (g_driver.sound_deinit) {
+        g_driver.sound_deinit();
+    }
+    g_driver.sound_active = 0;
+    g_audio.remaining = 0;
+    log_msg("click audio closed");
+}
+
+static void audio_click(void)
+{
+    if (!g_driver.sound_active) {
+        return;
+    }
+    g_audio.remaining = TINY_CLICK_SAMPLES;
+    g_audio.phase = 0;
+}
+
+static void audio_update(void)
+{
+    const uint32_t step = (uint32_t)(((uint64_t)2200u << 16) / TINY_CLICK_AUDIO_RATE);
+    int rc;
+
+    if (!g_driver.sound_active || !g_driver.sound_playframe || g_audio.remaining <= 0) {
+        return;
+    }
+
+    memset(g_audio.frame, 0, sizeof(g_audio.frame));
+    for (int i = 0; i < TINY_CLICK_AUDIO_FRAMES && g_audio.remaining > 0; i++) {
+        int32_t amp = (int32_t)(2600 * g_audio.remaining / TINY_CLICK_SAMPLES);
+        int16_t sample;
+
+        if (amp < 120) {
+            amp = 120;
+        }
+        g_audio.phase += step;
+        sample = (g_audio.phase & 0x8000u) ? (int16_t)amp : (int16_t)-amp;
+        g_audio.frame[i * 2] = sample;
+        g_audio.frame[i * 2 + 1] = sample;
+        g_audio.remaining--;
+    }
+
+    rc = g_driver.sound_playframe(g_audio.frame, TINY_CLICK_AUDIO_FRAMES);
+    if (rc != 0) {
+        log_msg("sound_driver_playframe rc=%d", rc);
+    }
+}
+
 #if USE_ICUBE_HEARTBEAT
 static void heartbeat_tick(void)
 {
@@ -451,6 +556,7 @@ static uint32_t rgb888_from_565(uint16_t c)
 static void driver_close_display(void)
 {
     log_msg("driver display close active=%d handle=%p", g_driver.active, g_driver.handle);
+    audio_driver_close();
     if (g_driver.active && g_driver.deinit) {
         g_driver.deinit();
     }
@@ -512,6 +618,7 @@ static int driver_open_display(void)
         return -1;
     }
     log_msg("driver.so cube_ioctl=%p", g_driver.cube_ioctl);
+    audio_driver_open();
 
     g_fb.width = R36SX_SCREEN_WIDTH;
     g_fb.height = R36SX_SCREEN_HEIGHT;
@@ -1559,6 +1666,19 @@ static void handle_buttons(uint32_t buttons)
     }
 #endif
 
+    {
+        uint32_t click_buttons = changed;
+#if ENABLE_FN_ICUBE_SHORTCUT
+        if (!g_fn_shortcut_armed) {
+            click_buttons &= ~BTN_FN_BIT;
+        }
+#endif
+        if (click_buttons != 0) {
+            audio_click();
+            audio_update();
+        }
+    }
+
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {
         if (g_selected > 0) {
             g_selected--;
@@ -1615,6 +1735,7 @@ int main(int argc, char **argv)
         input_poll_devices();
         uint32_t buttons = input_buttons();
         handle_buttons(buttons);
+        audio_update();
         draw_ui();
         heartbeat_tick();
         usleep(REFRESH_USEC);
