@@ -16,8 +16,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../common/driver_audio.h"
 #include "../common/hardware.h"
-#include "../common/native_audio.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -74,7 +74,7 @@ static unsigned g_color_index;
 static int g_checker;
 static uint32_t g_prev_buttons;
 static char g_button_log[LOG_LINES][LOG_TEXT_LEN];
-static struct r36sx_audio_state g_audio;
+static struct r36sx_driver_audio_state g_audio;
 
 static void display_close(void);
 
@@ -321,6 +321,8 @@ static int display_open(void)
         display_close();
         return -1;
     }
+    r36sx_driver_audio_init(&g_audio);
+    (void)r36sx_driver_audio_bind(&g_audio, g_driver.handle);
 
     {
         int cfg[5] = {
@@ -344,6 +346,7 @@ static int display_open(void)
 
 static void display_close(void)
 {
+    r36sx_driver_audio_close(&g_audio);
     if (g_driver.active && g_driver.deinit) {
         g_driver.deinit();
     }
@@ -437,7 +440,7 @@ static void tick_demo(uint32_t buttons)
 
     log_pressed_buttons(changed);
     if (changed != 0) {
-        r36sx_audio_play_button(&g_audio);
+        r36sx_driver_audio_play_button(&g_audio);
     }
 
     if ((buttons & BTN_LEFT_BIT) != 0) {
@@ -487,8 +490,6 @@ int main(void)
         display_close();
         return 1;
     }
-    r36sx_audio_init(&g_audio);
-
     memset(g_button_log, 0, sizeof(g_button_log));
     copy_label(g_button_log[0], "PRESS BUTTONS");
 
@@ -502,12 +503,11 @@ int main(void)
             tick_demo(buttons);
             draw_frame();
             present_frame();
-            r36sx_audio_update(&g_audio);
+            r36sx_driver_audio_update(&g_audio);
             usleep(FRAME_USEC);
         }
     }
 
-    r36sx_audio_close(&g_audio);
     display_close();
     return 0;
 }

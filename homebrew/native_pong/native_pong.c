@@ -16,8 +16,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../common/driver_audio.h"
 #include "../common/hardware.h"
-#include "../common/native_audio.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -90,7 +90,7 @@ static int g_paused;
 static int g_game_over;
 static int g_player_won;
 static uint32_t g_prev_buttons;
-static struct r36sx_audio_state g_audio;
+static struct r36sx_driver_audio_state g_audio;
 
 static void display_close(void);
 
@@ -358,6 +358,8 @@ static int display_open(void)
         display_close();
         return -1;
     }
+    r36sx_driver_audio_init(&g_audio);
+    (void)r36sx_driver_audio_bind(&g_audio, g_driver.handle);
 
     {
         int cfg[5] = {
@@ -381,6 +383,7 @@ static int display_open(void)
 
 static void display_close(void)
 {
+    r36sx_driver_audio_close(&g_audio);
     if (g_driver.active && g_driver.deinit) {
         g_driver.deinit();
     }
@@ -541,11 +544,11 @@ static void update_ball(void)
     if (g_ball_y <= PLAY_TOP) {
         g_ball_y = PLAY_TOP;
         g_ball_vy = -g_ball_vy;
-        r36sx_audio_play_bounce(&g_audio);
+        r36sx_driver_audio_play_bounce(&g_audio);
     } else if (g_ball_y + BALL_SIZE >= PLAY_BOTTOM) {
         g_ball_y = PLAY_BOTTOM - BALL_SIZE;
         g_ball_vy = -g_ball_vy;
-        r36sx_audio_play_bounce(&g_audio);
+        r36sx_driver_audio_play_bounce(&g_audio);
     }
 
     left_x = PADDLE_MARGIN;
@@ -561,7 +564,7 @@ static void update_ball(void)
         if (g_ball_vy == 0) {
             g_ball_vy = offset < 0 ? -2 : 2;
         }
-        r36sx_audio_play_bounce(&g_audio);
+        r36sx_driver_audio_play_bounce(&g_audio);
     } else if (g_ball_vx > 0 && ball_overlaps_paddle(right_x, g_right_paddle_y)) {
         int paddle_center = g_right_paddle_y + PADDLE_H / 2;
         int ball_center = g_ball_y + BALL_SIZE / 2;
@@ -573,7 +576,7 @@ static void update_ball(void)
         if (g_ball_vy == 0) {
             g_ball_vy = offset < 0 ? -2 : 2;
         }
-        r36sx_audio_play_bounce(&g_audio);
+        r36sx_driver_audio_play_bounce(&g_audio);
     }
 
     if (g_ball_x + BALL_SIZE < PLAY_LEFT) {
@@ -584,10 +587,10 @@ static void update_ball(void)
             g_game_over = 1;
             g_player_won = 0;
             g_paused = 0;
-            r36sx_audio_play_lose(&g_audio);
+            r36sx_driver_audio_play_lose(&g_audio);
             return;
         }
-        r36sx_audio_play_score(&g_audio);
+        r36sx_driver_audio_play_score(&g_audio);
         reset_round(-1);
     } else if (g_ball_x > PLAY_RIGHT) {
         if (g_left_score < SCORE_LIMIT) {
@@ -597,10 +600,10 @@ static void update_ball(void)
             g_game_over = 1;
             g_player_won = 1;
             g_paused = 0;
-            r36sx_audio_play_win(&g_audio);
+            r36sx_driver_audio_play_win(&g_audio);
             return;
         }
-        r36sx_audio_play_score(&g_audio);
+        r36sx_driver_audio_play_score(&g_audio);
         reset_round(1);
     }
 }
@@ -619,10 +622,10 @@ static void tick_game(uint32_t buttons)
 
     if ((pressed & BTN_START_BIT) != 0) {
         g_paused = !g_paused;
-        r36sx_audio_play_button(&g_audio);
+        r36sx_driver_audio_play_button(&g_audio);
     }
     if ((pressed & BTN_A_BIT) != 0 && g_paused) {
-        r36sx_audio_play_button(&g_audio);
+        r36sx_driver_audio_play_button(&g_audio);
         reset_game();
     }
 
@@ -647,8 +650,6 @@ int main(void)
         display_close();
         return 1;
     }
-    r36sx_audio_init(&g_audio);
-
     reset_game();
     while (running) {
         uint32_t buttons = input_buttons();
@@ -660,12 +661,11 @@ int main(void)
             tick_game(buttons);
             draw_frame();
             present_frame();
-            r36sx_audio_update(&g_audio);
+            r36sx_driver_audio_update(&g_audio);
             usleep(FRAME_USEC);
         }
     }
 
-    r36sx_audio_close(&g_audio);
     display_close();
     return 0;
 }

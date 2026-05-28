@@ -155,3 +155,53 @@ Defender scan homebrew\native_pong\pong: found no threats
 Defender scan patches\disk_image_patch_044\MIPS_NATIVE\pong\pong: found no threats
 Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
 ```
+
+## 2026-05-28 driver.so audio rebuild
+
+Purpose:
+
+Move Pong sound from the direct `/dev/auddec` packet path to the stock `rkgame`
+LibRetro-style path through `driver.so` `sound_driver_playframe`.
+
+Implementation:
+
+- Added `homebrew/common/driver_audio.h`.
+- Pong now resolves `sound_driver_init`, `sound_driver_playframe`,
+  `sound_driver_flush`, and `sound_driver_deinit` from the already loaded
+  `driver.so` handle used for display and controls.
+- Bounce, score, pause, win, and lose tones are still generated as 44.1 kHz
+  stereo PCM, but are now passed to `driver.so` instead of opening
+  `/dev/auddec` directly.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_pong\build_native_pong.ps1
+```
+
+Patch directory:
+
+```text
+patches\disk_image_patch_046
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_046\MIPS_NATIVE\pong\pong
+patches\disk_image_patch_046\MIPS_NATIVE\pong\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: YOU WIN, YOU LOSE, /mnt/sdcard/cubegm/driver.so, sound_driver_init, sound_driver_playframe, cube_ioctl
+Does not contain string: /dev/auddec
+Does not contain string: retro_run
+ELF: class=1, data=1, type=2, machine=8, interpreter /lib/ld.so.1
+Size: 18888 bytes
+SHA256: CAB8C5F32DAFD3C53DA157518D43E9E181CED23431E135C435954A83658FC95D
+Defender scan homebrew\native_pong\pong: found no threats
+Defender scan patches\disk_image_patch_046: found no threats
+Defender scan disk_image\MIPS_NATIVE\pong\pong: found no threats
+```

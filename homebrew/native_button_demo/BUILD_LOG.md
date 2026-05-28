@@ -121,3 +121,59 @@ Defender scan homebrew\native_button_demo\button_demo: found no threats
 Defender scan patches\disk_image_patch_044\MIPS_NATIVE\button_demo\button_demo: found no threats
 Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
 ```
+
+## 2026-05-28 driver.so audio rebuild
+
+Purpose:
+
+Move Button Demo sound from the direct `/dev/auddec` packet path to the stock
+`rkgame` LibRetro-style path through `driver.so` `sound_driver_playframe`.
+
+Implementation:
+
+- Added `homebrew/common/driver_audio.h`.
+- Button Demo now resolves `sound_driver_init`, `sound_driver_playframe`,
+  `sound_driver_flush`, and `sound_driver_deinit` from the already loaded
+  `driver.so` handle used for display and controls.
+- Button press tones are still generated as 44.1 kHz stereo PCM, but are now
+  passed to `driver.so` instead of opening `/dev/auddec` directly.
+
+Build command from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\native_button_demo\build_native_button_demo.ps1
+```
+
+Build note:
+
+The first rebuild failed with `ld.lld: error: undefined symbol: __udivdi3`
+because the new helper briefly used a 64-bit divide for the tone phase step.
+The helper now uses the original 32-bit calculation, avoiding extra libgcc
+runtime helpers.
+
+Patch directory:
+
+```text
+patches\disk_image_patch_046
+```
+
+Patch files:
+
+```text
+patches\disk_image_patch_046\MIPS_NATIVE\button_demo\button_demo
+patches\disk_image_patch_046\MIPS_NATIVE\button_demo\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: BUTTON DEMO, /mnt/sdcard/cubegm/driver.so, sound_driver_init, sound_driver_playframe, cube_ioctl
+Does not contain string: /dev/auddec
+Does not contain string: retro_run
+ELF: class=1, data=1, type=2, machine=8, interpreter /lib/ld.so.1
+Size: 16956 bytes
+SHA256: 3BEB30973118B04747D992C79FBFFA2E7555BE9D793B576013B2B3C30C596D1C
+Defender scan homebrew\native_button_demo\button_demo: found no threats
+Defender scan patches\disk_image_patch_046: found no threats
+Defender scan disk_image\MIPS_NATIVE\button_demo\button_demo: found no threats
+```

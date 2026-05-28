@@ -37,6 +37,7 @@ For Tiny MC, copy it to:
 MIPS_NATIVE\button_demo\button_demo
 ```
 
-This native build uses `/mnt/sdcard/cubegm/driver.so` for display and controls.
-It plays a short generated button sound through `/dev/auddec`, following the
-same packet model that `hcprojector` uses for its UI WAV effects.
+This native build uses `/mnt/sdcard/cubegm/driver.so` for display, controls,
+and audio. It plays a short generated button sound through
+`sound_driver_playframe`, the same driver-level path used by stock LibRetro
+cores in `rkgame`.
