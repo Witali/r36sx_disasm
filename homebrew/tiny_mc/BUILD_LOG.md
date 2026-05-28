@@ -1317,3 +1317,49 @@ Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan patches\disk_image_patch_056: found no threats
 ```
+
+## 2026-05-28 child-return input/display rebuild
+
+Purpose:
+
+Fix a black-screen/failed-return symptom after leaving native Pong or Button
+Demo back to Tiny MC. The likely trigger is the standard native-app exit chord
+`Select + Start`: when Tiny MC resumes, `Start` can still be physically held or
+left in the input queue, and Tiny MC treats a fresh `Start` press as "run the
+selected file" and immediately relaunches the same child.
+
+Implementation:
+
+- After a child process exits, Tiny MC now reopens the display with up to five
+  attempts and redraws the menu immediately.
+- After input devices are reopened, Tiny MC polls the current state and
+  suppresses post-launch button input until all buttons are released once.
+- `handle_buttons()` returns immediately after launching a child so it does not
+  overwrite the refreshed post-child input state with stale pre-launch buttons.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_057
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 55780 bytes
+Tiny MC SHA256: B5E01B7DAFF20C0D82867702F6664A55E969EFDB60A13593F5962A49D14E40B0
+Contains strings: suppressing post-launch buttons, post-launch buttons
+released, display reopened after child, display reopen after child failed
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_057: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+```

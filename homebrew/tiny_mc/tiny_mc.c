@@ -343,6 +343,7 @@ static char g_status[256] = "A/Start runs a file. Right/A enters a directory. Fn
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
+static int g_wait_buttons_release;
 static struct click_audio_state g_audio;
 static struct font_state g_font;
 static struct app_config g_config = {
@@ -943,6 +944,27 @@ static void display_close(void)
     } else {
         fb_close_device();
     }
+}
+
+static int display_reopen_after_child(void)
+{
+    enum {
+        DISPLAY_REOPEN_ATTEMPTS = 5,
+        DISPLAY_REOPEN_DELAY_USEC = 200000
+    };
+
+    for (int attempt = 1; attempt <= DISPLAY_REOPEN_ATTEMPTS; attempt++) {
+        if (display_open() == 0) {
+            if (attempt > 1) {
+                log_msg("display reopened after child on attempt %d", attempt);
+            }
+            return 0;
+        }
+        log_msg("display reopen after child failed on attempt %d: %s",
+                attempt, g_status);
+        usleep(DISPLAY_REOPEN_DELAY_USEC);
+    }
+    return -1;
 }
 
 static void present_frame(void)
@@ -1888,6 +1910,19 @@ static uint32_t input_buttons(void)
     return b;
 }
 
+static void input_reset_after_child(void)
+{
+    input_poll_devices();
+    g_prev_buttons = input_buttons();
+    g_repeat_buttons = 0;
+    g_next_repeat_ms = 0;
+    g_wait_buttons_release = g_prev_buttons != 0;
+    if (g_wait_buttons_release) {
+        log_msg("suppressing post-launch buttons until release: 0x%08x",
+                g_prev_buttons);
+    }
+}
+
 static int visible_rows(void)
 {
     int top = HEADER_H + LIST_TOP_OFFSET;
@@ -2100,8 +2135,10 @@ static void launch_selected(void)
     if (pid < 0) {
         snprintf(g_status, sizeof(g_status), "fork failed: %s", strerror(errno));
         log_msg("%s", g_status);
-        display_open();
+        display_reopen_after_child();
         input_open_devices();
+        input_reset_after_child();
+        draw_ui();
         return;
     }
 
@@ -2148,10 +2185,14 @@ static void launch_selected(void)
         snprintf(result, sizeof(result), "%s returned", e->name);
     }
     log_msg("launch result: %s raw_status=0x%x", result, status);
-    display_open();
+    if (display_reopen_after_child() != 0) {
+        log_msg("display reopen failed after child exit; continuing with fallback state");
+    }
     input_open_devices();
-    snprintf(g_status, sizeof(g_status), "%s", result);
+    input_reset_after_child();
     scan_directory();
+    snprintf(g_status, sizeof(g_status), "%s", result);
+    draw_ui();
 }
 
 #if ENABLE_FN_ICUBE_SHORTCUT
@@ -2199,6 +2240,21 @@ static void choose_start_dir(int argc, char **argv)
 
 static void handle_buttons(uint32_t buttons)
 {
+    if (g_wait_buttons_release) {
+        if (buttons == 0) {
+            log_msg("post-launch buttons released");
+            g_wait_buttons_release = 0;
+            g_prev_buttons = 0;
+        } else {
+            if (buttons != g_prev_buttons) {
+                log_msg("post-launch buttons still held: 0x%08x", buttons);
+            }
+            g_prev_buttons = buttons;
+        }
+        g_repeat_buttons = 0;
+        return;
+    }
+
     uint32_t changed = buttons & ~g_prev_buttons;
     uint32_t nav = buttons & (BTN_UP_BIT | BTN_DOWN_BIT);
     long now = now_ms();
@@ -2265,6 +2321,7 @@ static void handle_buttons(uint32_t buttons)
     }
     if ((changed & (BTN_A_BIT | BTN_START_BIT)) != 0) {
         launch_selected();
+        return;
     }
 
     ensure_selection_visible();

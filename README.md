@@ -361,6 +361,9 @@ Notable patch history:
 - `disk_image_patch_056`: rebuilds Tiny MC, native Button Demo, and native Pong
   so they preserve the current mixer volume around `driver.so`
   `sound_driver_init()`.
+- `disk_image_patch_057`: rebuilds Tiny MC so returning from native apps
+  reopens/redraws the display and suppresses held `Select + Start`/`Start`
+  input until all buttons are released once.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

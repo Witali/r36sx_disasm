@@ -94,6 +94,8 @@ Tiny MC:
   `tiny_mc.log`;
 - has `USE_ICUBE_HEARTBEAT=0`, so it does not attach to the old `icube`
   SysV heartbeat;
+- after a launched native app exits, reopens/redraws the display and ignores
+  held post-launch buttons until all buttons are released once;
 - has Fn shortcut enabled. It ignores an initially raised Fn bit until Fn is
   released once, then a later Fn press executes `/mnt/sdcard/cubegm/icube`
   directly.
@@ -105,8 +107,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 54516 bytes
-  SHA256: 144F89FA72FE1372B7E3F7E522BFD40C4F66243B149B4963E8D877AB51177B94
+  Size: 55780 bytes
+  SHA256: B5E01B7DAFF20C0D82867702F6664A55E969EFDB60A13593F5962A49D14E40B0
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -115,7 +117,8 @@ Tiny MC:
             DejaVuSansMono.ttf, NotoSansMono-Regular.ttf,
             SourceCodePro-Regular.ttf, Hack-Regular.ttf,
             RobotoMono-Regular.ttf, tiny_mc.conf, config loaded,
-            preserving mixer volume, restored mixer volume
+            preserving mixer volume, restored mixer volume,
+            suppressing post-launch buttons, display reopened after child
   Does not contain: icube heartbeat, shmget
 
 Tiny MC config:
