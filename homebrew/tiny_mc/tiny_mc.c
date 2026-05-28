@@ -70,6 +70,7 @@ enum {
 #define LOG_LINE_MAX 768
 #define TINY_MC_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf"
 #define TINY_MC_CONFIG_LOCAL_PATH "tiny_mc.conf"
+#define TINY_MC_EXEC_PATH "/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc"
 
 enum button_bits {
     BTN_UP_BIT = 1u << 0,
@@ -2113,6 +2114,20 @@ static void finish_button_frame(uint32_t buttons)
     g_prev_buttons = buttons;
 }
 
+static int restart_self_after_child(const char *start_dir)
+{
+    const char *dir = (start_dir && start_dir[0]) ? start_dir : R36SX_MIPS_NATIVE_DIR;
+
+    log_msg("restarting tiny_mc after child: %s", dir);
+    heartbeat_close();
+    setenv("LD_LIBRARY_PATH",
+           "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",
+           1);
+    execl(TINY_MC_EXEC_PATH, "tiny_mc", dir, (char *)NULL);
+    log_msg("tiny_mc self-exec failed: %s", strerror(errno));
+    return -1;
+}
+
 static int launch_selected(void)
 {
     if (g_entry_count <= 0) {
@@ -2192,6 +2207,9 @@ static int launch_selected(void)
         snprintf(result, sizeof(result), "%s returned", e->name);
     }
     log_msg("launch result: %s raw_status=0x%x", result, status);
+    if (restart_self_after_child(g_cwd) == 0) {
+        return 1;
+    }
     if (display_reopen_after_child() != 0) {
         log_msg("display reopen failed after child exit; continuing with fallback state");
     }

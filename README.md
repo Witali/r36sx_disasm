@@ -367,6 +367,9 @@ Notable patch history:
 - `disk_image_patch_058`: fixes the Tiny MC directory-enter regression from
   patch 057 by updating normal navigation button state even when `A` enters a
   directory instead of launching a child process.
+- `disk_image_patch_059`: changes Tiny MC native-app return to self-`exec()`
+  after child exit, because the device log showed in-process `driver.so`
+  display reopen succeeds by return code but leaves the LCD black.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

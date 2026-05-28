@@ -96,6 +96,9 @@ Tiny MC:
   SysV heartbeat;
 - after a launched native app exits, reopens/redraws the display and ignores
   held post-launch buttons until all buttons are released once;
+- after a real launched child process exits, replaces itself with a fresh
+  `/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc` process so `driver.so` and the
+  framebuffer are initialized from a clean process state;
 - normal directory navigation updates its previous-button state before
   returning, so a held `A` cannot immediately activate `..`;
 - has Fn shortcut enabled. It ignores an initially raised Fn bit until Fn is
@@ -109,8 +112,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 56420 bytes
-  SHA256: FA262555F116BE3E5C37E386B519D5C70EDDF7D1619766BEED71B9BBBF153CC0
+  Size: 56796 bytes
+  SHA256: 72DB5041C4496DA9489D18CB22E4D14F860274B37336CBEB7DCE64B86EAC427B
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -120,7 +123,8 @@ Tiny MC:
             SourceCodePro-Regular.ttf, Hack-Regular.ttf,
             RobotoMono-Regular.ttf, tiny_mc.conf, config loaded,
             preserving mixer volume, restored mixer volume,
-            suppressing post-launch buttons, display reopened after child
+            suppressing post-launch buttons, display reopened after child,
+            restarting tiny_mc after child, tiny_mc self-exec failed
   Does not contain: icube heartbeat, shmget
 
 Tiny MC config:

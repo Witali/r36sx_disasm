@@ -1364,6 +1364,60 @@ Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
 found no threats
 ```
 
+## 2026-05-28 self-exec child return rebuild
+
+Purpose:
+
+Fix the persistent black-screen return from native Pong/Button Demo. The device
+log showed that after Pong exited, Tiny MC successfully reached:
+
+```text
+launch result: pong exited: 0 raw_status=0x0
+Display via driver.so 640x480
+scan_directory done ...
+```
+
+but the LCD still showed only a black screen with the battery OSD. That means
+the child process exits and Tiny MC is alive, but reopening/reusing the vendor
+display path inside the same process is not reliable after a native app has
+also owned `driver.so`.
+
+Implementation:
+
+- After a real child process exits, Tiny MC now `execl()`s
+  `/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc` with the current directory as its
+  startup argument.
+- This gives Tiny MC the same clean display initialization path as a cold
+  launch from `icube.sh`.
+- The old display reopen path remains as a fallback only if self-exec fails.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_059
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 56796 bytes
+Tiny MC SHA256: 72DB5041C4496DA9489D18CB22E4D14F860274B37336CBEB7DCE64B86EAC427B
+Contains strings: restarting tiny_mc after child,
+/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc, tiny_mc self-exec failed
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_059: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+```
+
 ## 2026-05-28 directory-enter debounce rebuild
 
 Purpose:
