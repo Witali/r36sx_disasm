@@ -129,3 +129,17 @@ script=/mnt/sdcard/cubegm/icube.sh ... event=launching /mnt/sdcard/MIPS_NATIVE/t
 
 If that line appears but Tiny MC still does not stay on screen, the next issue
 is inside Tiny MC startup/display/input, not the boot shell route.
+
+## Cleanup
+
+After Tiny MC successfully started through `icube.sh`, `disk_image_patch_040`
+removed the temporary route tracing from:
+
+```text
+cubegm/icube.sh
+cubegm/icube_start.sh
+cubegm/icubemp_start.sh
+```
+
+The confirmed behavior is kept, but the scripts no longer append
+`boot_route.log` or run `ps` snapshots during boot.

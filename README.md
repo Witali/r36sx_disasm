@@ -305,6 +305,8 @@ Notable patch history:
   `icube_start.sh`, and `icubemp_start.sh` to discover the real shell route.
 - `disk_image_patch_039`: changes the real boot route, `icube.sh`, to launch
   Tiny MC directly after `boot_route.log` showed `icube_start.sh` is skipped.
+- `disk_image_patch_040`: removes temporary `boot_route.log` tracing while
+  keeping the confirmed Tiny MC boot route through `icube.sh`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
