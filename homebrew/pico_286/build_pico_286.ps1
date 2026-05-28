@@ -321,14 +321,12 @@ static void r36sx_pico286_log_visible_text(uint8_t mode, uint32_t offset,
 }
 #endif
 '@
+    $ScreenTextLogger = ""
     $Text = $Text.Replace('static inline void renderer() {',
         $ScreenTextLogger + "`nstatic inline void renderer() {")
     $Text = $Text.Replace('    uint8_t cols = 80;
     for (int y = 0; y < 480; y++) {',
 '    uint8_t cols = 80;
-#if DEBUG
-    r36sx_pico286_log_visible_text(videomode, vram_offset, vidramptr);
-#endif
     for (int y = 0; y < 480; y++) {')
     $Text = $Text.Replace('void signal_handler(int sig) {
     running = 0;

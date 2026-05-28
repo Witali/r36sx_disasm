@@ -67,17 +67,6 @@ or writes to disk image sectors.
 It also maps BIOS video modes `0x20` and `0x30` to the 80x25 text renderer so
 FreeDOS/BIOS boot text can be shown instead of `unsupported video mode 20/30`.
 
-Current debug build additionally logs changed text rows from Pico-286's
-emulated screen area.  Look in `MIPS_NATIVE/pico_286/pico_286.log` for:
-
-- `screen_text:logical-b800`
-- `screen_text:renderer-byte-view`
-- `screen_text:logical-small-text`
-- `screen_text:renderer-byte-small-text`
-
-The paired logical/renderer views help diagnose whether BIOS text exists in
-video memory but is not visible because the renderer reads a different layout.
-
 The current build adds the missing text-mode BIOS `INT 10h` services needed by
 BIOS/DOS boot screens, including cursor shape/position, scroll/clear window,
 read/write character and attribute, teletype output, mode query, active page
@@ -87,4 +76,5 @@ shown on screen.
 
 The on-screen debug overlay has been disabled.  Diagnostics still go to
 `MIPS_NATIVE/pico_286/pico_286.log`, but `DEBUG_VRAM` is no longer drawn into
-the bottom of the framebuffer.
+the bottom of the framebuffer, and the emulated screen text is no longer dumped
+to the log as `screen_text:*` entries.

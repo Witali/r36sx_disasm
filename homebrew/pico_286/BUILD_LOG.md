@@ -190,6 +190,14 @@ Rebuild command:
 Result:
 
 - Output: `homebrew/pico_286/pico_286`
+- Size: 7,909,160 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
 - Size: 7,894,916 bytes
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
@@ -443,3 +451,16 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-28 disable screen text log dumps
+
+Disabled the `screen_text:*` diagnostics that copied changed text rows from the
+emulated screen area into `pico_286.log`.  General runtime logging remains
+enabled, but the emulator no longer mirrors BIOS/DOS screen contents into the
+log file.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```

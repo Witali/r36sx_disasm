@@ -29,10 +29,9 @@ patched copies into `homebrew/pico_286/obj/`:
   debug logs.  It also initializes the host memory backend pointers before
   `reset86()`, matching the upstream Win32 entrypoint.  BIOS video modes
   `0x20` and `0x30` are aliased to the normal 80x25 text renderer and scaled
-  into the 640x480 output.  The debug build also logs changed text rows from
-  the emulated screen area with `screen_text:*` prefixes.  Normal 40/80-column
-  text modes now read from the same logical `VIDEORAM` cell layout used by the
-  emulator and the upstream Win32 renderer.
+  into the 640x480 output.  Normal 40/80-column text modes now read from the
+  same logical `VIDEORAM` cell layout used by the emulator and the upstream
+  Win32 renderer.
 - `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
   `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
   directory, matching TinyMC's `chdir()` before launch.  It also adds missing
@@ -90,19 +89,10 @@ If that file cannot be opened, it writes:
 /mnt/sdcard/pico_286.log
 ```
 
-Screen text diagnostics appear only when the text contents change.  The most
-useful tags are:
-
-- `screen_text:logical-b800`: characters read from logical B800-style
-  `VIDEORAM` cells.
-- `screen_text:renderer-byte-view`: characters read the same way the current
-  renderer sees them.
-- `screen_text:logical-small-text` and `screen_text:renderer-byte-small-text`:
-  the same comparison for Pico-286's small text modes `0x77` and `0x78`.
-
-The old on-screen debug text area is disabled.  Runtime diagnostics still go to
-`pico_286.log`, but the lower part of the framebuffer is cleared instead of
-drawing `DEBUG_VRAM` contents.
+The old on-screen debug text area and the `screen_text:*` log dumps are
+disabled.  Runtime diagnostics still go to `pico_286.log`, but the lower part
+of the framebuffer is cleared instead of drawing `DEBUG_VRAM` contents, and the
+emulated screen text is no longer copied into the log.
 
 `zig objcopy --strip-all` currently reports `error: unimplemented` for this
 MIPS ELF.  The script therefore leaves the executable unstripped by default.
