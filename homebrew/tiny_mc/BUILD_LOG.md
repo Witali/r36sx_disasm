@@ -916,3 +916,43 @@ Defender scan homebrew\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_037\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 Defender scan disk_image_patch_037\cubegm\rkgame: found no threats
 ```
+
+## 2026-05-28 restore Fn iCube shortcut rebuild
+
+Purpose:
+
+Restore the Tiny MC Fn shortcut now that the device confirmed Tiny MC starts
+correctly through the real `icube.sh` boot route.
+
+Code change:
+
+- Changed `#define ENABLE_FN_ICUBE_SHORTCUT 0` to `1`.
+- Restored Fn input translation and the footer hint through the existing
+  compile-time guarded code.
+- The shortcut still arms only after Fn has been released once, so a raised Fn
+  bit during startup is ignored.
+- Fn executes `/mnt/sdcard/cubegm/icube` directly. It intentionally does not
+  execute `icube.sh`, because `icube.sh` now launches Tiny MC and would loop
+  back into Tiny MC.
+
+Commands from repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\tiny_mc\build_tiny_mc.ps1
+Copy-Item -Force homebrew\tiny_mc\tiny_mc disk_image\MIPS_NATIVE\tiny_mc\tiny_mc
+New-Item -ItemType Directory -Force -Path disk_image_patch_042\MIPS_NATIVE\tiny_mc
+Copy-Item -Force homebrew\tiny_mc\tiny_mc disk_image_patch_042\MIPS_NATIVE\tiny_mc\tiny_mc
+Copy-Item -Force disk_image\MIPS_NATIVE\tiny_mc\README.txt disk_image_patch_042\MIPS_NATIVE\tiny_mc\README.txt
+```
+
+Verification:
+
+```text
+Contains strings: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
+FN startup state ignored until release, FN pressed: launching %s
+Does not contain strings: icube heartbeat, shmget
+Tiny MC size: 40776 bytes
+Tiny MC SHA256: 1C01D7B90C58FBB3ADCDA99AC18C6BB5D8AA666AFEA34D09FC8F2B1360A21B5F
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image_patch_042\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+```

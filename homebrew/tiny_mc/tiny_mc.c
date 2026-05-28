@@ -10,7 +10,7 @@
 #define _GNU_SOURCE
 #define DEBUG 1
 #define USE_ICUBE_HEARTBEAT 0
-#define ENABLE_FN_ICUBE_SHORTCUT 0
+#define ENABLE_FN_ICUBE_SHORTCUT 1
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -263,7 +263,7 @@ static int g_entry_count;
 static int g_selected;
 static int g_scroll;
 static char g_cwd[PATH_MAX] = "/mnt/sdcard";
-static char g_status[256] = "A/Start runs a file. Right/A enters a directory.";
+static char g_status[256] = "A/Start runs a file. Right/A enters a directory. Fn starts iCube.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
@@ -1357,7 +1357,7 @@ static void draw_ui(void)
     draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
-              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK",
+              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK  FN ICUBE",
               rgb565(230, 240, 220), 1, g_fb.width - 24);
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 

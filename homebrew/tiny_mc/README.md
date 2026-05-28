@@ -3,9 +3,9 @@
 Tiny MC is a small one-panel framebuffer file manager / launcher for the
 R36SX/SF3000-like firmware.
 
-The current integration model launches Tiny MC directly from
-`cubegm/icube_start.sh`, without starting the stock `icube` supervisor. Tiny MC
-is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
+The current integration model launches Tiny MC directly from the confirmed boot
+route, `cubegm/icube.sh`, without starting the stock `icube` supervisor. Tiny
+MC is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 `/mnt/sdcard/MIPS_NATIVE` as its start directory argument.
 
 ## Controls
@@ -14,7 +14,8 @@ is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 - Left, B, or Select: parent directory.
 - Right: enter the selected directory.
 - A or Start: enter a directory or run the selected file.
-- Fn: close Tiny MC and start the stock `icube` supervisor.
+- Fn: close Tiny MC and `execl()` the stock `/mnt/sdcard/cubegm/icube`
+  supervisor directly.
 
 Directories with more entries than fit on screen show a thin scrollbar on the
 right side of the file list.
@@ -109,15 +110,17 @@ cubegm\rkgame.stock
 cubegm\rkgame
 ```
 
-and route `cubegm\icube_start.sh` directly to:
+and route `cubegm\icube.sh` directly to:
 
 ```sh
 /mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc /mnt/sdcard/MIPS_NATIVE &
 ```
 
 This bypasses `icube`; if Tiny MC hangs, there is no `icube` supervisor restart.
-Fn handling is currently disabled in Tiny MC. The binary should not contain the
-`/mnt/sdcard/cubegm/icube` path or treat Fn as a command.
+Fn handling is enabled in Tiny MC. The shortcut is armed only after Fn has been
+released once, so a raised Fn bit during startup is ignored. A later Fn press
+closes Tiny MC and starts `/mnt/sdcard/cubegm/icube` directly, not
+`icube.sh`, to avoid looping back into Tiny MC.
 
 ## Native Program Folder
 
