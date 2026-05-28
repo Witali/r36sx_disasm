@@ -156,9 +156,10 @@ A small Pong-style game module was built using the same no-libc libretro-style
 shell as Button Demo:
 
 - Shared source: [`homebrew/pong/pong.c`](homebrew/pong/pong.c)
-- Notes: [`homebrew/libretro_pong/README.md`](homebrew/libretro_pong/README.md)
-- Build log: [`homebrew/libretro_pong/BUILD_LOG.md`](homebrew/libretro_pong/BUILD_LOG.md)
-- Built module: `homebrew/libretro_pong/libemu_pong.so`
+- Notes: [`homebrew/pong/README.md`](homebrew/pong/README.md)
+- Build log: [`homebrew/pong/BUILD_LOG.md`](homebrew/pong/BUILD_LOG.md)
+- Build script: `homebrew/pong/build_libretro_pong.ps1`
+- Built module: `homebrew/pong/libemu_pong.so`
 
 It renders a 640x480 RGB565 playfield, supports D-pad left-paddle control,
 optional face-button right-paddle control, simple AI when the right paddle is
@@ -170,10 +171,10 @@ generated tones.
 A standalone Pong executable was added for direct launch from Tiny MC:
 
 - Shared source: [`homebrew/pong/pong.c`](homebrew/pong/pong.c)
-- Notes: [`homebrew/native_pong/README.md`](homebrew/native_pong/README.md)
-- Build log: [`homebrew/native_pong/BUILD_LOG.md`](homebrew/native_pong/BUILD_LOG.md)
-- Build script: `homebrew/native_pong/build_native_pong.ps1`
-- Built executable: `homebrew/native_pong/pong`
+- Notes: [`homebrew/pong/README.md`](homebrew/pong/README.md)
+- Build log: [`homebrew/pong/BUILD_LOG.md`](homebrew/pong/BUILD_LOG.md)
+- Build script: `homebrew/pong/build_native_pong.ps1`
+- Built executable: `homebrew/pong/pong`
 
 Unlike the older `libemu_pong.so`, this is a normal MIPS executable with
 `main()`. It uses `driver.so` for display/input and exits back to Tiny MC when
