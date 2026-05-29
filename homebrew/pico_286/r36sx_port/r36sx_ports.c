@@ -24,7 +24,7 @@ uint32_t vram_offset = 0x0;
 
 int sound_chips_clock = 0;
 
-#define R36SX_KEYBOARD_QUEUE_CAPACITY 32u
+#define R36SX_KEYBOARD_QUEUE_CAPACITY 8u
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
 #define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
 

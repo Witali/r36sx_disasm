@@ -139,3 +139,15 @@ Size: 7940088 bytes
 SHA256: AB360DAE43112F5A4B72286E9BBE968C172A1F1241DBC86591ED0D6F5725681A
 Defender scan: found no threats
 ```
+
+## 2026-05-29 keyboard FIFO size reduction
+
+The emulated keyboard controller FIFO was reduced from 32 scancode bytes to 8.
+This is enough for the current joystick/on-screen keyboard path while keeping
+the model smaller.
+
+```text
+Size: 7940104 bytes
+SHA256: 4EB23B444826C36A60B734F4F66FEB58676DED6FF0FD9676FBE7D77F4EAD01B9
+Defender scan: found no threats
+```
