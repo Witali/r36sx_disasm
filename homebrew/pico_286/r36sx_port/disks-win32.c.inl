@@ -39,11 +39,17 @@ static inline void ejectdisk(uint8_t drivenum) {
     if (drivenum & 0x80) drivenum -= 126;
 
     if (disk[drivenum].inserted) {
+        if (disk[drivenum].diskfile) {
+            fflush(disk[drivenum].diskfile);
+            fclose(disk[drivenum].diskfile);
+            disk[drivenum].diskfile = 0;
+        }
         disk[drivenum].inserted = 0;
-        if (drivenum >= 0x80)
-            hdcount--;
-        else
-            fdcount--;
+        if (drivenum >= 2) {
+            if (hdcount > 0) hdcount--;
+        } else {
+            if (fdcount > 0) fdcount--;
+        }
     }
 }
 
@@ -226,7 +232,7 @@ static void writedisk(uint8_t drivenum,
                uint16_t sectcount
 ) {
     uint32_t memdest = ((uint32_t) dstseg << 4) + (uint32_t) dstoff;
-    uint32_t cursect;
+    uint32_t cursect = 0;
 
     // Check if disk is inserted
     if (!disk[drivenum].inserted) {
@@ -274,7 +280,19 @@ static void writedisk(uint8_t drivenum,
         r36sx_pico286_disk_activity();
 
         // Write the buffer to the file
-        fwrite(sectorbuffer, 512, 1, disk[drivenum].diskfile);
+        if (fwrite(sectorbuffer, 512, 1, disk[drivenum].diskfile) != 1) {
+            CPU_AH = 0xCC;    // write fault
+            CPU_AL = cursect;
+            CPU_FL_CF = 1;
+            return;
+        }
+    }
+
+    if (fflush(disk[drivenum].diskfile) != 0) {
+        CPU_AH = 0xCC;    // write fault
+        CPU_AL = cursect;
+        CPU_FL_CF = 1;
+        return;
     }
 
     // Handle the case where no sectors were written

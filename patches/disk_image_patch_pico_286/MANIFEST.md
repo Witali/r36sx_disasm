@@ -336,3 +336,24 @@ Size: 8005860 bytes
 SHA256: 583587D4DFA6A0CD7D817370DBA8CDB4397957513818F6D454C30D9DC1F56BC5
 Defender scan: found no threats
 ```
+
+## 2026-05-29 hard disk write flush fix
+
+The disk layer was rebuilt so writes to `hdd.img` survive an in-emulator reboot
+immediately after formatting DOS `C:`.
+
+`hdd0=hdd.img` is mounted as BIOS drive `80h`, then normalized to internal disk
+slot `2`.  Previously, `writedisk()` used `fwrite()` without `fflush()`, and
+`ejectdisk()` did not close the old `FILE *` before `INT 19h` mounted the disk
+again.  A freshly formatted `hdd.img` could therefore be reopened before the old
+buffered writes reached the image.
+
+The current binary flushes after sector writes, flushes/closes the image on
+eject/remount, and fixes hard-disk/floppy counters to use normalized slots
+`0`/`1` for floppies and `2`/`3` for hard disks.
+
+```text
+Size: 8006344 bytes
+SHA256: 451570BAC02DBADDF73AC3A9B2EB6CF96A9A31C1E2943ADC766C8A6A455F03EC
+Defender scan: found no threats
+```

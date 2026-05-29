@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-05-29 hard disk write flush fix
+
+Investigated why FreeDOS could appear to format DOS `C:` successfully, but the
+hard disk was not visible after rebooting inside Pico-286.  DOS `C:` is mounted
+as BIOS drive `80h`, normalized to internal disk slot `2`, from `hdd0=hdd.img`
+in `pico_286.conf`.
+
+The disk layer had two persistence problems:
+
+- `writedisk()` wrote sectors with `fwrite()` but did not flush the host file.
+- Re-running BIOS `INT 19h` mounted the disk images again, but `ejectdisk()`
+  only cleared the inserted flag; it did not `fflush()`/`fclose()` the old host
+  `FILE *`.
+
+This meant a format/write could remain buffered on the old handle while reboot
+opened the same `hdd.img` through a new handle and saw stale contents.
+
+Changes:
+
+- `ejectdisk()` now flushes and closes the old image file before clearing the
+  slot.
+- Hard-disk/floppy counters now use the normalized internal slot number:
+  slots `0`/`1` are floppy, slots `2`/`3` are hard disks.
+- `writedisk()` now checks `fwrite()` result and calls `fflush()` after sector
+  writes, returning BIOS write-fault status `0xCC` on failure.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,006,344 bytes
+- SHA256: `451570BAC02DBADDF73AC3A9B2EB6CF96A9A31C1E2943ADC766C8A6A455F03EC`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+
 ## 2026-05-29 FreeDOS image rename
 
 Renamed the local FreeDOS floppy images to make their role clearer:
