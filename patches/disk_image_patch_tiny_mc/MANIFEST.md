@@ -178,3 +178,18 @@ Defender scan:
 
 The temporary `boot_route.log` tracing from the discovery patches is not
 included.
+
+## 2026-05-29 list row visual alignment
+
+TinyMC was rebuilt so file-list text is vertically centered from the visible
+FreeType glyph bounds, not just from the configured font pixel size.  This
+addresses the selected row highlight looking slightly shifted upward relative
+to the file name text.
+
+```text
+Tiny MC:
+  Size: 64824 bytes
+  SHA256: 73A563ED3A494F9C3DF97AF5EA8F151D6B258719D027AD1CE3ED222A338247EE
+Defender scan:
+  disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+```

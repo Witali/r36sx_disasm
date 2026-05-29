@@ -1416,6 +1416,44 @@ Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
 found no threats
 ```
 
+## 2026-05-29 list row visual alignment
+
+Purpose:
+
+Align the selected file highlight with the visible text, not only with the
+configured `font_large_px` em box. With the current FreeType font
+(`large_px=19`, `list_row_h=22`), glyphs have their own bitmap top/bottom
+metrics, so the selection could look slightly shifted upward relative to the
+drawn file name.
+
+Implementation:
+
+- Added `list_row_text_y()` for the file list.
+- For FreeType fonts, it samples common glyphs, computes their visible
+  top/bottom relative to the existing baseline model, and centers that visible
+  glyph box inside `list_row_h`.
+- For the bitmap fallback, it centers the actual 7-pixel glyph height scaled by
+  the requested text scale.
+- The selected row background still covers the full logical row; only the file
+  label Y coordinate is adjusted.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Verification:
+
+```text
+Tiny MC size: 64824 bytes
+Tiny MC SHA256: 73A563ED3A494F9C3DF97AF5EA8F151D6B258719D027AD1CE3ED222A338247EE
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+```
+
 ## 2026-05-29 row padding rebuild
 
 Purpose:

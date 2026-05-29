@@ -2026,6 +2026,58 @@ static int list_row_pad_bottom(void)
     return extra - extra / 2;
 }
 
+static int list_row_text_y(int row_y)
+{
+    const int scale = 2;
+
+    if (g_font.active) {
+        static int cached_pixel_height = -1;
+        static int cached_row_h = -1;
+        static int cached_offset = 0;
+        int pixel_height = g_config.font_large_px;
+
+        if (cached_pixel_height != pixel_height ||
+            cached_row_h != g_config.list_row_h) {
+            const char *sample =
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789[]";
+            int visible_top = 10000;
+            int visible_bottom = -10000;
+            int found = 0;
+
+            for (const char *p = sample; *p != '\0'; p++) {
+                struct ft_glyph_cache_entry *glyph =
+                    font_load_glyph((uint32_t)(unsigned char)*p, pixel_height);
+                if (glyph && glyph->buffer && glyph->rows > 0) {
+                    int glyph_top = pixel_height - 1 - glyph->bitmap_top;
+                    int glyph_bottom = glyph_top + glyph->rows;
+                    if (glyph_top < visible_top) {
+                        visible_top = glyph_top;
+                    }
+                    if (glyph_bottom > visible_bottom) {
+                        visible_bottom = glyph_bottom;
+                    }
+                    found = 1;
+                }
+            }
+
+            if (found && visible_bottom > visible_top) {
+                int visible_h = visible_bottom - visible_top;
+                cached_offset =
+                    (g_config.list_row_h - visible_h) / 2 - visible_top;
+            } else {
+                cached_offset =
+                    (g_config.list_row_h - pixel_height) / 2;
+            }
+            cached_pixel_height = pixel_height;
+            cached_row_h = g_config.list_row_h;
+        }
+
+        return row_y + cached_offset;
+    }
+
+    return row_y + (g_config.list_row_h - 7 * scale) / 2;
+}
+
 static void ensure_selection_visible(void)
 {
     int rows = visible_rows();
@@ -2343,7 +2395,8 @@ static void draw_ui(void)
     draw_text(12, HEADER_H + 4, g_cwd, muted, 1, g_fb.width - 24);
 
     if (g_entry_count == 0) {
-        draw_text(22, top + row_pad_top, "[EMPTY]", muted, 2, g_fb.width - 44);
+        draw_text(22, list_row_text_y(top), "[EMPTY]", muted, 2,
+                  g_fb.width - 44);
     }
 
     for (int row = 0; row < rows; row++) {
@@ -2352,7 +2405,7 @@ static void draw_ui(void)
             break;
         }
         int y = top + row * g_config.list_row_h;
-        int text_y = y + row_pad_top;
+        int text_y = list_row_text_y(y);
         char label[320];
         format_entry(label, sizeof(label), &g_entries[idx]);
         if (idx == g_selected) {
