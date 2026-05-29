@@ -51,6 +51,8 @@ directory is only for compiler output:
   `81h`.  The same config also controls the optional on-screen keyboard cursor
   block.  If the file is absent, it falls back to the legacy internal disk
   names `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
+- `EXE_README.md` is the short user-facing control guide copied next to the
+  `pico_286` executable on the SD-card filesystem.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
   writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer

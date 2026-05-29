@@ -6,6 +6,7 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 
 - `MIPS_NATIVE/pico_286/pico_286`
 - `MIPS_NATIVE/pico_286/pico_286.conf`
+- `MIPS_NATIVE/pico_286/README.md`
 - `MIPS_NATIVE/pico_286/keypresets.conf`
 - `MIPS_NATIVE/pico_286/FreeDOS1.img`
 - `MIPS_NATIVE/pico_286/FreeDOS2.img`
@@ -23,6 +24,13 @@ This debug build writes a startup/runtime log to:
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-05-29 executable README
+
+Adds `MIPS_NATIVE/pico_286/README.md`, a short user-facing control guide for
+the native `pico_286` executable.  It documents main DOS controls, Fn
+shortcuts, the on-screen keyboard, the disk image menu, and the key preset
+editor.
 
 ## 2026-05-29 settings menu button defaults
 

@@ -414,6 +414,8 @@ Notable patch history:
   blinking underscore cursor next to the edited name.
 - `disk_image_patch_070`: rebuilds Pico-286 so settings menus use `A`/`Y` for
   accept/change and `B`/`X` for cancel.
+- `disk_image_patch_071`: adds `MIPS_NATIVE/pico_286/README.md`, a short
+  control guide for the Pico-286 native executable.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
