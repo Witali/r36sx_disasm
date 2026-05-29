@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-05-29 clean object directory before build
+
+Updated `build_pico_286.ps1` so every Pico-286 build starts from a clean
+`homebrew/pico_286/obj` directory.  The script verifies the absolute object
+directory path before removing it, then recreates it for fresh compiler output.
+
+Commands run:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still reports `error: unimplemented`, so the build
+keeps the unstripped executable.  The clean rebuild produced the same binary
+content as the previous Pico-286 build:
+
+- Path: `homebrew/pico_286/pico_286`
+- Size: `891968` bytes
+- SHA256: `78498E29EE66FC29570D30CABA35699EAC46FC053DA5D1D981821FAC00589A94`
+- Defender scan: found no threats
+
 ## 2026-05-29 active-height keyboard compression
 
 Changed the Pico-286 MiniFB backend so the on-screen keyboard no longer

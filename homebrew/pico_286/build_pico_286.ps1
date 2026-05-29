@@ -35,6 +35,15 @@ if (!(Test-Path $PortRoot)) {
     throw "Missing homebrew\pico_286\r36sx_port source tree."
 }
 
+$ObjDirFull = [IO.Path]::GetFullPath($ObjDir)
+$ScriptRootFull = [IO.Path]::GetFullPath($PSScriptRoot)
+$ExpectedObjDir = [IO.Path]::GetFullPath((Join-Path $ScriptRootFull "obj"))
+if ($ObjDirFull -ne $ExpectedObjDir) {
+    throw "Refusing to clean unexpected object directory: $ObjDirFull"
+}
+if (Test-Path -LiteralPath $ObjDirFull) {
+    Remove-Item -LiteralPath $ObjDirFull -Recurse -Force
+}
 New-Item -ItemType Directory -Force $ObjDir | Out-Null
 $env:ZIG_GLOBAL_CACHE_DIR = (Resolve-Path (Join-Path $Root "tools\zig-global-cache")).Path
 $env:ZIG_LOCAL_CACHE_DIR = (Resolve-Path (Join-Path $Root "tools\zig-cache")).Path
