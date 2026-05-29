@@ -122,11 +122,17 @@ The upstream PC disk images are still expected by the emulator.  In this port,
 devices:
 
 ```ini
+cpu_mhz=32.768
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
 ```
+
+`cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
+`32.768` preserves the old hard-coded behavior (`exec86(32768)` per
+millisecond-like host loop).  This is a practical speed knob for this port,
+not a cycle-exact 80286 timing model.
 
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
 `80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286

@@ -10,6 +10,7 @@
 #include "emulator/includes/font8x8.h"
 #include "emu8950.h"
 #include "linux-audio.h"
+#include "r36sx_disk_config.h"
 
 static uint32_t ALIGN(4, SCREEN[640 * 480]);
 uint8_t ALIGN(4, DEBUG_VRAM[80 * 10]) = {0};
@@ -845,6 +846,9 @@ int main() {
     r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=%d",
                             sound_thread_rc, ticks_thread_rc);
 
+    const uint32_t cpu_exec_loops = r36sx_pico286_cpu_exec_loops(32768u);
+    r36sx_pico286_debug_log("main: cpu_exec_loops=%u", cpu_exec_loops);
+
     unsigned int main_loop_count = 0;
     while (running) {
         r36sx_keyboard_tick();
@@ -852,7 +856,7 @@ int main() {
             r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
         }
-        exec86(32768);  // Reduced from 32768 to allow more frequent audio updates
+        exec86(cpu_exec_loops);
         r36sx_keyboard_tick();
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",

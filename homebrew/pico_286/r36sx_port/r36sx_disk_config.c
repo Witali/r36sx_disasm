@@ -2,11 +2,14 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define R36SX_PICO286_CONFIG_PATH "pico_286.conf"
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
+#define R36SX_PICO286_MIN_CPU_MHZ 0.100
+#define R36SX_PICO286_MAX_CPU_MHZ 250.000
 
 typedef struct {
     uint8_t bios_drive;
@@ -25,6 +28,7 @@ static r36sx_pico286_disk_entry_t disk_entries[] = {
 
 static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
+static uint32_t cpu_exec_loops = 0;
 
 static char *trim_space(char *text)
 {
@@ -120,13 +124,47 @@ static void set_config_dir(const char *config_path)
     disk_config_dir[len] = '\0';
 }
 
-static void set_disk_entry(const char *key, const char *value, int line_no)
+static int set_cpu_mhz(const char *value, int line_no)
+{
+    char *end = NULL;
+    double mhz = strtod(value, &end);
+    uint32_t loops;
+
+    if (end) {
+        end = trim_space(end);
+    }
+    if (value[0] == '\0' || (end && end[0] != '\0') ||
+        mhz < R36SX_PICO286_MIN_CPU_MHZ ||
+        mhz > R36SX_PICO286_MAX_CPU_MHZ) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid cpu_mhz '%s' at line %d",
+            value, line_no);
+        return 0;
+    }
+
+    loops = (uint32_t)(mhz * 1000.0 + 0.5);
+    if (loops == 0) {
+        loops = 1;
+    }
+    cpu_exec_loops = loops;
+    r36sx_pico286_debug_log("diskcfg: cpu_mhz=%.3f exec_loops=%u",
+                            mhz, cpu_exec_loops);
+    return 1;
+}
+
+static int set_config_value(const char *key, const char *value, int line_no)
 {
     r36sx_pico286_disk_entry_t *entry = find_disk_entry(key);
 
+    if (key_equals(key, "cpu_mhz") ||
+        key_equals(key, "cpu_frequency_mhz")) {
+        return set_cpu_mhz(value, line_no);
+    }
+
     if (!entry) {
-        r36sx_pico286_debug_log("diskcfg: ignoring unknown key '%s' at line %d", key, line_no);
-        return;
+        r36sx_pico286_debug_log("diskcfg: ignoring unknown key '%s' at line %d",
+                                key, line_no);
+        return 0;
     }
 
     if (value[0] == '\0' || is_absolute_path(value) || disk_config_dir[0] == '\0') {
@@ -138,6 +176,7 @@ static void set_disk_entry(const char *key, const char *value, int line_no)
     r36sx_pico286_debug_log("diskcfg: %s drive=%u path='%s'",
                             entry->name, entry->bios_drive,
                             entry->path[0] ? entry->path : "<disabled>");
+    return 1;
 }
 
 static void load_disk_config(void)
@@ -187,7 +226,7 @@ static void load_disk_config(void)
         *equals = '\0';
         value = trim_quotes(trim_space(equals + 1));
         key = trim_space(key);
-        set_disk_entry(key, value, line_no);
+        set_config_value(key, value, line_no);
     }
 
     fclose(fp);
@@ -206,4 +245,11 @@ const char *r36sx_pico286_disk_path(uint8_t bios_drive, const char *fallback_pat
     }
 
     return fallback_path;
+}
+
+uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
+{
+    load_disk_config();
+
+    return cpu_exec_loops ? cpu_exec_loops : fallback_loops;
 }

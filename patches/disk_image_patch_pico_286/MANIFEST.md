@@ -24,6 +24,28 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 configurable CPU speed
+
+`pico_286.conf` now includes:
+
+```ini
+cpu_mhz=32.768
+```
+
+This controls the R36SX host execution quantum passed to `exec86()`.
+`32.768` preserves the previous hard-coded behavior (`exec86(32768)` per
+millisecond-like host loop).  The setting is a practical speed knob for this
+port, not a cycle-exact 80286 clock.
+
+The rebuilt binary was copied into this patch and scanned with
+`tools/scan-download.ps1`; Microsoft Defender reported no threats.
+
+```text
+Size: 8010412 bytes
+SHA256: FE190E432D63957A91728F0E9BCEC7895BF5ECE7FC3D99291D0211E10BD84B43
+Defender scan: found no threats
+```
+
 Optional PC disk images should be placed in the same directory:
 
 - `MIPS_NATIVE/pico_286/pico_286.conf`
@@ -165,11 +187,17 @@ above the keyboard instead of being covered.
 Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf`:
 
 ```ini
+cpu_mhz=32.768
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
 ```
+
+`cpu_mhz` controls the R36SX execution quantum passed to `exec86()`;
+`32.768` keeps the previous hard-coded speed (`exec86(32768)` per
+millisecond-like host loop).  It is a practical speed knob, not a cycle-exact
+80286 timing model.
 
 These map to BIOS drives `00h`, `01h`, `80h`, and `81h` respectively.  Paths
 are relative to the Pico-286 directory unless absolute paths are used.  Empty

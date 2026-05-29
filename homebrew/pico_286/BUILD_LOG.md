@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-05-29 configurable CPU speed
+
+Checked the active R36SX Pico-286 main loop for a CPU speed binding.  The port
+does not model a cycle-exact 80286 MHz clock.  Its practical CPU speed knob is
+the execution quantum passed to `exec86()` once per millisecond-like host loop;
+before this change it was hard-coded as `exec86(32768)`.
+
+Changes:
+
+- Added `cpu_mhz` parsing to `pico_286.conf`.
+- `cpu_mhz=32.768` maps to `exec86(32768)`, preserving the previous behavior.
+- Invalid values outside `0.100` to `250.000` MHz are ignored and the built-in
+  fallback is used.
+- Added the default `cpu_mhz=32.768` line to the homebrew, `disk_image`, and
+  patch configs.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,010,412 bytes
+- SHA256: `FE190E432D63957A91728F0E9BCEC7895BF5ECE7FC3D99291D0211E10BD84B43`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+
 ## 2026-05-29 BIOS hard disk registration
 
 Added BIOS-visible hard disk presence reporting for DOS/FDISK.
