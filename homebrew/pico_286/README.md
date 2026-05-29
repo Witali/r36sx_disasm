@@ -217,7 +217,14 @@ Build:
 .\homebrew\pico_286\build_pico_286.ps1
 ```
 
-The current build is a debug build.  On the device it writes:
+The default build is a release-style build with `DEBUG=0`.  To enable runtime
+diagnostics, pass `-DebugLog`:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -DebugLog
+```
+
+With `-DebugLog`, the device writes:
 
 ```text
 /mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log

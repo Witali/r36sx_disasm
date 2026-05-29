@@ -23,6 +23,7 @@ extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
 extern "C" void r36sx_keyboard_tick(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
+#define R36SX_TICKS_THREAD_SLEEP_US 250u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
 
@@ -725,6 +726,15 @@ void *ticks_thread(void *arg) {
     int16_t last_sb_sample = 0;
 
     const uint64_t hostfreq = 1000000000; // nanoseconds
+    const uint64_t dss_period = hostfreq / 7000;
+    const uint64_t sb_period = hostfreq / 22050;
+    const uint64_t sound_period = hostfreq / SOUND_FREQUENCY;
+    const uint64_t blink_period = 333333333;
+    const uint64_t frame_period = 16666666;
+    const unsigned int max_system_catchup = 8;
+    const unsigned int max_dss_catchup = 700;
+    const unsigned int max_sb_catchup = 2205;
+    const unsigned int max_audio_catchup = SOUND_FREQUENCY / 20;
 
     unsigned int ticks_loop_count = 0;
     while (running) {
@@ -735,27 +745,48 @@ void *ticks_thread(void *arg) {
         }
 
         uint64_t elapsedTime = (current.tv_sec - start.tv_sec) * hostfreq + (current.tv_nsec - start.tv_nsec);
+        uint64_t system_period = timer_period > 0 ? hostfreq / (uint64_t)timer_period : hostfreq / 18;
 
         // Timer interrupt (~18.2 Hz)
-        if (elapsedTime - elapsed_system_timer >= hostfreq / timer_period) {
+        for (unsigned int catchup = 0;
+             elapsedTime - elapsed_system_timer >= system_period;
+             catchup++) {
             doirq(0);
-            elapsed_system_timer = elapsedTime;
+            elapsed_system_timer += system_period;
+            if (catchup >= max_system_catchup) {
+                elapsed_system_timer = elapsedTime;
+                break;
+            }
         }
 
         // Disney Sound Source frequency ~7KHz
-        if (elapsedTime - last_dss_tick >= hostfreq / 7000) {
+        for (unsigned int catchup = 0;
+             elapsedTime - last_dss_tick >= dss_period;
+             catchup++) {
             last_dss_sample = dss_sample();
-            last_dss_tick = elapsedTime;
+            last_dss_tick += dss_period;
+            if (catchup >= max_dss_catchup) {
+                last_dss_tick = elapsedTime;
+                break;
+            }
         }
 
         // Sound Blaster
-        if (elapsedTime - last_sb_tick >= hostfreq / 22050) {
+        for (unsigned int catchup = 0;
+             elapsedTime - last_sb_tick >= sb_period;
+             catchup++) {
             last_sb_sample = blaster_sample();
-            last_sb_tick = elapsedTime;
+            last_sb_tick += sb_period;
+            if (catchup >= max_sb_catchup) {
+                last_sb_tick = elapsedTime;
+                break;
+            }
         }
 
         // Audio samples
-        if (elapsedTime - last_sound_tick >= hostfreq / SOUND_FREQUENCY) {
+        for (unsigned int catchup = 0;
+             elapsedTime - last_sound_tick >= sound_period;
+             catchup++) {
             get_sound_sample(last_dss_sample + last_sb_sample, &audio_buffer[sample_index]);
             sample_index += 2;
 
@@ -767,24 +798,29 @@ void *ticks_thread(void *arg) {
                 sample_index = 0;
             }
 
-            last_sound_tick = elapsedTime;
+            last_sound_tick += sound_period;
+            if (catchup >= max_audio_catchup) {
+                last_sound_tick = elapsedTime;
+                break;
+            }
         }
 
         // Cursor blink
-        if (elapsedTime - elapsed_blink_tics >= 333333333) {
+        if (elapsedTime - elapsed_blink_tics >= blink_period) {
             // ~3Hz
             cursor_blink_state ^= 1;
             elapsed_blink_tics = elapsedTime;
         }
 
         // Frame rendering (60 FPS)
-        if (elapsedTime - elapsed_frame_tics >= 16666666) {
+        if (elapsedTime - elapsed_frame_tics >= frame_period) {
             // ~60Hz
             renderer();
             elapsed_frame_tics = elapsedTime;
         }
 
-        // No sleep - let the timing be controlled by clock precision
+        // Generate missed ticks in batches, then yield the CPU to exec86().
+        usleep(R36SX_TICKS_THREAD_SLEEP_US);
     }
     r36sx_pico286_debug_log("ticks_thread: exit loops=%u", ticks_loop_count);
     return NULL;

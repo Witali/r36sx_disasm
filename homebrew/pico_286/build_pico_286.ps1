@@ -1,4 +1,5 @@
 param(
+    [switch]$DebugLog,
     [switch]$TryStrip
 )
 
@@ -25,6 +26,7 @@ $Crtn = Join-Path $Sysroot "usr\lib\crtn.o"
 $CrtBegin = Join-Path $GccLib "crtbegin.o"
 $CrtEnd = Join-Path $GccLib "crtend.o"
 $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
+$DebugValue = if ($DebugLog) { "1" } else { "0" }
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -59,7 +61,7 @@ $CommonArgs = @(
     "--sysroot=$Sysroot",
     "-DPICO_RP2040=0",
     "-DPICO_RP2350=0",
-    "-DDEBUG=1",
+    "-DDEBUG=$DebugValue",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",

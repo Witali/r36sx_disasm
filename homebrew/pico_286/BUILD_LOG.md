@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-05-29 timing thread busy-loop reduction
+
+Reviewed the Pico-286 hot loops after the emulator felt slow on the device.
+The main CPU loop still intentionally calls `exec86()` once per host loop and
+then lets `mfb_update()` enforce the configured `cpu_mhz` pacing.  The suspicious
+busy loop was in `ticks_thread()`: it continuously polled `clock_gettime()` with
+no sleep while also generating audio/timer/render ticks.
+
+Changes:
+
+- `ticks_thread()` now catches up missed timer/audio ticks in bounded batches.
+- The thread sleeps for 250 us after each pass so the host CPU can run the
+  `exec86()` thread instead of burning cycles on timer polling.
+- `build_pico_286.ps1` now builds with `DEBUG=0` by default.  Pass `-DebugLog`
+  to re-enable `pico_286.log` diagnostics.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_077\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 890,172 bytes
+- SHA256: `3429FB3DEC4F85A11120F277180B70F84ABA39F212238F70BE94DDE6CD7AEBE5`
+- Defender scan: no threats.
+
 ## 2026-05-29 held on-screen-keyboard press animation
 
 Rebuilt Pico-286 after adding pressed-key animation to the shared R36SX
