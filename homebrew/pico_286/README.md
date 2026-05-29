@@ -128,7 +128,8 @@ through TinyMC.
 
 On-screen keyboard controls:
 
-- D-pad: move the highlighted key.
+- D-pad: move the highlighted key; holding a direction repeats movement after
+  a short delay.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.

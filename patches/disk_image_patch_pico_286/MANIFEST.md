@@ -30,6 +30,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 on-screen keyboard D-pad repeat
+
+The current `pico_286` binary adds auto-repeat for D-pad navigation in the
+shared on-screen keyboard.  Holding Left/Right/Up/Down moves the highlighted
+key once immediately, waits about 280 ms, then repeats about every 85 ms.  This
+works both in the normal DOS on-screen keyboard and in the key-preset picker.
+
+Only navigation repeats; A/Start, B, X, Y, and Select remain one-shot actions.
+
+```text
+pico_286 size: 912504 bytes
+pico_286 SHA256: 5AB34A3F4B7C9DE260E990228549C66B55629D6039D0CF1E1C567B59153E8810
+Defender scan: found no threats
+```
+
 ## 2026-05-29 Fn+B soft reset
 
 The current `pico_286` binary adds a native soft-reset shortcut:

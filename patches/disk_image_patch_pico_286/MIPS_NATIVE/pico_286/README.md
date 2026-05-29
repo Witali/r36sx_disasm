@@ -27,6 +27,7 @@ This file documents the `pico_286` native executable for TinyMC.
 ## On-Screen Keyboard
 
 - D-pad: move between keys.
+- Hold D-pad: repeat movement after a short delay.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.

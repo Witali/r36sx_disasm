@@ -60,6 +60,7 @@ inverted-T layout with Up above Left/Down/Right.
 Current physical button bindings while the keyboard is visible:
 
 - D-pad moves the highlighted key.
+- Holding a D-pad direction repeats movement after a short delay.
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Y sends Enter immediately.

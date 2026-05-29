@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-29 on-screen keyboard D-pad repeat
+
+Added D-pad auto-repeat to the shared on-screen keyboard helper.  In normal
+keyboard mode and in the key-preset picker, holding Left/Right/Up/Down now
+moves the highlighted key once immediately, waits about 280 ms, then repeats
+movement about every 85 ms while the direction remains held.  Only navigation
+repeats; A/Start, B, X, Y, and Select keep their previous one-shot behavior.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_090\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 912,504 bytes
+- SHA256: `5AB34A3F4B7C9DE260E990228549C66B55629D6039D0CF1E1C567B59153E8810`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_090/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_090/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 Fn+B soft reset
 
 Added a native Pico-286 soft-reset shortcut.  Holding `Fn` and pressing `B`

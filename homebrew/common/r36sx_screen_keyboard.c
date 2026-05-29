@@ -1,6 +1,7 @@
 #include "r36sx_screen_keyboard.h"
 
 #include <stddef.h>
+#include <time.h>
 
 #define R36SX_OSK_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_OSK_KEY_W 47
@@ -16,6 +17,11 @@
 #define R36SX_OSK_CURSOR_BLOCK_COLS 3
 #define R36SX_OSK_CURSOR_BLOCK_ROWS 2
 #define R36SX_OSK_CURSOR_BLOCK_Y_ROW 3
+#define R36SX_OSK_NAV_MASK \
+    (R36SX_RKGAME_KEY_LEFT | R36SX_RKGAME_KEY_RIGHT | \
+     R36SX_RKGAME_KEY_UP | R36SX_RKGAME_KEY_DOWN)
+#define R36SX_OSK_NAV_REPEAT_DELAY_US 280000ull
+#define R36SX_OSK_NAV_REPEAT_INTERVAL_US 85000ull
 #define R36SX_OSK_CURSOR_BLOCK_W \
     (R36SX_OSK_CURSOR_BLOCK_COLS * R36SX_OSK_CURSOR_KEY_W + \
      (R36SX_OSK_CURSOR_BLOCK_COLS - 1) * R36SX_OSK_CURSOR_GAP)
@@ -124,6 +130,13 @@ static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
     return (uint16_t)(((uint16_t)(r & 0xf8u) << 8) |
                       ((uint16_t)(g & 0xfcu) << 3) |
                       ((uint16_t)b >> 3));
+}
+
+static uint64_t now_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
 }
 
 static void fill_rect(uint16_t *frame, int width, int height, int stride,
@@ -502,6 +515,83 @@ static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
     }
 }
 
+static uint32_t first_nav_button(uint32_t buttons)
+{
+    if ((buttons & R36SX_RKGAME_KEY_LEFT) != 0) {
+        return R36SX_RKGAME_KEY_LEFT;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        return R36SX_RKGAME_KEY_RIGHT;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_UP) != 0) {
+        return R36SX_RKGAME_KEY_UP;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_DOWN) != 0) {
+        return R36SX_RKGAME_KEY_DOWN;
+    }
+    return 0;
+}
+
+static void reset_nav_repeat(struct r36sx_screen_keyboard *keyboard)
+{
+    if (!keyboard) {
+        return;
+    }
+    keyboard->nav_repeat_button = 0;
+    keyboard->nav_repeat_next_us = 0;
+}
+
+static uint32_t nav_buttons_with_repeat(struct r36sx_screen_keyboard *keyboard,
+                                        uint32_t pressed,
+                                        uint32_t held)
+{
+    uint32_t nav_pressed = pressed & R36SX_OSK_NAV_MASK;
+    uint32_t nav_held = held & R36SX_OSK_NAV_MASK;
+    uint64_t now;
+
+    if (nav_pressed != 0) {
+        keyboard->nav_repeat_button = first_nav_button(nav_pressed);
+        keyboard->nav_repeat_next_us =
+            now_us() + R36SX_OSK_NAV_REPEAT_DELAY_US;
+        return nav_pressed;
+    }
+    if (nav_held == 0) {
+        reset_nav_repeat(keyboard);
+        return 0;
+    }
+
+    nav_held = first_nav_button(nav_held);
+    now = now_us();
+    if (keyboard->nav_repeat_button != nav_held) {
+        keyboard->nav_repeat_button = nav_held;
+        keyboard->nav_repeat_next_us = now + R36SX_OSK_NAV_REPEAT_DELAY_US;
+        return 0;
+    }
+    if ((int64_t)(now - keyboard->nav_repeat_next_us) < 0) {
+        return 0;
+    }
+
+    keyboard->nav_repeat_next_us = now + R36SX_OSK_NAV_REPEAT_INTERVAL_US;
+    return nav_held;
+}
+
+static void handle_navigation(struct r36sx_screen_keyboard *keyboard,
+                              uint32_t buttons)
+{
+    if ((buttons & R36SX_RKGAME_KEY_LEFT) != 0) {
+        move_selection(keyboard, -1, 0);
+    }
+    if ((buttons & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        move_selection(keyboard, 1, 0);
+    }
+    if ((buttons & R36SX_RKGAME_KEY_UP) != 0) {
+        move_selection(keyboard, 0, -1);
+    }
+    if ((buttons & R36SX_RKGAME_KEY_DOWN) != 0) {
+        move_selection(keyboard, 0, 1);
+    }
+}
+
 static const struct r36sx_osk_key *current_key(
     struct r36sx_screen_keyboard *keyboard)
 {
@@ -706,6 +796,8 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->press_row = 0;
     keyboard->press_col = 0;
     keyboard->press_buttons = 0;
+    keyboard->nav_repeat_button = 0;
+    keyboard->nav_repeat_next_us = 0;
 }
 
 int r36sx_screen_keyboard_is_visible(
@@ -726,6 +818,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->ctrl = 0;
         keyboard->alt = 0;
         keyboard->press_buttons = 0;
+        reset_nav_repeat(keyboard);
     }
 }
 
@@ -788,23 +881,14 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
     void *emit_user)
 {
     uint32_t result = 0;
+    uint32_t nav_buttons;
 
     if (!keyboard || !keyboard->visible) {
         return 0;
     }
     update_press_animation(keyboard, held);
-    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
-        move_selection(keyboard, -1, 0);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
-        move_selection(keyboard, 1, 0);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
-        move_selection(keyboard, 0, -1);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
-        move_selection(keyboard, 0, 1);
-    }
+    nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
+    handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
@@ -839,23 +923,14 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     uint16_t *keycode)
 {
     const struct r36sx_osk_key *key;
+    uint32_t nav_buttons;
 
     if (!keyboard || !keyboard->visible) {
         return 0;
     }
     update_press_animation(keyboard, held);
-    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
-        move_selection(keyboard, -1, 0);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
-        move_selection(keyboard, 1, 0);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
-        move_selection(keyboard, 0, -1);
-    }
-    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
-        move_selection(keyboard, 0, 1);
-    }
+    nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
+    handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
         start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_BACK,
                                       pressed & R36SX_RKGAME_KEY_B);

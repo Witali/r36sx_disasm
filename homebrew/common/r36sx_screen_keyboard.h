@@ -51,6 +51,8 @@ struct r36sx_screen_keyboard {
     uint8_t press_row;
     uint8_t press_col;
     uint32_t press_buttons;
+    uint32_t nav_repeat_button;
+    uint64_t nav_repeat_next_us;
 };
 
 typedef void (*r36sx_screen_keyboard_emit_fn)(
