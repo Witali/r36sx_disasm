@@ -471,3 +471,21 @@ Size: 8006884 bytes
 SHA256: 0737E66B6DB7C0165F3A1B22BBF3200678CEA8E7BDC339A827DA56392234ECBF
 Defender scan: found no threats
 ```
+
+## 2026-05-29 key preset editor draft UI
+
+The Pico-286 binary was rebuilt after reworking the Select key preset editor.
+The binding list now uses two columns so all physical buttons stay inside the
+outer frame.  Opening the editor starts a draft session: choosing another
+preset, adding a preset, renaming it, or changing bindings does not touch
+`keypresets.conf` until the visual `OK` button is selected.  `Cancel` and
+`Select` close the editor without saving the draft.
+
+The shared on-screen keyboard now has a picker mode.  Pico-286 uses it for
+renaming presets and for choosing the key assigned to each physical button row.
+
+```text
+Size: 8054724 bytes
+SHA256: 598071628DA6ECA5B608625CB636AEF76977BB5C59D50039B4E93BB37FC2E4E1
+Defender scan: found no threats
+```

@@ -9,7 +9,17 @@
 
 #define R36SX_KEY_PRESETS_CONF "keypresets.conf"
 #define R36SX_KEY_PRESETS_ABS_CONF "/mnt/sdcard/MIPS_NATIVE/pico_286/keypresets.conf"
-#define R36SX_KEY_PRESET_ROW_COUNT (2 + R36SX_KEY_PRESET_BUTTON_COUNT)
+#define R36SX_KEY_PRESET_BUTTON_ITEM_FIRST 3
+#define R36SX_KEY_PRESET_BUTTON_LEFT_COUNT \
+    ((R36SX_KEY_PRESET_BUTTON_COUNT + 1) / 2)
+#define R36SX_KEY_PRESET_ROW_OK \
+    (R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + R36SX_KEY_PRESET_BUTTON_COUNT)
+#define R36SX_KEY_PRESET_ROW_CANCEL (R36SX_KEY_PRESET_ROW_OK + 1)
+#define R36SX_KEY_PRESET_ROW_COUNT (R36SX_KEY_PRESET_ROW_CANCEL + 1)
+#define R36SX_KEY_PRESET_PICKER_NONE 0u
+#define R36SX_KEY_PRESET_PICKER_KEY 1u
+#define R36SX_KEY_PRESET_PICKER_NAME 2u
+#define R36SX_KEY_PRESET_PICKER_BUTTON_NONE 0xffu
 
 struct r36sx_key_preset_button_info {
     const char *config_key;
@@ -348,6 +358,7 @@ void r36sx_key_presets_init(struct r36sx_key_presets *state)
     state->count = 1;
     state->active = 0;
     set_default_preset(&state->presets[0]);
+    r36sx_screen_keyboard_init(&state->picker_keyboard);
 }
 
 static FILE *open_config_for_read(struct r36sx_key_presets *state)
@@ -498,12 +509,115 @@ int r36sx_key_presets_is_visible(const struct r36sx_key_presets *state)
     return state && state->visible != 0;
 }
 
-void r36sx_key_presets_set_visible(struct r36sx_key_presets *state, int visible)
+static struct r36sx_key_preset *current_draft_preset(
+    struct r36sx_key_presets *state)
+{
+    if (!state) {
+        return NULL;
+    }
+    if (state->draft_count == 0) {
+        state->draft_count = 1;
+        set_default_preset(&state->draft_presets[0]);
+    }
+    if (state->draft_active >= state->draft_count) {
+        state->draft_active = 0;
+    }
+    return &state->draft_presets[state->draft_active];
+}
+
+static const struct r36sx_key_preset *current_draft_preset_const(
+    const struct r36sx_key_presets *state)
+{
+    if (!state || state->draft_count == 0) {
+        return NULL;
+    }
+    if (state->draft_active >= state->draft_count) {
+        return &state->draft_presets[0];
+    }
+    return &state->draft_presets[state->draft_active];
+}
+
+static void begin_edit_session(struct r36sx_key_presets *state)
+{
+    if (state->count == 0) {
+        state->count = 1;
+        set_default_preset(&state->presets[0]);
+    }
+    if (state->active >= state->count) {
+        state->active = 0;
+    }
+
+    memset(state->draft_presets, 0, sizeof(state->draft_presets));
+    memcpy(state->draft_presets, state->presets,
+           sizeof(state->presets[0]) * state->count);
+    state->draft_count = state->count;
+    state->draft_active = state->active;
+    state->selected_row = 0;
+    state->edit_mode = R36SX_KEY_PRESET_PICKER_NONE;
+    state->picker_button = R36SX_KEY_PRESET_PICKER_BUTTON_NONE;
+    r36sx_screen_keyboard_init(&state->picker_keyboard);
+}
+
+static void close_picker(struct r36sx_key_presets *state)
+{
+    state->edit_mode = R36SX_KEY_PRESET_PICKER_NONE;
+    state->picker_button = R36SX_KEY_PRESET_PICKER_BUTTON_NONE;
+    r36sx_screen_keyboard_set_visible(&state->picker_keyboard, 0);
+}
+
+static void ensure_draft_names(struct r36sx_key_presets *state)
+{
+    for (uint8_t i = 0; i < state->draft_count; i++) {
+        char *name = state->draft_presets[i].name;
+        if (trim_space(name)[0] == '\0') {
+            snprintf(name, R36SX_KEY_PRESET_NAME_LEN, "Preset %u",
+                     (unsigned int)i + 1u);
+        }
+    }
+}
+
+static void commit_edit_session(struct r36sx_key_presets *state)
+{
+    if (!state || state->draft_count == 0) {
+        return;
+    }
+
+    ensure_draft_names(state);
+    memset(state->presets, 0, sizeof(state->presets));
+    memcpy(state->presets, state->draft_presets,
+           sizeof(state->presets[0]) * state->draft_count);
+    state->count = state->draft_count;
+    state->active =
+        state->draft_active < state->count ? state->draft_active : 0;
+    r36sx_key_presets_save(state);
+    state->visible = 0;
+    close_picker(state);
+}
+
+static void cancel_edit_session(struct r36sx_key_presets *state)
 {
     if (!state) {
         return;
     }
-    state->visible = (uint8_t)(visible != 0);
+    state->visible = 0;
+    close_picker(state);
+}
+
+void r36sx_key_presets_set_visible(struct r36sx_key_presets *state, int visible)
+{
+    int new_visible;
+
+    if (!state) {
+        return;
+    }
+    new_visible = visible != 0;
+    if (new_visible && !state->visible) {
+        begin_edit_session(state);
+    }
+    if (!new_visible) {
+        close_picker(state);
+    }
+    state->visible = (uint8_t)new_visible;
     if (state->selected_row >= R36SX_KEY_PRESET_ROW_COUNT) {
         state->selected_row = 0;
     }
@@ -526,121 +640,312 @@ uint16_t r36sx_key_presets_key_for_mask(
     return 0;
 }
 
-static void select_next_preset(struct r36sx_key_presets *state, int direction)
+static void select_next_draft_preset(struct r36sx_key_presets *state,
+                                     int direction)
 {
     int active;
 
-    if (state->count == 0) {
+    if (state->draft_count == 0) {
         return;
     }
-    active = (int)state->active + direction;
+    active = (int)state->draft_active + direction;
     if (active < 0) {
-        active = (int)state->count - 1;
-    } else if (active >= state->count) {
+        active = (int)state->draft_count - 1;
+    } else if (active >= state->draft_count) {
         active = 0;
     }
-    state->active = (uint8_t)active;
-    r36sx_key_presets_save(state);
+    state->draft_active = (uint8_t)active;
 }
 
-static void add_preset(struct r36sx_key_presets *state)
+static void add_draft_preset(struct r36sx_key_presets *state)
 {
     struct r36sx_key_preset *preset;
 
-    if (state->count >= R36SX_KEY_PRESETS_MAX) {
+    if (state->draft_count >= R36SX_KEY_PRESETS_MAX) {
         return;
     }
-    preset = &state->presets[state->count];
-    *preset = state->presets[state->active];
+    preset = &state->draft_presets[state->draft_count];
+    *preset = *current_draft_preset(state);
     snprintf(preset->name, sizeof(preset->name), "Preset %u",
-             (unsigned int)state->count + 1u);
-    state->active = state->count;
-    state->count++;
-    r36sx_key_presets_save(state);
+             (unsigned int)state->draft_count + 1u);
+    state->draft_active = state->draft_count;
+    state->draft_count++;
 }
 
-static void cycle_binding(struct r36sx_key_presets *state, int button,
-                          int direction)
+static int selected_button(const struct r36sx_key_presets *state)
 {
-    int choice;
-    int count = (int)(sizeof(g_choices) / sizeof(g_choices[0]));
+    int row;
 
-    if (button < 0 || button >= R36SX_KEY_PRESET_BUTTON_COUNT) {
+    if (!state) {
+        return -1;
+    }
+    row = state->selected_row;
+    if (row < R36SX_KEY_PRESET_BUTTON_ITEM_FIRST ||
+        row >= R36SX_KEY_PRESET_ROW_OK) {
+        return -1;
+    }
+    return row - R36SX_KEY_PRESET_BUTTON_ITEM_FIRST;
+}
+
+static int button_visual_col(int button)
+{
+    return button >= R36SX_KEY_PRESET_BUTTON_LEFT_COUNT ? 1 : 0;
+}
+
+static int button_visual_row(int button)
+{
+    return button >= R36SX_KEY_PRESET_BUTTON_LEFT_COUNT ?
+        button - R36SX_KEY_PRESET_BUTTON_LEFT_COUNT : button;
+}
+
+static int button_from_visual(int col, int row)
+{
+    int button = col != 0 ? R36SX_KEY_PRESET_BUTTON_LEFT_COUNT + row : row;
+
+    return button >= 0 && button < R36SX_KEY_PRESET_BUTTON_COUNT ? button : -1;
+}
+
+static void move_selection_vertical(struct r36sx_key_presets *state,
+                                    int direction)
+{
+    int button = selected_button(state);
+
+    if (button >= 0) {
+        int col = button_visual_col(button);
+        int row = button_visual_row(button) + direction;
+        int next_button = button_from_visual(col, row);
+        if (next_button >= 0) {
+            state->selected_row =
+                (uint8_t)(R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + next_button);
+        } else if (direction < 0) {
+            state->selected_row = 2;
+        } else {
+            state->selected_row =
+                (uint8_t)(col == 0 ? R36SX_KEY_PRESET_ROW_OK :
+                                       R36SX_KEY_PRESET_ROW_CANCEL);
+        }
         return;
     }
-    choice = choice_index_for_keycode(
-        state->presets[state->active].keycodes[button]);
-    choice += direction;
-    if (choice < 0) {
-        choice = count - 1;
-    } else if (choice >= count) {
-        choice = 0;
+
+    if (direction < 0) {
+        if (state->selected_row == 0) {
+            state->selected_row = R36SX_KEY_PRESET_ROW_CANCEL;
+        } else if (state->selected_row == R36SX_KEY_PRESET_ROW_OK) {
+            state->selected_row =
+                R36SX_KEY_PRESET_BUTTON_ITEM_FIRST +
+                R36SX_KEY_PRESET_BUTTON_LEFT_COUNT - 1;
+        } else if (state->selected_row == R36SX_KEY_PRESET_ROW_CANCEL) {
+            state->selected_row =
+                R36SX_KEY_PRESET_BUTTON_ITEM_FIRST +
+                R36SX_KEY_PRESET_BUTTON_COUNT - 1;
+        } else {
+            state->selected_row--;
+        }
+    } else {
+        if (state->selected_row == 2) {
+            state->selected_row = R36SX_KEY_PRESET_BUTTON_ITEM_FIRST;
+        } else if (state->selected_row == R36SX_KEY_PRESET_ROW_OK ||
+                   state->selected_row == R36SX_KEY_PRESET_ROW_CANCEL) {
+            state->selected_row = 0;
+        } else {
+            state->selected_row++;
+        }
     }
-    state->presets[state->active].keycodes[button] =
-        g_choices[choice].keycode;
-    r36sx_key_presets_save(state);
+}
+
+static void move_selection_horizontal(struct r36sx_key_presets *state,
+                                      int direction)
+{
+    int button = selected_button(state);
+
+    if (state->selected_row == 0) {
+        select_next_draft_preset(state, direction);
+        return;
+    }
+    if (button >= 0) {
+        int col = button_visual_col(button);
+        int row = button_visual_row(button);
+        int next_button = button_from_visual(col == 0 ? 1 : 0, row);
+        if (next_button >= 0) {
+            state->selected_row =
+                (uint8_t)(R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + next_button);
+        }
+        return;
+    }
+    if (state->selected_row == R36SX_KEY_PRESET_ROW_OK) {
+        state->selected_row = R36SX_KEY_PRESET_ROW_CANCEL;
+    } else if (state->selected_row == R36SX_KEY_PRESET_ROW_CANCEL) {
+        state->selected_row = R36SX_KEY_PRESET_ROW_OK;
+    }
+}
+
+static char name_char_for_keycode(uint16_t keycode)
+{
+    if ((keycode >= 'A' && keycode <= 'Z') ||
+        (keycode >= '0' && keycode <= '9')) {
+        return (char)keycode;
+    }
+    switch (keycode) {
+    case R36SX_SCREEN_KEY_SPACE: return ' ';
+    case R36SX_SCREEN_KEY_OEM_MINUS: return '-';
+    case R36SX_SCREEN_KEY_OEM_PLUS: return '=';
+    case R36SX_SCREEN_KEY_OEM_COMMA: return ',';
+    case R36SX_SCREEN_KEY_OEM_PERIOD: return '.';
+    case R36SX_SCREEN_KEY_OEM_2: return '/';
+    case R36SX_SCREEN_KEY_OEM_5: return '\\';
+    case R36SX_SCREEN_KEY_OEM_7: return '\'';
+    case R36SX_SCREEN_KEY_OEM_1: return ':';
+    default: return '\0';
+    }
+}
+
+static void append_name_key(struct r36sx_key_presets *state, uint16_t keycode)
+{
+    struct r36sx_key_preset *preset = current_draft_preset(state);
+    size_t len;
+    char ch;
+
+    if (!preset) {
+        return;
+    }
+    if (keycode == R36SX_SCREEN_KEY_RETURN ||
+        keycode == R36SX_SCREEN_KEY_ESCAPE) {
+        close_picker(state);
+        return;
+    }
+    len = strlen(preset->name);
+    if (keycode == R36SX_SCREEN_KEY_BACK) {
+        if (len > 0) {
+            preset->name[len - 1] = '\0';
+        }
+        return;
+    }
+    ch = name_char_for_keycode(keycode);
+    if (ch != '\0' && len + 1 < sizeof(preset->name)) {
+        preset->name[len] = ch;
+        preset->name[len + 1] = '\0';
+    }
+}
+
+static void start_picker(struct r36sx_key_presets *state, uint8_t mode,
+                         uint8_t button)
+{
+    state->edit_mode = mode;
+    state->picker_button = button;
+    r36sx_screen_keyboard_init(&state->picker_keyboard);
+    r36sx_screen_keyboard_set_visible(&state->picker_keyboard, 1);
+}
+
+static void handle_picker_buttons(struct r36sx_key_presets *state,
+                                  uint32_t pressed)
+{
+    uint16_t keycode = 0;
+    uint32_t result = r36sx_screen_keyboard_handle_picker_buttons(
+        &state->picker_keyboard, pressed, &keycode);
+
+    if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
+        close_picker(state);
+        return;
+    }
+    if ((result & R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED) == 0) {
+        return;
+    }
+
+    if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY) {
+        struct r36sx_key_preset *preset = current_draft_preset(state);
+        if (preset && state->picker_button < R36SX_KEY_PRESET_BUTTON_COUNT) {
+            preset->keycodes[state->picker_button] = keycode;
+        }
+        close_picker(state);
+    } else if (state->edit_mode == R36SX_KEY_PRESET_PICKER_NAME) {
+        append_name_key(state, keycode);
+    }
 }
 
 uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
                                           uint32_t pressed)
 {
     int row;
+    int button;
+    struct r36sx_key_preset *preset;
 
     if (!state || !state->visible) {
         return 0;
     }
 
+    if (state->edit_mode != R36SX_KEY_PRESET_PICKER_NONE) {
+        handle_picker_buttons(state, pressed);
+        return 0;
+    }
+
     if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
-        r36sx_key_presets_set_visible(state, 0);
-        r36sx_key_presets_save(state);
+        cancel_edit_session(state);
         return R36SX_KEY_PRESET_RESULT_CLOSED;
     }
 
     if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
-        state->selected_row =
-            state->selected_row == 0 ?
-                (uint8_t)(R36SX_KEY_PRESET_ROW_COUNT - 1) :
-                (uint8_t)(state->selected_row - 1);
+        move_selection_vertical(state, -1);
     }
     if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
-        state->selected_row =
-            (uint8_t)((state->selected_row + 1) % R36SX_KEY_PRESET_ROW_COUNT);
+        move_selection_vertical(state, 1);
+    }
+    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        move_selection_horizontal(state, -1);
+    }
+    if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        move_selection_horizontal(state, 1);
     }
 
     row = state->selected_row;
     if (row == 0) {
-        if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
-            select_next_preset(state, -1);
-        }
-        if ((pressed & (R36SX_RKGAME_KEY_RIGHT |
-                        R36SX_RKGAME_KEY_A |
+        if ((pressed & (R36SX_RKGAME_KEY_A |
                         R36SX_RKGAME_KEY_START)) != 0) {
-            select_next_preset(state, 1);
+            select_next_draft_preset(state, 1);
         }
         return 0;
     }
 
     if (row == 1) {
         if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
-            add_preset(state);
+            start_picker(state, R36SX_KEY_PRESET_PICKER_NAME,
+                         R36SX_KEY_PRESET_PICKER_BUTTON_NONE);
         }
         return 0;
     }
 
-    {
-        int button = row - 2;
-        if ((pressed & (R36SX_RKGAME_KEY_RIGHT |
-                        R36SX_RKGAME_KEY_A |
-                        R36SX_RKGAME_KEY_START)) != 0) {
-            cycle_binding(state, button, 1);
+    if (row == 2) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+            add_draft_preset(state);
         }
-        if ((pressed & (R36SX_RKGAME_KEY_LEFT |
-                        R36SX_RKGAME_KEY_B)) != 0) {
-            cycle_binding(state, button, -1);
+        return 0;
+    }
+
+    if (row == R36SX_KEY_PRESET_ROW_OK) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+            commit_edit_session(state);
+            return R36SX_KEY_PRESET_RESULT_CLOSED;
+        }
+        return 0;
+    }
+
+    if (row == R36SX_KEY_PRESET_ROW_CANCEL) {
+        if ((pressed & (R36SX_RKGAME_KEY_A |
+                        R36SX_RKGAME_KEY_B |
+                        R36SX_RKGAME_KEY_START)) != 0) {
+            cancel_edit_session(state);
+            return R36SX_KEY_PRESET_RESULT_CLOSED;
+        }
+        return 0;
+    }
+
+    button = selected_button(state);
+    preset = current_draft_preset(state);
+    if (button >= 0 && preset) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+            start_picker(state, R36SX_KEY_PRESET_PICKER_KEY, (uint8_t)button);
         }
         if ((pressed & R36SX_RKGAME_KEY_Y) != 0) {
-            state->presets[state->active].keycodes[button] = 0;
-            r36sx_key_presets_save(state);
+            preset->keycodes[button] = 0;
         }
     }
 
@@ -655,6 +960,7 @@ static void draw_row(const struct r36sx_key_presets *state,
                      int row,
                      int x,
                      int y,
+                     int w,
                      int row_h,
                      const char *text)
 {
@@ -663,9 +969,8 @@ static void draw_row(const struct r36sx_key_presets *state,
     uint16_t fg = selected ? rgb565(15, 18, 20) : rgb565(232, 238, 226);
     uint16_t border = selected ? rgb565(255, 239, 158) : rgb565(74, 91, 108);
 
-    fill_rect(frame, width, height, stride, x, y, width - x * 2, row_h, bg);
-    stroke_rect(frame, width, height, stride, x, y, width - x * 2, row_h,
-                border);
+    fill_rect(frame, width, height, stride, x, y, w, row_h, bg);
+    stroke_rect(frame, width, height, stride, x, y, w, row_h, border);
     draw_text(frame, width, height, stride, x + 10, y + 5, text, fg, 2);
 }
 
@@ -676,11 +981,26 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
                             int stride_pixels)
 {
     char line[96];
+    const struct r36sx_key_preset *preset;
     int x = 28;
     int y = 86;
-    const int row_h = 23;
+    int col_gap = 12;
+    int full_w = width - x * 2;
+    int col_w = (full_w - col_gap) / 2;
+    int right_x = x + col_w + col_gap;
+    int ok_w = 128;
+    int ok_gap = 24;
+    int ok_x = (width - ok_w * 2 - ok_gap) / 2;
+    int cancel_x = ok_x + ok_w + ok_gap;
+    int button_y;
+    const int row_h = 24;
+    const int grid_gap = 4;
 
     if (!r36sx_key_presets_is_visible(state) || !frame) {
+        return;
+    }
+    preset = current_draft_preset_const(state);
+    if (!preset) {
         return;
     }
 
@@ -691,27 +1011,62 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
     draw_text(frame, width, height, stride_pixels, 28, 28, "KEY PRESETS",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
-              "SELECT CLOSE  UP/DOWN ROW  LEFT/RIGHT KEY  A NEXT/ADD  B PREV  Y NONE",
+              "A/START EDIT  SELECT CANCEL  OK SAVES  Y NONE  LEFT/RIGHT PRESET/COLUMN",
               rgb565(180, 202, 208), 1);
 
     snprintf(line, sizeof(line), "PRESET: %s  %u/%u",
-             state->presets[state->active].name,
-             (unsigned int)state->active + 1u,
-             (unsigned int)state->count);
-    draw_row(state, frame, width, height, stride_pixels, 0, x, y, row_h, line);
+             preset->name,
+             (unsigned int)state->draft_active + 1u,
+             (unsigned int)state->draft_count);
+    draw_row(state, frame, width, height, stride_pixels, 0, x, y, full_w,
+             row_h, line);
+    y += row_h + 4;
+
+    snprintf(line, sizeof(line), "RENAME: %s", preset->name);
+    draw_row(state, frame, width, height, stride_pixels, 1, x, y, full_w,
+             row_h, line);
     y += row_h + 4;
 
     snprintf(line, sizeof(line), "%s",
-             state->count < R36SX_KEY_PRESETS_MAX ?
+             state->draft_count < R36SX_KEY_PRESETS_MAX ?
                 "+ ADD NEW PRESET" : "MAX PRESETS REACHED");
-    draw_row(state, frame, width, height, stride_pixels, 1, x, y, row_h, line);
-    y += row_h + 8;
+    draw_row(state, frame, width, height, stride_pixels, 2, x, y, full_w,
+             row_h, line);
+    y += row_h + 10;
+    button_y = y;
 
     for (int i = 0; i < R36SX_KEY_PRESET_BUTTON_COUNT; i++) {
-        snprintf(line, sizeof(line), "%-6s : %s", g_buttons[i].label,
-                 choice_label(state->presets[state->active].keycodes[i]));
-        draw_row(state, frame, width, height, stride_pixels, i + 2, x, y,
-                 row_h, line);
-        y += row_h + 3;
+        int col = button_visual_col(i);
+        int row = button_visual_row(i);
+        int item = R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + i;
+        int draw_x = col == 0 ? x : right_x;
+        int draw_y = button_y + row * (row_h + grid_gap);
+        snprintf(line, sizeof(line), "%-5s %s", g_buttons[i].label,
+                 choice_label(preset->keycodes[i]));
+        draw_row(state, frame, width, height, stride_pixels, item, draw_x,
+                 draw_y, col_w, row_h, line);
+    }
+
+    y = height - 54;
+    draw_row(state, frame, width, height, stride_pixels,
+             R36SX_KEY_PRESET_ROW_OK, ok_x, y, ok_w, 28, "OK");
+    draw_row(state, frame, width, height, stride_pixels,
+             R36SX_KEY_PRESET_ROW_CANCEL, cancel_x, y, ok_w, 28, "CANCEL");
+
+    if (r36sx_screen_keyboard_is_visible(&state->picker_keyboard)) {
+        int keyboard_y = r36sx_screen_keyboard_panel_y(height);
+        if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY &&
+            state->picker_button < R36SX_KEY_PRESET_BUTTON_COUNT) {
+            snprintf(line, sizeof(line), "PICK KEY FOR %s",
+                     g_buttons[state->picker_button].label);
+        } else {
+            snprintf(line, sizeof(line), "RENAME PRESET: %s", preset->name);
+        }
+        fill_rect(frame, width, height, stride_pixels, 16, keyboard_y - 15,
+                  width - 32, 13, rgb565(10, 13, 18));
+        draw_text(frame, width, height, stride_pixels, 28, keyboard_y - 12,
+                  line, rgb565(238, 236, 196), 1);
+        r36sx_screen_keyboard_draw(&state->picker_keyboard, frame, width,
+                                   height, stride_pixels);
     }
 }

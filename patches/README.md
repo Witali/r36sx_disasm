@@ -21,4 +21,5 @@ Example:
 
 Make a backup of the original disk before applying patches. Numbered patch
 directories are the experiment history; `disk_image_patch_tiny_mc` is the
-current consolidated Tiny MC launcher overlay.
+current consolidated Tiny MC launcher overlay, and
+`disk_image_patch_pico_286` is the current consolidated Pico-286 overlay.

@@ -11,6 +11,7 @@ extern "C" {
 
 #define R36SX_SCREEN_KEYBOARD_PANEL_H 96
 #define R36SX_SCREEN_KEYBOARD_RESULT_CLOSED 0x01u
+#define R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED 0x02u
 
 enum {
     R36SX_SCREEN_KEY_BACK = 8,
@@ -57,11 +58,19 @@ void r36sx_screen_keyboard_set_visible(
 int r36sx_screen_keyboard_panel_y(int framebuffer_height);
 int r36sx_screen_keyboard_content_height(
     const struct r36sx_screen_keyboard *keyboard, int framebuffer_height);
+uint16_t r36sx_screen_keyboard_current_keycode(
+    struct r36sx_screen_keyboard *keyboard);
+const char *r36sx_screen_keyboard_current_label(
+    struct r36sx_screen_keyboard *keyboard);
 uint32_t r36sx_screen_keyboard_handle_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
     r36sx_screen_keyboard_emit_fn emit,
     void *emit_user);
+uint32_t r36sx_screen_keyboard_handle_picker_buttons(
+    struct r36sx_screen_keyboard *keyboard,
+    uint32_t pressed,
+    uint16_t *keycode);
 void r36sx_screen_keyboard_draw(
     const struct r36sx_screen_keyboard *keyboard,
     uint16_t *frame,

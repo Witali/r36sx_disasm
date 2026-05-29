@@ -468,6 +468,24 @@ int r36sx_screen_keyboard_content_height(
         r36sx_screen_keyboard_panel_y(framebuffer_height) : framebuffer_height;
 }
 
+uint16_t r36sx_screen_keyboard_current_keycode(
+    struct r36sx_screen_keyboard *keyboard)
+{
+    if (!keyboard) {
+        return 0;
+    }
+    return current_key(keyboard)->keycode;
+}
+
+const char *r36sx_screen_keyboard_current_label(
+    struct r36sx_screen_keyboard *keyboard)
+{
+    if (!keyboard) {
+        return "";
+    }
+    return current_key(keyboard)->label;
+}
+
 uint32_t r36sx_screen_keyboard_handle_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
@@ -508,6 +526,47 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         result |= activate_current(keyboard, emit, emit_user);
     }
     return result;
+}
+
+uint32_t r36sx_screen_keyboard_handle_picker_buttons(
+    struct r36sx_screen_keyboard *keyboard,
+    uint32_t pressed,
+    uint16_t *keycode)
+{
+    const struct r36sx_osk_key *key;
+
+    if (!keyboard || !keyboard->visible) {
+        return 0;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        move_selection(keyboard, -1, 0);
+    }
+    if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        move_selection(keyboard, 1, 0);
+    }
+    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
+        move_selection(keyboard, 0, -1);
+    }
+    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
+        move_selection(keyboard, 0, 1);
+    }
+    if ((pressed & (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_B)) != 0) {
+        r36sx_screen_keyboard_set_visible(keyboard, 0);
+        return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
+    }
+    if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) == 0) {
+        return 0;
+    }
+
+    key = current_key(keyboard);
+    if ((key->flags & R36SX_OSK_FLAG_CLOSE) != 0) {
+        r36sx_screen_keyboard_set_visible(keyboard, 0);
+        return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
+    }
+    if (keycode) {
+        *keycode = key->keycode;
+    }
+    return R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
 }
 
 void r36sx_screen_keyboard_draw(

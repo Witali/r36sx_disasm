@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "../common/r36sx_screen_keyboard.h"
+
 #define R36SX_KEY_PRESETS_MAX 8
 #define R36SX_KEY_PRESET_NAME_LEN 32
 #define R36SX_KEY_PRESET_RESULT_CLOSED 0x01u
@@ -31,10 +33,16 @@ struct r36sx_key_preset {
 
 struct r36sx_key_presets {
     struct r36sx_key_preset presets[R36SX_KEY_PRESETS_MAX];
+    struct r36sx_key_preset draft_presets[R36SX_KEY_PRESETS_MAX];
+    struct r36sx_screen_keyboard picker_keyboard;
     uint8_t count;
     uint8_t active;
+    uint8_t draft_count;
+    uint8_t draft_active;
     uint8_t visible;
     uint8_t selected_row;
+    uint8_t edit_mode;
+    uint8_t picker_button;
     char config_path[192];
 };
 

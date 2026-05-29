@@ -445,6 +445,57 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 key preset editor draft UI
+
+Rebuilt Pico-286 after reworking the Select key preset editor:
+
+- the physical button binding list is now split into two columns so it stays
+  inside the outer frame;
+- opening the editor starts a draft session, and changes are written only by
+  selecting the visual `OK` button;
+- `Cancel` or `Select` closes the editor without saving the draft;
+- the preset name can be edited with the shared on-screen keyboard picker;
+- pressing A/Start on a button binding row opens the same on-screen keyboard as
+  a key picker instead of cycling through a hardcoded list.
+
+Build command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `-TryStrip` step still reports Zig objcopy `unimplemented`, so the build
+kept the unstripped executable.
+
+Copy commands:
+
+```powershell
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_063\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\keypresets.conf -Destination patches\disk_image_patch_063\MIPS_NATIVE\pico_286\keypresets.conf -Force
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_063\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,054,724 bytes
+- SHA256: `598071628DA6ECA5B608625CB636AEF76977BB5C59D50039B4E93BB37FC2E4E1`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_063/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 Sopwith DOS game floppy
 
 Downloaded Sopwith (The Author's Edition) from DOS Games Archive as a small

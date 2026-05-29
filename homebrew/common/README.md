@@ -39,6 +39,13 @@ r36sx_screen_keyboard_handle_buttons(&keyboard, pressed, emit_key, NULL);
 r36sx_screen_keyboard_draw(&keyboard, frame, width, height, stride_pixels);
 ```
 
+The same layout can also be used as a key picker instead of a typing device.
+`r36sx_screen_keyboard_handle_picker_buttons()` moves the highlighted key and
+returns `R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED` with the selected keycode when
+A or Start is pressed; it does not call the emit callback or send scancodes.
+Pico-286 uses this mode in the key preset editor for selecting bindings and
+renaming presets.
+
 The keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.  Use
 `r36sx_screen_keyboard_content_height()` when the underlying app screen should
 be vertically compressed or clipped while the keyboard is visible.

@@ -393,6 +393,9 @@ Notable patch history:
 - `disk_image_patch_062`: rebuilds Tiny MC so the orange selection marker is
   vertically aligned to the highlighted row padding instead of the text
   baseline.
+- `disk_image_patch_063`: rebuilds Pico-286 with a safer key preset editor:
+  two-column physical button list, draft edits, on-screen-keyboard assignment,
+  preset rename, and explicit OK/Cancel save controls.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
