@@ -7,9 +7,9 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/pico_286`
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/keypresets.conf`
-- `MIPS_NATIVE/pico_286/fdd0.img`
-- `MIPS_NATIVE/pico_286/fdd1.img`
-- `MIPS_NATIVE/pico_286/fdd2.img`
+- `MIPS_NATIVE/pico_286/FreeDOS1.img`
+- `MIPS_NATIVE/pico_286/FreeDOS2.img`
+- `MIPS_NATIVE/pico_286/FreeDOS3.img`
 - `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
@@ -27,12 +27,12 @@ If that path cannot be opened on the device, it falls back to:
 Optional PC disk images should be placed in the same directory:
 
 - `MIPS_NATIVE/pico_286/pico_286.conf`
-- `MIPS_NATIVE/pico_286/fdd0.img`
-- `MIPS_NATIVE/pico_286/fdd1.img`
+- `MIPS_NATIVE/pico_286/FreeDOS1.img`
+- `MIPS_NATIVE/pico_286/FreeDOS2.img`
 - `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
-- `MIPS_NATIVE/pico_286/fdd2.img` for older test builds that request a third
+- `MIPS_NATIVE/pico_286/FreeDOS3.img` for older test builds that request a third
   floppy image
 
 Button presets are stored in:
@@ -68,9 +68,9 @@ name such as `Preset 2`.
 
 The included image set is based on official FreeDOS 1.4 Floppy Edition:
 
-- `fdd0.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
-- `fdd1.img`: `144m/x86DSK01.img`.
-- `fdd2.img`: `144m/x86DSK02.img`.
+- `FreeDOS1.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
+- `FreeDOS2.img`: `144m/x86DSK01.img`.
+- `FreeDOS3.img`: `144m/x86DSK02.img`.
 - `hdd.img` and `hdd2.img`: blank raw hard disk images, 65/16/63 CHS,
   33,546,240 bytes each.
 
@@ -88,7 +88,7 @@ game floppy:
 floppy:
 
 ```ini
-fdd0=fdd0.img
+fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
@@ -138,7 +138,7 @@ the bottom of the framebuffer, and the emulated screen text is no longer dumped
 to the log as `screen_text:*` entries.
 
 Device testing confirmed that this patch set boots DOS successfully from the
-included FreeDOS `fdd0.img` floppy image.
+included `FreeDOS1.img` floppy image.
 
 The current binary includes a joystick-controlled on-screen keyboard and a key
 preset editor:
@@ -165,7 +165,7 @@ above the keyboard instead of being covered.
 Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf`:
 
 ```ini
-fdd0=fdd0.img
+fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
@@ -276,7 +276,7 @@ reads floppy and hard disk bindings from the config file before BIOS boot.
 Default bindings:
 
 ```ini
-fdd0=fdd0.img
+fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
@@ -285,7 +285,7 @@ hdd1=hdd2.img
 These map to BIOS drives `00h`, `01h`, `80h`, and `81h`.  Relative paths are
 resolved from the directory that contains `pico_286.conf`.  Empty values
 disable a drive.  If the config file is missing, Pico-286 falls back to these
-same four filenames.
+legacy internal names: `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
 
 ```text
 Size: 7965128 bytes
@@ -312,6 +312,24 @@ full-screen key preset editor.  Select opens or closes it while DOS is running
 and the on-screen keyboard is hidden.  The editor can switch presets, copy the
 active preset into a new automatically named preset, and assign each game
 button to a supported keyboard key.
+
+```text
+Size: 8005860 bytes
+SHA256: 583587D4DFA6A0CD7D817370DBA8CDB4397957513818F6D454C30D9DC1F56BC5
+Defender scan: found no threats
+```
+
+## 2026-05-29 FreeDOS image rename
+
+The FreeDOS floppy images were renamed:
+
+- `fdd0.img` -> `FreeDOS1.img`
+- `fdd1.img` -> `FreeDOS2.img`
+- `fdd2.img` -> `FreeDOS3.img`
+
+`pico_286.conf` now boots DOS from `FreeDOS1.img` and keeps `sopwith.img`
+mounted as DOS `B:`.  The binary keeps the legacy missing-config fallback names
+inside the app.
 
 ```text
 Size: 8005860 bytes

@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-29 FreeDOS image rename
+
+Renamed the local FreeDOS floppy images to make their role clearer:
+
+- `fdd0.img` -> `FreeDOS1.img` (`144m/x86BOOT.img`, bootable FreeDOS floppy)
+- `fdd1.img` -> `FreeDOS2.img` (`144m/x86DSK01.img`)
+- `fdd2.img` -> `FreeDOS3.img` (`144m/x86DSK02.img`)
+
+The current `pico_286.conf` keeps Sopwith mounted as DOS `B:`:
+
+```ini
+fdd0=FreeDOS1.img
+fdd1=sopwith.img
+hdd0=hdd.img
+hdd1=hdd2.img
+```
+
+The binary fallback names in `r36sx_cpu.c` intentionally remain the legacy
+`fdd0.img`/`fdd1.img`; the active renamed disks are selected through
+`pico_286.conf`.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,005,860 bytes
+- SHA256: `583587D4DFA6A0CD7D817370DBA8CDB4397957513818F6D454C30D9DC1F56BC5`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+- Renamed FreeDOS image copies in both `disk_image` and
+  `patches/disk_image_patch_pico_286` were also scanned; Defender reported no
+  threats.
+
 ## 2026-05-29 source extraction build
 
 Purpose:

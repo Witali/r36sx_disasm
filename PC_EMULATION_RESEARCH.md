@@ -85,7 +85,7 @@ Limitations:
 - The Linux timing thread currently busy-waits with no sleep. A console port
   should add frame pacing with `clock_gettime` plus `usleep`/`nanosleep`, or use
   our usual cooperative loop pattern, to avoid unnecessary battery drain.
-- A usable DOS experience needs bootable disk images (`fdd0.img`, `hdd.img`,
+- A usable DOS experience needs bootable disk images (`FreeDOS1.img`, `hdd.img`,
   etc.) placed in a path expected by the port.
 
 ## Feasibility On Our Console

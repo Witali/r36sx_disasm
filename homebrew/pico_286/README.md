@@ -48,8 +48,8 @@ directory is only for compiler output:
   teletype output, mode query, active page selection, and write string.
 - `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
   `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
-  `81h`.  If the file is absent, it falls back to `fdd0.img`, `fdd1.img`,
-  `hdd.img`, and `hdd2.img`.
+  `81h`.  If the file is absent, it falls back to the legacy internal names
+  `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
   writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
@@ -122,7 +122,7 @@ The upstream PC disk images are still expected by the emulator.  In this port,
 devices:
 
 ```ini
-fdd0=fdd0.img
+fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
@@ -132,16 +132,17 @@ hdd1=hdd2.img
 `80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286
 directory unless absolute paths are used.  Leaving a value empty disables that
 drive.  If `pico_286.conf` is missing, the same four default filenames are
-used.  A compatibility `fdd2.img` can also be placed there for older test
-builds that tried to attach a third floppy image.  The upstream network
+used from the legacy internal fallback (`fdd0.img`, `fdd1.img`, `hdd.img`,
+`hdd2.img`).  A compatibility `FreeDOS3.img` can also be placed there for
+older test builds that tried to attach a third floppy image.  The upstream network
 redirector still maps DOS drive H: to `/tmp/`.
 
 The local test image set uses official FreeDOS 1.4 Floppy Edition images plus
 a separate Sopwith game floppy:
 
-- `fdd0.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
-- `fdd1.img`: `144m/x86DSK01.img`, first FreeDOS package floppy.
-- `fdd2.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
+- `FreeDOS1.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
+- `FreeDOS2.img`: `144m/x86DSK01.img`, first FreeDOS package floppy.
+- `FreeDOS3.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
 - `sopwith.img`: 1.44 MB FAT12 floppy with Sopwith (The Author's Edition),
   available as DOS `B:` in the current `pico_286.conf`.
 - `hdd.img`: blank raw hard disk image, 65 cylinders, 16 heads, 63 sectors.
