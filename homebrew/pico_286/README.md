@@ -123,7 +123,7 @@ devices:
 
 ```ini
 fdd0=fdd0.img
-fdd1=fdd1.img
+fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
 ```
@@ -136,11 +136,14 @@ used.  A compatibility `fdd2.img` can also be placed there for older test
 builds that tried to attach a third floppy image.  The upstream network
 redirector still maps DOS drive H: to `/tmp/`.
 
-The local test image set uses official FreeDOS 1.4 Floppy Edition images:
+The local test image set uses official FreeDOS 1.4 Floppy Edition images plus
+a separate Sopwith game floppy:
 
 - `fdd0.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
 - `fdd1.img`: `144m/x86DSK01.img`, first FreeDOS package floppy.
 - `fdd2.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
+- `sopwith.img`: 1.44 MB FAT12 floppy with Sopwith (The Author's Edition),
+  available as DOS `B:` in the current `pico_286.conf`.
 - `hdd.img`: blank raw hard disk image, 65 cylinders, 16 heads, 63 sectors.
 - `hdd2.img`: blank raw hard disk image with the same geometry.
 

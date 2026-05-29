@@ -10,6 +10,7 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/fdd0.img`
 - `MIPS_NATIVE/pico_286/fdd1.img`
 - `MIPS_NATIVE/pico_286/fdd2.img`
+- `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
 
@@ -28,6 +29,7 @@ Optional PC disk images should be placed in the same directory:
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/fdd0.img`
 - `MIPS_NATIVE/pico_286/fdd1.img`
+- `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
 - `MIPS_NATIVE/pico_286/fdd2.img` for older test builds that request a third
@@ -75,6 +77,28 @@ The included image set is based on official FreeDOS 1.4 Floppy Edition:
 The downloaded FreeDOS archive, extracted files, and final copied image
 directories were scanned with `tools/scan-download.ps1`; Microsoft Defender
 reported no threats.
+
+The current patch also includes a separate Sopwith (The Author's Edition)
+game floppy:
+
+- `sopwith.img`: 1.44 MB FAT12 floppy with `SW.EXE`, `SOPWTH.BAT`, and
+  `README.TXT`.
+
+`pico_286.conf` currently maps DOS `B:` / BIOS drive `01h` to this game
+floppy:
+
+```ini
+fdd0=fdd0.img
+fdd1=sopwith.img
+hdd0=hdd.img
+hdd1=hdd2.img
+```
+
+Sopwith was downloaded from DOS Games Archive (`swae-box.zip`, SHA256
+`689BC2B80BFE9A7079F94C7A550BA2E0D7FA1842DC4F9C6BCED225A7424BAFBA`) and
+packed with `tools/create_fat12_floppy.py`.  The ZIP, extracted files, and
+all three final image copies were scanned with `tools/scan-download.ps1`;
+Microsoft Defender reported no threats.
 
 The current binary is an unstripped ELF32 little-endian MIPS executable.  Zig
 0.16.0 `objcopy --strip-all` reports `error: unimplemented` for this file, so
@@ -142,7 +166,7 @@ Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf
 
 ```ini
 fdd0=fdd0.img
-fdd1=fdd1.img
+fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
 ```
@@ -253,7 +277,7 @@ Default bindings:
 
 ```ini
 fdd0=fdd0.img
-fdd1=fdd1.img
+fdd1=sopwith.img
 hdd0=hdd.img
 hdd1=hdd2.img
 ```

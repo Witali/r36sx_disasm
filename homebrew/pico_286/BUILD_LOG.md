@@ -200,6 +200,49 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 Sopwith DOS game floppy
+
+Downloaded Sopwith (The Author's Edition) from DOS Games Archive as a small
+286-compatible DOS game candidate.  The selected package is listed by DOS Games
+Archive as `Freeware (installed)`, `MS-DOS`, 42 kB, and the page description
+states that the author's edition was released under the GNU GPL with source
+available separately.
+
+Commands used:
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\internet_sources\sopwith_ae
+Invoke-WebRequest -Uri 'https://www.dosgamesarchive.com/file.php?id=2395' -OutFile .\internet_sources\sopwith_ae\swae-box.zip
+.\tools\scan-download.ps1 .\internet_sources\sopwith_ae\swae-box.zip
+Expand-Archive -LiteralPath .\internet_sources\sopwith_ae\swae-box.zip -DestinationPath .\internet_sources\sopwith_ae\swae-box -Force
+.\tools\scan-download.ps1 .\internet_sources\sopwith_ae\swae-box
+python .\tools\create_fat12_floppy.py --output .\homebrew\pico_286\sopwith.img --label SOPWITH --file SW.EXE=.\internet_sources\sopwith_ae\swae-box\sopwith\sw.exe --file SOPWTH.BAT=.\homebrew\pico_286\dos_games\sopwith\SOPWTH.BAT --file README.TXT=.\homebrew\pico_286\dos_games\sopwith\README.TXT
+Copy-Item -LiteralPath .\homebrew\pico_286\sopwith.img -Destination .\disk_image\MIPS_NATIVE\pico_286\sopwith.img -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\sopwith.img -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\sopwith.img -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\sopwith.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\sopwith.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\sopwith.img
+```
+
+Result:
+
+- Downloaded ZIP: `internet_sources/sopwith_ae/swae-box.zip`
+- ZIP SHA256: `689BC2B80BFE9A7079F94C7A550BA2E0D7FA1842DC4F9C6BCED225A7424BAFBA`
+- New image: `homebrew/pico_286/sopwith.img`
+- Image size: 1,474,560 bytes
+- Image SHA256: `14D8A70F3288DA8B0A9AAF4577F2BCA84E89E35D614F1FAA913EA6490ED8ACB2`
+- FAT12 root entries: `SW.EXE`, `SOPWTH.BAT`, `README.TXT`
+- Defender scan: found no threats for the ZIP, extracted folder, and all three
+  `sopwith.img` copies
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/sopwith.img`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/sopwith.img`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+
+`pico_286.conf` now maps `fdd1=sopwith.img`, so after FreeDOS boots from
+`A:`, the game floppy is available as DOS drive `B:`.
+
 ## 2026-05-29 key preset editor
 
 Added `keypresets.conf` and a full-screen key preset editor to the Pico-286

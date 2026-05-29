@@ -14,6 +14,7 @@ internet_sources/
 tools/*
 !tools/*.md
 !tools/scan-download.ps1
+!tools/create_fat12_floppy.py
 
 # Build outputs and caches
 *.o
