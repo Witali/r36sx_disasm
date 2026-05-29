@@ -542,3 +542,40 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-29 vendor pico-286 source tree
+
+Moved the upstream Pico-286 source snapshot into
+`homebrew/pico_286/pico-286` so the port can build from sources kept next to
+the R36SX wrapper code.  The copied tree excludes the upstream `.git`
+directory and `.gitignore`; it is a plain source snapshot, not a nested
+repository.  The old ignored clone at `internet_sources/pico-286` was removed
+after the new tree built successfully.
+
+The source snapshot contains 165 files, about 3.9 MB total.  The copied tree
+also excludes upstream `tools/mapdrive.com`, because that is a generated DOS
+binary; `tools/mapdrive.asm` remains as source.  The build script now resolves
+`$PicoRoot` from `homebrew/pico_286/pico-286` instead of the old ignored
+`internet_sources/pico-286` mirror.
+
+Scanned the vendored source snapshot:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico-286
+```
+
+Result: Microsoft Defender reported no threats.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,935,964 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

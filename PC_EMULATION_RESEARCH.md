@@ -10,13 +10,15 @@ applications for the R36SX/GB350-like MIPS/Linux console.
 ### xrip/pico-286
 
 - Source URL: https://github.com/xrip/pico-286
-- Local path: `internet_sources\pico-286`
+- Current vendored path: `homebrew\pico_286\pico-286`
+- Original downloaded path: `internet_sources\pico-286` (removed after vendoring)
 - Checked commit: `2ba88bf17de8e69c86f9256e22a241e8d31e8c96`
 - Commit summary: `2ba88bf MIDI: add per-instrument ADSR envelope with GM program table`
 - Download command:
   - `git clone --depth 1 https://github.com/xrip/pico-286.git internet_sources\pico-286`
 - Security scan:
   - Command: `.\tools\scan-download.ps1 .\internet_sources\pico-286`
+  - Vendored scan command: `.\tools\scan-download.ps1 .\homebrew\pico_286\pico-286`
   - Scanner: Microsoft Defender `MpCmdRun.exe`
   - Result: no threats found
 
@@ -33,7 +35,9 @@ applications for the R36SX/GB350-like MIPS/Linux console.
   - Result: no threats found
 
 `internet_sources\` is ignored by git, so the downloaded repositories are local
-reference copies only. This tracked file records the sources and exact commits.
+reference copies only. Pico-286 was later vendored into
+`homebrew\pico_286\pico-286` without `.git` metadata so the port can build from
+tracked local sources. This tracked file records the sources and exact commits.
 
 ## pico-286 Summary
 

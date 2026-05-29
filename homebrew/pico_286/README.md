@@ -2,8 +2,8 @@
 
 This directory contains the first native R36SX/SF3000-style port layer for
 [xrip/pico-286](https://github.com/xrip/pico-286).  The upstream project is MIT
-licensed and is stored locally under `internet_sources/pico-286`, which is
-ignored by git because it is a downloaded third-party source mirror.
+licensed and is vendored locally under `homebrew/pico_286/pico-286` without
+the upstream `.git` repository metadata.
 
 The port reuses the upstream Linux/host emulator core and replaces only the host
 integration pieces:
@@ -122,10 +122,12 @@ emulated screen text is no longer copied into the log.
 MIPS ELF.  The script therefore leaves the executable unstripped by default.
 Pass `-TryStrip` only when testing a newer Zig that supports stripping it.
 
-Before using an updated `internet_sources/pico-286` checkout, scan it with:
+Before replacing the vendored `homebrew/pico_286/pico-286` source snapshot,
+scan the downloaded checkout/archive first, then scan the copied vendored tree:
 
 ```powershell
-.\tools\scan-download.ps1 .\internet_sources\pico-286
+.\tools\scan-download.ps1 .\path\to\downloaded\pico-286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico-286
 ```
 
 Downloaded FreeDOS archives/images should also be scanned before copying them

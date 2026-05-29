@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$PicoRoot = Join-Path $Root "internet_sources\pico-286"
+$PicoRoot = Join-Path $PSScriptRoot "pico-286"
 $Zig = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\zig.exe"
 $ZigInclude = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\lib\include"
 $Sysroot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot"
@@ -26,7 +26,7 @@ $CrtEnd = Join-Path $GccLib "crtend.o"
 $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
 
 if (!(Test-Path $PicoRoot)) {
-    throw "Missing internet_sources\pico-286. Clone https://github.com/xrip/pico-286 first."
+    throw "Missing homebrew\pico_286\pico-286 source tree."
 }
 
 New-Item -ItemType Directory -Force $ObjDir | Out-Null

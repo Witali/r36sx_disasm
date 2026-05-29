@@ -131,7 +131,7 @@
   - Компактный PC 8086/8088/80186/286 эмулятор для RP2040/RP2350/Murmulator.
   - Важно для нас: есть Linux/Windows host frontends, поэтому ядро эмулятора
     можно пытаться портировать как MIPS native app с нашим framebuffer/input/audio.
-  - Локальная копия: `internet_sources\pico-286`, commit
+  - Локальная копия: `homebrew\pico_286\pico-286`, commit
     `2ba88bf17de8e69c86f9256e22a241e8d31e8c96`, Defender scan без угроз.
   - Подробная оценка: `PC_EMULATION_RESEARCH.md`.
 
