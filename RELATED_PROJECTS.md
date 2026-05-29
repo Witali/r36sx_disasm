@@ -1,207 +1,197 @@
-# Похожие проекты и полезные ссылки
+# Similar Projects And Useful Links
 
-Этот файл собирает ссылки, которые могут быть полезны для исследования `disk_image`, Hichip/HC16xx, iCube/cubegm, R36SX/GB350/SF3000 и родственных MIPS handheld-платформ.
+This file collects links useful for researching `disk_image`, Hichip/HC16xx, iCube/cubegm, R36SX/GB350/SF3000, and related MIPS handheld platforms.
 
-## Самые близкие к нашему дампу
+## Closest To Our Dump
 
 ### HCRTOS / Hichip SDK
 
 - https://git.maschath.de/ignatz/hcrtos
-  - Публичное дерево HCRTOS/Hichip SDK.
-  - Локальная копия уже есть в `internet_sources\hcrtos`.
-  - Важные директории:
+  - Public HCRTOS/Hichip SDK tree.
+  - A local copy already exists in `internet_sources\hcrtos`.
+  - Important directories:
     - `components\applications\apps-projector\source\hcprojector_app`
     - `board\hc16xx\projector`
     - `configs\hichip_hc16xx_*_projector_*`
     - `components\hcfota`
     - `components\liblvgl`
-  - Почему важно: содержит исходники projector-приложения и DTS/defconfig для HC16xx projector-платформ. В `projector.c` есть строка `Welcome to Hichip world!`, совпадающая со строками из нашего `hcprojector`.
+  - Why it matters: it contains projector application sources and DTS/defconfig files for HC16xx projector platforms. `projector.c` contains the string `Welcome to Hichip world!`, matching strings from our `hcprojector`.
 
 - https://git.maschath.de/ignatz/hcrtos/-/blob/7356e416d0d07a6f844faf89f433fb106677e9d8/configs/hichip_hc16xx_linux_bl_tiny_defconfig
-  - Пример HC16xx defconfig из того же HCRTOS-дерева.
+  - Example HC16xx defconfig from the same HCRTOS tree.
 
 ### R36SX / GB350 / SF3000
 
 - https://r36sx-hub.neocities.org/
   - R36SX / GB350 / SF3000 owner hub.
-  - Полезен как агрегатор ссылок и текущего состояния сообщества.
-  - Важные совпадения с нашим анализом: MIPS SoC, iCube/cubegm firmware, stock OS only, несовместимость с ArkOS/JELOS/EmuELEC.
+  - Useful as a link aggregator and for current community status.
+  - Important matches with our analysis: MIPS SoC, iCube/cubegm firmware, stock OS only, incompatibility with ArkOS/JELOS/EmuELEC.
 
 - https://www.reddit.com/r/R36S/comments/1qdqocz/does_anyone_have_a_backup_of_this_gb350_r36sx/
-  - Обсуждение R36SX/GB350 clone.
-  - Утверждает, что R36SX использует HiChip HC16xx, MIPS32_R2, Linux 4.4.186, U-Boot и hichip_hc16xx-драйверы.
-  - Хорошо совпадает с нашим `dtb.bin` и `rootfs`.
+  - R36SX/GB350 clone discussion.
+  - Claims that R36SX uses HiChip HC16xx, MIPS32_R2, Linux 4.4.186, U-Boot, and hichip_hc16xx drivers.
+  - Matches our `dtb.bin` and `rootfs` well.
 
 - https://github.com/LiamJ74/R36S-V2.6_Wiki
-  - Wiki/tools для R36S-V2.6 / GB350 / R36SX-like карт.
-  - По сообщениям сообщества содержит `sync_sd_card` и `download_covers`.
-  - Полезно для восстановления списков игр, обложек и структуры SD-карты.
+  - Wiki/tools for R36S-V2.6 / GB350 / R36SX-like cards.
+  - Community reports mention `sync_sd_card` and `download_covers`.
+  - Useful for restoring game lists, covers, and SD card structure.
 
 - https://www.reddit.com/r/R36S/comments/1td4nxu/guide_r36sv260712_gb350_r36sx_how_to_add_games/
-  - Практический guide по добавлению игр и исправлению SD-карты для R36S-V2.6 / GB350 / R36SX.
-  - Полезно для понимания `allfiles.lst`, `filelist.csv`, обложек и пользовательской части карты.
+  - Practical guide for adding games and fixing the SD card for R36S-V2.6 / GB350 / R36SX.
+  - Useful for understanding `allfiles.lst`, `filelist.csv`, covers, and the user-facing card area.
 
-## Родственные Hichip/HCSEMI handheld-платформы
+## Related Hichip/HCSEMI Handheld Platforms
 
-Эти проекты не обязательно совместимы напрямую, но полезны как референсы по подходам: патчинг bootloader/BIOS, работа с ресурсами, списками игр, темами, кастомными frontend и MIPS-бинарниками.
+These projects are not necessarily directly compatible, but they are useful as references for approaches: bootloader/BIOS patching, resource handling, game lists, themes, custom frontends, and MIPS binaries.
 
 ### SF2000
 
 - https://github.com/vonmillhausen/sf2000
-  - Большая база знаний по Data Frog SF2000.
-  - Полезно как пример реверса дешевого Hichip/HCSEMI handheld.
-  - Есть сведения по firmware, bootloader bug, tools, ресурсам и моддингу.
+  - Large knowledge base for the Data Frog SF2000.
+  - Useful as an example of reverse engineering a cheap Hichip/HCSEMI handheld.
+  - Contains information on firmware, the bootloader bug, tools, resources, and modding.
 
 - https://vonmillhausen.github.io/sf2000/
-  - Web-версия SF2000 documentation/tools.
-  - Полезно для быстрого доступа к инструментам и описаниям.
+  - Web version of SF2000 documentation/tools.
+  - Useful for quick access to tools and descriptions.
 
 - https://github.com/Dteyn/Datafrog_SF2000_Vanilla
   - Stripped-down / vanilla SF2000 OS project.
-  - Полезно как пример раскладки firmware-only / complete OS files / full image.
+  - Useful as an example of firmware-only / complete OS files / full image layouts.
 
 - https://github.com/tzlion/frogtool
-  - Game list rebuilding tool для SF2000.
-  - Может быть полезен как пример форматов списков игр, хотя форматы R36SX/cubegm могут отличаться.
+  - Game list rebuilding tool for SF2000.
+  - May be useful as a reference for game-list formats, although R36SX/cubegm formats may differ.
 
 - https://q-ta-s.github.io/sf2000.html
-  - Набор SF2000/GB300 tools: themes, boot logo и другие мелкие моды.
+  - Set of SF2000/GB300 tools: themes, boot logo, and other small mods.
 
 - https://grgadam.github.io/SF2000LinkTree/
-  - Link tree по SF2000 firmware/tools.
+  - Link tree for SF2000 firmware/tools.
 
 ### GB300
 
 - https://github.com/nummacway/gb300
-  - Информация по GB300 handheld.
-  - Важно: обсуждает родство GB300 и SF2000, firmware versions, multicore, hardware.
+  - Information about the GB300 handheld.
+  - Important because it discusses the relationship between GB300 and SF2000, firmware versions, multicore, and hardware.
 
 - https://github.com/nummacway/gb300-sf2000-tool
-  - All-in-one tool для GB300 и SF2000.
-  - Может быть полезен как пример GUI-инструмента для тем, списков, bootloader patch и firmware/resource management.
+  - All-in-one tool for GB300 and SF2000.
+  - May be useful as an example GUI tool for themes, lists, bootloader patching, and firmware/resource management.
 
 - https://retromods.pl/blog/gb300-setup
-  - SF2000/GB300 first steps и multicore setup.
+  - SF2000/GB300 first steps and multicore setup.
 
-## Кастомные frontend / CFW-инициативы для родственных устройств
+## Custom Frontends / CFW Initiatives For Related Devices
 
 - https://github.com/axgdev/UniFrog
-  - UniFrog CFW для SF2000/GB300.
-  - Прямо не подходит для нашего дампа, но полезен как референс идеи кастомного firmware/frontend на родственных дешевых handheld.
+  - UniFrog CFW for SF2000/GB300.
+  - Not directly suitable for our dump, but useful as a reference for custom firmware/frontend ideas on related cheap handhelds.
 
 - https://github.com/axgdev/UniFrog/releases
-  - Releases UniFrog.
+  - UniFrog releases.
 
 - https://www.reddit.com/r/DataFrogCentral/comments/1t4wvn1/alpha_testers_unifrog_v040_cfw_released/
-  - Обсуждение UniFrog v0.4.x.
+  - UniFrog v0.4.x discussion.
 
 - https://www.reddit.com/r/SBCGaming/comments/1oyqgwq/frogui_v010_released_a_modern_frontend_for_sf2000/
-  - FrogUI: frontend/UI replacement для SF2000/GB300.
-  - Полезно как пример направления: заменить stock UI, не обязательно весь kernel/rootfs.
+  - FrogUI: frontend/UI replacement for SF2000/GB300.
+  - Useful as an example of replacing the stock UI without necessarily replacing the whole kernel/rootfs.
 
-## Эмуляторы / дополнительные cores
+## Emulators / Additional Cores
 
 - https://murmulator.ru/zxmurmulator
   - Murmulator ZX Spectrum firmware / `pico-spec`.
-  - Это богатый ZX Spectrum/Pentagon/Byte/ALF эмулятор для RP2040/RP2350,
-    но он bare-metal Pico SDK firmware, а не Linux/libretro `.so`.
-  - Подробная локальная оценка портирования: `MURMULATOR_PORTING_ANALYSIS.md`.
+  - This is a rich ZX Spectrum/Pentagon/Byte/ALF emulator for RP2040/RP2350, but it is bare-metal Pico SDK firmware rather than a Linux/libretro `.so`.
+  - Detailed local porting assessment: `MURMULATOR_PORTING_ANALYSIS.md`.
 
 - https://github.com/DnCraptor/pico-spec
-  - Исходники Murmulator/pico-spec.
-  - Локальная копия скачана в `internet_sources\murmulator\pico-spec-main`
-    и архив просканирован Defender без угроз.
+  - Murmulator/pico-spec sources.
+  - Local copy downloaded to `internet_sources\murmulator\pico-spec-main`; the archive was scanned by Defender with no threats found.
 
 - https://github.com/EremusOne/ESPectrum
-  - Оригинальный ESPectrum, от которого унаследован pico-spec.
-  - Может быть полезен для сравнения платформенного слоя и поиска менее
-    embedded-зависимых частей.
+  - Original ESPectrum project inherited by pico-spec.
+  - May be useful for comparing the platform layer and finding less embedded-dependent parts.
 
 - https://github.com/angree/sf2000-uae-amiga-emulator/releases
-  - Amiga emulator для SF2000/GB300.
-  - Полезно как пример добавления нового эмуляторного компонента в похожую экосистему.
+  - Amiga emulator for SF2000/GB300.
+  - Useful as an example of adding a new emulator component to a similar ecosystem.
 
 - https://github.com/madcock/sf2000_multicore_cores
-  - Multicore cores для SF2000.
-  - Если репозиторий доступен, смотреть как пример сборки/адаптации cores.
+  - Multicore cores for SF2000.
+  - If available, inspect as an example of core build/adaptation.
 
-## PC / DOS / x86 эмуляторы
+## PC / DOS / x86 Emulators
 
 - https://github.com/xrip/pico-286
-  - Компактный PC 8086/8088/80186/286 эмулятор для RP2040/RP2350/Murmulator.
-  - Важно для нас: есть Linux/Windows host frontends, поэтому ядро эмулятора
-    можно пытаться портировать как MIPS native app с нашим framebuffer/input/audio.
-  - Локальная копия: `homebrew\pico_286\pico-286`, commit
-    `2ba88bf17de8e69c86f9256e22a241e8d31e8c96`, Defender scan без угроз.
-  - Подробная оценка: `PC_EMULATION_RESEARCH.md`.
+  - Compact PC 8086/8088/80186/286 emulator for RP2040/RP2350/Murmulator.
+  - Important for us: it has Linux/Windows host frontends, so the emulator core can be attempted as a MIPS native app with our framebuffer/input/audio.
+  - Local copy: `homebrew\pico_286\pico-286`, commit `2ba88bf17de8e69c86f9256e22a241e8d31e8c96`, Defender scan passed without threats.
+  - Detailed assessment: `PC_EMULATION_RESEARCH.md`.
 
 - https://github.com/hchunhui/tiny386
-  - C99 i386 PC emulator: CPU core плюс PIC/PIT/keyboard/CMOS/VGA/IDE/NE2000/DMA,
-    PC speaker, optional AdLib OPL2 и Sound Blaster 16.
-  - Интересен как наиболее близкий 386-кандидат, но тяжелее `pico-286` по RAM,
-    BIOS/VGABIOS, storage и общей сложности.
-  - Локальная копия: `internet_sources\tiny386`, commit
-    `5cad7585d7a9e3081e8c5f50e3865fdbf09f5ebb`, Defender scan без угроз.
-  - Подробная оценка: `PC_EMULATION_RESEARCH.md`.
+  - C99 i386 PC emulator: CPU core plus PIC/PIT/keyboard/CMOS/VGA/IDE/NE2000/DMA, PC speaker, optional AdLib OPL2, and Sound Blaster 16.
+  - Interesting as the closest 386 candidate, but heavier than `pico-286` in RAM, BIOS/VGABIOS, storage, and overall complexity.
+  - Local copy: `internet_sources\tiny386`, commit `5cad7585d7a9e3081e8c5f50e3865fdbf09f5ebb`, Defender scan passed without threats.
+  - Detailed assessment: `PC_EMULATION_RESEARCH.md`.
 
 - https://github.com/schellingb/dosbox-pure
   - Libretro DOSBox fork with controller-friendly DOS game UX.
-  - Может быть полезен как источник идей по gamepad mapper/on-screen keyboard,
-    но прямой порт на наш stock/libretro путь выглядит рискованнее, чем native app.
+  - Could be useful as a source of ideas for a gamepad mapper/on-screen keyboard, but a direct port to our stock/libretro path looks riskier than a native app.
 
 - https://github.com/dosbox-staging/dosbox-staging
-  - Современный DOSBox fork/continuation.
-  - Хороший upstream для standalone DOSBox, но порт на нашу MIPS/Linux консоль
-    будет существенно тяжелее `pico-286`.
+  - Modern DOSBox fork/continuation.
+  - Good upstream for standalone DOSBox, but porting it to our MIPS/Linux console would be significantly heavier than `pico-286`.
 
 - https://github.com/joncampbell123/dosbox-x
-  - Очень полный DOSBox fork с большим охватом DOS/Windows 3.x/9x сценариев.
-  - Полезен как reference, но слишком крупный и сложный для первого порта.
+  - Very complete DOSBox fork with broad DOS/Windows 3.x/9x coverage.
+  - Useful as a reference project, but too large and complex for a first port.
 
 - https://github.com/copy/v86
   - Browser/WASM x86 PC emulator.
-  - Полезен как reference, но не как прямой MIPS native port target.
+  - Useful as a reference, but not as a direct MIPS native port target.
 
 - https://github.com/86Box/86Box
-  - Полноценная эмуляция x86-машин с фокусом на точность.
-  - Скорее reference-проект; для нашей консоли слишком большой первый шаг.
+  - Full x86 machine emulator focused on accuracy.
+  - More of a reference project; it is too large for our console as a first step.
 
-## Темы, ресурсы, музыка, картинки
+## Themes, Resources, Music, Images
 
 - https://github.com/zerter555/SF2000_BGM
-  - Примеры/ресурсы для BGM на SF2000.
+  - BGM examples/resources for SF2000.
 
 - https://zerter555.github.io/sf2000-collection/
-  - Коллекции тем/ресурсов SF2000.
+  - SF2000 theme/resource collections.
 
 - https://q-ta-s.github.io/sf2000_theme.html
-  - Theme tools/resources для SF2000/GB300.
+  - Theme tools/resources for SF2000/GB300.
 
-## Общие инструменты, полезные для нашего анализа
+## General Tools Useful For Our Analysis
 
 - https://github.com/NationalSecurityAgency/ghidra
   - Ghidra decompiler/disassembler.
-  - В workspace уже есть `ghidra_12.0.4_PUBLIC`.
-  - Используем для MIPS ELF: `hcprojector`, `rkgame`, `icube`, `cubevol`, `MyExecutable`.
+  - The workspace already contains `ghidra_12.0.4_PUBLIC`.
+  - Used for MIPS ELF analysis: `hcprojector`, `rkgame`, `icube`, `cubevol`, `MyExecutable`.
 
 - https://github.com/u-boot/u-boot
   - U-Boot source.
-  - Полезно для формата legacy `uImage`, `mkimage`, load/entry/arch headers.
+  - Useful for legacy `uImage` format, `mkimage`, load/entry/arch headers.
 
 - https://github.com/dgibson/dtc
   - Device Tree Compiler.
-  - Нужен для декомпиляции `dtb.bin` / `Bubbles.scr` в DTS и сравнения с HCRTOS DTS.
+  - Needed to decompile `dtb.bin` / `Bubbles.scr` to DTS and compare with HCRTOS DTS.
 
 - https://github.com/ReFirmLabs/binwalk
   - Binwalk firmware analysis.
-  - Полезно для поиска вложенных образов, сжатых payload и файловых систем.
+  - Useful for finding nested images, compressed payloads, and file systems.
 
-## Что учитывать
+## Notes
 
-- SF2000/GB300 проекты полезны как методические аналоги, но не являются прямой заменой прошивки для R36SX/GB350/SF3000-like `cubegm`.
-- ArkOS, JELOS, EmuELEC и большинство firmware для настоящей R36S обычно рассчитаны на ARM/RK3326 или другие платформы и не подходят для этого MIPS/Hichip дампа.
-- Самая перспективная линия для нашего устройства:
-  1. HCRTOS SDK как база для понимания Hichip HC16xx.
-  2. Локальный `cubegm` как точка мягкой кастомизации.
-  3. Свой MIPS32 LE userspace binary/frontend вместо `rkgame` или через `icube_start.sh`.
-  4. DTB/uImage менять только после полного backup и проверки load/entry/SHA256.
+- SF2000/GB300 projects are useful methodological analogs, but they are not direct firmware replacements for the R36SX/GB350/SF3000-like `cubegm` dump.
+- ArkOS, JELOS, EmuELEC, and most firmware for the real R36S usually target ARM/RK3326 or other platforms and do not fit this MIPS/Hichip dump.
+- The most promising path for our device:
+  1. HCRTOS SDK as a base for understanding Hichip HC16xx.
+  2. Local `cubegm` as the soft-customization point.
+  3. Our own MIPS32 LE userspace binary/frontend instead of `rkgame` or through `icube_start.sh`.
+  4. Change DTB/uImage only after a complete backup and load/entry/SHA256 verification.

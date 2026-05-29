@@ -1,18 +1,18 @@
-# Анализ энергосбережения в игровой части
+# Power Management Analysis In The Game Side
 
-## Краткий вывод
+## Short Conclusion
 
-В `cubegm` / игровом эмуляторном frontend я не нашел признаков CPU halt, MIPS `wait` или динамического снижения частоты CPU.
+In `cubegm` / the game emulator frontend, I did not find signs of CPU halt, MIPS `wait`, or dynamic CPU frequency scaling.
 
-Что есть:
+What exists:
 
-- обычные `usleep(...)` / `SDL_Delay`-подобные задержки;
-- polling input каждые ~16 ms;
-- frame pacing через задержки, frame skip и audio/video timing;
-- управление backlight/MIPI/HDMI;
-- переключение boot slot / reboot при выходе или переходе между game/projector UI.
+- normal `usleep(...)` / `SDL_Delay`-style delays;
+- input polling roughly every 16 ms;
+- frame pacing through delays, frame skip, and audio/video timing;
+- backlight/MIPI/HDMI control;
+- boot slot switching / reboot during exit or transitions between the game and projector UI.
 
-Что не найдено:
+What was not found:
 
 - `cpufreq`;
 - `scaling_governor`;
@@ -22,13 +22,13 @@
 - `scaling_max_freq`;
 - `/sys/devices/system/cpu/cpu*/cpufreq`;
 - `/sys/power/state`;
-- MIPS instruction `wait` (`0x42000020`) в основных бинарниках.
+- MIPS instruction `wait` (`0x42000020`) in the main binaries.
 
-## Проверка MIPS wait/halt
+## MIPS `wait` / Halt Check
 
-Искал little-endian encoding MIPS `wait`: bytes `20 00 00 42`.
+I searched for the little-endian encoding of MIPS `wait`: bytes `20 00 00 42`.
 
-Результат по основным бинарникам:
+Results for the main binaries:
 
 - `disk_image\cubegm\rkgame`: `0`
 - `disk_image\cubegm\icube`: `0`
@@ -37,38 +37,38 @@
 - `disk_image\rootfs\usr\bin\cubevol`: `0`
 - `disk_image\rootfs\usr\bin\hcprojector`: `0`
 
-По MIPS cores из `disk_image\cubegm\cores` размером до 15 MB также не найдено попаданий.
+The same pattern was also not found in MIPS cores from `disk_image\cubegm\cores` up to 15 MB in size.
 
-Вывод: в userspace-бинарниках не видно прямого использования MIPS CPU idle/halt instruction.
+Conclusion: userspace binaries do not show direct use of the MIPS CPU idle/halt instruction.
 
 ## `rkgame`
 
-`disk_image\cubegm\rkgame` — главный frontend/loader эмуляторных cores.
+`disk_image\cubegm\rkgame` is the main frontend / emulator core loader.
 
-Ghidra показала:
+Ghidra showed:
 
-- `run_game()` выбирает core, грузит ROM/ZIP, вызывает `FBA_Load`, `Gpsp_Load`, `PCSX_Load` или `Core_Load`.
-- `DrawFrame()` делает rotation/skipframe/displayfps и вызывает `dispFlip(...)`.
-- `PlayFrame()` фактически вызывает `PlaySound()`.
-- В pause/menu/UI много `usleep(...)`, но это обычные задержки, не управление CPU.
-- Есть frame skip:
+- `run_game()` selects a core, loads a ROM/ZIP, and calls `FBA_Load`, `Gpsp_Load`, `PCSX_Load`, or `Core_Load`.
+- `DrawFrame()` handles rotation/skipframe/displayfps and calls `dispFlip(...)`.
+- `PlayFrame()` effectively calls `PlaySound()`.
+- Pause/menu/UI code contains many `usleep(...)` calls, but these are ordinary delays, not CPU control.
+- Frame skip exists:
   - `skipframe_count = 0x14`
   - `skipframe_count = 0x1e`
   - `skipframe_count = 0x3c`
-- Есть audio-buffer based поведение через строки/символы вроде `sound_driver_buffering_percent`, `retro_audio_buff_occupancy`.
+- There is audio-buffer-based behavior through strings/symbols such as `sound_driver_buffering_percent` and `retro_audio_buff_occupancy`.
 
-Не найдено:
+Not found:
 
-- управление CPU governor/frequency;
-- запись в cpufreq sysfs;
-- прямой CPU halt/wait;
-- standby через `/dev/standby` внутри основного игрового цикла.
+- CPU governor/frequency control;
+- writes to cpufreq sysfs;
+- direct CPU halt/wait;
+- standby through `/dev/standby` inside the main game loop.
 
 ## `MyExecutable`
 
-`disk_image\cubegm\MyExecutable` — helper для железа: кнопки, HDMI hotplug, MIPI, backlight.
+`disk_image\cubegm\MyExecutable` is a hardware helper for buttons, HDMI hotplug, MIPI, and backlight.
 
-Важная декомпиляция:
+Important decompilation:
 
 ```c
 void main(void) {
@@ -97,7 +97,7 @@ void main(void) {
 }
 ```
 
-Это похоже на выключение/включение экрана и подсветки, а не на halt CPU.
+This looks like screen/backlight on/off handling, not CPU halt.
 
 `set_backlight_value2()`:
 
@@ -110,20 +110,20 @@ close(fd);
 
 `set_mipi_onoff()`:
 
-- открывает `/dev/backlight`;
-- открывает `/dev/mipi`;
-- делает несколько `ioctl(...)`;
-- при выключении ставит backlight в `0`;
-- делает `usleep(500000)` и `usleep(200000)`;
-- при включении восстанавливает яркость через `/dev/persistentmem` при необходимости.
+- opens `/dev/backlight`;
+- opens `/dev/mipi`;
+- performs several `ioctl(...)` calls;
+- sets backlight to `0` when switching off;
+- calls `usleep(500000)` and `usleep(200000)`;
+- restores brightness through `/dev/persistentmem` when switching on, if needed.
 
-Вывод: энергосбережение в этой части — гашение дисплея/MIPI/backlight, не снижение частоты CPU.
+Conclusion: power saving here means turning off the display/MIPI/backlight, not lowering CPU frequency.
 
 ## `driver.so`
 
-`disk_image\cubegm\driver.so` динамически грузится из `rkgame`.
+`disk_image\cubegm\driver.so` is loaded dynamically from `rkgame`.
 
-Там есть строка `/dev/standby`, но Ghidra показывает, что она используется в `set_bootup_slot()`:
+It contains the string `/dev/standby`, but Ghidra shows that it is used in `set_bootup_slot()`:
 
 ```c
 set_bootup_slot(slot) {
@@ -158,27 +158,27 @@ api_osd_show_onoff(0);
 system("/mnt/sdcard/cubegm/icubemp_start.sh &");
 ```
 
-Вывод: `/dev/standby` здесь используется как интерфейс boot slot / multi-OS switching, а не как suspend/halt в игровом цикле.
+Conclusion: `/dev/standby` is used here as a boot slot / multi-OS switching interface, not as suspend/halt in the game loop.
 
-## Где настоящий standby
+## Where Real Standby Exists
 
-Настоящий standby/sleep найден не в `rkgame`, а в системной/projector части:
+Real standby/sleep was found not in `rkgame`, but in the system/projector side:
 
 - `disk_image\rootfs\usr\bin\hcprojector`
-  - строки: `MSG_TYPE_STANDBY_SLEEP`, `MSG_TYPE_WAKE_UP`, `api_system_standby`, `api_dis_suspend`, `/dev/standby`, `Enter standby?`, `Auto Sleep`.
+  - strings: `MSG_TYPE_STANDBY_SLEEP`, `MSG_TYPE_WAKE_UP`, `api_system_standby`, `api_dis_suspend`, `/dev/standby`, `Enter standby?`, `Auto Sleep`.
 
 - `disk_image\rootfs\usr\bin\cubevol`
-  - строки/символы: `standby_sleep.c`, `mp5_enter_standby`, `enter_sleep_mode_countdown`, `power_handle_proc`, `battery_monitor`, `Low battery`.
+  - strings/symbols: `standby_sleep.c`, `mp5_enter_standby`, `enter_sleep_mode_countdown`, `power_handle_proc`, `battery_monitor`, `Low battery`.
 
 - `disk_image\rootfs\usr\lib\libhudi.so`
-  - функции: `hudi_standby_enter`, `hudi_standby_ddr_pwroff_set`, `hudi_standby_saradc_wakeup_set`, `hudi_standby_gpio_wakeup_set`, `hudi_standby_ir_wakeup_set`.
-  - устройство: `/dev/standby`.
+  - functions: `hudi_standby_enter`, `hudi_standby_ddr_pwroff_set`, `hudi_standby_saradc_wakeup_set`, `hudi_standby_gpio_wakeup_set`, `hudi_standby_ir_wakeup_set`.
+  - device: `/dev/standby`.
 
-В HCRTOS SDK есть пример bootloader standby:
+The HCRTOS SDK contains a bootloader standby example:
 
 - `internet_sources\hcrtos\components\applications\apps-bootloader\source\cmd\standby.c`
 
-Там логика:
+Its logic:
 
 ```c
 fd = open("/dev/standby", O_RDWR);
@@ -188,66 +188,66 @@ ioctl(fd, STANDBY_ENTER, 0);
 close(fd);
 ```
 
-Это уже настоящий standby-путь платформы.
+This is the real standby path of the platform.
 
-## Вероятная модель энергосбережения
+## Likely Power-Saving Model
 
-1. В обычной игре CPU не останавливается и частота не снижается из userspace.
-2. Эмулятор держит скорость через `usleep`, frame skip, audio buffer и `dispFlip`.
-3. При паузе/menu CPU тоже не halt-ится, но часть потоков ждут через `usleep`.
-4. В helper-коде можно погасить экран/backlight/MIPI — это экономит заметно больше, чем idle frontend, но CPU продолжает работать.
-5. Полный standby делает системная часть через `/dev/standby` и Hichip/HUDI API, вероятно с участием драйвера/AVP/RTOS.
+1. During normal gameplay, userspace does not stop the CPU and does not lower CPU frequency.
+2. The emulator keeps speed through `usleep`, frame skip, audio buffering, and `dispFlip`.
+3. In pause/menu, the CPU is still not halted, but some threads wait through `usleep`.
+4. Helper code can turn off the screen/backlight/MIPI. This likely saves much more power than an idle frontend, but the CPU keeps running.
+5. Full standby is handled by the system side through `/dev/standby` and Hichip/HUDI APIs, probably with involvement from the driver/AVP/RTOS.
 
-## Что можно попробовать для собственного frontend
+## What To Try For Our Own Frontend
 
-Если цель — экономия энергии:
+If the goal is saving power:
 
-- Для idle/menu использовать `usleep(16000)` или больше, если не нужен 60 Hz polling.
-- Не делать busy-wait как `OS_Delay()` из `MyExecutable`; это крутит CPU впустую.
-- Гасить подсветку через `/dev/backlight`.
-- Гасить MIPI/LCD через тот же ioctl-путь, который использует `set_mipi_onoff()`.
-- Для полного сна изучать `/dev/standby` ioctl из `libhudi.so`, `hcprojector`, `cubevol` и HCRTOS `standby.c`.
-- Не рассчитывать на стандартный Linux cpufreq: в дампе не видно обычного cpufreq sysfs/userspace-интерфейса.
+- Use `usleep(16000)` or longer in idle/menu states if 60 Hz polling is not needed.
+- Avoid busy-wait loops like `OS_Delay()` from `MyExecutable`; they spin the CPU.
+- Turn off backlight through `/dev/backlight`.
+- Turn off MIPI/LCD through the same ioctl path used by `set_mipi_onoff()`.
+- For full sleep, study `/dev/standby` ioctls from `libhudi.so`, `hcprojector`, `cubevol`, and HCRTOS `standby.c`.
+- Do not rely on standard Linux cpufreq: the dump does not show the usual cpufreq sysfs/userspace interface.
 
-## Проверка goph-R/SF3000-RE
+## `goph-R/SF3000-RE` Check
 
-Репозиторий: https://github.com/goph-R/SF3000-RE
+Repository: https://github.com/goph-R/SF3000-RE
 
-Локальная копия: `internet_sources\SF3000-RE`
+Local copy: `internet_sources\SF3000-RE`
 
-Состояние на момент проверки: в git-дереве есть только `README.md` и `LICENSE`; исходников C/C++/asm, Makefile, драйверов или launcher-кода нет.
+State at the time of checking: the git tree contains only `README.md` and `LICENSE`; there are no C/C++/asm sources, Makefile, drivers, or launcher code.
 
-Поиск по `README.md` и дереву репозитория:
+Search results across `README.md` and the repository tree:
 
-- `halt`: не найдено.
-- `wait`: не найдено.
-- `powersave` / `power saving`: не найдено.
-- `cpufreq` / `frequency`: не найдено.
-- `standby`: не найдено.
-- `suspend`: не найдено.
-- `sleep`: не найдено.
-- `idle`: не найдено.
+- `halt`: not found.
+- `wait`: not found.
+- `powersave` / `power saving`: not found.
+- `cpufreq` / `frequency`: not found.
+- `standby`: not found.
+- `suspend`: not found.
+- `sleep`: not found.
+- `idle`: not found.
 
-Что в репозитории полезно для нашей темы:
+What is useful in that repository for this topic:
 
-- подтверждает MIPS32 little-endian / MIPS32r2;
-- подтверждает Buildroot `2021.05-rc2`;
-- подтверждает модель `rootfs/` + `cubegm/`;
-- подтверждает `cubegm/icube` как рабочую точку запуска своего MIPS32 static binary;
-- упоминает DirectFB в `cubegm` и отсутствие SDL/EGL/GLES в stock system.
+- confirms MIPS32 little-endian / MIPS32r2;
+- confirms Buildroot `2021.05-rc2`;
+- confirms the `rootfs/` + `cubegm/` model;
+- confirms `cubegm/icube` as a working launch point for a custom MIPS32 static binary;
+- mentions DirectFB in `cubegm` and the lack of SDL/EGL/GLES in the stock system.
 
-Вывод: `goph-R/SF3000-RE` полезен как заметка по homebrew/custom launcher, но не даёт исходных файлов, по которым можно подтвердить `halt`, MIPS `wait`, cpufreq или powersaving mode. Для ответа на вопрос об энергосбережении всё ещё важнее локальный бинарный анализ `rkgame`, `driver.so`, `hcprojector`, `cubevol`, `libhudi.so` и HCRTOS standby-кода.
+Conclusion: `goph-R/SF3000-RE` is useful as a note about homebrew/custom launcher work, but it does not provide source files that could confirm `halt`, MIPS `wait`, cpufreq, or a power-saving mode. Answering the power-management question still depends primarily on local binary analysis of `rkgame`, `driver.so`, `hcprojector`, `cubevol`, `libhudi.so`, and HCRTOS standby code.
 
-## Проверка libc usleep и kernel nanosleep
+## libc `usleep` And Kernel `nanosleep` Check
 
-Дополнительно проверен локальный `disk_image\rootfs\lib\libc.so.6` через Ghidra:
+The local `disk_image\rootfs\lib\libc.so.6` was additionally checked in Ghidra:
 
-- `usleep` находится по адресу `000f5ed0`;
-- `nanosleep` находится по адресу `000bfb84`;
-- `clock_nanosleep` находится по адресу `0010ea90`;
-- Ghidra определила библиотеку как `MIPS:LE:32`.
+- `usleep` is at address `000f5ed0`;
+- `nanosleep` is at address `000bfb84`;
+- `clock_nanosleep` is at address `0010ea90`;
+- Ghidra identified the library as `MIPS:LE:32`.
 
-Декомпилированная логика `usleep`:
+Decompiled `usleep` logic:
 
 ```c
 local_10.tv_sec = __useconds / 1000000;
@@ -255,12 +255,12 @@ local_10.tv_nsec = (__useconds % 1000000) * 1000;
 return nanosleep(&local_10, 0);
 ```
 
-В MIPS-дизассемблере `nanosleep` перед `syscall` загружает `v0 = 0x1046`, то есть `usleep` в userspace не содержит собственного ожидания, busy-wait, `halt` или MIPS `wait`; он переводит микросекунды в `timespec` и передает управление ядру через syscall `nanosleep`.
+In the MIPS disassembly, `nanosleep` loads `v0 = 0x1046` before `syscall`. In other words, userspace `usleep` does not contain its own wait loop, busy-wait, `halt`, or MIPS `wait`; it converts microseconds to a `timespec` and hands control to the kernel through the `nanosleep` syscall.
 
-`disk_image\cubegm\advapi32.dll` подтвержден как U-Boot `uImage` с именем `vmlinux`, MIPS, gzip. Payload распакован в `ghidra_exports\kernel\advapi32_vmlinux_decompressed.bin`; внутри есть строка:
+`disk_image\cubegm\advapi32.dll` was confirmed as a U-Boot `uImage` named `vmlinux`, MIPS, gzip. The payload was unpacked to `ghidra_exports\kernel\advapi32_vmlinux_decompressed.bin`; inside it there is the string:
 
 ```text
 Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #21 PREEMPT Thu Dec 18 18:13:45 CST 2025
 ```
 
-В распакованном ядре также есть строки `cpu_wait` и `wait instruction`, поэтому kernel idle path, вероятно, умеет использовать MIPS `wait`. Но это отдельный уровень: приложение вызывает `usleep`/`nanosleep`, задача снимается с выполнения scheduler'ом, а уже если системе нечего делать, ядро может уйти в idle/wait.
+The unpacked kernel also contains strings `cpu_wait` and `wait instruction`, so the kernel idle path probably can use MIPS `wait`. But this is a separate layer: the application calls `usleep`/`nanosleep`, the scheduler removes the task from execution, and if the system has nothing else to run, the kernel can enter idle/wait.

@@ -1,63 +1,63 @@
-# Наиболее похожий найденный репозиторий
+# Most Similar Repository Found
 
-## Лучшее совпадение: goph-R/SF3000-RE
+## Best Match: `goph-R/SF3000-RE`
 
 - URL: https://github.com/goph-R/SF3000-RE
-- Локальная копия: `internet_sources\SF3000-RE`
-- Тип: reverse-engineering notes / практические заметки по запуску своего кода, не исходники `rkgame`.
+- Local copy: `internet_sources\SF3000-RE`
+- Type: reverse-engineering notes / practical notes for running custom code, not `rkgame` source code.
 
-Почему это самый близкий репозиторий к нашему `disk_image`:
+Why this is the closest repository to our `disk_image`:
 
-- Совпадает платформа: MIPS32 little-endian / MIPS32r2.
-- Совпадает userspace: Buildroot `2021.05-rc2`.
-- Совпадает раскладка SD/rootfs: `rootfs/` + `cubegm/`.
-- Совпадает запуск игрового окружения через `/mnt/sdcard/cubegm/icube`.
-- Совпадает модель emulator cores: MIPS32 `.so` в `cubegm/cores/`, конфиги `cores/config.xml` и `cores/filelist.xml`.
-- Совпадает графический стек по смыслу: stock system без SDL/EGL/GLES, с DirectFB в `cubegm`.
-- В репозитории заявлен и описан рабочий способ запуска собственного MIPS32 static binary через замену `cubegm/icube`.
+- Same platform: MIPS32 little-endian / MIPS32r2.
+- Same userspace: Buildroot `2021.05-rc2`.
+- Same SD/rootfs layout: `rootfs/` + `cubegm/`.
+- Same game environment startup through `/mnt/sdcard/cubegm/icube`.
+- Same emulator core model: MIPS32 `.so` files in `cubegm/cores/`, with `cores/config.xml` and `cores/filelist.xml`.
+- Similar graphics stack in principle: stock system without SDL/EGL/GLES, with DirectFB in `cubegm`.
+- The repository describes a working method for running a custom MIPS32 static binary by replacing `cubegm/icube`.
 
-Наши локальные подтверждения:
+Our local confirmations:
 
 - `disk_image\rootfs\etc\os-release`: `PRETTY_NAME="Buildroot 2021.05-rc2"`.
-- `disk_image\cubegm\rkgame`: 1 178 732 bytes.
-- `disk_image\cubegm\icube`: 11 976 bytes.
-- `disk_image\cubegm\driver.so`: 98 216 bytes.
+- `disk_image\cubegm\rkgame`: 1,178,732 bytes.
+- `disk_image\cubegm\icube`: 11,976 bytes.
+- `disk_image\cubegm\driver.so`: 98,216 bytes.
 
-Вывод:
+Conclusion:
 
-`goph-R/SF3000-RE` сейчас выглядит как наиболее похожая публичная RE-база именно для этой ветки консолей SF3000 / GB350 / R36SX-like на MIPS + iCube/cubegm. Это лучший старт для самостоятельного homebrew/custom launcher.
+`goph-R/SF3000-RE` currently looks like the most similar public reverse-engineering base for this branch of SF3000 / GB350 / R36SX-like MIPS + iCube/cubegm consoles. It is the best starting point for standalone homebrew and custom launcher work.
 
-## Второе место: LiamJ74/R36S-V2.6_Wiki
+## Second Place: `LiamJ74/R36S-V2.6_Wiki`
 
 - URL: https://github.com/LiamJ74/R36S-V2.6_Wiki
-- Локальная копия: `internet_sources\R36S-V2.6_Wiki`
-- Тип: wiki/tools для структуры SD-карты, ROM lists, covers, UI resources.
+- Local copy: `internet_sources\R36S-V2.6_Wiki`
+- Type: wiki/tools for SD card structure, ROM lists, covers, and UI resources.
 
-Почему важно:
+Why it matters:
 
-- Прямо описывает `iCube/cubegm`.
-- Даёт ту же цепочку: `icube_start.sh` убивает `hcprojector`, запускает `cubegm/icube`, затем `icube` стартует `cubegm/rkgame`.
-- Перечисляет ключевые файлы: `rkgame`, `icube`, `driver.so`, `UI_Res.cpd`, `resource.cpd`, `setting.xml`, `allfiles.lst`, `cores/config.xml`.
-- Полезен для моддинга SD-карты и ресурсов, но не для компиляции собственного firmware.
+- It directly describes `iCube/cubegm`.
+- It gives the same chain: `icube_start.sh` kills `hcprojector`, starts `cubegm/icube`, then `icube` starts `cubegm/rkgame`.
+- It lists key files: `rkgame`, `icube`, `driver.so`, `UI_Res.cpd`, `resource.cpd`, `setting.xml`, `allfiles.lst`, `cores/config.xml`.
+- It is useful for SD card and resource modding, but not for compiling custom firmware.
 
-## Близкий firmware backup/toolchain: game-de-it/testrepo + game-de-it/sf3000
+## Close Firmware Backup / Toolchain: `game-de-it/testrepo` + `game-de-it/sf3000`
 
 - Stock OS release: https://github.com/game-de-it/testrepo/releases/tag/SF3000_StockOS
 - Toolchain repo: https://github.com/game-de-it/sf3000
-- Локальные копии:
+- Local copies:
   - `internet_sources\sf3000_stockos_repo`
   - `internet_sources\sf3000_toolchain`
 
-Почему важно:
+Why it matters:
 
-- Release `SF3000_StockOS` описан как внутренние файлы SD-карты SF3000 без ROM-файлов.
-- `game-de-it/sf3000` сейчас почти пустой в git-дереве, но на GitHub есть release `sf3000_toolchain_v0.1`.
+- The `SF3000_StockOS` release is described as internal SF3000 SD card files without ROM files.
+- `game-de-it/sf3000` is almost empty in the git tree, but GitHub has a release named `sf3000_toolchain_v0.1`.
 
-## Не найдено
+## Not Found
 
-Публичные исходники `cubegm/rkgame`, `icube` или `driver.so` пока не нашлись. Наиболее вероятная стратегия не "декомпилировать до исходников 1:1", а:
+Public source code for `cubegm/rkgame`, `icube`, or `driver.so` has not been found so far. The most likely strategy is not to decompile everything back into exact original source code, but to:
 
-1. использовать `goph-R/SF3000-RE` как практический путь запуска своего MIPS32 кода;
-2. использовать HCRTOS/Hichip SDK для понимания платформы HC16xx/rootfs/kernel/userspace;
-3. оставить штатные kernel/rootfs/driver.so, а заменить или обойти `icube`/`rkgame` своим frontend;
-4. для полной замены firmware сначала собрать минимальный MIPS32 static userspace launcher и проверить вывод через `/dev/fb0` или DirectFB.
+1. use `goph-R/SF3000-RE` as the practical path for running our own MIPS32 code;
+2. use the HCRTOS/Hichip SDK to understand the HC16xx/rootfs/kernel/userspace platform;
+3. keep the stock kernel/rootfs/driver.so, while replacing or bypassing `icube`/`rkgame` with our own frontend;
+4. for full firmware replacement, first build a minimal MIPS32 static userspace launcher and test output through `/dev/fb0` or DirectFB.
