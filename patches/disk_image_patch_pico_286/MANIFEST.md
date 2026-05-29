@@ -30,6 +30,26 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 RGB565 video present cache
+
+The current `pico_286` binary reduces video work in the R36SX MiniFB layer.
+The DOS renderer marks completed frames with a generation counter, and
+`mfb_update()` keeps a converted RGB565 base frame.  It now rebuilds that base
+only when a new DOS frame is ready or when the on-screen keyboard changes the
+layout.  Menus, the keyboard, and the disk LED are drawn on a separate overlay
+frame copied from the cached base image.
+
+If no overlay is active and no new DOS frame is ready, the binary skips both
+the RGB888-to-RGB565 conversion and the `driver.so` frame submit.  The
+no-keyboard path also converts only the active DOS video height and clears the
+remaining bottom area as black.
+
+```text
+pico_286 size: 899216 bytes
+pico_286 SHA256: F4D7FF18F098A744C640FC8B63395D05C6E78453FF7E22E43901153597985BF7
+Defender scan: found no threats
+```
+
 ## 2026-05-29 Sopwith CGA mode 04h renderer fix
 
 `SW.EXE` from `sopwith.img` normally selects BIOS video mode `04h`, the CGA

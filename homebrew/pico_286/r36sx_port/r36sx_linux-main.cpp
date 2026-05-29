@@ -21,6 +21,7 @@ uint8_t log_debug = 0;
 extern OPL *emu8950_opl;
 extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
 extern "C" void r36sx_keyboard_tick(void);
+extern "C" void r36sx_mfb_mark_frame_ready(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 #define R36SX_TICKS_THREAD_SLEEP_US 250u
@@ -595,6 +596,7 @@ static inline void renderer() {
             fill_black_row(pixels);
         }
     }
+    r36sx_mfb_mark_frame_ready();
 }
 
 extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
@@ -962,6 +964,7 @@ int main() {
     r36sx_pico286_debug_log("main: memory backend read=%p write=%p",
                             read86, write86);
     memset(SCREEN, 0, sizeof(SCREEN));
+    r36sx_mfb_mark_frame_ready();
     r36sx_pico286_debug_log("main: screen cleared");
     emu8950_opl = OPL_new(3579552, SOUND_FREQUENCY);
     r36sx_pico286_debug_log("main: OPL_new=%p", emu8950_opl);

@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-29 RGB565 video present cache
+
+Optimized the R36SX MiniFB video path.  `renderer()` now marks a completed DOS
+frame with `r36sx_mfb_mark_frame_ready()`.  `mfb_update()` keeps a converted
+RGB565 base frame and only rebuilds it when a new renderer generation arrives
+or when the keyboard layout changes.  Menus, the on-screen keyboard, and the
+disk LED are drawn on a separate overlay frame copied from that base image.
+
+When no overlay is active and no new DOS frame is ready, `mfb_update()` now
+skips both the RGB888-to-RGB565 conversion and the `driver.so` frame submit.
+The normal no-keyboard path also converts only the active DOS video height and
+clears the remaining bottom rows as black instead of converting already-black
+renderer rows one pixel at a time.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `zig objcopy --strip-all` step still reports `error: unimplemented`; the
+script kept the working unstripped binary.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_085\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 899,216 bytes
+- SHA256: `F4D7FF18F098A744C640FC8B63395D05C6E78453FF7E22E43901153597985BF7`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_085/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 Sopwith CGA mode 04h renderer fix
 
 Investigated `homebrew/pico_286/sopwith.img`.  The FAT12 root contains

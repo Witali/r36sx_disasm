@@ -45,6 +45,7 @@ struct r36sx_mfb_driver {
     video_driver_deinit_fn deinit;
     cube_ioctl_fn cube_ioctl;
     uint16_t *frame;
+    uint16_t *base_frame;
     int width;
     int height;
     int stride;
@@ -63,10 +64,17 @@ struct r36sx_mfb_driver {
     uint8_t fn_hold_exit_fired;
     uint64_t fn_down_since_us;
     uint8_t exit_requested;
+    uint8_t base_frame_valid;
+    uint8_t force_present;
+    uint8_t disk_led_was_active;
+    int base_content_h;
+    int base_source_h;
+    uint32_t base_generation;
 };
 
 static struct r36sx_mfb_driver g_mfb;
 static uint32_t g_palette[256];
+static volatile uint32_t g_frame_generation;
 static volatile uint32_t g_disk_activity_until_ms;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
@@ -82,6 +90,16 @@ static uint64_t r36sx_mfb_now_us(void)
 static uint32_t r36sx_mfb_now_ms32(void)
 {
     return (uint32_t)(r36sx_mfb_now_us() / 1000ull);
+}
+
+void r36sx_mfb_mark_frame_ready(void)
+{
+    __sync_add_and_fetch(&g_frame_generation, 1u);
+}
+
+static uint32_t r36sx_mfb_frame_generation(void)
+{
+    return __sync_add_and_fetch(&g_frame_generation, 0u);
 }
 
 void r36sx_pico286_disk_activity(void)
@@ -167,6 +185,8 @@ static void r36sx_osk_set_visible(int visible)
     }
     r36sx_mfb_release_all_keys();
     r36sx_screen_keyboard_set_visible(&g_mfb.osk, visible);
+    g_mfb.base_frame_valid = 0;
+    g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: osk %s", visible ? "open" : "close");
 }
@@ -199,6 +219,7 @@ static void r36sx_mfb_disk_menu_set_visible(int visible)
     r36sx_osk_set_visible(0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, visible);
+    g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: disk menu %s",
                             visible ? "open" : "close");
@@ -237,6 +258,7 @@ static void r36sx_presets_set_visible(int visible)
     r36sx_osk_set_visible(0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, visible);
+    g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: key presets %s",
                             visible ? "open" : "close");
@@ -312,6 +334,114 @@ static int r36sx_mfb_video_source_height(void)
         }
     }
     return source_h;
+}
+
+static int r36sx_mfb_overlay_active(uint32_t now_ms)
+{
+    int disk_led_active =
+        (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
+
+    return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
+           r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
+           r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
+           disk_led_active ||
+           g_mfb.disk_led_was_active ||
+           g_mfb.force_present;
+}
+
+static void r36sx_mfb_convert_source(uint32_t *src, int content_h,
+                                     int source_h)
+{
+    int keyboard_visible = r36sx_screen_keyboard_is_visible(&g_mfb.osk);
+    int rows_to_copy = content_h;
+
+    if (!keyboard_visible) {
+        rows_to_copy = r36sx_pico286_video_active_height();
+        if (rows_to_copy <= 0 || rows_to_copy > g_mfb.height) {
+            rows_to_copy = g_mfb.height;
+        }
+    }
+
+    for (int y = 0; y < rows_to_copy; y++) {
+        uint16_t *dst_row =
+            g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
+
+        if (keyboard_visible) {
+            int start = y * source_h;
+            int end = (y + 1) * source_h;
+            int sy0 = start / content_h;
+            int sy1 = (end - 1) / content_h;
+            int weight0;
+            int weight1;
+            const uint32_t *src_row0;
+            const uint32_t *src_row1;
+
+            if (sy1 >= source_h) {
+                sy1 = source_h - 1;
+            }
+            weight0 = (sy0 + 1) * content_h - start;
+            if (weight0 > source_h) {
+                weight0 = source_h;
+            }
+            if (sy0 == sy1) {
+                weight1 = 0;
+                weight0 = source_h;
+            } else {
+                weight1 = source_h - weight0;
+            }
+
+            src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
+            src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
+            if (source_h == 480 && content_h == 384) {
+                uint32_t w0 = (uint32_t)(weight0 / 96);
+                uint32_t w1 = (uint32_t)(weight1 / 96);
+                for (int x = 0; x < g_mfb.width; x++) {
+                    uint32_t c0 = src_row0[x];
+                    uint32_t c1 = src_row1[x];
+                    uint32_t r = (((c0 >> 16) & 0xffu) * w0 +
+                                  ((c1 >> 16) & 0xffu) * w1 + 2u) / 5u;
+                    uint32_t g = (((c0 >> 8) & 0xffu) * w0 +
+                                  ((c1 >> 8) & 0xffu) * w1 + 2u) / 5u;
+                    uint32_t b = ((c0 & 0xffu) * w0 +
+                                  (c1 & 0xffu) * w1 + 2u) / 5u;
+                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
+                                            ((g & 0xfcu) << 3) | (b >> 3));
+                }
+            } else {
+                for (int x = 0; x < g_mfb.width; x++) {
+                    uint32_t c0 = src_row0[x];
+                    uint32_t c1 = src_row1[x];
+                    uint32_t r = (((c0 >> 16) & 0xffu) *
+                                  (uint32_t)weight0 +
+                                  ((c1 >> 16) & 0xffu) *
+                                  (uint32_t)weight1) /
+                                 (uint32_t)source_h;
+                    uint32_t g = (((c0 >> 8) & 0xffu) *
+                                  (uint32_t)weight0 +
+                                  ((c1 >> 8) & 0xffu) *
+                                  (uint32_t)weight1) /
+                                 (uint32_t)source_h;
+                    uint32_t b = ((c0 & 0xffu) * (uint32_t)weight0 +
+                                  (c1 & 0xffu) * (uint32_t)weight1) /
+                                 (uint32_t)source_h;
+                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
+                                            ((g & 0xfcu) << 3) | (b >> 3));
+                }
+            }
+        } else {
+            uint32_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
+            for (int x = 0; x < g_mfb.width; x++) {
+                dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
+            }
+        }
+    }
+
+    if (rows_to_copy < g_mfb.height) {
+        memset(g_mfb.base_frame + (size_t)rows_to_copy * (size_t)g_mfb.width,
+               0,
+               (size_t)(g_mfb.height - rows_to_copy) *
+                   (size_t)g_mfb.width * sizeof(g_mfb.base_frame[0]));
+    }
 }
 
 static int r36sx_mfb_load_driver(void)
@@ -530,6 +660,7 @@ int mfb_open(const char *name, int width, int height, int scale)
            1);
 
     memset(&g_mfb, 0, sizeof(g_mfb));
+    g_frame_generation = 0;
     r36sx_screen_keyboard_init(&g_mfb.osk);
     r36sx_screen_keyboard_set_cursor_block(&g_mfb.osk, 0);
     r36sx_disk_menu_init(&g_mfb.disk_menu);
@@ -539,8 +670,11 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_mfb.stride = width * R36SX_RGB565_BYTES_PER_PIXEL;
     g_mfb.frame = (uint16_t *)calloc((size_t)width * (size_t)height,
                                      sizeof(g_mfb.frame[0]));
-    if (!g_mfb.frame) {
+    g_mfb.base_frame = (uint16_t *)calloc((size_t)width * (size_t)height,
+                                          sizeof(g_mfb.base_frame[0]));
+    if (!g_mfb.frame || !g_mfb.base_frame) {
         r36sx_pico286_debug_log("minifb: framebuffer allocation failed");
+        mfb_close();
         return 0;
     }
     if (r36sx_mfb_load_driver() != 0) {
@@ -595,9 +729,13 @@ int mfb_open(const char *name, int width, int height, int scale)
 int mfb_update(void *buffer, int fps_limit)
 {
     uint64_t now;
+    uint32_t now_ms;
     uint32_t *src = (uint32_t *)buffer;
+    uint32_t frame_generation;
     int content_h;
     int source_h;
+    int source_dirty;
+    int overlay_active;
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
@@ -616,94 +754,51 @@ int mfb_update(void *buffer, int fps_limit)
         return 0;
     }
 
+    now_ms = (uint32_t)(now / 1000ull);
+    frame_generation = r36sx_mfb_frame_generation();
     content_h = r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
     source_h = r36sx_mfb_video_source_height();
-    for (int y = 0; y < content_h; y++) {
-        uint16_t *dst_row = g_mfb.frame + (size_t)y * (size_t)g_mfb.width;
+    source_dirty =
+        !g_mfb.base_frame_valid ||
+        frame_generation != g_mfb.base_generation ||
+        content_h != g_mfb.base_content_h ||
+        source_h != g_mfb.base_source_h;
+    overlay_active = r36sx_mfb_overlay_active(now_ms);
 
-        if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
-            int start = y * source_h;
-            int end = (y + 1) * source_h;
-            int sy0 = start / content_h;
-            int sy1 = (end - 1) / content_h;
-            int weight0;
-            int weight1;
-            const uint32_t *src_row0;
-            const uint32_t *src_row1;
+    if (!source_dirty && !overlay_active) {
+        usleep(1000);
+        return 0;
+    }
 
-            if (sy1 >= source_h) {
-                sy1 = source_h - 1;
-            }
-            weight0 = (sy0 + 1) * content_h - start;
-            if (weight0 > source_h) {
-                weight0 = source_h;
-            }
-            if (sy0 == sy1) {
-                weight1 = 0;
-                weight0 = source_h;
-            } else {
-                weight1 = source_h - weight0;
-            }
+    if (source_dirty) {
+        r36sx_mfb_convert_source(src, content_h, source_h);
+        g_mfb.base_generation = frame_generation;
+        g_mfb.base_content_h = content_h;
+        g_mfb.base_source_h = source_h;
+        g_mfb.base_frame_valid = 1;
+    }
 
-            src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
-            src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
-            if (source_h == 480 && content_h == 384) {
-                uint32_t w0 = (uint32_t)(weight0 / 96);
-                uint32_t w1 = (uint32_t)(weight1 / 96);
-                for (int x = 0; x < g_mfb.width; x++) {
-                    uint32_t c0 = src_row0[x];
-                    uint32_t c1 = src_row1[x];
-                    uint32_t r = (((c0 >> 16) & 0xffu) * w0 +
-                                  ((c1 >> 16) & 0xffu) * w1 + 2u) / 5u;
-                    uint32_t g = (((c0 >> 8) & 0xffu) * w0 +
-                                  ((c1 >> 8) & 0xffu) * w1 + 2u) / 5u;
-                    uint32_t b = ((c0 & 0xffu) * w0 +
-                                  (c1 & 0xffu) * w1 + 2u) / 5u;
-                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
-                                            ((g & 0xfcu) << 3) | (b >> 3));
-                }
-            } else {
-                for (int x = 0; x < g_mfb.width; x++) {
-                    uint32_t c0 = src_row0[x];
-                    uint32_t c1 = src_row1[x];
-                    uint32_t r = (((c0 >> 16) & 0xffu) *
-                                  (uint32_t)weight0 +
-                                  ((c1 >> 16) & 0xffu) *
-                                  (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    uint32_t g = (((c0 >> 8) & 0xffu) *
-                                  (uint32_t)weight0 +
-                                  ((c1 >> 8) & 0xffu) *
-                                  (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    uint32_t b = ((c0 & 0xffu) * (uint32_t)weight0 +
-                                  (c1 & 0xffu) * (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
-                                            ((g & 0xfcu) << 3) | (b >> 3));
-                }
-            }
+    if (overlay_active) {
+        memcpy(g_mfb.frame, g_mfb.base_frame,
+               (size_t)g_mfb.width * (size_t)g_mfb.height *
+                   sizeof(g_mfb.frame[0]));
+        r36sx_mfb_draw_disk_led(now_ms);
+        if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
+            r36sx_disk_menu_draw_overlay();
+        } else if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
+            r36sx_presets_draw();
         } else {
-            uint32_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
-            for (int x = 0; x < g_mfb.width; x++) {
-                dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
-            }
+            r36sx_osk_draw();
         }
-    }
-    if (content_h < g_mfb.height) {
-        r36sx_mfb_fill_rect(0, content_h, g_mfb.width,
-                            g_mfb.height - content_h,
-                            r36sx_mfb_rgb565(0, 0, 0));
-    }
-    r36sx_mfb_draw_disk_led((uint32_t)(now / 1000ull));
-    if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
-        r36sx_disk_menu_draw_overlay();
-    } else if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
-        r36sx_presets_draw();
+        g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     } else {
-        r36sx_osk_draw();
+        g_mfb.disp_frame(g_mfb.base_frame, g_mfb.width, g_mfb.height,
+                         g_mfb.stride);
     }
-    g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
+
+    g_mfb.disk_led_was_active =
+        (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
+    g_mfb.force_present = 0;
     g_mfb.last_present_us = now;
     return 0;
 }
@@ -733,6 +828,9 @@ void mfb_close(void)
     }
     if (g_mfb.frame) {
         free(g_mfb.frame);
+    }
+    if (g_mfb.base_frame) {
+        free(g_mfb.base_frame);
     }
     if (g_mfb.handle) {
         dlclose(g_mfb.handle);
