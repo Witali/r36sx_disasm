@@ -20,6 +20,7 @@ This file documents the `pico_286` native executable for TinyMC.
 - Tap Fn: show or hide the on-screen keyboard.
 - Fn+Select: open the disk image menu.
 - Fn+Start: open the key preset editor.
+- Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 

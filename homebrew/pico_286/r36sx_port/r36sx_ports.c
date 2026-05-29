@@ -100,6 +100,16 @@ void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
     }
 }
 
+void r36sx_keyboard_reset(void) {
+    memset(keyboard_queue, 0, sizeof(keyboard_queue));
+    keyboard_queue_head = 0;
+    keyboard_queue_count = 0;
+    keyboard_output_full = 0;
+    keyboard_next_ready_us = 0;
+    port60 = 0;
+    r36sx_keyboard_refresh_status();
+}
+
 static INLINE uint8_t r36sx_keyboard_read_data(void) {
     uint8_t data = port60;
 

@@ -27,8 +27,16 @@ extern "C" void r36sx_mfb_mark_frame_ready(void);
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
+static volatile int soft_reset_requested = 0;
+static volatile int soft_reset_in_progress = 0;
 
 extern "C" void adlib_getsample(int16_t *sndptr, intptr_t numsamples);
+
+extern "C" void r36sx_pico286_request_soft_reset(void) {
+    soft_reset_requested = 1;
+}
+
+static void r36sx_pico286_soft_reset(void);
 
 extern "C" int r36sx_pico286_video_active_height(void) {
     /*
@@ -790,6 +798,42 @@ pthread_mutex_t update_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t update_cond = PTHREAD_COND_INITIALIZER;
 volatile int update_ready = 0;
 
+static void r36sx_pico286_soft_reset(void) {
+    r36sx_pico286_debug_log("main: soft reset begin");
+    soft_reset_requested = 0;
+    soft_reset_in_progress = 1;
+    __sync_synchronize();
+
+    r36sx_keyboard_reset();
+    port60 = 0;
+    port61 = 0;
+    port64 = 0;
+    memset(&i8259_controller, 0, sizeof(i8259_controller));
+    i8259_controller.interrupt_vector_offset = 8;
+    memset(&i8253_controller, 0, sizeof(i8253_controller));
+    timer_period = 54925;
+    speakerenabled = 0;
+    covox_sample = 0;
+
+    blaster_reset();
+    sn76489_reset();
+    if (emu8950_opl) {
+        OPL_reset(emu8950_opl);
+    }
+    reset86();
+
+    pthread_mutex_lock(&update_mutex);
+    memset(audio_buffer, 0, sizeof(audio_buffer));
+    sample_index = 0;
+    update_ready = 0;
+    pthread_mutex_unlock(&update_mutex);
+
+    r36sx_mfb_mark_frame_ready();
+    __sync_synchronize();
+    soft_reset_in_progress = 0;
+    r36sx_pico286_debug_log("main: soft reset end");
+}
+
 void *sound_thread(void *arg) {
     r36sx_pico286_debug_log("sound_thread: start arg=%p", arg);
     unsigned int sound_loop_count = 0;
@@ -849,6 +893,10 @@ void *ticks_thread(void *arg) {
 
     unsigned int ticks_loop_count = 0;
     while (running) {
+        if (soft_reset_in_progress) {
+            usleep(R36SX_TICKS_THREAD_SLEEP_US);
+            continue;
+        }
         clock_gettime(CLOCK_MONOTONIC, &current);
         if (++ticks_loop_count <= 4u) {
             r36sx_pico286_debug_log("ticks_thread: loop #%u timer_period=%d sample_index=%d",
@@ -999,6 +1047,9 @@ int main() {
 
     unsigned int main_loop_count = 0;
     while (running) {
+        if (soft_reset_requested) {
+            r36sx_pico286_soft_reset();
+        }
         r36sx_keyboard_tick();
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",

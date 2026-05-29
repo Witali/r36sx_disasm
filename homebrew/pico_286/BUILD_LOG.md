@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-29 Fn+B soft reset
+
+Added a native Pico-286 soft-reset shortcut.  Holding `Fn` and pressing `B`
+now requests a reset of the emulated PC without exiting the native app.  The
+input backend releases all virtual keys and closes overlays before the reset
+request is applied.  The main emulation loop then resets the CPU, RAM/video
+state, keyboard queue, PIC, PIT, PC speaker/Covox, Sound Blaster, SN76489,
+OPL, and the host audio buffer before continuing.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_089\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 910,824 bytes
+- SHA256: `BAE91FC64A41F8D4AC86E9DCBB89220D0D99695967643CE65EAB590B36B39F21`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_089/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_089/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 REP MOVS/STOS batching
 
 Optimized the R36SX CPU core string move/store path.  `REP MOVSB`,

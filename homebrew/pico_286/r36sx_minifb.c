@@ -79,6 +79,7 @@ static volatile uint32_t g_disk_activity_until_ms;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
+extern void r36sx_pico286_request_soft_reset(void);
 
 static uint64_t r36sx_mfb_now_us(void)
 {
@@ -279,6 +280,19 @@ static void r36sx_presets_draw(void)
 {
     r36sx_key_presets_draw(&g_mfb.key_presets, g_mfb.frame, g_mfb.width,
                            g_mfb.height, g_mfb.width);
+}
+
+static void r36sx_mfb_request_soft_reset(void)
+{
+    r36sx_mfb_release_all_keys();
+    r36sx_screen_keyboard_set_visible(&g_mfb.osk, 0);
+    r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
+    r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
+    r36sx_pico286_request_soft_reset();
+    g_mfb.base_frame_valid = 0;
+    g_mfb.force_present = 1;
+    g_mfb.input_release_guard = 1;
+    r36sx_pico286_debug_log("minifb: Fn+B soft reset requested");
 }
 
 static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
@@ -580,6 +594,11 @@ static int r36sx_mfb_poll_input(void)
         if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
             r36sx_pico286_debug_log("minifb: Fn+X exit requested");
             return -1;
+        }
+        if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
+            r36sx_mfb_request_soft_reset();
+            g_mfb.last_raw_keys = raw;
+            return 0;
         }
         if (g_mfb.fn_down && !g_mfb.fn_chord_used &&
             g_mfb.fn_down_since_us != 0 &&

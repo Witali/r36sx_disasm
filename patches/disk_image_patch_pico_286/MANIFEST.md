@@ -30,6 +30,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 Fn+B soft reset
+
+The current `pico_286` binary adds a native soft-reset shortcut:
+
+- `Fn+B`: reset the emulated PC without exiting Pico-286.
+
+The reset path releases held virtual keys, closes the on-screen keyboard and
+settings overlays, then resets the emulated CPU, RAM/video state, keyboard
+queue, PIC, PIT, PC speaker/Covox, Sound Blaster, SN76489, OPL, and the host
+audio buffer.
+
+```text
+pico_286 size: 910824 bytes
+pico_286 SHA256: BAE91FC64A41F8D4AC86E9DCBB89220D0D99695967643CE65EAB590B36B39F21
+Defender scan: found no threats
+```
+
 ## 2026-05-29 REP MOVS/STOS batching
 
 The current `pico_286` binary batches common REP string move/store

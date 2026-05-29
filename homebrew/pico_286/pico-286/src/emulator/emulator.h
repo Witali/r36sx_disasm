@@ -248,6 +248,7 @@ extern uint32_t tga_offset;
 extern void exec86(uint32_t execloops);
 
 extern void reset86();
+void r36sx_keyboard_reset(void);
 
 // i8253
     extern struct i8253_s {
