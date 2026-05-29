@@ -661,6 +661,49 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 reusable on-screen keyboard module
+
+Moved the joystick-controlled on-screen keyboard out of Pico-286's MiniFB
+backend into reusable shared files:
+
+- `homebrew/common/r36sx_screen_keyboard.h`
+- `homebrew/common/r36sx_screen_keyboard.c`
+- `homebrew/common/README.md`
+
+The module owns keyboard state, button navigation, layout, and RGB565 drawing.
+Pico-286 now supplies a small adapter callback that maps emitted key-down/key-up
+events to its existing `HandleInput()` path, where they become PC scancodes for
+the keyboard-controller FIFO.
+
+The Pico-286 build script now compiles `homebrew/common/r36sx_screen_keyboard.c`
+as a normal source file.  Device-facing behavior should stay the same; the
+keyboard can now be reused by other native projects without copying the old
+MiniFB-local implementation.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,948,928 bytes
+- SHA256: `1C1BC7F76802DB1B2974704AB0B73E13473A5A335B83280BB73DE1A4C07E85B3`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 keyboard scancode pacing
 
 Added 1 ms pacing between scancode bytes becoming available in the emulated

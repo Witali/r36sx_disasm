@@ -130,6 +130,7 @@ $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "src\emulator") -Recurse -Fi
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "src\emu8950") -File -Filter "*.c"
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "findfirst") -File -Filter "*.c"
 $CFiles += Get-Item (Join-Path $PicoRoot "src\printf\printf.c")
+$CFiles += Get-Item (Join-Path $Root "homebrew\common\r36sx_screen_keyboard.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_minifb.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_linux_audio.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu.c")

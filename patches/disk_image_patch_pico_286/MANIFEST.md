@@ -164,3 +164,17 @@ Size: 7942728 bytes
 SHA256: 7DF7757CB0A685ACF8BB5C09F9EAC292D6AD737AA0342CF67DB93F208144F9D3
 Defender scan: found no threats
 ```
+
+## 2026-05-29 reusable on-screen keyboard module
+
+The Pico-286 binary was rebuilt after moving the joystick-controlled on-screen
+keyboard implementation into the reusable shared module
+`homebrew/common/r36sx_screen_keyboard.*`.  The device-facing keyboard behavior
+should remain the same; Pico-286 now uses the shared module through a small
+callback adapter.
+
+```text
+Size: 7948928 bytes
+SHA256: 1C1BC7F76802DB1B2974704AB0B73E13473A5A335B83280BB73DE1A4C07E85B3
+Defender scan: found no threats
+```
