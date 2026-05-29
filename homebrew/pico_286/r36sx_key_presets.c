@@ -10,8 +10,9 @@
 #define R36SX_KEY_PRESETS_CONF "keypresets.conf"
 #define R36SX_KEY_PRESETS_ABS_CONF "/mnt/sdcard/MIPS_NATIVE/pico_286/keypresets.conf"
 #define R36SX_KEY_PRESET_BUTTON_ITEM_FIRST 3
-#define R36SX_KEY_PRESET_BUTTON_LEFT_COUNT \
-    ((R36SX_KEY_PRESET_BUTTON_COUNT + 1) / 2)
+#define R36SX_KEY_PRESET_LAYOUT_COLS 2
+#define R36SX_KEY_PRESET_LAYOUT_ROWS 7
+#define R36SX_KEY_PRESET_NO_BUTTON (-1)
 #define R36SX_KEY_PRESET_ROW_OK \
     (R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + R36SX_KEY_PRESET_BUTTON_COUNT)
 #define R36SX_KEY_PRESET_ROW_CANCEL (R36SX_KEY_PRESET_ROW_OK + 1)
@@ -47,6 +48,28 @@ static const struct r36sx_key_preset_button_info g_buttons[] = {
     { "l2", "L2", R36SX_RKGAME_KEY_L2, R36SX_SCREEN_KEY_F1 },
     { "r", "R", R36SX_RKGAME_KEY_R, R36SX_SCREEN_KEY_SHIFT },
     { "r2", "R2", R36SX_RKGAME_KEY_R2, R36SX_SCREEN_KEY_F1 + 1 },
+};
+
+static const int g_button_layout
+    [R36SX_KEY_PRESET_LAYOUT_COLS][R36SX_KEY_PRESET_LAYOUT_ROWS] = {
+    {
+        R36SX_KEY_PRESET_BUTTON_UP,
+        R36SX_KEY_PRESET_BUTTON_DOWN,
+        R36SX_KEY_PRESET_BUTTON_LEFT,
+        R36SX_KEY_PRESET_BUTTON_RIGHT,
+        R36SX_KEY_PRESET_BUTTON_L,
+        R36SX_KEY_PRESET_BUTTON_L2,
+        R36SX_KEY_PRESET_NO_BUTTON,
+    },
+    {
+        R36SX_KEY_PRESET_BUTTON_X,
+        R36SX_KEY_PRESET_BUTTON_Y,
+        R36SX_KEY_PRESET_BUTTON_A,
+        R36SX_KEY_PRESET_BUTTON_B,
+        R36SX_KEY_PRESET_BUTTON_R,
+        R36SX_KEY_PRESET_BUTTON_R2,
+        R36SX_KEY_PRESET_BUTTON_START,
+    },
 };
 
 static const struct r36sx_key_choice g_choices[] = {
@@ -689,20 +712,57 @@ static int selected_button(const struct r36sx_key_presets *state)
 
 static int button_visual_col(int button)
 {
-    return button >= R36SX_KEY_PRESET_BUTTON_LEFT_COUNT ? 1 : 0;
+    for (int col = 0; col < R36SX_KEY_PRESET_LAYOUT_COLS; col++) {
+        for (int row = 0; row < R36SX_KEY_PRESET_LAYOUT_ROWS; row++) {
+            if (g_button_layout[col][row] == button) {
+                return col;
+            }
+        }
+    }
+    return -1;
 }
 
 static int button_visual_row(int button)
 {
-    return button >= R36SX_KEY_PRESET_BUTTON_LEFT_COUNT ?
-        button - R36SX_KEY_PRESET_BUTTON_LEFT_COUNT : button;
+    for (int col = 0; col < R36SX_KEY_PRESET_LAYOUT_COLS; col++) {
+        for (int row = 0; row < R36SX_KEY_PRESET_LAYOUT_ROWS; row++) {
+            if (g_button_layout[col][row] == button) {
+                return row;
+            }
+        }
+    }
+    return -1;
 }
 
 static int button_from_visual(int col, int row)
 {
-    int button = col != 0 ? R36SX_KEY_PRESET_BUTTON_LEFT_COUNT + row : row;
+    int button;
 
+    if (col < 0 || col >= R36SX_KEY_PRESET_LAYOUT_COLS ||
+        row < 0 || row >= R36SX_KEY_PRESET_LAYOUT_ROWS) {
+        return -1;
+    }
+
+    button = g_button_layout[col][row];
     return button >= 0 && button < R36SX_KEY_PRESET_BUTTON_COUNT ? button : -1;
+}
+
+static int next_button_in_visual_col(int col, int row, int direction)
+{
+    row += direction;
+    while (row >= 0 && row < R36SX_KEY_PRESET_LAYOUT_ROWS) {
+        int button = button_from_visual(col, row);
+        if (button >= 0) {
+            return button;
+        }
+        row += direction;
+    }
+    return -1;
+}
+
+static int last_button_in_visual_col(int col)
+{
+    return next_button_in_visual_col(col, R36SX_KEY_PRESET_LAYOUT_ROWS, -1);
 }
 
 static void move_selection_vertical(struct r36sx_key_presets *state,
@@ -712,8 +772,8 @@ static void move_selection_vertical(struct r36sx_key_presets *state,
 
     if (button >= 0) {
         int col = button_visual_col(button);
-        int row = button_visual_row(button) + direction;
-        int next_button = button_from_visual(col, row);
+        int row = button_visual_row(button);
+        int next_button = next_button_in_visual_col(col, row, direction);
         if (next_button >= 0) {
             state->selected_row =
                 (uint8_t)(R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + next_button);
@@ -731,13 +791,13 @@ static void move_selection_vertical(struct r36sx_key_presets *state,
         if (state->selected_row == 0) {
             state->selected_row = R36SX_KEY_PRESET_ROW_CANCEL;
         } else if (state->selected_row == R36SX_KEY_PRESET_ROW_OK) {
+            int next_button = last_button_in_visual_col(0);
             state->selected_row =
-                R36SX_KEY_PRESET_BUTTON_ITEM_FIRST +
-                R36SX_KEY_PRESET_BUTTON_LEFT_COUNT - 1;
+                (uint8_t)(R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + next_button);
         } else if (state->selected_row == R36SX_KEY_PRESET_ROW_CANCEL) {
+            int next_button = last_button_in_visual_col(1);
             state->selected_row =
-                R36SX_KEY_PRESET_BUTTON_ITEM_FIRST +
-                R36SX_KEY_PRESET_BUTTON_COUNT - 1;
+                (uint8_t)(R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + next_button);
         } else {
             state->selected_row--;
         }
@@ -1039,6 +1099,9 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         int col = button_visual_col(i);
         int row = button_visual_row(i);
         int item = R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + i;
+        if (col < 0 || row < 0) {
+            continue;
+        }
         int draw_x = col == 0 ? x : right_x;
         int draw_y = button_y + row * (row_h + grid_gap);
         snprintf(line, sizeof(line), "%-5s %s", g_buttons[i].label,
@@ -1046,6 +1109,9 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         draw_row(state, frame, width, height, stride_pixels, item, draw_x,
                  draw_y, col_w, row_h, line);
     }
+    draw_row(state, frame, width, height, stride_pixels, -1, x,
+             button_y + (R36SX_KEY_PRESET_LAYOUT_ROWS - 1) *
+             (row_h + grid_gap), col_w, row_h, "SELECT CANCEL");
 
     y = height - 54;
     draw_row(state, frame, width, height, stride_pixels,

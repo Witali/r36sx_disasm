@@ -399,6 +399,9 @@ Notable patch history:
 - `disk_image_patch_064`: replaces Pico-286 blank hard disk images with
   host-created FAT16 `hdd.img`/`hdd2.img` and rebuilds Pico-286 with detailed
   INT 13h disk read/write failure logging.
+- `disk_image_patch_065`: rebuilds Pico-286 with the key preset editor laid out
+  by physical console sides: d-pad/L/L2/Select on the left and X/Y/A/B/R/R2/Start
+  on the right, with Select and Start at the bottom of their columns.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

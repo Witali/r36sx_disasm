@@ -519,6 +519,47 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 key preset editor physical layout
+
+Rebuilt Pico-286 after changing the key preset editor from an automatic
+half-list split to an explicit physical console layout:
+
+- left column: d-pad, `L`, `L2`, and static `SELECT CANCEL` at the bottom,
+- right column: `X`, `Y`, `A`, `B`, `R`, `R2`, and `START` at the bottom.
+
+The saved `keypresets.conf` keys are unchanged.  `Select` remains a service
+button for opening/canceling the preset editor instead of becoming a remappable
+DOS key.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_065\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,061,088 bytes
+- SHA256: `7770B1BD818DA27E1E4F7B924ACABC95B193509314341B24B6CC769F690D78C9`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_065/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 key preset editor draft UI
 
 Rebuilt Pico-286 after reworking the Select key preset editor:

@@ -520,3 +520,20 @@ hdd.img SHA256: 26953A16F571AB8452570E37E2C0688C0B60A2859E72B81D6E9EBA8D80379818
 hdd2.img SHA256: 45A095789D0C5A4F8E0BB2717493874C761789AF199D602BF794DBAB12448C71
 Defender scan: found no threats
 ```
+
+## 2026-05-29 key preset editor physical layout
+
+The current `pico_286` binary uses an explicit two-column layout for the key
+preset editor, matching the console sides:
+
+- left column: d-pad, `L`, `L2`, and static `SELECT CANCEL` at the bottom,
+- right column: `X`, `Y`, `A`, `B`, `R`, `R2`, and `START` at the bottom.
+
+Saved `keypresets.conf` keys are unchanged.  `Select` remains the service
+button for opening/canceling the preset editor.
+
+```text
+pico_286 size: 8061088 bytes
+pico_286 SHA256: 7770B1BD818DA27E1E4F7B924ACABC95B193509314341B24B6CC769F690D78C9
+Defender scan: found no threats
+```
