@@ -7,6 +7,12 @@
 #include <stdint.h>
 #include "cpu.h"
 
+#if PICO_ON_DEVICE
+#define PICO286_PSRAM_ATTR __attribute__((aligned (4), section(".psram")))
+#else
+#define PICO286_PSRAM_ATTR __attribute__((aligned (4)))
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

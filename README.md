@@ -416,6 +416,9 @@ Notable patch history:
   accept/change and `B`/`X` for cancel.
 - `disk_image_patch_071`: adds `MIPS_NATIVE/pico_286/README.md`, a short
   control guide for the Pico-286 native executable.
+- `disk_image_patch_072`: rebuilds Pico-286 without storing the Pico/ESP-style
+  `.psram` memory section in the Linux/MIPS executable, reducing `pico_286`
+  from about 8 MB to about 0.9 MB.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

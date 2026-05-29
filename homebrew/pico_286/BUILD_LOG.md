@@ -1,5 +1,61 @@
 # pico-286 Build Log
 
+## 2026-05-29 remove PSRAM payload from Linux executable
+
+Rebuilt Pico-286 after changing the upstream RAM/EMS/XMS storage attributes.
+The `.psram` section is needed for Pico/RP-style hardware builds, but in this
+Linux/MIPS native port it made the executable store 7 MB of zero-filled
+emulated memory.
+
+The new `PICO286_PSRAM_ATTR` macro keeps `.psram` only when `PICO_ON_DEVICE`
+is true.  In the Linux/MIPS host build, these arrays now become ordinary
+zero-initialized storage:
+
+- `RAM`
+- `UMB`
+- `HMA`
+- `EMS`
+- `XMS`
+
+Size check:
+
+- Before: about 8,114,624 bytes.
+- After: 922,472 bytes.
+- `.psram`: removed from the file.
+- `.bss`: now contains the emulated memory and is about 8.7 MiB at runtime.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_072\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 922,472 bytes
+- SHA256: `68CCFDD09C2230CD862A5BBEABD88277F9BCA10087F5F2F0F9F12B0217CA5913`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_072/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_072/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 settings menu button defaults
 
 Rebuilt Pico-286 after normalizing button behavior in settings menus.

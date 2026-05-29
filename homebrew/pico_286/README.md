@@ -28,6 +28,10 @@ integration pieces:
   not used by the Linux/host configuration.
 - `build_pico_286.ps1` cross-compiles the upstream C/C++ emulator sources into
   a native MIPS executable named `pico_286`.
+- The upstream `.psram` memory arrays are kept as `.psram` only for
+  `PICO_ON_DEVICE` builds.  In the Linux/MIPS host build they use normal
+  zero-initialized storage so the executable does not contain 7 MB of empty
+  RAM/EMS/XMS data.
 
 The build script leaves upstream source files untouched.  R36SX changes live as
 separate source files under `homebrew/pico_286/r36sx_port/`; the `obj/`

@@ -25,6 +25,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 remove PSRAM payload from Linux executable
+
+The current `pico_286` binary no longer stores the Pico/ESP-style `.psram`
+section inside the Linux/MIPS executable.  The emulated RAM/EMS/XMS arrays are
+still allocated at runtime as zero-initialized storage, but they no longer add
+about 7 MB of zeros to the file on the SD card.
+
+```text
+pico_286 size: 922472 bytes
+pico_286 SHA256: 68CCFDD09C2230CD862A5BBEABD88277F9BCA10087F5F2F0F9F12B0217CA5913
+Defender scan: found no threats
+```
+
 ## 2026-05-29 executable README
 
 Adds `MIPS_NATIVE/pico_286/README.md`, a short user-facing control guide for

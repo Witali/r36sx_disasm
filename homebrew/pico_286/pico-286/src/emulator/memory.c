@@ -8,9 +8,9 @@
 #include "swap.h"
 #endif
 uint32_t __attribute__((aligned (4)))  VIDEORAM[VIDEORAM_SIZE] = {0};
-uint8_t __attribute__((aligned (4), section(".psram"))) RAM[RAM_SIZE] = {0};
-uint8_t __attribute__((aligned (4), section(".psram"))) UMB[UMB_END - UMB_START] = {0};
-uint8_t __attribute__((aligned (4), section(".psram"))) HMA[HMA_END - HMA_START] = {0};
+uint8_t PICO286_PSRAM_ATTR RAM[RAM_SIZE] = {0};
+uint8_t PICO286_PSRAM_ATTR UMB[UMB_END - UMB_START] = {0};
+uint8_t PICO286_PSRAM_ATTR HMA[HMA_END - HMA_START] = {0};
 uint8_t __attribute__((aligned (4))) SRAM[SRAM_BLOCK_SIZE] = {0};
 
 #define VIDEORAM_MASK 0xFFFF
