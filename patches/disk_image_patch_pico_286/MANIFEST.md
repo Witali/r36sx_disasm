@@ -24,6 +24,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 preset rename cursor
+
+The current `pico_286` binary improves the key preset editor.  When editing a
+preset name, the `RENAME PRESET:` line shows a blinking underscore cursor next
+to the current text.
+
+```text
+pico_286 size: 8114908 bytes
+pico_286 SHA256: C98A6ABE633D9D22AC9E153D695EE6B059DE42065E753B1F651FCF07D6942485
+Defender scan: found no threats
+```
+
 ## 2026-05-29 Fn+X and long-Fn exit
 
 The current `pico_286` binary removes the Select+Start application exit.

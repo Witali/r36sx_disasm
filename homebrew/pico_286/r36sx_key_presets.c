@@ -215,6 +215,7 @@ static uint8_t glyph_row(char c, int row)
     static const uint8_t glyph_slash[7] = {1, 1, 2, 4, 8, 16, 16};
     static const uint8_t glyph_backslash[7] = {16, 16, 8, 4, 2, 1, 1};
     static const uint8_t glyph_plus[7] = {0, 4, 4, 31, 4, 4, 0};
+    static const uint8_t glyph_underscore[7] = {0, 0, 0, 0, 0, 0, 31};
     const uint8_t *glyph = blank;
 
     if (c >= 'a' && c <= 'z') {
@@ -267,6 +268,7 @@ static uint8_t glyph_row(char c, int row)
     case '/': glyph = glyph_slash; break;
     case '\\': glyph = glyph_backslash; break;
     case '+': glyph = glyph_plus; break;
+    case '_': glyph = glyph_underscore; break;
     default: break;
     }
     return glyph[row];
@@ -295,6 +297,14 @@ static void draw_text(uint16_t *frame, int width, int height, int stride,
         draw_char(frame, width, height, stride, x + i * 6 * scale, y,
                   text[i], color, scale);
     }
+}
+
+static int blink_cursor_visible(void)
+{
+    static unsigned int frame_counter;
+
+    frame_counter++;
+    return ((frame_counter / 30u) & 1u) == 0;
 }
 
 static int str_equals(const char *left, const char *right)
@@ -1126,7 +1136,8 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
             snprintf(line, sizeof(line), "PICK KEY FOR %s",
                      g_buttons[state->picker_button].label);
         } else {
-            snprintf(line, sizeof(line), "RENAME PRESET: %s", preset->name);
+            snprintf(line, sizeof(line), "RENAME PRESET: %s%s",
+                     preset->name, blink_cursor_visible() ? "_" : "");
         }
         fill_rect(frame, width, height, stride_pixels, 16, keyboard_y - 15,
                   width - 32, 13, rgb565(10, 13, 18));

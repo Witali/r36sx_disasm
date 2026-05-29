@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-29 preset rename cursor
+
+Rebuilt Pico-286 after improving the preset-name editor.  While editing a
+preset name, the `RENAME PRESET:` line now draws a blinking underscore cursor
+next to the current text.  The small built-in 5x7 font used by the preset
+editor now includes an underscore glyph.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_069\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,114,908 bytes
+- SHA256: `C98A6ABE633D9D22AC9E153D695EE6B059DE42065E753B1F651FCF07D6942485`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_069/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_069/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 Fn+X and long-Fn exit
 
 Rebuilt Pico-286 after changing the application exit gesture.  Select+Start no

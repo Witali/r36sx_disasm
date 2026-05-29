@@ -100,6 +100,8 @@ pressing Start opens the full-screen preset editor.  D-pad moves between rows,
 Left/Right or A/Start changes a binding, B moves backward through key choices,
 Y clears a binding, and the `ADD NEW PRESET` row creates a new preset by
 copying the current one.
+The `RENAME` row opens the on-screen keyboard for editing the current preset
+name and shows a blinking underscore cursor next to the text.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
