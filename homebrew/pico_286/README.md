@@ -54,8 +54,21 @@ Input mapping for the first build:
 - L: Alt.
 - R: Shift.
 - L2/R2: F1/F2.
-- Fn: F3.
+- Fn: toggle the on-screen keyboard.
 - Select+Start: exit back to TinyMC.
+
+On-screen keyboard controls:
+
+- D-pad: move the highlighted key.
+- A or Start: type the highlighted key.
+- B or Select: close the keyboard.
+- X: toggle Shift.
+- Y: Backspace.
+- Shift, Ctrl, and Alt keys on the keyboard act as latched modifiers.
+
+The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
+F1-F10, Delete, and common DOS punctuation such as `:`, `\`, `.`, `/`, `-`,
+and `=`.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
 put images next to the executable as `fdd0.img`, `fdd1.img`, `hdd.img`, and

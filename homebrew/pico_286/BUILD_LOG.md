@@ -480,3 +480,38 @@ startup path through:
 
 The on-screen debug overlay and `screen_text:*` log dumps remained disabled in
 the confirmed booting build.
+
+## 2026-05-28 joystick on-screen keyboard
+
+Added a joystick-controlled on-screen keyboard to the R36SX MiniFB backend.
+Fn now toggles the keyboard instead of sending F3 directly; F3 remains available
+from the keyboard's F-key row.
+
+Controls:
+
+- D-pad moves the highlighted key.
+- A or Start types the highlighted key.
+- B or Select closes the keyboard.
+- X toggles Shift.
+- Y sends Backspace.
+- Select+Start still exits Pico-286 back to TinyMC.
+
+The keyboard draws over the bottom of the framebuffer after each DOS frame.  It
+sends key events through the existing `HandleInput()` path, so DOS sees normal
+PC keyboard scancodes.  The build script also adds missing host keycode
+translations for Delete and DOS punctuation used by the keyboard: `:`, `\`,
+apostrophe, comma, period, slash, minus, and equals.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,933,564 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

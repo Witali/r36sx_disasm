@@ -81,3 +81,16 @@ to the log as `screen_text:*` entries.
 
 Device testing confirmed that this patch set boots DOS successfully from the
 included FreeDOS `fdd0.img` floppy image.
+
+The current binary includes a joystick-controlled on-screen keyboard:
+
+- Fn toggles the keyboard.
+- D-pad moves the highlighted key.
+- A or Start types the highlighted key.
+- B or Select closes the keyboard.
+- X toggles Shift.
+- Y sends Backspace.
+- Select+Start still exits back to TinyMC.
+
+F1-F10, Delete, common DOS punctuation, and latched Shift/Ctrl/Alt modifiers
+are available from the on-screen keyboard.

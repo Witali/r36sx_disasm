@@ -554,6 +554,32 @@ int main() {')
 }
 
 extern "C" void HandleInput')
+    $Text = $Text.Replace('        case 18: scancode = 0x38;
+            break; // Alt
+        default: scancode = 0;
+            break;',
+'        case 18: scancode = 0x38;
+            break; // Alt
+        case 46: scancode = 0x53;
+            break; // Delete
+        case 186: scancode = 0x27;
+            break; // ; / :
+        case 187: scancode = 0x0D;
+            break; // = / +
+        case 188: scancode = 0x33;
+            break; // ,
+        case 189: scancode = 0x0C;
+            break; // - / _
+        case 190: scancode = 0x34;
+            break; // .
+        case 191: scancode = 0x35;
+            break; // / / ?
+        case 220: scancode = 0x2B;
+            break; // backslash / |
+        case 222: scancode = 0x28;
+            break; // apostrophe / quote
+        default: scancode = 0;
+            break;')
     Set-Content -Path $Dest -Value $Text -NoNewline -Encoding ascii
     return $Dest
 }
