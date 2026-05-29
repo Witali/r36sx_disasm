@@ -938,19 +938,24 @@ void intcall86(uint8_t intnum) {
             insertdisk(129, "\\XT\\hdd2.img");
 #else
             {
-                const char *fdd0_path = r36sx_pico286_disk_path(0, "fdd0.img");
-                const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
-                const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
-                const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
-                uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
-                uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
-                uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
-                uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
-                r36sx_pico286_debug_log("cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",
-                                        fdd0_ok, fdd0_path[0] ? fdd0_path : "<disabled>",
-                                        fdd1_ok, fdd1_path[0] ? fdd1_path : "<disabled>",
-                                        hdd0_ok, hdd0_path[0] ? hdd0_path : "<disabled>",
-                                        hdd1_ok, hdd1_path[0] ? hdd1_path : "<disabled>");
+                if (r36sx_pico286_boot_bios_prompt()) {
+                    r36sx_pico286_debug_log(
+                        "cpu: int19 boot_mode=bios_prompt; disks left detached");
+                } else {
+                    const char *fdd0_path = r36sx_pico286_disk_path(0, "fdd0.img");
+                    const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
+                    const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
+                    const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
+                    uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
+                    uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
+                    uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
+                    uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
+                    r36sx_pico286_debug_log("cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",
+                                            fdd0_ok, fdd0_path[0] ? fdd0_path : "<disabled>",
+                                            fdd1_ok, fdd1_path[0] ? fdd1_path : "<disabled>",
+                                            hdd0_ok, hdd0_path[0] ? hdd0_path : "<disabled>",
+                                            hdd1_ok, hdd1_path[0] ? hdd1_path : "<disabled>");
+                }
             }
 #endif
             if (1) {

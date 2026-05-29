@@ -14,6 +14,9 @@ const char *r36sx_pico286_disk_path(uint8_t bios_drive,
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 
+// Return non-zero when boot should stop at the ROM BIOS boot prompt.
+int r36sx_pico286_boot_bios_prompt(void);
+
 #ifdef __cplusplus
 }
 #endif

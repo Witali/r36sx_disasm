@@ -29,6 +29,7 @@ static r36sx_pico286_disk_entry_t disk_entries[] = {
 static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
 static uint32_t cpu_exec_loops = 0;
+static int boot_bios_prompt = 0;
 
 static char *trim_space(char *text)
 {
@@ -152,6 +153,30 @@ static int set_cpu_mhz(const char *value, int line_no)
     return 1;
 }
 
+static int set_boot_mode(const char *value, int line_no)
+{
+    if (key_equals(value, "normal") ||
+        key_equals(value, "disk") ||
+        key_equals(value, "auto")) {
+        boot_bios_prompt = 0;
+        r36sx_pico286_debug_log("diskcfg: boot_mode=normal");
+        return 1;
+    }
+
+    if (key_equals(value, "bios") ||
+        key_equals(value, "bios_prompt") ||
+        key_equals(value, "prompt")) {
+        boot_bios_prompt = 1;
+        r36sx_pico286_debug_log("diskcfg: boot_mode=bios_prompt");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid boot_mode '%s' at line %d",
+        value, line_no);
+    return 0;
+}
+
 static int set_config_value(const char *key, const char *value, int line_no)
 {
     r36sx_pico286_disk_entry_t *entry = find_disk_entry(key);
@@ -159,6 +184,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (key_equals(key, "cpu_mhz") ||
         key_equals(key, "cpu_frequency_mhz")) {
         return set_cpu_mhz(value, line_no);
+    }
+    if (key_equals(key, "boot_mode")) {
+        return set_boot_mode(value, line_no);
     }
 
     if (!entry) {
@@ -252,4 +280,11 @@ uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
     load_disk_config();
 
     return cpu_exec_loops ? cpu_exec_loops : fallback_loops;
+}
+
+int r36sx_pico286_boot_bios_prompt(void)
+{
+    load_disk_config();
+
+    return boot_bios_prompt;
 }

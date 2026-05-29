@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-29 BIOS boot prompt mode
+
+Checked whether Pico-286 can enter an interactive BIOS setup screen at startup.
+The embedded ROM is `Turbo XT BIOS v3.1`, mapped at `0xFE000`, and it contains
+boot/diagnostic strings such as `No ROM BASIC, booting from disk...` and
+`Insert BOOT disk in A:`, but no full CMOS/BIOS setup utility.
+
+Added a config boot mode instead:
+
+```ini
+boot_mode=normal
+```
+
+Supported values:
+
+- `normal`: attach configured disks during BIOS `INT 19h` and boot DOS.
+- `bios_prompt` (aliases: `bios`, `prompt`): leave disks detached at
+  `INT 19h`, so the ROM BIOS stops at its boot prompt.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,016,928 bytes
+- SHA256: `4AF76508FCF896130572E53E0D4B1A6E3BF5060FAB02817888CDFF17FE4194AD`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+
 ## 2026-05-29 configurable CPU speed
 
 Checked the active R36SX Pico-286 main loop for a CPU speed binding.  The port

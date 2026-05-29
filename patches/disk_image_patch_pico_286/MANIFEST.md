@@ -24,6 +24,28 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 BIOS boot prompt mode
+
+`pico_286.conf` now includes:
+
+```ini
+boot_mode=normal
+```
+
+`normal` attaches the configured disks during BIOS `INT 19h` and boots DOS.
+`bios_prompt` leaves disks detached at `INT 19h`, so the embedded Turbo XT BIOS
+stops at its boot prompt.  The ROM contains boot/diagnostic text, but no full
+interactive CMOS/BIOS setup utility.
+
+The rebuilt binary was copied into this patch and scanned with
+`tools/scan-download.ps1`; Microsoft Defender reported no threats.
+
+```text
+Size: 8016928 bytes
+SHA256: 4AF76508FCF896130572E53E0D4B1A6E3BF5060FAB02817888CDFF17FE4194AD
+Defender scan: found no threats
+```
+
 ## 2026-05-29 configurable CPU speed
 
 `pico_286.conf` now includes:
@@ -188,6 +210,7 @@ Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf
 
 ```ini
 cpu_mhz=32.768
+boot_mode=normal
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
@@ -198,6 +221,11 @@ hdd1=hdd2.img
 `32.768` keeps the previous hard-coded speed (`exec86(32768)` per
 millisecond-like host loop).  It is a practical speed knob, not a cycle-exact
 80286 timing model.
+
+`boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
+boots DOS.  `boot_mode=bios_prompt` leaves disks detached at `INT 19h`, so the
+embedded Turbo XT BIOS stops at its boot prompt.  The ROM does not include a
+full interactive CMOS/BIOS setup utility.
 
 These map to BIOS drives `00h`, `01h`, `80h`, and `81h` respectively.  Paths
 are relative to the Pico-286 directory unless absolute paths are used.  Empty
