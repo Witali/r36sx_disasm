@@ -25,6 +25,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 preset-only cursor-key block
+
+The current `pico_286` binary hides the right-side on-screen cursor-key block
+during normal DOS use.  The key picker inside the preset editor enables that
+block explicitly, so cursor keys remain available while assigning physical
+buttons.
+
+The default `pico_286.conf` no longer contains `osk_cursor_keys`, and the disk
+config save path no longer writes that legacy setting.  Existing configs may
+still contain the old key; it is accepted for compatibility but has no effect.
+
+```text
+pico_286 size: 914080 bytes
+pico_286 SHA256: 5B1D9D8887C512FFF48C125B084CFEA6B05CC9F4F7E481E0D65D2804EEB07E7F
+Defender scan: found no threats
+```
+
 ## 2026-05-29 edge-to-edge on-screen keyboard panel
 
 The current `pico_286` binary updates the shared R36SX on-screen keyboard

@@ -1,5 +1,52 @@
 # pico-286 Build Log
 
+## 2026-05-29 preset-only cursor-key block
+
+Rebuilt Pico-286 after splitting the shared on-screen keyboard cursor-key
+block behavior.  The normal DOS on-screen keyboard now always hides the
+right-side cursor-key block.  The key picker used inside the preset editor
+enables the block explicitly, so cursor keys are still available when assigning
+physical buttons.
+
+The default `pico_286.conf` no longer contains `osk_cursor_keys`, and the disk
+config save path no longer writes that legacy setting.  Existing configs may
+still contain the old key; it is accepted for compatibility but has no effect.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_074\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 914,080 bytes
+- SHA256: `5B1D9D8887C512FFF48C125B084CFEA6B05CC9F4F7E481E0D65D2804EEB07E7F`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_074/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_074/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_074/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 edge-to-edge on-screen keyboard panel
 
 Rebuilt Pico-286 after changing the shared R36SX on-screen keyboard geometry.

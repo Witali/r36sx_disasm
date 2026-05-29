@@ -37,7 +37,6 @@ static char boot_order_text[64] = "fdd0,hdd0";
 static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
-static int osk_cursor_keys = 1;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -263,44 +262,6 @@ static int set_boot_mode(const char *value, int line_no)
     return 0;
 }
 
-static int parse_bool_value(const char *value, int *out)
-{
-    if (key_equals(value, "1") ||
-        key_equals(value, "yes") ||
-        key_equals(value, "true") ||
-        key_equals(value, "on") ||
-        key_equals(value, "enabled")) {
-        *out = 1;
-        return 1;
-    }
-    if (key_equals(value, "0") ||
-        key_equals(value, "no") ||
-        key_equals(value, "false") ||
-        key_equals(value, "off") ||
-        key_equals(value, "disabled")) {
-        *out = 0;
-        return 1;
-    }
-    return 0;
-}
-
-static int set_osk_cursor_keys(const char *value, int line_no)
-{
-    int enabled = 0;
-
-    if (!parse_bool_value(value, &enabled)) {
-        r36sx_pico286_debug_log(
-            "diskcfg: ignoring invalid osk_cursor_keys '%s' at line %d",
-            value, line_no);
-        return 0;
-    }
-
-    osk_cursor_keys = enabled;
-    r36sx_pico286_debug_log("diskcfg: osk_cursor_keys=%s",
-                            osk_cursor_keys ? "on" : "off");
-    return 1;
-}
-
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -444,7 +405,7 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
-        return set_osk_cursor_keys(value, line_no);
+        return 1;
     }
     if (key_equals(key, "boot_order")) {
         snprintf(mutable_value, sizeof(mutable_value), "%s", value);
@@ -594,7 +555,6 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
     fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
-    fprintf(fp, "osk_cursor_keys=%s\n", osk_cursor_keys ? "on" : "off");
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
     fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
@@ -625,13 +585,6 @@ int r36sx_pico286_boot_bios_prompt(void)
     load_disk_config();
 
     return boot_bios_prompt;
-}
-
-int r36sx_pico286_osk_cursor_keys(void)
-{
-    load_disk_config();
-
-    return osk_cursor_keys;
 }
 
 uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives)

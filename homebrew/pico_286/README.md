@@ -131,8 +131,9 @@ On-screen keyboard controls:
 
 The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
 F1-F10, Delete, and common DOS punctuation such as `:`, `\`, `.`, `/`, `-`,
-and `=`.  When `osk_cursor_keys=on`, it also shows a compact right-side
-cursor-key block laid out like a physical keyboard: Up above Left/Down/Right.
+and `=`.  The normal DOS keyboard does not show the right-side cursor-key
+block.  The preset editor's key picker does show that compact block, laid out
+like a physical keyboard: Up above Left/Down/Right.
 
 When the keyboard is visible it occupies the bottom 96 pixels, about 20% of the
 640x480 framebuffer.  Its panel is drawn edge-to-edge along the left, right,
@@ -147,7 +148,6 @@ devices:
 ```ini
 cpu_mhz=32.768
 boot_mode=normal
-osk_cursor_keys=on
 boot_order=fdd0,hdd0
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
@@ -161,9 +161,6 @@ hdd1_geometry=65,16,63
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
 millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
-
-`osk_cursor_keys` accepts `on`/`off` and controls whether the shared on-screen
-keyboard reserves a right-side inverted-T cursor-key block.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

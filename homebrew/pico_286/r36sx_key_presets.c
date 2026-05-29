@@ -903,6 +903,7 @@ static void start_picker(struct r36sx_key_presets *state, uint8_t mode,
     state->edit_mode = mode;
     state->picker_button = button;
     r36sx_screen_keyboard_init(&state->picker_keyboard);
+    r36sx_screen_keyboard_set_cursor_block(&state->picker_keyboard, 1);
     r36sx_screen_keyboard_set_visible(&state->picker_keyboard, 1);
 }
 
