@@ -1364,6 +1364,51 @@ Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
 found no threats
 ```
 
+## 2026-05-29 row padding rebuild
+
+Purpose:
+
+Adjust Tiny MC file-list row spacing so extra pixels in `list_row_h` over
+`large_px` are distributed around the text. The upper padding is
+`(list_row_h - large_px) / 2`, and the lower padding receives the remainder.
+With the current config, `list_row_h=22` and `large_px=19`, so the row adds
+`1` pixel above the list text and `2` pixels below it.
+
+Implementation:
+
+- Added row-padding helpers in `tiny_mc.c`.
+- File-list entries and `[EMPTY]` now draw at `row_y + top_padding`.
+- The selected-row background is constrained to the actual row bounds instead
+  of starting two pixels above the row.
+- Updated `tiny_mc.conf` and README text to describe odd-pixel distribution.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_060
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 56892 bytes
+Tiny MC SHA256: 7357C4376E545BCBE6AB3CE150EA6D5915C3EDF1E5BAA8D8C4981B5D19ACE6AA
+tiny_mc.conf size: 507 bytes
+tiny_mc.conf SHA256: DE24AE69C7255CE3E770BD80F42A7D79EF7EDDBBF3AE899068A6F9101D3B9803
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+Defender scan patches\disk_image_patch_060: found no threats
+```
+
 ## 2026-05-28 self-exec child return rebuild
 
 Purpose:

@@ -95,8 +95,10 @@ list_row_h=22
 
 `font` can point at any TTF file readable by FreeType. `small_px` controls the
 header/path/footer text, `large_px` controls the file-list text, and
-`list_row_h` controls the file-list row height. If `list_row_h` is omitted,
-Tiny MC keeps it at least `large_px + 3`.
+`list_row_h` controls the file-list row height. Extra row pixels above
+`large_px` are split around the list text; if the extra amount is odd, the
+larger half goes below the text. If `list_row_h` is omitted, Tiny MC keeps it
+at least `large_px + 3`.
 
 ## Input model
 

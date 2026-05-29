@@ -1932,6 +1932,23 @@ static int visible_rows(void)
     return rows > 1 ? rows : 1;
 }
 
+static int list_row_extra_px(void)
+{
+    int extra = g_config.list_row_h - g_config.font_large_px;
+    return extra > 0 ? extra : 0;
+}
+
+static int list_row_pad_top(void)
+{
+    return list_row_extra_px() / 2;
+}
+
+static int list_row_pad_bottom(void)
+{
+    int extra = list_row_extra_px();
+    return extra - extra / 2;
+}
+
 static void ensure_selection_visible(void)
 {
     int rows = visible_rows();
@@ -2024,6 +2041,12 @@ static void draw_ui(void)
     int has_scrollbar = g_entry_count > rows;
     int selection_w = g_fb.width - (has_scrollbar ? 34 : 16);
     int text_max_w = g_fb.width - (has_scrollbar ? 64 : 44);
+    int row_pad_top = list_row_pad_top();
+    int row_pad_bottom = list_row_pad_bottom();
+    int row_marker_h = g_config.list_row_h - row_pad_top - row_pad_bottom;
+    if (row_marker_h < 1) {
+        row_marker_h = 1;
+    }
 
     fill_rect(0, 0, g_fb.width, g_fb.height, bg);
     fill_rect(0, 0, g_fb.width, HEADER_H, band);
@@ -2035,7 +2058,7 @@ static void draw_ui(void)
     draw_text(12, HEADER_H + 4, g_cwd, muted, 1, g_fb.width - 24);
 
     if (g_entry_count == 0) {
-        draw_text(22, top, "[EMPTY]", muted, 2, g_fb.width - 44);
+        draw_text(22, top + row_pad_top, "[EMPTY]", muted, 2, g_fb.width - 44);
     }
 
     for (int row = 0; row < rows; row++) {
@@ -2044,14 +2067,15 @@ static void draw_ui(void)
             break;
         }
         int y = top + row * g_config.list_row_h;
+        int text_y = y + row_pad_top;
         char label[320];
         format_entry(label, sizeof(label), &g_entries[idx]);
         if (idx == g_selected) {
-            fill_rect(8, y - 2, selection_w, g_config.list_row_h, rgb565(50, 78, 92));
-            fill_rect(10, y, 4, g_config.list_row_h - 4, hi);
-            draw_text(22, y, label, rgb565(255, 246, 220), 2, text_max_w);
+            fill_rect(8, y, selection_w, g_config.list_row_h, rgb565(50, 78, 92));
+            fill_rect(10, text_y, 4, row_marker_h, hi);
+            draw_text(22, text_y, label, rgb565(255, 246, 220), 2, text_max_w);
         } else {
-            draw_text(22, y, label, text, 2, text_max_w);
+            draw_text(22, text_y, label, text, 2, text_max_w);
         }
     }
 

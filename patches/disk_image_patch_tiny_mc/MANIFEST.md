@@ -112,8 +112,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 56796 bytes
-  SHA256: 72DB5041C4496DA9489D18CB22E4D14F860274B37336CBEB7DCE64B86EAC427B
+  Size: 56892 bytes
+  SHA256: 7357C4376E545BCBE6AB3CE150EA6D5915C3EDF1E5BAA8D8C4981B5D19ACE6AA
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -128,9 +128,9 @@ Tiny MC:
   Does not contain: icube heartbeat, shmget
 
 Tiny MC config:
-  tiny_mc.conf size: 452 bytes
+  tiny_mc.conf size: 507 bytes
   tiny_mc.conf SHA256:
-    06F53A12D7B4EBC88B587FABF0CB531FB601041E78D025AC0F58CECF443F5D70
+    DE24AE69C7255CE3E770BD80F42A7D79EF7EDDBBF3AE899068A6F9101D3B9803
 
 Tiny MC common fonts:
   JetBrainsMonoNL-Regular.ttf size: 208576 bytes
