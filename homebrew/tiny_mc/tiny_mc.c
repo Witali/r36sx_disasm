@@ -64,10 +64,14 @@ enum {
     SCROLLBAR_MIN_THUMB = 14,
     DEFAULT_TINY_FT_SMALL_PX = 12,
     DEFAULT_TINY_FT_LARGE_PX = 19,
-    TINY_FT_CACHE_SLOTS = 192
+    TINY_FT_CACHE_SLOTS = 192,
+    MAX_TEXT_EXTENSIONS = 128,
+    TEXT_VIEWER_MAX_BYTES = 256 * 1024,
+    TEXT_VIEWER_MAX_LINES = 4096
 };
 
 #define LOG_LINE_MAX 768
+#define DEFAULT_TEXT_EXTENSIONS "txt,log,conf"
 #define TINY_MC_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf"
 #define TINY_MC_CONFIG_LOCAL_PATH "tiny_mc.conf"
 #define TINY_MC_EXEC_PATH "/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc"
@@ -292,6 +296,7 @@ struct entry {
     char name[MAX_NAME];
     int is_dir;
     int is_exec;
+    int is_text;
     off_t size;
 };
 
@@ -318,9 +323,22 @@ struct dir_state {
 
 struct app_config {
     char font_path[PATH_MAX];
+    char text_extensions[MAX_TEXT_EXTENSIONS];
     int font_small_px;
     int font_large_px;
     int list_row_h;
+};
+
+struct text_viewer_state {
+    int active;
+    char path[PATH_MAX];
+    char title[MAX_NAME];
+    char *buffer;
+    char **lines;
+    size_t byte_count;
+    int line_count;
+    int scroll;
+    int truncated;
 };
 
 static struct fb_state g_fb = {
@@ -340,7 +358,7 @@ static int g_entry_count;
 static int g_selected;
 static int g_scroll;
 static char g_cwd[PATH_MAX] = "/mnt/sdcard";
-static char g_status[256] = "A/Start runs a file. Right/A enters a directory. Fn starts iCube.";
+static char g_status[256] = "A/Start runs files or opens text. Right/A enters dirs. Fn starts iCube.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
@@ -349,10 +367,12 @@ static struct click_audio_state g_audio;
 static struct font_state g_font;
 static struct app_config g_config = {
     R36SX_DEFAULT_MONO_FONT_PATH,
+    DEFAULT_TEXT_EXTENSIONS,
     DEFAULT_TINY_FT_SMALL_PX,
     DEFAULT_TINY_FT_LARGE_PX,
     DEFAULT_LIST_ROW_H
 };
+static struct text_viewer_state g_viewer;
 #if ENABLE_FN_ICUBE_SHORTCUT
 static int g_fn_shortcut_armed;
 #endif
@@ -510,9 +530,10 @@ static void config_load(void)
         }
     }
     if (!fp) {
-        log_msg("config not found; defaults font=%s small=%d large=%d row=%d",
-                g_config.font_path, g_config.font_small_px,
-                g_config.font_large_px, g_config.list_row_h);
+        log_msg("config not found; defaults font=%s text_ext=%s small=%d large=%d row=%d",
+                g_config.font_path, g_config.text_extensions,
+                g_config.font_small_px, g_config.font_large_px,
+                g_config.list_row_h);
         return;
     }
 
@@ -544,6 +565,17 @@ static void config_load(void)
                 snprintf(g_config.font_path, sizeof(g_config.font_path), "%s",
                          R36SX_DEFAULT_MONO_FONT_PATH);
             }
+        } else if (strcmp(key, "text_extensions") == 0 ||
+                   strcmp(key, "viewer_extensions") == 0 ||
+                   strcmp(key, "text_ext") == 0) {
+            if (*value != '\0' && strcmp(value, "default") != 0) {
+                snprintf(g_config.text_extensions,
+                         sizeof(g_config.text_extensions), "%s", value);
+            } else {
+                snprintf(g_config.text_extensions,
+                         sizeof(g_config.text_extensions), "%s",
+                         DEFAULT_TEXT_EXTENSIONS);
+            }
         } else if (strcmp(key, "small_px") == 0 ||
                    strcmp(key, "font_small_px") == 0) {
             g_config.font_small_px =
@@ -566,9 +598,10 @@ static void config_load(void)
         g_config.list_row_h = g_config.font_large_px + 3;
     }
 
-    log_msg("config loaded: %s font=%s small=%d large=%d row=%d",
-            loaded_path, g_config.font_path, g_config.font_small_px,
-            g_config.font_large_px, g_config.list_row_h);
+    log_msg("config loaded: %s font=%s text_ext=%s small=%d large=%d row=%d",
+            loaded_path, g_config.font_path, g_config.text_extensions,
+            g_config.font_small_px, g_config.font_large_px,
+            g_config.list_row_h);
 }
 
 static void audio_driver_open(void)
@@ -1563,6 +1596,47 @@ static int has_script_suffix(const char *name)
     return n > 3 && strcasecmp(name + n - 3, ".sh") == 0;
 }
 
+static int is_extension_separator(char c)
+{
+    return c == ',' || c == ';' || c == ' ' || c == '\t';
+}
+
+static int has_text_suffix(const char *name)
+{
+    const char *dot = strrchr(name, '.');
+    const char *list = g_config.text_extensions;
+    size_t ext_len;
+
+    if (!dot || dot[1] == '\0') {
+        return 0;
+    }
+    dot++;
+    ext_len = strlen(dot);
+
+    while (*list != '\0') {
+        const char *start;
+        size_t len;
+
+        while (is_extension_separator(*list)) {
+            list++;
+        }
+        start = list;
+        while (*list != '\0' && !is_extension_separator(*list)) {
+            list++;
+        }
+        len = (size_t)(list - start);
+        if (len > 0 && start[0] == '.') {
+            start++;
+            len--;
+        }
+        if (len == ext_len && strncasecmp(start, dot, len) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int find_dir_state(const char *path)
 {
     for (int i = 0; i < g_dir_state_count; i++) {
@@ -1642,6 +1716,7 @@ static void scan_directory(void)
         strcpy(g_entries[g_entry_count].name, "..");
         g_entries[g_entry_count].is_dir = 1;
         g_entries[g_entry_count].is_exec = 0;
+        g_entries[g_entry_count].is_text = 0;
         g_entries[g_entry_count].size = 0;
         g_entry_count++;
     }
@@ -1670,10 +1745,12 @@ static void scan_directory(void)
         if (lstat(full, &st) == 0) {
             e->is_dir = S_ISDIR(st.st_mode);
             e->is_exec = ((st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0) || has_script_suffix(e->name);
+            e->is_text = !e->is_dir && has_text_suffix(e->name);
             e->size = st.st_size;
         } else {
             e->is_dir = 0;
             e->is_exec = 0;
+            e->is_text = 0;
             e->size = 0;
         }
         g_entry_count++;
@@ -1982,6 +2059,8 @@ static void format_entry(char *out, size_t out_size, const struct entry *e)
         snprintf(out, out_size, "[UP] ..");
     } else if (e->is_dir) {
         snprintf(out, out_size, "[DIR] %s", e->name);
+    } else if (e->is_text) {
+        snprintf(out, out_size, "[TXT] %s", e->name);
     } else if (e->is_exec || has_script_suffix(e->name)) {
         snprintf(out, out_size, "[RUN] %s", e->name);
     } else {
@@ -1989,7 +2068,7 @@ static void format_entry(char *out, size_t out_size, const struct entry *e)
     }
 }
 
-static void draw_scrollbar(int top, int rows)
+static void draw_scrollbar_for(int top, int rows, int total, int scroll, int row_h)
 {
     int track_h;
     int thumb_h;
@@ -1998,14 +2077,14 @@ static void draw_scrollbar(int top, int rows)
     int thumb_y;
     int x;
 
-    if (g_entry_count <= rows || rows <= 0) {
+    if (total <= rows || rows <= 0) {
         return;
     }
 
-    track_h = rows * g_config.list_row_h;
+    track_h = rows * row_h;
     x = g_fb.width - SCROLLBAR_RIGHT_PAD - SCROLLBAR_WIDTH;
-    max_scroll = g_entry_count - rows;
-    thumb_h = (rows * track_h) / g_entry_count;
+    max_scroll = total - rows;
+    thumb_h = (rows * track_h) / total;
     if (thumb_h < SCROLLBAR_MIN_THUMB) {
         thumb_h = SCROLLBAR_MIN_THUMB;
     }
@@ -2016,7 +2095,7 @@ static void draw_scrollbar(int top, int rows)
     movable = track_h - thumb_h;
     thumb_y = top;
     if (max_scroll > 0 && movable > 0) {
-        thumb_y += (g_scroll * movable + max_scroll / 2) / max_scroll;
+        thumb_y += (scroll * movable + max_scroll / 2) / max_scroll;
     }
     if (thumb_y + thumb_h > top + track_h) {
         thumb_y = top + track_h - thumb_h;
@@ -2025,6 +2104,207 @@ static void draw_scrollbar(int top, int rows)
     fill_rect(x, top, SCROLLBAR_WIDTH, track_h, rgb565(32, 42, 48));
     fill_rect(x, thumb_y, SCROLLBAR_WIDTH, thumb_h, rgb565(105, 138, 146));
     fill_rect(x, thumb_y, SCROLLBAR_WIDTH, 1, rgb565(170, 205, 205));
+}
+
+static void draw_scrollbar(int top, int rows)
+{
+    draw_scrollbar_for(top, rows, g_entry_count, g_scroll,
+                       g_config.list_row_h);
+}
+
+static int text_viewer_row_h(void)
+{
+    int row_h = g_config.font_small_px + 3;
+    return row_h > 10 ? row_h : 10;
+}
+
+static int text_viewer_visible_rows(void)
+{
+    int top = HEADER_H + LIST_TOP_OFFSET;
+    int bottom = g_fb.height - FOOTER_H - LIST_BOTTOM_PAD;
+    int rows = (bottom - top) / text_viewer_row_h();
+    return rows > 1 ? rows : 1;
+}
+
+static void text_viewer_release(void)
+{
+    free(g_viewer.lines);
+    free(g_viewer.buffer);
+    memset(&g_viewer, 0, sizeof(g_viewer));
+}
+
+static void text_viewer_close(void)
+{
+    if (g_viewer.active) {
+        log_msg("text viewer close: %s", g_viewer.path);
+    }
+    text_viewer_release();
+    snprintf(g_status, sizeof(g_status), "Text viewer closed");
+}
+
+static void text_viewer_clamp_scroll(void)
+{
+    int rows = text_viewer_visible_rows();
+    int max_scroll = g_viewer.line_count - rows;
+
+    if (max_scroll < 0) {
+        max_scroll = 0;
+    }
+    if (g_viewer.scroll < 0) {
+        g_viewer.scroll = 0;
+    }
+    if (g_viewer.scroll > max_scroll) {
+        g_viewer.scroll = max_scroll;
+    }
+}
+
+static int text_viewer_open(const char *path, const char *title)
+{
+    int fd;
+    struct stat st;
+    size_t wanted = TEXT_VIEWER_MAX_BYTES;
+    size_t total = 0;
+    char *buffer;
+    char **lines;
+
+    text_viewer_release();
+    fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        snprintf(g_status, sizeof(g_status), "Cannot open text: %s", strerror(errno));
+        log_msg("text viewer open failed: %s: %s", path, strerror(errno));
+        return -1;
+    }
+    set_close_on_exec(fd);
+
+    if (fstat(fd, &st) == 0 && st.st_size >= 0 &&
+        (uint64_t)st.st_size < (uint64_t)wanted) {
+        wanted = (size_t)st.st_size;
+    }
+
+    buffer = (char *)malloc(wanted + 1);
+    lines = (char **)malloc(sizeof(char *) * TEXT_VIEWER_MAX_LINES);
+    if (!buffer || !lines) {
+        close(fd);
+        free(lines);
+        free(buffer);
+        snprintf(g_status, sizeof(g_status), "Not enough memory for text viewer");
+        log_msg("text viewer malloc failed for %s", path);
+        return -1;
+    }
+
+    while (total < wanted) {
+        ssize_t rc = read(fd, buffer + total, wanted - total);
+        if (rc < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            close(fd);
+            free(lines);
+            free(buffer);
+            snprintf(g_status, sizeof(g_status), "Read failed: %s", strerror(errno));
+            log_msg("text viewer read failed: %s: %s", path, strerror(errno));
+            return -1;
+        }
+        if (rc == 0) {
+            break;
+        }
+        total += (size_t)rc;
+    }
+    close(fd);
+    buffer[total] = '\0';
+
+    int line_count = 0;
+    if (total > 0) {
+        lines[line_count++] = buffer;
+    }
+    for (size_t i = 0; i < total && line_count < TEXT_VIEWER_MAX_LINES; i++) {
+        unsigned char c = (unsigned char)buffer[i];
+        if (c == '\r' || c == '\n') {
+            buffer[i] = '\0';
+            if (c == '\r' && i + 1 < total && buffer[i + 1] == '\n') {
+                i++;
+                buffer[i] = '\0';
+            }
+            if (i + 1 < total && line_count < TEXT_VIEWER_MAX_LINES) {
+                lines[line_count++] = buffer + i + 1;
+            }
+        } else if ((c < 32 && c != '\t') || c == 127) {
+            buffer[i] = ' ';
+        }
+    }
+
+    g_viewer.active = 1;
+    g_viewer.buffer = buffer;
+    g_viewer.lines = lines;
+    g_viewer.byte_count = total;
+    g_viewer.line_count = line_count;
+    g_viewer.scroll = 0;
+    g_viewer.truncated =
+        total == TEXT_VIEWER_MAX_BYTES ||
+        (line_count >= TEXT_VIEWER_MAX_LINES && total > 0);
+    snprintf(g_viewer.path, sizeof(g_viewer.path), "%s", path);
+    snprintf(g_viewer.title, sizeof(g_viewer.title), "%s", title);
+    snprintf(g_status, sizeof(g_status), "Viewing %s: %d lines%s",
+             title, line_count, g_viewer.truncated ? " (truncated)" : "");
+    log_msg("text viewer open: path=%s bytes=%lu lines=%d truncated=%d",
+            path, (unsigned long)total, line_count, g_viewer.truncated);
+    return 0;
+}
+
+static void draw_text_viewer_ui(void)
+{
+    uint16_t bg = rgb565(12, 16, 20);
+    uint16_t band = rgb565(24, 38, 48);
+    uint16_t accent = rgb565(55, 150, 120);
+    uint16_t hi = rgb565(240, 170, 60);
+    uint16_t text = rgb565(222, 235, 228);
+    uint16_t muted = rgb565(145, 160, 165);
+    uint16_t black = rgb565(0, 0, 0);
+    int top = HEADER_H + LIST_TOP_OFFSET;
+    int row_h = text_viewer_row_h();
+    int rows = text_viewer_visible_rows();
+    char header[360];
+    char footer[192];
+
+    text_viewer_clamp_scroll();
+    fill_rect(0, 0, g_fb.width, g_fb.height, bg);
+    fill_rect(0, 0, g_fb.width, HEADER_H, band);
+    fill_rect(0, HEADER_H - 3, g_fb.width, 3, accent);
+    fill_rect(0, g_fb.height - FOOTER_H, g_fb.width, FOOTER_H, band);
+    fill_rect(0, g_fb.height - FOOTER_H, g_fb.width, 3, hi);
+
+    snprintf(header, sizeof(header), "VIEW %s", g_viewer.title);
+    draw_text(12, 12, header, rgb565(250, 250, 245), 2, g_fb.width - 24);
+    draw_text(12, HEADER_H + 4, g_viewer.path, muted, 1, g_fb.width - 24);
+
+    if (g_viewer.line_count == 0) {
+        draw_text(12, top, "[EMPTY TEXT FILE]", muted, 1, g_fb.width - 24);
+    } else {
+        for (int row = 0; row < rows; row++) {
+            int idx = g_viewer.scroll + row;
+            if (idx >= g_viewer.line_count) {
+                break;
+            }
+            draw_text(12, top + row * row_h, g_viewer.lines[idx],
+                      text, 1, g_fb.width - 36);
+        }
+    }
+
+    draw_scrollbar_for(top, rows, g_viewer.line_count, g_viewer.scroll, row_h);
+
+    snprintf(footer, sizeof(footer),
+             "UP/DOWN SCROLL  SELECT PGUP  A/START PGDN  LEFT/B BACK");
+    draw_text(12, g_fb.height - FOOTER_H + 8, footer,
+              rgb565(230, 240, 220), 1, g_fb.width - 24);
+    snprintf(footer, sizeof(footer), "Line %d/%d%s",
+             g_viewer.line_count > 0 ? g_viewer.scroll + 1 : 0,
+             g_viewer.line_count,
+             g_viewer.truncated ? "  TRUNCATED" : "");
+    draw_text(12, g_fb.height - 17, footer,
+              rgb565(220, 210, 180), 1, g_fb.width - 24);
+
+    fill_rect(0, g_fb.height - 1, g_fb.width, 1, black);
+    present_frame();
 }
 
 static void draw_ui(void)
@@ -2046,6 +2326,11 @@ static void draw_ui(void)
     int row_marker_h = g_config.list_row_h - row_pad_top - row_pad_bottom;
     if (row_marker_h < 1) {
         row_marker_h = 1;
+    }
+
+    if (g_viewer.active) {
+        draw_text_viewer_ui();
+        return;
     }
 
     fill_rect(0, 0, g_fb.width, g_fb.height, bg);
@@ -2082,7 +2367,7 @@ static void draw_ui(void)
     draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
-              "UP/DOWN SELECT  A/START RUN  RIGHT ENTER  LEFT/B BACK  FN ICUBE",
+              "UP/DOWN SELECT  A/START OPEN  RIGHT ENTER  LEFT/B BACK  FN ICUBE",
               rgb565(230, 240, 220), 1, g_fb.width - 24);
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 
@@ -2169,6 +2454,13 @@ static int launch_selected(void)
     char dir[PATH_MAX];
     const char *base;
     join_path(path, sizeof(path), g_cwd, e->name);
+
+    if (e->is_text || has_text_suffix(e->name)) {
+        save_dir_state(g_cwd);
+        text_viewer_open(path, e->name);
+        return 0;
+    }
+
     split_dir_base(path, dir, sizeof(dir), &base);
 
     snprintf(g_status, sizeof(g_status), "Running %s", e->name);
@@ -2288,6 +2580,45 @@ static void choose_start_dir(int argc, char **argv)
     log_msg("start dir: %s", g_cwd);
 }
 
+static void handle_text_viewer_buttons(uint32_t buttons, uint32_t changed,
+                                       uint32_t nav, long now)
+{
+    int rows = text_viewer_visible_rows();
+    int page = rows > 1 ? rows - 1 : 1;
+
+    if ((changed & (BTN_LEFT_BIT | BTN_B_BIT)) != 0) {
+        text_viewer_close();
+        g_repeat_buttons = 0;
+        finish_button_frame(buttons);
+        return;
+    }
+
+    if ((changed & BTN_SELECT_BIT) != 0) {
+        g_viewer.scroll -= page;
+        g_repeat_buttons = 0;
+    } else if ((changed & (BTN_RIGHT_BIT | BTN_A_BIT | BTN_START_BIT)) != 0) {
+        g_viewer.scroll += page;
+        g_repeat_buttons = 0;
+    } else if ((changed & BTN_UP_BIT) != 0 ||
+               (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT &&
+                now >= g_next_repeat_ms)) {
+        g_viewer.scroll--;
+        g_repeat_buttons = BTN_UP_BIT;
+        g_next_repeat_ms = now + ((changed & BTN_UP_BIT) ? 360 : 80);
+    } else if ((changed & BTN_DOWN_BIT) != 0 ||
+               (nav == BTN_DOWN_BIT && g_repeat_buttons == BTN_DOWN_BIT &&
+                now >= g_next_repeat_ms)) {
+        g_viewer.scroll++;
+        g_repeat_buttons = BTN_DOWN_BIT;
+        g_next_repeat_ms = now + ((changed & BTN_DOWN_BIT) ? 360 : 80);
+    } else if (nav == 0) {
+        g_repeat_buttons = 0;
+    }
+
+    text_viewer_clamp_scroll();
+    finish_button_frame(buttons);
+}
+
 static void handle_buttons(uint32_t buttons)
 {
     if (g_wait_buttons_release) {
@@ -2341,6 +2672,11 @@ static void handle_buttons(uint32_t buttons)
             audio_click();
             audio_update();
         }
+    }
+
+    if (g_viewer.active) {
+        handle_text_viewer_buttons(buttons, changed, nav, now);
+        return;
     }
 
     if ((changed & BTN_UP_BIT) != 0 || (nav == BTN_UP_BIT && g_repeat_buttons == BTN_UP_BIT && now >= g_next_repeat_ms)) {

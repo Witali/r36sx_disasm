@@ -13,7 +13,10 @@ MC is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 - D-pad / left stick up and down: select a file.
 - Left, B, or Select: parent directory.
 - Right: enter the selected directory.
-- A or Start: enter a directory or run the selected file.
+- A or Start: enter a directory, view a configured text file, or run the
+  selected executable.
+- In the text viewer, Up/Down scroll, Select pages up, A/Start pages down,
+  and Left/B returns to the file list.
 - Fn: close Tiny MC and `execl()` the stock `/mnt/sdcard/cubegm/icube`
   supervisor directly.
 
@@ -38,8 +41,8 @@ The program uses:
   loaded with `dlopen()` so the built-in 5x7 bitmap font remains a fallback;
 - `MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf` as the preferred
   FreeType font, with the other common mono fonts as fallbacks;
-- `MIPS_NATIVE/tiny_mc/tiny_mc.conf` for the runtime font path and text-size
-  settings;
+- `MIPS_NATIVE/tiny_mc/tiny_mc.conf` for the runtime font path, text-size
+  settings, and text-viewer extensions;
 - an internal RGB565 640x480 framebuffer;
 - `/dev/fb0` direct drawing only as fallback if `driver.so` is unavailable;
 - `/dev/input/js0..js3` for Linux joystick input;
@@ -91,6 +94,7 @@ font=/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf
 small_px=12
 large_px=19
 list_row_h=22
+text_extensions=txt,log,conf
 ```
 
 `font` can point at any TTF file readable by FreeType. `small_px` controls the
@@ -98,7 +102,12 @@ header/path/footer text, `large_px` controls the file-list text, and
 `list_row_h` controls the file-list row height. Extra row pixels above
 `large_px` are split around the list text; if the extra amount is odd, the
 larger half goes below the text. If `list_row_h` is omitted, Tiny MC keeps it
-at least `large_px + 3`.
+at least `large_px + 3`. `text_extensions` is a comma-separated list of file
+extensions opened by the built-in text viewer.
+
+Files matching `text_extensions` are shown as `[TXT]` in the list. Press
+`A`/`Start` to open them, `Up`/`Down` to scroll, `Select` for page up,
+`A`/`Start` for page down, and `Left`/`B` to return to the file list.
 
 ## Input model
 

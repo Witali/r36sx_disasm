@@ -1,5 +1,57 @@
 # Build log: Tiny MC
 
+## 2026-05-29 text viewer rebuild
+
+Purpose:
+
+Add a built-in Tiny MC viewer for small text files so logs/configs can be read
+directly on the console without launching an external program.
+
+Implementation:
+
+- Added `text_extensions` to `tiny_mc.conf`; default value is
+  `txt,log,conf`.
+- Added config parsing aliases: `text_extensions`, `viewer_extensions`, and
+  `text_ext`.
+- File-list entries matching the configured extensions are marked as `[TXT]`.
+- Pressing `A` or `Start` on a text file opens it in an internal viewer.
+- Viewer controls:
+  - `Up`/`Down`: scroll one line.
+  - `Select`: page up.
+  - `A`/`Start`: page down.
+  - `Left`/`B`: return to the file list.
+- The viewer reads up to 256 KiB and up to 4096 lines, replacing non-printing
+  control bytes with spaces and marking truncated files in the footer.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_061
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 63864 bytes
+Tiny MC SHA256: B448F38D3962508167EFC9D897D85A2875B7BACE8E5D7E2BA5F0EFDE0AA3710E
+tiny_mc.conf size: 629 bytes
+tiny_mc.conf SHA256: C1CCD97FF41FCC4A9E66F923FECB05F969443CF9B21FBF29A768308E54218CE7
+Contains strings: text_extensions, text viewer, [TXT], VIEW, PGUP, PGDN,
+TRUNCATED
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+Defender scan patches\disk_image_patch_061: found no threats
+```
+
 ## 2026-05-28 initial one-panel launcher
 
 Purpose:

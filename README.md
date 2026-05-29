@@ -374,6 +374,10 @@ Notable patch history:
 - `disk_image_patch_059`: changes Tiny MC native-app return to self-`exec()`
   after child exit, because the device log showed in-process `driver.so`
   display reopen succeeds by return code but leaves the LCD black.
+- `disk_image_patch_060`: rebuilds Tiny MC so extra file-list row height is
+  split around the text; odd extra pixels put the larger half below the text.
+- `disk_image_patch_061`: adds the Tiny MC built-in text viewer for configured
+  extensions, defaulting to `txt`, `log`, and `conf`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

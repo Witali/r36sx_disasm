@@ -88,7 +88,9 @@ Tiny MC:
   as the preferred monospaced font, with other common mono fonts and the
   built-in 5x7 bitmap font as fallbacks;
 - reads `/mnt/sdcard/MIPS_NATIVE/tiny_mc/tiny_mc.conf` for the runtime font
-  path and text-size settings;
+  path, text-size settings, and text-viewer extensions;
+- opens configured text extensions in a built-in viewer instead of executing
+  them;
 - has `DEBUG=1`, so it writes `tiny_mc.log` to the first writable path:
   `/mnt/sdcard/cubegm/tiny_mc.log`, `/mnt/sdcard/tiny_mc.log`, or
   `tiny_mc.log`;
@@ -112,8 +114,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 56892 bytes
-  SHA256: 7357C4376E545BCBE6AB3CE150EA6D5915C3EDF1E5BAA8D8C4981B5D19ACE6AA
+  Size: 63864 bytes
+  SHA256: B448F38D3962508167EFC9D897D85A2875B7BACE8E5D7E2BA5F0EFDE0AA3710E
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -124,13 +126,15 @@ Tiny MC:
             RobotoMono-Regular.ttf, tiny_mc.conf, config loaded,
             preserving mixer volume, restored mixer volume,
             suppressing post-launch buttons, display reopened after child,
-            restarting tiny_mc after child, tiny_mc self-exec failed
+            restarting tiny_mc after child, tiny_mc self-exec failed,
+            text_extensions, text viewer, [TXT], VIEW, PGUP, PGDN,
+            TRUNCATED
   Does not contain: icube heartbeat, shmget
 
 Tiny MC config:
-  tiny_mc.conf size: 507 bytes
+  tiny_mc.conf size: 629 bytes
   tiny_mc.conf SHA256:
-    DE24AE69C7255CE3E770BD80F42A7D79EF7EDDBBF3AE899068A6F9101D3B9803
+    C1CCD97FF41FCC4A9E66F923FECB05F969443CF9B21FBF29A768308E54218CE7
 
 Tiny MC common fonts:
   JetBrainsMonoNL-Regular.ttf size: 208576 bytes
