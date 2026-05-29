@@ -2409,8 +2409,9 @@ static void draw_ui(void)
         char label[320];
         format_entry(label, sizeof(label), &g_entries[idx]);
         if (idx == g_selected) {
+            int marker_y = y + row_pad_top;
             fill_rect(8, y, selection_w, g_config.list_row_h, rgb565(50, 78, 92));
-            fill_rect(10, text_y, 4, row_marker_h, hi);
+            fill_rect(10, marker_y, 4, row_marker_h, hi);
             draw_text(22, text_y, label, rgb565(255, 246, 220), 2, text_max_w);
         } else {
             draw_text(22, text_y, label, text, 2, text_max_w);

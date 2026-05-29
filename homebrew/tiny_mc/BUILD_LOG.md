@@ -1416,6 +1416,47 @@ Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
 found no threats
 ```
 
+## 2026-05-29 selection marker alignment rebuild
+
+Purpose:
+
+Fix the Tiny MC file-list selection marker: the orange marker on the left side
+of the highlighted row was one pixel too high after the row padding/text
+centering changes.
+
+Implementation:
+
+- Changed selected-row marker placement from `text_y` to `y + row_pad_top`, so
+  the marker is aligned to the row highlight geometry instead of the text
+  baseline.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Patch directories:
+
+```text
+patches\disk_image_patch_062
+patches\disk_image_patch_tiny_mc
+```
+
+Verification:
+
+```text
+Tiny MC size: 64888 bytes
+Tiny MC SHA256: 4FF4C45964101461FD795CF21565A7E3D2FB55307D88FD9C0C8F5BABFB5587A1
+
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+Defender scan disk_image\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+Defender scan patches\disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+Defender scan patches\disk_image_patch_062\MIPS_NATIVE\tiny_mc\tiny_mc:
+found no threats
+```
+
 ## 2026-05-29 list row visual alignment
 
 Purpose:

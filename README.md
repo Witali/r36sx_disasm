@@ -390,6 +390,9 @@ Notable patch history:
   split around the text; odd extra pixels put the larger half below the text.
 - `disk_image_patch_061`: adds the Tiny MC built-in text viewer for configured
   extensions, defaulting to `txt`, `log`, and `conf`.
+- `disk_image_patch_062`: rebuilds Tiny MC so the orange selection marker is
+  vertically aligned to the highlighted row padding instead of the text
+  baseline.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

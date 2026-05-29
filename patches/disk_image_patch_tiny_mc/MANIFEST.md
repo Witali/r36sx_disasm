@@ -114,8 +114,8 @@ stock `icube` supervisor has the expected target to launch.
 
 ```text
 Tiny MC:
-  Size: 63864 bytes
-  SHA256: B448F38D3962508167EFC9D897D85A2875B7BACE8E5D7E2BA5F0EFDE0AA3710E
+  Size: 64888 bytes
+  SHA256: 4FF4C45964101461FD795CF21565A7E3D2FB55307D88FD9C0C8F5BABFB5587A1
   Contains: /mnt/sdcard/cubegm/icube, FN shortcut armed after release,
             FN startup state ignored until release, click audio,
             sound_driver_init, sound_driver_playframe, libfreetype.so.6,
@@ -190,6 +190,21 @@ to the file name text.
 Tiny MC:
   Size: 64824 bytes
   SHA256: 73A563ED3A494F9C3DF97AF5EA8F151D6B258719D027AD1CE3ED222A338247EE
+Defender scan:
+  disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
+```
+
+## 2026-05-29 selection marker alignment
+
+Tiny MC was rebuilt so the orange marker at the left edge of the selected
+file-list row is placed from the row padding (`y + row_pad_top`) instead of the
+text baseline. This fixes the marker being one pixel too high relative to the
+highlight strip.
+
+```text
+Tiny MC:
+  Size: 64888 bytes
+  SHA256: 4FF4C45964101461FD795CF21565A7E3D2FB55307D88FD9C0C8F5BABFB5587A1
 Defender scan:
   disk_image_patch_tiny_mc\MIPS_NATIVE\tiny_mc\tiny_mc: found no threats
 ```
