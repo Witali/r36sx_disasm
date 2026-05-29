@@ -168,8 +168,14 @@ a separate Sopwith game floppy:
 - `FreeDOS3.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
 - `sopwith.img`: 1.44 MB FAT12 floppy with Sopwith (The Author's Edition),
   available as DOS `B:` in the current `pico_286.conf`.
-- `hdd.img`: blank raw hard disk image, 65 cylinders, 16 heads, 63 sectors.
-- `hdd2.img`: blank raw hard disk image with the same geometry.
+- `hdd.img`: 33,546,240-byte hard disk image with MBR and one FAT16 primary
+  partition, 65 cylinders, 16 heads, 63 sectors.
+- `hdd2.img`: second FAT16 hard disk image with the same geometry.
+
+The hard disk images are generated on the host with
+`tools/create_fat16_hdd.py`.  This avoids booting DOS with a completely blank
+C: image, which can make `DIR C:` fail with a BIOS read error until the image is
+partitioned and formatted.
 
 Device status: this port has successfully booted DOS from the included
 FreeDOS floppy image on the console.  The working build includes the host

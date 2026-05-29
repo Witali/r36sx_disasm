@@ -133,18 +133,18 @@ r2=F2
 ```
 
 When DOS is running and the on-screen keyboard is hidden, Select opens or
-closes the full-screen preset editor.  D-pad chooses a row, Left/Right or
-A/Start changes a binding, B cycles backward, Y clears a binding, and the
-`ADD NEW PRESET` row creates a copy of the active preset with an automatic
-name such as `Preset 2`.
+closes the full-screen preset editor.  D-pad chooses a row.  The current editor
+uses a two-column physical button list, opens the shared on-screen keyboard as
+a picker for key assignments and preset renames, and saves only through the
+visual `OK` button.  `Cancel` or Select closes without saving the draft.
 
 The included image set is based on official FreeDOS 1.4 Floppy Edition:
 
 - `FreeDOS1.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
 - `FreeDOS2.img`: `144m/x86DSK01.img`.
 - `FreeDOS3.img`: `144m/x86DSK02.img`.
-- `hdd.img` and `hdd2.img`: blank raw hard disk images, 65/16/63 CHS,
-  33,546,240 bytes each.
+- `hdd.img` and `hdd2.img`: 33,546,240-byte hard disk images with MBR and one
+  FAT16 primary partition, 65/16/63 CHS.
 
 The downloaded FreeDOS archive, extracted files, and final copied image
 directories were scanned with `tools/scan-download.ps1`; Microsoft Defender
@@ -487,5 +487,36 @@ renaming presets and for choosing the key assigned to each physical button row.
 ```text
 Size: 8054724 bytes
 SHA256: 598071628DA6ECA5B608625CB636AEF76977BB5C59D50039B4E93BB37FC2E4E1
+Defender scan: found no threats
+```
+
+## 2026-05-29 FAT16 hard disk images and disk read diagnostics
+
+The previous `hdd.img` and `hdd2.img` files were blank raw images: sector 0 had
+no MBR, no BPB, and no `55 AA` signature.  On the device this can surface as
+DOS `DIR C:` reporting `Cannot read` / retry / abort because BIOS drive `80h`
+exists but the backing image is not partitioned or formatted.
+
+Both hard disk images are now generated on the host with
+`tools/create_fat16_hdd.py`:
+
+- CHS: `65,16,63`
+- MBR primary partition: active FAT16 type `0x06`
+- partition start: sector `63`
+- partition size: `65457` sectors
+- VBR: FAT16, `63` sectors per track, `16` heads, hidden sectors `63`
+- root directory contains `README.TXT` so `DIR C:` should show at least one
+  file immediately.
+
+Pico-286 was also rebuilt with extra `INT 13h` diagnostics.  Failed reads,
+writes, verifies, invalid CHS requests, out-of-range transfers, `fseek`,
+`fread`, `fwrite`, and `fflush` failures are written to
+`/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log` in debug builds.
+
+```text
+pico_286 size: 8058240 bytes
+pico_286 SHA256: 43E4C5A227FE8E83F4A643F1546F6E9B51E79D509B78BA3E13C4B1C75CDC0332
+hdd.img SHA256: 26953A16F571AB8452570E37E2C0688C0B60A2859E72B81D6E9EBA8D80379818
+hdd2.img SHA256: 45A095789D0C5A4F8E0BB2717493874C761789AF199D602BF794DBAB12448C71
 Defender scan: found no threats
 ```

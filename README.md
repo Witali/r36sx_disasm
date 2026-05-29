@@ -396,6 +396,9 @@ Notable patch history:
 - `disk_image_patch_063`: rebuilds Pico-286 with a safer key preset editor:
   two-column physical button list, draft edits, on-screen-keyboard assignment,
   preset rename, and explicit OK/Cancel save controls.
+- `disk_image_patch_064`: replaces Pico-286 blank hard disk images with
+  host-created FAT16 `hdd.img`/`hdd2.img` and rebuilds Pico-286 with detailed
+  INT 13h disk read/write failure logging.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

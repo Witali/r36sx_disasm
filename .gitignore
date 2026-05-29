@@ -15,6 +15,7 @@ tools/*
 !tools/*.md
 !tools/scan-download.ps1
 !tools/create_fat12_floppy.py
+!tools/create_fat16_hdd.py
 
 # Build outputs and caches
 *.o

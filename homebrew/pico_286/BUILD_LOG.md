@@ -1,5 +1,79 @@
 # pico-286 Build Log
 
+## 2026-05-29 FAT16 hard disk images and disk read diagnostics
+
+Investigated DOS `DIR` failing with `Cannot read` / retry / abort.  The local
+`disk_image/MIPS_NATIVE/pico_286/hdd.img` and `hdd2.img` were still blank raw
+images: sector 0 had no MBR, no BPB, and no `55 AA` signature.  With BIOS drive
+`80h` attached to a blank image, DOS can see a disk device but fail when reading
+the filesystem.
+
+Added `tools/create_fat16_hdd.py` and generated both hard disk images as
+readable FAT16 disks:
+
+- disk size: 33,546,240 bytes
+- CHS: `65,16,63`
+- MBR primary partition: active FAT16 type `0x06`
+- partition start: sector `63`
+- partition size: `65457` sectors
+- FAT16 VBR: `63` sectors per track, `16` heads, hidden sectors `63`
+- root directory contains `README.TXT` for an immediate `DIR C:` check.
+
+Also rebuilt Pico-286 with `INT 13h` diagnostics in
+`r36sx_port/disks-win32.c.inl`.  Failed reads, writes, verifies, invalid CHS
+requests, out-of-range transfers, and host file I/O failures are logged to
+`pico_286.log` in debug builds.
+
+Commands used:
+
+```powershell
+python .\tools\create_fat16_hdd.py --output .\disk_image\MIPS_NATIVE\pico_286\hdd.img --geometry 65,16,63 --label "R36SX HDD" --file README.TXT=.\homebrew\pico_286\dos_files\hdd\README.TXT
+python .\tools\create_fat16_hdd.py --output .\disk_image\MIPS_NATIVE\pico_286\hdd2.img --geometry 65,16,63 --label "R36SX HDD2" --file README.TXT=.\homebrew\pico_286\dos_files\hdd\README.TXT
+Copy-Item -LiteralPath .\disk_image\MIPS_NATIVE\pico_286\hdd.img -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hdd.img -Force
+Copy-Item -LiteralPath .\disk_image\MIPS_NATIVE\pico_286\hdd2.img -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hdd2.img -Force
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+The `-TryStrip` step still reports Zig objcopy `unimplemented`, so the build
+kept the unstripped executable.  Existing warnings are from the upstream
+network redirector pointer-sign conversions and one old VGA palette expression.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_064\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\hdd.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\hdd2.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hdd.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hdd2.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_064\MIPS_NATIVE\pico_286\hdd.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_064\MIPS_NATIVE\pico_286\hdd2.img
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,058,240 bytes
+- SHA256: `43E4C5A227FE8E83F4A643F1546F6E9B51E79D509B78BA3E13C4B1C75CDC0332`
+- `hdd.img` SHA256:
+  `26953A16F571AB8452570E37E2C0688C0B60A2859E72B81D6E9EBA8D80379818`
+- `hdd2.img` SHA256:
+  `45A095789D0C5A4F8E0BB2717493874C761789AF199D602BF794DBAB12448C71`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/hdd.img`
+  - `disk_image/MIPS_NATIVE/pico_286/hdd2.img`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hdd.img`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hdd2.img`
+  - `patches/disk_image_patch_064/MIPS_NATIVE/pico_286/*`
+
 ## 2026-05-29 boot order and HDD geometry config
 
 Added two BIOS-like configuration controls to `pico_286.conf`:
