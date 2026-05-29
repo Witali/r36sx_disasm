@@ -3,11 +3,13 @@
 #include <stddef.h>
 
 #define R36SX_OSK_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
-#define R36SX_OSK_KEY_W 46
-#define R36SX_OSK_COMPACT_KEY_W 38
+#define R36SX_OSK_KEY_W 47
+#define R36SX_OSK_COMPACT_KEY_W 39
 #define R36SX_OSK_KEY_H 13
 #define R36SX_OSK_KEY_GAP 2
 #define R36SX_OSK_TEXT_SCALE 1
+#define R36SX_OSK_INNER_PAD 1
+#define R36SX_OSK_HEADER_H 16
 #define R36SX_OSK_CURSOR_KEY_W 28
 #define R36SX_OSK_CURSOR_GAP 2
 #define R36SX_OSK_CURSOR_BLOCK_GAP 10
@@ -886,13 +888,13 @@ void r36sx_screen_keyboard_draw(
         (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows) * R36SX_OSK_KEY_H +
         ((int)R36SX_OSK_ARRAY_COUNT(g_osk_rows) - 1) *
         R36SX_OSK_KEY_GAP;
-    const int inset = (R36SX_SCREEN_KEYBOARD_PANEL_H - rows_h) / 2;
     const int panel_x = 0;
     const int panel_w = width;
     const int panel_y = r36sx_screen_keyboard_panel_y(height);
-    const int content_x = panel_x + inset;
-    const int content_w = panel_w - 2 * inset;
-    const int keys_y = panel_y + inset;
+    const int content_x = panel_x + 1 + R36SX_OSK_INNER_PAD;
+    const int content_w = panel_w - 2 * (1 + R36SX_OSK_INNER_PAD);
+    const int keys_y = panel_y + R36SX_SCREEN_KEYBOARD_PANEL_H - 1 -
+        R36SX_OSK_INNER_PAD - rows_h;
     const int compact = r36sx_screen_keyboard_cursor_block_enabled(keyboard);
     const int main_key_w = key_width(keyboard);
     const int cursor_x = content_x + content_w - R36SX_OSK_CURSOR_BLOCK_W;
@@ -900,7 +902,9 @@ void r36sx_screen_keyboard_draw(
         content_w - R36SX_OSK_CURSOR_BLOCK_W - R36SX_OSK_CURSOR_BLOCK_GAP :
         content_w;
     const uint16_t panel = rgb565(12, 18, 24);
+    const uint16_t header = rgb565(24, 54, 70);
     const uint16_t border = rgb565(160, 192, 204);
+    const uint16_t text = rgb565(228, 236, 224);
 
     if (!r36sx_screen_keyboard_is_visible(keyboard) || !frame || width <= 0 ||
         height <= 0 || stride_pixels <= 0 || content_w <= 0) {
@@ -911,6 +915,11 @@ void r36sx_screen_keyboard_draw(
               R36SX_SCREEN_KEYBOARD_PANEL_H, panel);
     stroke_rect(frame, width, height, stride_pixels, panel_x, panel_y, panel_w,
                 R36SX_SCREEN_KEYBOARD_PANEL_H, border);
+    fill_rect(frame, width, height, stride_pixels, panel_x + 1, panel_y + 1,
+              panel_w - 2, R36SX_OSK_HEADER_H, header);
+    draw_text(frame, width, height, stride_pixels, panel_x + 6, panel_y + 5,
+              "FN KBD  D-PAD MOVE  A/START TYPE  B BS  X ESC  Y ENT", text,
+              R36SX_OSK_TEXT_SCALE);
 
     for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
         int count = g_osk_row_counts[row];

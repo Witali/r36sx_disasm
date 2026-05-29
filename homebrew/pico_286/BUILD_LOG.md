@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-05-29 on-screen keyboard compact edge padding
+
+Adjusted the shared R36SX on-screen keyboard layout after the previous
+edge-to-edge change introduced large centered padding around the keys.
+
+The panel is still flush with the left, right, and bottom screen edges, but the
+header/status text is restored.  The key rows now use a one-pixel inner gap from
+the panel border on the left, right, and bottom edges instead of the previous
+computed vertical inset.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_079
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 891,076 bytes
+- SHA256: `521FD0C4E9F1D518A79CEA6F72FD1AC4C4FE21362A3646C737F68466983C51F2`
+- Defender scan: no threats.
+
 ## 2026-05-29 remaining FreeDOS package floppies
 
 Downloaded the official FreeDOS 1.4 Floppy Edition archive again:

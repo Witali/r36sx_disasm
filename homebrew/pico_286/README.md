@@ -139,9 +139,10 @@ like a physical keyboard: Up above Left/Down/Right.
 
 When the keyboard is visible it occupies the bottom 96 pixels, about 20% of the
 640x480 framebuffer.  Its panel is drawn edge-to-edge along the left, right,
-and bottom screen borders, and the key area uses compact equal inner padding.
-A pressed virtual key shifts down-right and darkens until the physical button
-is released.
+and bottom screen borders.  The header/status text stays at the top of the
+panel, while the key rows use a one-pixel inner gap from the panel border on
+the left, right, and bottom edges.  A pressed virtual key shifts down-right and
+darkens until the physical button is released.
 The DOS screen is vertically compressed into the remaining top 384 pixels with
 a halftone-style area filter instead of being covered by the keyboard.
 

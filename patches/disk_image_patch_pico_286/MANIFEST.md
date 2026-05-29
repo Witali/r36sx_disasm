@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 on-screen keyboard compact edge padding
+
+The current `pico_286` binary corrects the previous edge-to-edge keyboard
+layout.  The panel remains flush with the screen edges, the header/status text
+is restored, and the key rows leave only a one-pixel inner gap from the panel
+border on the left, right, and bottom edges.
+
+```text
+pico_286 size: 891076 bytes
+pico_286 SHA256: 521FD0C4E9F1D518A79CEA6F72FD1AC4C4FE21362A3646C737F68466983C51F2
+Defender scan: found no threats
+```
+
 ## 2026-05-29 remaining FreeDOS package floppies
 
 The patch now includes the full official FreeDOS 1.4 Floppy Edition 1.44 MB
@@ -105,9 +118,9 @@ Defender scan: found no threats
 ## 2026-05-29 edge-to-edge on-screen keyboard panel
 
 The current `pico_286` binary updates the shared R36SX on-screen keyboard
-layout.  The panel now touches the left, right, and bottom screen borders.  The
-old header/status text inside the panel was removed, and the key area uses
-compact equal inner padding.
+layout.  The panel touches the left, right, and bottom screen borders, keeps
+the header/status text, and leaves only a one-pixel inner gap between the
+buttons and the panel border on the left, right, and bottom edges.
 
 ```text
 pico_286 size: 921312 bytes
