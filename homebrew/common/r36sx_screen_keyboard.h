@@ -47,6 +47,10 @@ struct r36sx_screen_keyboard {
     uint8_t ctrl;
     uint8_t alt;
     uint8_t cursor_block;
+    uint8_t press_zone;
+    uint8_t press_row;
+    uint8_t press_col;
+    uint32_t press_buttons;
 };
 
 typedef void (*r36sx_screen_keyboard_emit_fn)(
@@ -71,11 +75,13 @@ const char *r36sx_screen_keyboard_current_label(
 uint32_t r36sx_screen_keyboard_handle_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
+    uint32_t held,
     r36sx_screen_keyboard_emit_fn emit,
     void *emit_user);
 uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
+    uint32_t held,
     uint16_t *keycode);
 void r36sx_screen_keyboard_draw(
     const struct r36sx_screen_keyboard *keyboard,

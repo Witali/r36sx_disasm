@@ -427,6 +427,8 @@ Notable patch history:
   editor picker.
 - `disk_image_patch_075`: rebuilds Pico-286 with physical `Select` as a
   remappable key preset entry; the default preset maps it to `Space`.
+- `disk_image_patch_076`: rebuilds Pico-286 with a pressed-key animation for
+  the shared on-screen keyboard.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

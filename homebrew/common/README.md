@@ -12,7 +12,8 @@ The module owns only keyboard UI state, button navigation, key layout, and
 RGB565 drawing.  The host application supplies:
 
 - a `struct r36sx_screen_keyboard` state object;
-- the pressed R36SX button bitmask for navigation;
+- the pressed and currently held R36SX button bitmasks for navigation and
+  press animation;
 - an `emit` callback that receives Windows-like keycodes and key-down/key-up
   transitions;
 - a RGB565 framebuffer pointer, dimensions, and stride for drawing.
@@ -36,7 +37,7 @@ static void emit_key(void *user, uint16_t keycode, int is_down)
 r36sx_screen_keyboard_init(&keyboard);
 r36sx_screen_keyboard_set_cursor_block(&keyboard, 1);
 r36sx_screen_keyboard_set_visible(&keyboard, 1);
-r36sx_screen_keyboard_handle_buttons(&keyboard, pressed, emit_key, NULL);
+r36sx_screen_keyboard_handle_buttons(&keyboard, pressed, held, emit_key, NULL);
 r36sx_screen_keyboard_draw(&keyboard, frame, width, height, stride_pixels);
 ```
 

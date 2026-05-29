@@ -36,7 +36,8 @@ The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
 DOS keyboard does not show the right-side cursor-key block; that block is only
 shown by the key picker inside the preset editor.  The keyboard panel is drawn
 edge-to-edge along the bottom of the screen, with compact equal padding around
-the key area.
+the key area.  A pressed virtual key shifts down-right and darkens until the
+physical button is released.
 
 ## Disk Image Menu
 

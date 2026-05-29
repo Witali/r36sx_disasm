@@ -170,10 +170,10 @@ static void r36sx_osk_set_visible(int visible)
     r36sx_pico286_debug_log("minifb: osk %s", visible ? "open" : "close");
 }
 
-static void r36sx_osk_handle_buttons(uint32_t pressed)
+static void r36sx_osk_handle_buttons(uint32_t pressed, uint32_t held)
 {
     uint32_t result = r36sx_screen_keyboard_handle_buttons(
-        &g_mfb.osk, pressed, r36sx_mfb_emit_osk_key, NULL);
+        &g_mfb.osk, pressed, held, r36sx_mfb_emit_osk_key, NULL);
 
     if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
         g_mfb.input_release_guard = 1;
@@ -241,10 +241,10 @@ static void r36sx_presets_set_visible(int visible)
                             visible ? "open" : "close");
 }
 
-static void r36sx_presets_handle_buttons(uint32_t pressed)
+static void r36sx_presets_handle_buttons(uint32_t pressed, uint32_t held)
 {
     uint32_t result = r36sx_key_presets_handle_buttons(&g_mfb.key_presets,
-                                                       pressed);
+                                                        pressed, held);
     if ((result & R36SX_KEY_PRESET_RESULT_CLOSED) != 0) {
         r36sx_mfb_release_all_keys();
         g_mfb.input_release_guard = 1;
@@ -414,7 +414,7 @@ static int r36sx_mfb_poll_input(void)
     }
 
     if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
-        r36sx_presets_handle_buttons(pressed);
+        r36sx_presets_handle_buttons(pressed, raw);
         g_mfb.last_raw_keys = raw;
         return 0;
     }
@@ -473,7 +473,7 @@ static int r36sx_mfb_poll_input(void)
     }
 
     if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
-        r36sx_osk_handle_buttons(pressed);
+        r36sx_osk_handle_buttons(pressed, raw);
         g_mfb.last_raw_keys = raw;
         return 0;
     }

@@ -56,7 +56,8 @@ void r36sx_key_presets_set_visible(struct r36sx_key_presets *state,
 uint16_t r36sx_key_presets_key_for_mask(
     const struct r36sx_key_presets *state, uint32_t raw_mask);
 uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
-                                          uint32_t pressed);
+                                          uint32_t pressed,
+                                          uint32_t held);
 void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
                             uint16_t *frame,
                             int width,

@@ -1,5 +1,53 @@
 # pico-286 Build Log
 
+## 2026-05-29 held on-screen-keyboard press animation
+
+Rebuilt Pico-286 after adding pressed-key animation to the shared R36SX
+on-screen keyboard.  When a physical accept shortcut presses a virtual key, the
+drawn key shifts down-right and darkens.  The pressed state now follows the
+physical button's held bit and stays visible until that physical button is
+released.
+
+This affects both normal DOS keyboard mode and the preset editor key picker.
+Direct shortcuts animate their matching visible keys:
+
+- `B`: `BS`
+- `X`: `ESC`
+- `Y`: `ENT`
+- `A` or `Start`: the highlighted virtual key
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_076\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 917,844 bytes
+- SHA256: `570E55DE4A0357D392A30C418B6152F88DD4A70F76B137F24DB997E9935699A1`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_076/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_076/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 remappable Select preset key
 
 Rebuilt Pico-286 after making physical `Select` a normal remappable key preset

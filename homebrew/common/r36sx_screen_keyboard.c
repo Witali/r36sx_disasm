@@ -523,12 +523,79 @@ static const struct r36sx_osk_key *current_key(
     return &g_osk_rows[keyboard->row][keyboard->col];
 }
 
+static void update_press_animation(struct r36sx_screen_keyboard *keyboard,
+                                   uint32_t held)
+{
+    if (keyboard && keyboard->press_buttons != 0 &&
+        (held & keyboard->press_buttons) == 0) {
+        keyboard->press_buttons = 0;
+    }
+}
+
+static void start_current_press_animation(
+    struct r36sx_screen_keyboard *keyboard,
+    uint32_t buttons)
+{
+    current_key(keyboard);
+    keyboard->press_zone = keyboard->zone;
+    keyboard->press_row = keyboard->row;
+    keyboard->press_col = keyboard->col;
+    keyboard->press_buttons = buttons;
+}
+
+static int keycode_matches(uint16_t a, uint16_t b)
+{
+    if (a == b) {
+        return 1;
+    }
+    if (a >= 'A' && a <= 'Z' && a + ('a' - 'A') == b) {
+        return 1;
+    }
+    return b >= 'A' && b <= 'Z' && b + ('a' - 'A') == a;
+}
+
+static void start_keycode_press_animation(
+    struct r36sx_screen_keyboard *keyboard,
+    uint16_t keycode,
+    uint32_t buttons)
+{
+    for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
+        for (size_t col = 0; col < g_osk_row_counts[row]; col++) {
+            if (keycode_matches(g_osk_rows[row][col].keycode, keycode)) {
+                keyboard->press_zone = R36SX_OSK_ZONE_MAIN;
+                keyboard->press_row = (uint8_t)row;
+                keyboard->press_col = (uint8_t)col;
+                keyboard->press_buttons = buttons;
+                return;
+            }
+        }
+    }
+
+    if (!keyboard->cursor_block) {
+        return;
+    }
+    for (int row = 0; row < R36SX_OSK_CURSOR_BLOCK_ROWS; row++) {
+        for (int col = 0; col < R36SX_OSK_CURSOR_BLOCK_COLS; col++) {
+            const struct r36sx_osk_key *key = cursor_key_at(row, col);
+            if (key && keycode_matches(key->keycode, keycode)) {
+                keyboard->press_zone = R36SX_OSK_ZONE_CURSOR;
+                keyboard->press_row = (uint8_t)row;
+                keyboard->press_col = (uint8_t)col;
+                keyboard->press_buttons = buttons;
+                return;
+            }
+        }
+    }
+}
+
 static uint32_t activate_current(struct r36sx_screen_keyboard *keyboard,
                                  r36sx_screen_keyboard_emit_fn emit,
-                                 void *emit_user)
+                                 void *emit_user,
+                                 uint32_t buttons)
 {
     const struct r36sx_osk_key *key = current_key(keyboard);
 
+    start_current_press_animation(keyboard, buttons);
     if ((key->flags & R36SX_OSK_FLAG_CLOSE) != 0) {
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
@@ -552,6 +619,17 @@ static uint32_t activate_current(struct r36sx_screen_keyboard *keyboard,
     return 0;
 }
 
+static int key_is_pressed(const struct r36sx_screen_keyboard *keyboard,
+                          uint8_t zone,
+                          uint8_t row,
+                          uint8_t col)
+{
+    return keyboard && keyboard->press_buttons != 0 &&
+        keyboard->press_zone == zone &&
+        keyboard->press_row == row &&
+        keyboard->press_col == col;
+}
+
 static void draw_key(const struct r36sx_screen_keyboard *keyboard,
                      const struct r36sx_osk_key *key,
                      uint16_t *frame,
@@ -561,7 +639,8 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
                      int x,
                      int y,
                      int key_w,
-                     int selected)
+                     int selected,
+                     int pressed)
 {
     uint16_t bg = rgb565(32, 42, 54);
     uint16_t fg = rgb565(235, 242, 232);
@@ -579,6 +658,20 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
         bg = rgb565(238, 172, 62);
         fg = rgb565(18, 22, 26);
         border = rgb565(255, 238, 168);
+    }
+    if (pressed) {
+        x++;
+        y++;
+        if (selected) {
+            bg = rgb565(176, 104, 34);
+            border = rgb565(178, 136, 72);
+        } else if (active_modifier) {
+            bg = rgb565(24, 78, 48);
+            border = rgb565(72, 146, 96);
+        } else {
+            bg = rgb565(18, 24, 32);
+            border = rgb565(64, 78, 92);
+        }
     }
 
     fill_rect(frame, width, height, stride, x, y, key_w,
@@ -607,6 +700,10 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->ctrl = 0;
     keyboard->alt = 0;
     keyboard->cursor_block = 0;
+    keyboard->press_zone = R36SX_OSK_ZONE_MAIN;
+    keyboard->press_row = 0;
+    keyboard->press_col = 0;
+    keyboard->press_buttons = 0;
 }
 
 int r36sx_screen_keyboard_is_visible(
@@ -626,6 +723,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->shift = 0;
         keyboard->ctrl = 0;
         keyboard->alt = 0;
+        keyboard->press_buttons = 0;
     }
 }
 
@@ -683,6 +781,7 @@ const char *r36sx_screen_keyboard_current_label(
 uint32_t r36sx_screen_keyboard_handle_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
+    uint32_t held,
     r36sx_screen_keyboard_emit_fn emit,
     void *emit_user)
 {
@@ -691,6 +790,7 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
     if (!keyboard || !keyboard->visible) {
         return 0;
     }
+    update_press_animation(keyboard, held);
     if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         move_selection(keyboard, -1, 0);
     }
@@ -708,16 +808,24 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
     }
     if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_BACK,
+                                      pressed & R36SX_RKGAME_KEY_B);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_BACK, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_ESCAPE,
+                                      pressed & R36SX_RKGAME_KEY_X);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_ESCAPE, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_Y) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_RETURN,
+                                      pressed & R36SX_RKGAME_KEY_Y);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_RETURN, 0);
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
-        result |= activate_current(keyboard, emit, emit_user);
+        result |= activate_current(
+            keyboard, emit, emit_user,
+            pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START));
     }
     return result;
 }
@@ -725,6 +833,7 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
 uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     struct r36sx_screen_keyboard *keyboard,
     uint32_t pressed,
+    uint32_t held,
     uint16_t *keycode)
 {
     const struct r36sx_osk_key *key;
@@ -732,6 +841,7 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     if (!keyboard || !keyboard->visible) {
         return 0;
     }
+    update_press_animation(keyboard, held);
     if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         move_selection(keyboard, -1, 0);
     }
@@ -753,6 +863,8 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     }
 
     key = current_key(keyboard);
+    start_current_press_animation(
+        keyboard, pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y));
     if ((key->flags & R36SX_OSK_FLAG_CLOSE) != 0) {
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
@@ -811,7 +923,9 @@ void r36sx_screen_keyboard_draw(
             draw_key(keyboard, &g_osk_rows[row][col], frame, width, height,
                      stride_pixels, x, y, main_key_w,
                      keyboard->zone == R36SX_OSK_ZONE_MAIN &&
-                     row == keyboard->row && col == keyboard->col);
+                     row == keyboard->row && col == keyboard->col,
+                     key_is_pressed(keyboard, R36SX_OSK_ZONE_MAIN,
+                                    (uint8_t)row, (uint8_t)col));
             x += main_key_w + R36SX_OSK_KEY_GAP;
         }
     }
@@ -833,7 +947,9 @@ void r36sx_screen_keyboard_draw(
                                            R36SX_OSK_CURSOR_GAP),
                          R36SX_OSK_CURSOR_KEY_W,
                          keyboard->zone == R36SX_OSK_ZONE_CURSOR &&
-                         row == keyboard->row && col == keyboard->col);
+                         row == keyboard->row && col == keyboard->col,
+                         key_is_pressed(keyboard, R36SX_OSK_ZONE_CURSOR,
+                                        (uint8_t)row, (uint8_t)col));
             }
         }
     }

@@ -25,6 +25,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 held on-screen-keyboard press animation
+
+The current `pico_286` binary adds a held press animation to the shared
+R36SX on-screen keyboard.  A pressed virtual key shifts down-right and darkens
+until the physical button that activated it is released.
+
+Direct shortcuts animate their matching visible keys:
+
+- `B`: `BS`
+- `X`: `ESC`
+- `Y`: `ENT`
+- `A` or `Start`: the highlighted virtual key
+
+```text
+pico_286 size: 917844 bytes
+pico_286 SHA256: 570E55DE4A0357D392A30C418B6152F88DD4A70F76B137F24DB997E9935699A1
+Defender scan: found no threats
+```
+
 ## 2026-05-29 remappable Select preset key
 
 The current `pico_286` binary makes physical `Select` a normal remappable key

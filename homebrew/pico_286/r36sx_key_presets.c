@@ -908,11 +908,12 @@ static void start_picker(struct r36sx_key_presets *state, uint8_t mode,
 }
 
 static void handle_picker_buttons(struct r36sx_key_presets *state,
-                                  uint32_t pressed)
+                                  uint32_t pressed,
+                                  uint32_t held)
 {
     uint16_t keycode = 0;
     uint32_t result = r36sx_screen_keyboard_handle_picker_buttons(
-        &state->picker_keyboard, pressed, &keycode);
+        &state->picker_keyboard, pressed, held, &keycode);
 
     if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
         close_picker(state);
@@ -934,7 +935,8 @@ static void handle_picker_buttons(struct r36sx_key_presets *state,
 }
 
 uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
-                                          uint32_t pressed)
+                                          uint32_t pressed,
+                                          uint32_t held)
 {
     int row;
     int button;
@@ -945,7 +947,7 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
     }
 
     if (state->edit_mode != R36SX_KEY_PRESET_PICKER_NONE) {
-        handle_picker_buttons(state, pressed);
+        handle_picker_buttons(state, pressed, held);
         return 0;
     }
 
