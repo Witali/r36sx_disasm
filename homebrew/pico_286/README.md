@@ -18,6 +18,8 @@ integration pieces:
   - `r36sx_linux-main.cpp`
   - `r36sx_cpu.c`
   - `r36sx_ports.c`
+  - `r36sx_disk_config.c`
+  - `r36sx_disk_config.h`
   - `disks-win32.c.inl`
 - `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
   lower-right corner when the emulator reads or writes disk image sectors.
@@ -39,12 +41,15 @@ directory is only for compiler output:
   into the 640x480 output.  Normal 40/80-column text modes now read from the
   same logical `VIDEORAM` cell layout used by the emulator and the upstream
   Win32 renderer.
-- `r36sx_cpu.c` changes the host disk image paths from `../fdd0.img`,
-  `../fdd1.img`, `../hdd.img`, and `../hdd2.img` to local files in the app
-  directory, matching TinyMC's `chdir()` before launch.  It also adds missing
+- `r36sx_cpu.c` changes the host disk image paths from upstream defaults to
+  the R36SX disk config loaded by `r36sx_disk_config.c`.  It also adds missing
   text-mode BIOS `INT 10h` services used by BIOS/DOS boot screens: cursor
   shape/position, scroll/clear window, read/write character and attribute,
   teletype output, mode query, active page selection, and write string.
+- `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
+  `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
+  `81h`.  If the file is absent, it falls back to `fdd0.img`, `fdd1.img`,
+  `hdd.img`, and `hdd2.img`.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
   writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
@@ -68,9 +73,10 @@ On-screen keyboard controls:
 
 - D-pad: move the highlighted key.
 - A or Start: type the highlighted key.
-- B or Select: close the keyboard.
+- B: Backspace.
+- Select: close the keyboard.
 - X: toggle Shift.
-- Y: Backspace.
+- Y: Enter.
 - Shift, Ctrl, and Alt keys on the keyboard act as latched modifiers.
 
 The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
@@ -83,9 +89,22 @@ remaining top 384 pixels with a halftone-style area filter instead of being
 covered by the keyboard.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
-put images next to the executable as `fdd0.img`, `fdd1.img`, `hdd.img`, and
-`hdd2.img`.  A compatibility `fdd2.img` can also be placed there for older
-test builds that tried to attach a third floppy image.  The upstream network
+`pico_286.conf` lives next to the executable and maps image files to emulated
+devices:
+
+```ini
+fdd0=fdd0.img
+fdd1=fdd1.img
+hdd0=hdd.img
+hdd1=hdd2.img
+```
+
+`fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
+`80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286
+directory unless absolute paths are used.  Leaving a value empty disables that
+drive.  If `pico_286.conf` is missing, the same four default filenames are
+used.  A compatibility `fdd2.img` can also be placed there for older test
+builds that tried to attach a third floppy image.  The upstream network
 redirector still maps DOS drive H: to `/tmp/`.
 
 The local test image set uses official FreeDOS 1.4 Floppy Edition images:

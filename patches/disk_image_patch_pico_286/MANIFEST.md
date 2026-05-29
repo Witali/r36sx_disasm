@@ -5,6 +5,7 @@ Adds the first native pico-286 port build for TinyMC.
 Copy this patch over the original SD-card filesystem root.  It installs:
 
 - `MIPS_NATIVE/pico_286/pico_286`
+- `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/fdd0.img`
 - `MIPS_NATIVE/pico_286/fdd1.img`
 - `MIPS_NATIVE/pico_286/fdd2.img`
@@ -23,6 +24,7 @@ If that path cannot be opened on the device, it falls back to:
 
 Optional PC disk images should be placed in the same directory:
 
+- `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/fdd0.img`
 - `MIPS_NATIVE/pico_286/fdd1.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
@@ -87,9 +89,10 @@ The current binary includes a joystick-controlled on-screen keyboard:
 - Fn toggles the keyboard.
 - D-pad moves the highlighted key.
 - A or Start types the highlighted key.
-- B or Select closes the keyboard.
+- B sends Backspace immediately.
+- Select closes the keyboard.
 - X toggles Shift.
-- Y sends Backspace.
+- Y sends Enter immediately.
 - Select+Start still exits back to TinyMC.
 
 F1-F10, Delete, common DOS punctuation, and latched Shift/Ctrl/Alt modifiers
@@ -99,6 +102,20 @@ The keyboard uses a compact bottom layout: 96 pixels tall, about 20% of the
 640x480 framebuffer.  While it is visible, the DOS screen is vertically
 compressed with a halftone-style area filter into the remaining 384 pixels
 above the keyboard instead of being covered.
+
+Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf`:
+
+```ini
+fdd0=fdd0.img
+fdd1=fdd1.img
+hdd0=hdd.img
+hdd1=hdd2.img
+```
+
+These map to BIOS drives `00h`, `01h`, `80h`, and `81h` respectively.  Paths
+are relative to the Pico-286 directory unless absolute paths are used.  Empty
+values disable a drive, and a missing config file falls back to the same four
+default filenames.
 
 ## 2026-05-29 rebuild
 
@@ -189,5 +206,30 @@ on-screen `CLOSE` key remains available.
 ```text
 Size: 7949544 bytes
 SHA256: B5A395D7A8CEDA18537659AC27339D950BD9F1E98C48061E6893073AD87BAE79
+Defender scan: found no threats
+```
+
+## 2026-05-29 disk image config
+
+Added `MIPS_NATIVE/pico_286/pico_286.conf` and rebuilt the binary so Pico-286
+reads floppy and hard disk bindings from the config file before BIOS boot.
+
+Default bindings:
+
+```ini
+fdd0=fdd0.img
+fdd1=fdd1.img
+hdd0=hdd.img
+hdd1=hdd2.img
+```
+
+These map to BIOS drives `00h`, `01h`, `80h`, and `81h`.  Relative paths are
+resolved from the directory that contains `pico_286.conf`.  Empty values
+disable a drive.  If the config file is missing, Pico-286 falls back to these
+same four filenames.
+
+```text
+Size: 7965128 bytes
+SHA256: A63CD65C36BE12E56E59EFF677F5C298DE6BD701993DC6EBC0E004D5A1151623
 Defender scan: found no threats
 ```
