@@ -357,3 +357,22 @@ Size: 8006344 bytes
 SHA256: 451570BAC02DBADDF73AC3A9B2EB6CF96A9A31C1E2943ADC766C8A6A455F03EC
 Defender scan: found no threats
 ```
+
+## 2026-05-29 BIOS hard disk registration
+
+The current binary also reports inserted hard disks through BIOS-visible state
+for DOS/FDISK:
+
+- updates BIOS Data Area byte `0040:0075` with the fixed-disk count,
+- answers `INT 13h AH=10` and `AH=11` for ready/recalibrate checks,
+- answers `INT 13h AH=15` with hard-disk type `0x03` and `CX:DX` total sectors.
+
+Pico-286 has no interactive BIOS setup screen.  The hard disk geometry is
+derived from image size when `hdd.img` is inserted.  For the included
+33,546,240-byte image the geometry is 65 cylinders, 16 heads, 63 sectors.
+
+```text
+Size: 8006884 bytes
+SHA256: 0737E66B6DB7C0165F3A1B22BBF3200678CEA8E7BDC339A827DA56392234ECBF
+Defender scan: found no threats
+```

@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-05-29 BIOS hard disk registration
+
+Added BIOS-visible hard disk presence reporting for DOS/FDISK.
+
+Pico-286 does not have an interactive BIOS setup screen.  The hard disk
+geometry is derived by the emulator when `hdd.img` is inserted: hard disks use
+63 sectors, 16 heads, and the cylinder count is calculated from image size.
+For the current 33,546,240-byte `hdd.img`, that is 65/16/63.
+
+The previous build answered `INT 13h AH=08` with geometry, but did not update
+the BIOS Data Area fixed-disk count at `0040:0075`.  Some DOS code checks that
+byte, and some disk tools also ask `INT 13h AH=15` for the drive type.
+
+Changes:
+
+- Update BIOS Data Area byte `0040:0075` whenever a hard disk is inserted or
+  ejected.
+- Add `INT 13h AH=10` drive-ready and `AH=11` recalibrate success responses for
+  inserted drives.
+- Add `INT 13h AH=15` get-disk-type support: hard disks return type `0x03`
+  and `CX:DX` total sectors, floppies return type `0x02`.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,006,884 bytes
+- SHA256: `0737E66B6DB7C0165F3A1B22BBF3200678CEA8E7BDC339A827DA56392234ECBF`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+
 ## 2026-05-29 hard disk write flush fix
 
 Investigated why FreeDOS could appear to format DOS `C:` successfully, but the

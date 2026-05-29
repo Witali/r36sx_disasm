@@ -34,6 +34,9 @@ struct struct_drive {
     uint8_t readonly;
 } disk[4];
 
+static inline void update_bios_disk_counts(void) {
+    RAM[0x475] = (uint8_t)hdcount;  // BIOS Data Area: fixed disk count.
+}
 
 static inline void ejectdisk(uint8_t drivenum) {
     if (drivenum & 0x80) drivenum -= 126;
@@ -50,6 +53,7 @@ static inline void ejectdisk(uint8_t drivenum) {
         } else {
             if (fdcount > 0) fdcount--;
         }
+        update_bios_disk_counts();
     }
 }
 
@@ -121,6 +125,7 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     } else {
         fdcount++;
     }
+    update_bios_disk_counts();
 
 //    printf("DISK: Disk %02Xh attached from file %s, size=%luK, CHS=%d,%d,%d\n",
 //           drivenum, pathname, (unsigned long) (size >> 10), cyls, heads, sects);
@@ -384,6 +389,34 @@ static INLINE void diskhandler() {
             } else {
                 CPU_FL_CF = 1;
                 CPU_AH = 0xAA;  // Error code for no disk inserted
+            }
+            break;
+
+        case 0x10:  // Check if drive is ready
+        case 0x11:  // Recalibrate drive
+            if (disk[drivenum].inserted) {
+                CPU_FL_CF = 0;
+                CPU_AH = 0;
+            } else {
+                CPU_FL_CF = 1;
+                CPU_AH = 0xAA;
+            }
+            break;
+
+        case 0x15:  // Get disk type
+            if (disk[drivenum].inserted) {
+                CPU_FL_CF = 0;
+                if (drivenum >= 2) {
+                    uint32_t total_sectors = (uint32_t)(disk[drivenum].filesize / 512);
+                    CPU_AH = 0x03;  // Fixed disk.
+                    CPU_CX = (uint16_t)(total_sectors >> 16);
+                    CPU_DX = (uint16_t)(total_sectors & 0xFFFF);
+                } else {
+                    CPU_AH = 0x02;  // Diskette with change-line support.
+                }
+            } else {
+                CPU_FL_CF = 1;
+                CPU_AH = 0x00;
             }
             break;
 
