@@ -425,6 +425,8 @@ Notable patch history:
 - `disk_image_patch_074`: rebuilds Pico-286 so the right-side on-screen
   cursor-key block is hidden in normal DOS use and shown only in the key preset
   editor picker.
+- `disk_image_patch_075`: rebuilds Pico-286 with physical `Select` as a
+  remappable key preset entry; the default preset maps it to `Space`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

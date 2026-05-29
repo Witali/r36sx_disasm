@@ -25,6 +25,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 remappable Select preset key
+
+The current `pico_286` binary makes physical `Select` a normal remappable key
+preset entry.  The default preset maps `Select` to `Space`, and the preset
+editor shows `SELECT` in the left column bottom slot opposite `START`.
+
+Older `keypresets.conf` presets that do not contain `select=...` are filled
+from current defaults before explicit values are applied, so they receive the
+new `Select = Space` binding.  An explicit `select=NONE` or another value still
+overrides the default.
+
+```text
+pico_286 size: 914632 bytes
+pico_286 SHA256: 04E15547B6DEB47BB9CCC781572B0070F672174B6E9AA099AC76BA96A8CE561E
+Defender scan: found no threats
+```
+
 ## 2026-05-29 preset-only cursor-key block
 
 The current `pico_286` binary hides the right-side on-screen cursor-key block

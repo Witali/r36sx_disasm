@@ -70,6 +70,7 @@ Default input mapping:
 - B: Escape.
 - X: Space.
 - Y: Ctrl.
+- Select: Space.
 - L: Alt.
 - R: Shift.
 - L2/R2: F1/F2.
@@ -95,6 +96,7 @@ b=ESC
 y=CTRL
 x=SPACE
 start=ENTER
+select=SPACE
 l=ALT
 l2=F1
 r=SHIFT

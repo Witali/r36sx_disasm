@@ -44,6 +44,7 @@ static const struct r36sx_key_preset_button_info g_buttons[] = {
     { "y", "Y", R36SX_RKGAME_KEY_Y, R36SX_SCREEN_KEY_CONTROL },
     { "x", "X", R36SX_RKGAME_KEY_X, R36SX_SCREEN_KEY_SPACE },
     { "start", "START", R36SX_RKGAME_KEY_START, R36SX_SCREEN_KEY_RETURN },
+    { "select", "SELECT", R36SX_RKGAME_KEY_SELECT, R36SX_SCREEN_KEY_SPACE },
     { "l", "L", R36SX_RKGAME_KEY_L, R36SX_SCREEN_KEY_MENU },
     { "l2", "L2", R36SX_RKGAME_KEY_L2, R36SX_SCREEN_KEY_F1 },
     { "r", "R", R36SX_RKGAME_KEY_R, R36SX_SCREEN_KEY_SHIFT },
@@ -59,7 +60,7 @@ static const int g_button_layout
         R36SX_KEY_PRESET_BUTTON_RIGHT,
         R36SX_KEY_PRESET_BUTTON_L,
         R36SX_KEY_PRESET_BUTTON_L2,
-        R36SX_KEY_PRESET_NO_BUTTON,
+        R36SX_KEY_PRESET_BUTTON_SELECT,
     },
     {
         R36SX_KEY_PRESET_BUTTON_X,
@@ -456,8 +457,7 @@ void r36sx_key_presets_load(struct r36sx_key_presets *state)
                 tolower((unsigned char)text[5]) == 't') {
                 char *name = trim_space(text + 6);
                 current_preset = (int)state->count++;
-                memset(&state->presets[current_preset], 0,
-                       sizeof(state->presets[current_preset]));
+                set_default_preset(&state->presets[current_preset]);
                 snprintf(state->presets[current_preset].name,
                          sizeof(state->presets[current_preset].name),
                          "%s", name);

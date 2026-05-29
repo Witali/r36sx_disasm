@@ -1,5 +1,56 @@
 # pico-286 Build Log
 
+## 2026-05-29 remappable Select preset key
+
+Rebuilt Pico-286 after making physical `Select` a normal remappable key preset
+entry.  The default preset maps `Select` to `Space`, and the preset editor now
+shows `SELECT` in the left column bottom slot opposite `START`.  Missing keys
+in older `keypresets.conf` presets are filled from current defaults before
+explicit config values are applied, so old configs receive the new `Select =
+Space` binding unless they add an explicit `select=...` line.
+
+`Fn+Select` remains the disk image binding menu shortcut.  When the on-screen
+keyboard or a settings menu is visible, that UI keeps handling Select according
+to its own rules instead of passing it to DOS.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_075\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 914,632 bytes
+- SHA256: `04E15547B6DEB47BB9CCC781572B0070F672174B6E9AA099AC76BA96A8CE561E`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `disk_image/MIPS_NATIVE/pico_286/keypresets.conf`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/keypresets.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_075/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_075/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_075/MIPS_NATIVE/pico_286/keypresets.conf`
+  - `patches/disk_image_patch_075/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 preset-only cursor-key block
 
 Rebuilt Pico-286 after splitting the shared on-screen keyboard cursor-key

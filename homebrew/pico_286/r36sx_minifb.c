@@ -384,6 +384,7 @@ static int r36sx_mfb_poll_input(void)
         R36SX_RKGAME_KEY_Y,
         R36SX_RKGAME_KEY_X,
         R36SX_RKGAME_KEY_START,
+        R36SX_RKGAME_KEY_SELECT,
         R36SX_RKGAME_KEY_L,
         R36SX_RKGAME_KEY_L2,
         R36SX_RKGAME_KEY_R,

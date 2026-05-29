@@ -9,6 +9,7 @@ This file documents the `pico_286` native executable for TinyMC.
 - B: Escape.
 - X: Space.
 - Y: Ctrl.
+- Select: Space.
 - L: Alt.
 - R: Shift.
 - L2: F1.
