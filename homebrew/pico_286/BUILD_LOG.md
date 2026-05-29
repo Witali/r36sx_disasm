@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-05-29 HLT idle wake-on-IRQ
+
+Implemented real `HLT` idle behavior in the R36SX CPU core.  Opcode `F4` now
+sets a CPU halt state and returns from `exec86()` instead of continuing to burn
+the rest of the host execution quantum.  At the start of later `exec86()`
+calls, a pending unmasked PIC interrupt wakes the halted CPU when `IF=1`, then
+the existing `nextintr()` / `intcall86()` path services the IRQ normally.
+
+This should reduce host CPU use in DOS prompts, installers, menus, BIOS idle
+loops, and other guest code that halts until timer or keyboard interrupts.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `zig objcopy --strip-all` step still reports `error: unimplemented`; the
+script kept the working unstripped binary.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_086\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 902,332 bytes
+- SHA256: `3BE291DAC81BE5BA61F8FF7824C1870E8F301E9EFE07DA203F118069F8F2C88B`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_086/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 RGB565 video present cache
 
 Optimized the R36SX MiniFB video path.  `renderer()` now marks a completed DOS

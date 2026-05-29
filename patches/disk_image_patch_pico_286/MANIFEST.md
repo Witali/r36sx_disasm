@@ -30,6 +30,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 HLT idle wake-on-IRQ
+
+The current `pico_286` binary implements real CPU halt behavior for opcode
+`F4` / `HLT`.  The CPU core now sets a halt state and returns from `exec86()`
+instead of continuing to burn the rest of the host execution quantum.  Later
+`exec86()` calls keep the guest halted until an unmasked PIC interrupt is
+pending and the guest interrupt flag is enabled.  The interrupt then wakes the
+CPU and is serviced through the existing `nextintr()` / `intcall86()` path.
+
+This is intended to reduce host CPU use while DOS, BIOS, installers, and menus
+are idle and waiting for timer or keyboard interrupts.
+
+```text
+pico_286 size: 902332 bytes
+pico_286 SHA256: 3BE291DAC81BE5BA61F8FF7824C1870E8F301E9EFE07DA203F118069F8F2C88B
+Defender scan: found no threats
+```
+
 ## 2026-05-29 RGB565 video present cache
 
 The current `pico_286` binary reduces video work in the R36SX MiniFB layer.

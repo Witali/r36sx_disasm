@@ -36,6 +36,7 @@ uint8_t tempcf, oldcf, mode, reg, rm, sib;
 x86_flags_t x86_flags;
 bool operandSizeOverride = false;
 bool addressSizeOverride = false;
+static volatile uint8_t hltstate;
 
 static const uint8_t __not_in_flash("cpu.regt") byteregtable[8] = {
     regal, regcl, regdl, regbl, regah, regch, regdh, regbh
@@ -48,6 +49,12 @@ uint32_t disp32;
 uint32_t ea;
 
 uint32_t dwordregs[8];
+
+static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
+{
+    return i8259_controller.interrupt_request_register &
+           (uint8_t)(~i8259_controller.interrupt_mask_register);
+}
 
 static const bool __not_in_flash("cpu.pf") parity[0x100] = {
     1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
@@ -1664,6 +1671,7 @@ void reset86() {
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
+    hltstate = 0;
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));
     if (butter_psram_size) {
@@ -1695,7 +1703,14 @@ void __not_in_flash() exec86(uint32_t execloops) {
     //counterticks = (uint64_t) ( (double) timerfreq / (double) 65536.0);
     //tickssource();
     for (uint32_t loopcount = 0; loopcount < execloops; loopcount++) {
-        if (unlikely(ifl && (i8259_controller.interrupt_request_register & (~i8259_controller.interrupt_mask_register)))) {
+        if (unlikely(hltstate)) {
+            if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
+                hltstate = 0;
+                intcall86(nextintr());
+            } else {
+                return;
+            }
+        } else if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
             intcall86(nextintr()); // get next interrupt from the i8259, if any d
         }
 #if PICO_ON_DEVICE
@@ -3919,9 +3934,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
 
             case 0xF4: /* F4 HLT */
-                /// TODO:
-                //hltstate = 1;
-                break;
+                hltstate = 1;
+                return;
 
             case 0xF5: /* F5 CMC */
                 if (!cf) {
