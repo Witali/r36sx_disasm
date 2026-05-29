@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-05-29 source extraction build
+
+Purpose:
+
+Move R36SX Pico-286 source patches out of `build_pico_286.ps1`. The build
+script had grown several `New-Patched-*` helpers that read upstream files,
+performed string replacements, and wrote generated patched sources into `obj/`.
+That made the real port changes hard to review and maintain.
+
+Implementation:
+
+- Added `homebrew/pico_286/r36sx_port/` as the explicit R36SX port source tree.
+- Moved the generated patched files into that directory:
+  - `r36sx_linux-main.cpp`
+  - `r36sx_cpu.c`
+  - `r36sx_ports.c`
+  - `disks-win32.c.inl`
+- Rewrote `build_pico_286.ps1` so it no longer reads upstream files and applies
+  inline string patches during build.
+- `build_pico_286.ps1` now compiles the upstream source tree plus the explicit
+  `r36sx_port` files; `obj/` is again only a compiler output directory.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Verification:
+
+```text
+Build succeeded.
+Output: homebrew\pico_286\pico_286
+Size: 7936004 bytes
+SHA256: CB9551333236CBEDEC8A173E212459D95B055A6FABAB6BC9DEC74BC1EF3A59DA
+Defender scan homebrew\pico_286\pico_286: found no threats
+Defender scan disk_image\MIPS_NATIVE\pico_286\pico_286: found no threats
+Defender scan patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286:
+found no threats
+```
+
+The warnings are the same kind of upstream/port warnings as previous builds:
+unused variables in `fpu.c`, unknown `#pragma GCC optimize`, pointer-sign
+warnings in `network-redirector.c.inl`, and audio inline linkage warnings.
+
 ## 2026-05-28
 
 - Reused the already downloaded `internet_sources/pico-286` checkout at commit

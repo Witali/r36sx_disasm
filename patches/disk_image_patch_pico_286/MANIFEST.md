@@ -99,3 +99,17 @@ The keyboard uses a compact bottom layout: 96 pixels tall, about 20% of the
 640x480 framebuffer.  While it is visible, the DOS screen is vertically
 compressed with a halftone-style area filter into the remaining 384 pixels
 above the keyboard instead of being covered.
+
+## 2026-05-29 rebuild
+
+The binary was rebuilt after moving the R36SX Pico-286 source patches out of
+`build_pico_286.ps1` into explicit source files under
+`homebrew/pico_286/r36sx_port/`.  Runtime behavior should be unchanged; the
+build script now compiles those files directly instead of generating patched
+copies in `obj/`.
+
+```text
+Size: 7936004 bytes
+SHA256: CB9551333236CBEDEC8A173E212459D95B055A6FABAB6BC9DEC74BC1EF3A59DA
+Defender scan: found no threats
+```
