@@ -146,7 +146,10 @@ panel, while the key rows use a one-pixel inner gap from the panel border on
 the left, right, and bottom edges.  A pressed virtual key shifts down-right and
 darkens until the physical button is released.
 The DOS screen is vertically compressed into the remaining top 384 pixels with
-a halftone-style area filter instead of being covered by the keyboard.
+a halftone-style area filter instead of being covered by the keyboard.  The
+compression uses the active height of the current emulated video mode rather
+than the whole 640x480 buffer, so normal DOS text mode compresses its 400 drawn
+rows and does not waste space scaling the black margin below the text area.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
 `pico_286.conf` lives next to the executable and maps image files to emulated

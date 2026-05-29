@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-05-29 active-height keyboard compression
+
+Changed the Pico-286 MiniFB backend so the on-screen keyboard no longer
+compresses the whole 640x480 framebuffer.  While the keyboard is visible,
+`mfb_update()` now asks the renderer for the active output height of the
+current emulated video mode and scales only that area into the 384-pixel DOS
+viewport above the keyboard.
+
+The current renderer reports:
+
+- 400 rows for the normal DOS/CGA/Tandy/VGA modes handled by the existing
+  `y < 400` renderer path, including text modes `0x02`, `0x03`, `0x20`, and
+  `0x30`.
+- 350 rows for EGA `0x10`.
+- 348 rows for the Hercules `0x1e` path.
+
+This avoids wasting vertical space on the black margin below the default
+80x25 text-mode area.
+
+Commands run:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+Copy-Item -Force -Path homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286
+Copy-Item -Force -Path homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+Copy-Item -Force -Path homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_081\MIPS_NATIVE\pico_286\pico_286
+Copy-Item -Force -Path homebrew\pico_286\EXE_README.md -Destination disk_image\MIPS_NATIVE\pico_286\README.md
+Copy-Item -Force -Path homebrew\pico_286\EXE_README.md -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\README.md
+Copy-Item -Force -Path homebrew\pico_286\EXE_README.md -Destination patches\disk_image_patch_081\MIPS_NATIVE\pico_286\README.md
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_081
+```
+
+`zig objcopy --strip-all` still reports `error: unimplemented`, so the build
+keeps the unstripped executable.
+
+Output binary:
+
+- Path: `homebrew/pico_286/pico_286`
+- Size: `891968` bytes
+- SHA256: `78498E29EE66FC29570D30CABA35699EAC46FC053DA5D1D981821FAC00589A94`
+- Defender scan: found no threats
+
 ## 2026-05-29 on-screen keyboard direct B/X keys
 
 Updated the shared R36SX on-screen keyboard picker behavior so physical B and X

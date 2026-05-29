@@ -29,6 +29,21 @@ static int sample_index = 0;
 
 extern "C" void adlib_getsample(int16_t *sndptr, intptr_t numsamples);
 
+extern "C" int r36sx_pico286_video_active_height(void) {
+    /*
+     * Mirrors the current renderer below: most DOS modes are drawn into the
+     * first 400 rows of the 640x480 buffer, with the rest kept black.
+     */
+    switch (videomode) {
+        case 0x10:
+            return 350;
+        case 0x1e:
+            return 348;
+        default:
+            return 400;
+    }
+}
+
 extern "C" void _putchar(char character) {
     putchar(character);
 #if DEBUG

@@ -38,7 +38,9 @@ shown by the key picker inside the preset editor.  The keyboard panel is drawn
 edge-to-edge along the bottom of the screen, keeps the header/status text, and
 uses a one-pixel inner gap around the key rows at the panel border.  A pressed
 virtual key shifts down-right and darkens until the physical button is
-released.
+released.  While the keyboard is visible, Pico-286 compresses only the active
+height of the emulated video mode into the remaining screen area; normal DOS
+text mode uses its 400 drawn rows rather than the full 480-pixel framebuffer.
 
 ## Disk Image Menu
 

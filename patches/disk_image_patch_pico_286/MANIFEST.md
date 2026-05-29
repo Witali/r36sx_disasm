@@ -30,6 +30,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 active-height keyboard compression
+
+The current `pico_286` binary compresses only the active DOS video area when
+the on-screen keyboard is visible.  Normal 80x25 text mode draws into the top
+400 rows of the 640x480 framebuffer, so the keyboard view now scales those
+400 rows into the 384-pixel area above the keyboard instead of scaling the
+extra black margin below the text.
+
+```text
+pico_286 size: 891968 bytes
+pico_286 SHA256: 78498E29EE66FC29570D30CABA35699EAC46FC053DA5D1D981821FAC00589A94
+Defender scan: found no threats
+```
+
 ## 2026-05-29 on-screen keyboard direct B/X keys
 
 The current `pico_286` binary keeps physical B and X as direct keyboard keys

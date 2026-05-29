@@ -70,6 +70,7 @@ static uint32_t g_palette[256];
 static volatile uint32_t g_disk_activity_until_ms;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
+extern int r36sx_pico286_video_active_height(void);
 
 static uint64_t r36sx_mfb_now_us(void)
 {
@@ -298,6 +299,19 @@ static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
             }
         }
     }
+}
+
+static int r36sx_mfb_video_source_height(void)
+{
+    int source_h = g_mfb.height;
+
+    if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
+        source_h = r36sx_pico286_video_active_height();
+        if (source_h <= 0 || source_h > g_mfb.height) {
+            source_h = g_mfb.height;
+        }
+    }
+    return source_h;
 }
 
 static int r36sx_mfb_load_driver(void)
@@ -583,6 +597,7 @@ int mfb_update(void *buffer, int fps_limit)
     uint64_t now;
     uint32_t *src = (uint32_t *)buffer;
     int content_h;
+    int source_h;
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
@@ -602,12 +617,13 @@ int mfb_update(void *buffer, int fps_limit)
     }
 
     content_h = r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
+    source_h = r36sx_mfb_video_source_height();
     for (int y = 0; y < content_h; y++) {
         uint16_t *dst_row = g_mfb.frame + (size_t)y * (size_t)g_mfb.width;
 
         if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
-            int start = y * g_mfb.height;
-            int end = (y + 1) * g_mfb.height;
+            int start = y * source_h;
+            int end = (y + 1) * source_h;
             int sy0 = start / content_h;
             int sy1 = (end - 1) / content_h;
             int weight0;
@@ -615,23 +631,23 @@ int mfb_update(void *buffer, int fps_limit)
             const uint32_t *src_row0;
             const uint32_t *src_row1;
 
-            if (sy1 >= g_mfb.height) {
-                sy1 = g_mfb.height - 1;
+            if (sy1 >= source_h) {
+                sy1 = source_h - 1;
             }
             weight0 = (sy0 + 1) * content_h - start;
-            if (weight0 > g_mfb.height) {
-                weight0 = g_mfb.height;
+            if (weight0 > source_h) {
+                weight0 = source_h;
             }
             if (sy0 == sy1) {
                 weight1 = 0;
-                weight0 = g_mfb.height;
+                weight0 = source_h;
             } else {
-                weight1 = g_mfb.height - weight0;
+                weight1 = source_h - weight0;
             }
 
             src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
             src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
-            if (g_mfb.height == 480 && content_h == 384) {
+            if (source_h == 480 && content_h == 384) {
                 uint32_t w0 = (uint32_t)(weight0 / 96);
                 uint32_t w1 = (uint32_t)(weight1 / 96);
                 for (int x = 0; x < g_mfb.width; x++) {
@@ -654,15 +670,15 @@ int mfb_update(void *buffer, int fps_limit)
                                   (uint32_t)weight0 +
                                   ((c1 >> 16) & 0xffu) *
                                   (uint32_t)weight1) /
-                                 (uint32_t)g_mfb.height;
+                                 (uint32_t)source_h;
                     uint32_t g = (((c0 >> 8) & 0xffu) *
                                   (uint32_t)weight0 +
                                   ((c1 >> 8) & 0xffu) *
                                   (uint32_t)weight1) /
-                                 (uint32_t)g_mfb.height;
+                                 (uint32_t)source_h;
                     uint32_t b = ((c0 & 0xffu) * (uint32_t)weight0 +
                                   (c1 & 0xffu) * (uint32_t)weight1) /
-                                 (uint32_t)g_mfb.height;
+                                 (uint32_t)source_h;
                     dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
                                             ((g & 0xfcu) << 3) | (b >> 3));
                 }
