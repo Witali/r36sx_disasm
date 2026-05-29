@@ -110,7 +110,9 @@ B/X cancels the editor without saving.  The `ADD NEW PRESET` row creates a new
 preset by copying the current one.
 The `RENAME` row opens the on-screen keyboard for editing the current preset
 name and shows a blinking underscore cursor next to the text.  In picker mode,
-A/Y accepts the highlighted on-screen key and B/X cancels the picker.
+A/Y accepts the highlighted on-screen key.  B always enters Backspace and X
+always enters Escape while the picker keyboard is visible; in name editing this
+means B deletes a character and X closes the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
@@ -126,9 +128,9 @@ On-screen keyboard controls:
 - D-pad: move the highlighted key.
 - A or Start: type the highlighted key.
 - B: Backspace.
-- Select: close the keyboard.
 - X: Escape.
 - Y: Enter.
+- Select: close the keyboard.
 - Shift, Ctrl, and Alt keys on the keyboard act as latched modifiers.
 
 The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,

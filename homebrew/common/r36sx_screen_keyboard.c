@@ -856,9 +856,21 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
         move_selection(keyboard, 0, 1);
     }
-    if ((pressed & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_X)) != 0) {
-        r36sx_screen_keyboard_set_visible(keyboard, 0);
-        return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
+    if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_BACK,
+                                      pressed & R36SX_RKGAME_KEY_B);
+        if (keycode) {
+            *keycode = R36SX_SCREEN_KEY_BACK;
+        }
+        return R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_ESCAPE,
+                                      pressed & R36SX_RKGAME_KEY_X);
+        if (keycode) {
+            *keycode = R36SX_SCREEN_KEY_ESCAPE;
+        }
+        return R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) == 0) {
         return 0;

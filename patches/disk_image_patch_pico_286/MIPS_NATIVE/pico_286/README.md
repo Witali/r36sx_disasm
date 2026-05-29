@@ -61,7 +61,8 @@ Open it with Fn+Start.
 - Left/Right: change preset or column.
 - A or Y: activate the selected row, accept OK, or accept the highlighted
   on-screen key in picker mode.
-- B or X: cancel the editor or picker without saving.
+- B or X: cancel the editor without saving when no picker keyboard is open.
+- In picker mode, B enters Backspace and X enters Escape.
 - `RENAME`: edit the preset name with the on-screen keyboard.
 - `OK`: save all draft changes to `keypresets.conf`.
 - `CANCEL`: close without saving.

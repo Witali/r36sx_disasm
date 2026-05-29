@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-29 on-screen keyboard direct B/X keys
+
+Updated the shared R36SX on-screen keyboard picker behavior so physical B and X
+are direct keyboard shortcuts everywhere the on-screen keyboard is active.
+
+- B returns `Backspace`.
+- X returns `Escape`.
+
+The normal DOS on-screen keyboard already sent those keys.  The preset editor's
+picker keyboard now does the same instead of treating B/X as a picker cancel.
+For preset-name editing, B deletes one character and X closes the picker through
+the existing Escape handling.  For key-binding rows, B assigns Backspace and X
+assigns Escape.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_080
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 891,276 bytes
+- SHA256: `366C47D675782BAD84EC4F353DCF733CA79BB525F716FEE6A3369CE93396A28C`
+- Defender scan: no threats.
+
 ## 2026-05-29 on-screen keyboard compact edge padding
 
 Adjusted the shared R36SX on-screen keyboard layout after the previous

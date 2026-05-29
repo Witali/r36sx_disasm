@@ -30,6 +30,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 on-screen keyboard direct B/X keys
+
+The current `pico_286` binary keeps physical B and X as direct keyboard keys
+whenever the on-screen keyboard is visible:
+
+- B sends Backspace.
+- X sends Escape.
+
+This also applies to the preset editor's picker keyboard.  B no longer cancels
+that picker; in name editing it deletes one character, and in key-binding mode
+it assigns Backspace.
+
+```text
+pico_286 size: 891276 bytes
+pico_286 SHA256: 366C47D675782BAD84EC4F353DCF733CA79BB525F716FEE6A3369CE93396A28C
+Defender scan: found no threats
+```
+
 ## 2026-05-29 on-screen keyboard compact edge padding
 
 The current `pico_286` binary corrects the previous edge-to-edge keyboard
