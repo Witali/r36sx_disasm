@@ -1,5 +1,56 @@
 # pico-286 Build Log
 
+## 2026-05-29 Sopwith CGA mode 04h renderer fix
+
+Investigated `homebrew/pico_286/sopwith.img`.  The FAT12 root contains
+`SW.EXE`, `SOPWTH.BAT`, and `README.TXT`; `SOPWTH.BAT` runs `SW.EXE` without
+arguments.
+
+`SW.EXE` uses a small BIOS video wrapper at file offset `0x66ac`:
+`mov al,[bp+4]; xor ah,ah; int 10h`.  Its startup path at file offsets
+`0x5d94..0x5da1` compares the BSS flag at `0x6bba` with `1`, then passes
+`04h` when the flag is zero or `06h` when it is nonzero.  The runtime startup
+clears the BSS range that contains `0x6bba`, and the bundled BAT file provides
+no video override, so normal Sopwith startup selects BIOS video mode `04h`
+(CGA 320x200 4-color graphics).  The alternate path is mode `06h` (CGA
+640x200 2-color graphics).
+
+The R36SX renderer for CGA modes `04h`, `05h`, and `06h` was still treating
+`VIDEORAM` as a dense `uint8_t *`.  The emulator stores each emulated video
+byte in the low byte of one `uint32_t VIDEORAM[]` slot, so that pointer cast
+read padding bytes from the same slot and scrambled CGA graphics.  The CGA
+renderer now indexes `VIDEORAM[]` by logical video byte and reads the low byte
+of each slot.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `zig objcopy --strip-all` step still reports `error: unimplemented`; the
+script kept the working unstripped binary.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_084\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: `896604` bytes
+- SHA256: `D1D5787DC9C83E8BBC1EC825B0AB623F0E6F5EB98801365DF8892EA4A187F874`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_084/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 EGA mode 0Fh monochrome renderer
 
 Added renderer support for BIOS video mode `0Fh`, the standard EGA/VGA

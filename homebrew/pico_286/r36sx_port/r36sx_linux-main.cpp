@@ -119,6 +119,16 @@ static inline uint32_t ega_mono_pixel(uint32_t plane_bits, int bit)
     return (plane_bits & mask) ? 0xffffff : 0x000000;
 }
 
+static inline uint32_t cga_graphics_base(void)
+{
+    return 0x8000u + ((uint32_t)(vram_offset & 0xffffu) << 1);
+}
+
+static inline uint32_t cga_graphics_row_offset(int screen_y)
+{
+    uint32_t source_y = (uint32_t)screen_y >> 1;
+    return (source_y >> 1) * 80u + (source_y & 1u) * 8192u;
+}
 
 static inline void renderer() {
     static uint8_t v = 0;
@@ -127,7 +137,6 @@ static inline void renderer() {
         v = videomode;
     }
 
-    uint8_t *vidramptr = (uint8_t *)(VIDEORAM + 0x8000 + ((vram_offset & 0xffff) << 1));
     uint8_t cols = 80;
     for (int y = 0; y < 480; y++) {
         if (y >= 399)
@@ -226,12 +235,12 @@ static inline void renderer() {
                 }
                 case 0x04:
                 case 0x05: {
-                    uint8_t *cga_row = vidramptr + ((y / 2 >> 1) * 80 + (y / 2 & 1) * 8192); // Precompute CGA row pointer
+                    uint32_t *cga_row = &VIDEORAM[cga_graphics_base() + cga_graphics_row_offset(y)];
                     uint8_t *current_cga_palette = (uint8_t *) cga_gfxpal[cga_colorset][cga_intensity];
 
                     // Each byte containing 4 pixels
                     for (int x = 320 / 4; x--;) {
-                        uint8_t cga_byte = *cga_row++;
+                        uint8_t cga_byte = (uint8_t)(*cga_row++ & 0xffu);
 
                         // Extract all four 2-bit pixels from the CGA byte
                         // and write each pixel twice for horizontal scaling
@@ -251,11 +260,11 @@ static inline void renderer() {
                     break;
                 }
                 case 0x06: {
-                    uint8_t *cga_row = vidramptr + (y / 2 >> 1) * 80 + (y / 2 & 1) * 8192; // Precompute row start
+                    uint32_t *cga_row = &VIDEORAM[cga_graphics_base() + cga_graphics_row_offset(y)];
 
                     // Each byte containing 8 pixels
                     for (int x = 640 / 8; x--;) {
-                        uint8_t cga_byte = *cga_row++;
+                        uint8_t cga_byte = (uint8_t)(*cga_row++ & 0xffu);
 
                         *pixels++ = cga_palette[(cga_byte >> 7 & 1) * cga_foreground_color];
                         *pixels++ = cga_palette[(cga_byte >> 6 & 1) * cga_foreground_color];

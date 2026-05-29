@@ -30,6 +30,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 Sopwith CGA mode 04h renderer fix
+
+`SW.EXE` from `sopwith.img` normally selects BIOS video mode `04h`, the CGA
+320x200 4-color graphics mode.  The game uses a generic `int 10h AH=00h`
+wrapper and passes either `04h` or `06h`; the bundled no-argument launch path
+keeps its selector flag zero, so it reaches `04h`.
+
+The current `pico_286` binary fixes CGA modes `04h`, `05h`, and `06h` in the
+R36SX renderer.  These modes now read the low byte from each logical
+`uint32_t VIDEORAM[]` slot instead of treating the host storage as a packed
+`uint8_t *`, which scrambled CGA images such as Sopwith.
+
+```text
+pico_286 size: 896604 bytes
+pico_286 SHA256: D1D5787DC9C83E8BBC1EC825B0AB623F0E6F5EB98801365DF8892EA4A187F874
+Defender scan: found no threats
+```
+
 ## 2026-05-29 EGA mode 0Fh monochrome renderer
 
 The current `pico_286` binary adds BIOS video mode `0Fh`, the standard
