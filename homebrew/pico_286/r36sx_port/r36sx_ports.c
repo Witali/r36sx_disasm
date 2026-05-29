@@ -25,15 +25,24 @@ uint32_t vram_offset = 0x0;
 int sound_chips_clock = 0;
 
 #define R36SX_KEYBOARD_QUEUE_CAPACITY 8u
+#define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
 #define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
 
 static uint8_t keyboard_queue[R36SX_KEYBOARD_QUEUE_CAPACITY];
 static uint8_t keyboard_queue_head;
 static uint8_t keyboard_queue_count;
+static uint8_t keyboard_output_full;
+static uint64_t keyboard_next_ready_us;
+
+static INLINE uint64_t r36sx_keyboard_now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
+}
 
 static INLINE void r36sx_keyboard_refresh_status(void) {
-    if (keyboard_queue_count > 0) {
+    if (keyboard_output_full && keyboard_queue_count > 0) {
         port60 = keyboard_queue[keyboard_queue_head];
         port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
     } else {
@@ -42,8 +51,35 @@ static INLINE void r36sx_keyboard_refresh_status(void) {
     }
 }
 
+void r36sx_keyboard_tick(void) {
+    uint64_t now;
+
+    if (keyboard_queue_count == 0 || keyboard_output_full) {
+        r36sx_keyboard_refresh_status();
+        return;
+    }
+
+    now = r36sx_keyboard_now_us();
+    if (keyboard_next_ready_us == 0) {
+        keyboard_next_ready_us = now + R36SX_KEYBOARD_BYTE_DELAY_US;
+        r36sx_keyboard_refresh_status();
+        return;
+    }
+    if ((int64_t)(now - keyboard_next_ready_us) < 0) {
+        r36sx_keyboard_refresh_status();
+        return;
+    }
+
+    keyboard_output_full = 1;
+    keyboard_next_ready_us = 0;
+    r36sx_keyboard_refresh_status();
+    r36sx_pico286_debug_log("kbd: ready scancode=0x%02x count=%u",
+                            port60, (unsigned int)keyboard_queue_count);
+    doirq(1);
+}
+
 void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
-    uint8_t was_empty = keyboard_queue_count == 0;
+    uint8_t was_idle = keyboard_queue_count == 0 && !keyboard_output_full;
 
     if (keyboard_queue_count >= R36SX_KEYBOARD_QUEUE_CAPACITY) {
         r36sx_pico286_debug_log("kbd: queue full, drop scancode=0x%02x",
@@ -58,25 +94,27 @@ void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
     r36sx_pico286_debug_log("kbd: enqueue scancode=0x%02x count=%u",
                             scancode, (unsigned int)keyboard_queue_count);
 
-    if (was_empty) {
-        doirq(1);
+    if (was_idle) {
+        keyboard_next_ready_us =
+            r36sx_keyboard_now_us() + R36SX_KEYBOARD_BYTE_DELAY_US;
     }
 }
 
 static INLINE uint8_t r36sx_keyboard_read_data(void) {
     uint8_t data = port60;
 
-    if (keyboard_queue_count > 0) {
+    r36sx_keyboard_tick();
+    if (keyboard_output_full && keyboard_queue_count > 0) {
         data = keyboard_queue[keyboard_queue_head];
         keyboard_queue_head =
             (keyboard_queue_head + 1u) % R36SX_KEYBOARD_QUEUE_CAPACITY;
         keyboard_queue_count--;
+        keyboard_output_full = 0;
+        keyboard_next_ready_us = keyboard_queue_count > 0 ?
+            r36sx_keyboard_now_us() + R36SX_KEYBOARD_BYTE_DELAY_US : 0;
         r36sx_keyboard_refresh_status();
         r36sx_pico286_debug_log("kbd: read scancode=0x%02x remaining=%u",
                                 data, (unsigned int)keyboard_queue_count);
-        if (keyboard_queue_count > 0) {
-            doirq(1);
-        }
     }
 
     return data;

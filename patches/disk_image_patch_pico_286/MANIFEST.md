@@ -151,3 +151,16 @@ Size: 7940104 bytes
 SHA256: 4EB23B444826C36A60B734F4F66FEB58676DED6FF0FD9676FBE7D77F4EAD01B9
 Defender scan: found no threats
 ```
+
+## 2026-05-29 keyboard scancode pacing
+
+The emulated keyboard controller now waits 1 ms before making each queued
+scancode byte available through port `0x60`.  This approximates PS/2 keyboard
+wire timing: one device-to-host byte is an 11-bit frame, and a 10-16.7 kHz
+clock gives about 660-1100 us per scancode byte.
+
+```text
+Size: 7942728 bytes
+SHA256: 7DF7757CB0A685ACF8BB5C09F9EAC292D6AD737AA0342CF67DB93F208144F9D3
+Defender scan: found no threats
+```

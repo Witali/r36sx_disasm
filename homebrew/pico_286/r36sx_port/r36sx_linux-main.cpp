@@ -19,6 +19,7 @@ uint8_t log_debug = 0;
 
 extern OPL *emu8950_opl;
 extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
+extern "C" void r36sx_keyboard_tick(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
@@ -846,11 +847,13 @@ int main() {
 
     unsigned int main_loop_count = 0;
     while (running) {
+        r36sx_keyboard_tick();
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
         }
         exec86(32768);  // Reduced from 32768 to allow more frequent audio updates
+        r36sx_keyboard_tick();
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
@@ -868,6 +871,7 @@ int main() {
             running = 0;
             break;
         }
+        r36sx_keyboard_tick();
         if (main_loop_count <= 8u) {
             r36sx_pico286_debug_log("main: after mfb_update loop=%u",
                                     main_loop_count);

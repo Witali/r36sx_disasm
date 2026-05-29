@@ -661,6 +661,44 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 keyboard scancode pacing
+
+Added 1 ms pacing between scancode bytes becoming available in the emulated
+keyboard controller output buffer.  Internet references agree that PS/2
+device-to-host transfers use an 11-bit frame: start bit, 8 data bits,
+odd-parity bit, and stop bit.  The device clock is typically 10-16.7 kHz, so
+one scancode byte takes roughly 660-1100 us to transmit.
+
+References checked:
+
+- [The PS/2 Mouse/Keyboard Protocol](https://www-ug.eecg.toronto.edu/msl/nios_devices/datasheets/PS2%20Protocol.htm)
+- [AT Keyboard/Mouse protocol - Hardware Book](https://www.hardwarebook.info/AT_Keyboard-Mouse_protocol)
+- [How Fast Is a PS/2 Keyboard? - OS/2 Museum](https://www.os2museum.com/wp/how-fast-is-a-ps-2-keyboard/)
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,942,728 bytes
+- SHA256: `7DF7757CB0A685ACF8BB5C09F9EAC292D6AD737AA0342CF67DB93F208144F9D3`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 keyboard FIFO size reduction
 
 Reduced the emulated keyboard controller FIFO from 32 scancode bytes to 8.
