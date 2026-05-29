@@ -31,7 +31,6 @@
 #define R36SX_OSK_KEY_H 13
 #define R36SX_OSK_KEY_GAP 2
 #define R36SX_OSK_TEXT_SCALE 1
-#define R36SX_OSK_KEY_HOLD_MS 80u
 
 enum {
     R36SX_OSK_VK_BACK = 8,
@@ -91,11 +90,6 @@ struct r36sx_mfb_driver {
     uint8_t osk_shift;
     uint8_t osk_ctrl;
     uint8_t osk_alt;
-    uint16_t osk_pending_keycode;
-    uint32_t osk_pending_release_ms;
-    uint8_t osk_pending_shift;
-    uint8_t osk_pending_ctrl;
-    uint8_t osk_pending_alt;
     uint8_t input_release_guard;
 };
 
@@ -394,49 +388,8 @@ static void r36sx_osk_draw_text(int x, int y, const char *text,
     }
 }
 
-static void r36sx_osk_release_pending(int force)
-{
-    uint16_t keycode = g_mfb.osk_pending_keycode;
-
-    if (keycode == 0) {
-        return;
-    }
-    if (!force) {
-        uint32_t now = r36sx_mfb_now_ms32();
-        if ((int32_t)(now - g_mfb.osk_pending_release_ms) < 0) {
-            return;
-        }
-    }
-
-    HandleInput(keycode, 0);
-    if (g_mfb.osk_pending_shift) {
-        HandleInput(R36SX_OSK_VK_SHIFT, 0);
-    }
-    if (g_mfb.osk_pending_alt) {
-        HandleInput(R36SX_OSK_VK_MENU, 0);
-    }
-    if (g_mfb.osk_pending_ctrl) {
-        HandleInput(R36SX_OSK_VK_CONTROL, 0);
-    }
-
-    r36sx_pico286_debug_log(
-        "minifb: osk key up keycode=%u shift=%u ctrl=%u alt=%u%s",
-        (unsigned int)keycode,
-        (unsigned int)g_mfb.osk_pending_shift,
-        (unsigned int)g_mfb.osk_pending_ctrl,
-        (unsigned int)g_mfb.osk_pending_alt,
-        force ? " force" : "");
-
-    g_mfb.osk_pending_keycode = 0;
-    g_mfb.osk_pending_release_ms = 0;
-    g_mfb.osk_pending_shift = 0;
-    g_mfb.osk_pending_ctrl = 0;
-    g_mfb.osk_pending_alt = 0;
-}
-
 static void r36sx_mfb_release_all_keys(void)
 {
-    r36sx_osk_release_pending(1);
     for (size_t code = 0; code < sizeof(g_mfb.key_down); code++) {
         if (g_mfb.key_down[code]) {
             HandleInput((unsigned int)code, 0);
@@ -509,8 +462,6 @@ static void r36sx_osk_emit_key(uint16_t keycode, int force_shift)
     int use_ctrl = g_mfb.osk_ctrl;
     int use_alt = g_mfb.osk_alt;
 
-    r36sx_osk_release_pending(1);
-
     if (use_ctrl) {
         HandleInput(R36SX_OSK_VK_CONTROL, 1);
     }
@@ -521,25 +472,16 @@ static void r36sx_osk_emit_key(uint16_t keycode, int force_shift)
         HandleInput(R36SX_OSK_VK_SHIFT, 1);
     }
     HandleInput(keycode, 1);
-
-    g_mfb.osk_pending_keycode = keycode;
-    g_mfb.osk_pending_release_ms =
-        r36sx_mfb_now_ms32() + R36SX_OSK_KEY_HOLD_MS;
-    g_mfb.osk_pending_shift = (uint8_t)(use_shift != 0);
-    g_mfb.osk_pending_ctrl = (uint8_t)(use_ctrl != 0);
-    g_mfb.osk_pending_alt = (uint8_t)(use_alt != 0);
-
-    r36sx_pico286_debug_log(
-        "minifb: osk key down keycode=%u shift=%u ctrl=%u alt=%u",
-        (unsigned int)keycode,
-        (unsigned int)g_mfb.osk_pending_shift,
-        (unsigned int)g_mfb.osk_pending_ctrl,
-        (unsigned int)g_mfb.osk_pending_alt);
-
+    HandleInput(keycode, 0);
+    if (use_shift) {
+        HandleInput(R36SX_OSK_VK_SHIFT, 0);
+    }
     if (use_alt) {
+        HandleInput(R36SX_OSK_VK_MENU, 0);
         g_mfb.osk_alt = 0;
     }
     if (use_ctrl) {
+        HandleInput(R36SX_OSK_VK_CONTROL, 0);
         g_mfb.osk_ctrl = 0;
     }
 }
@@ -803,8 +745,6 @@ static int r36sx_mfb_poll_input(void)
     uint8_t new_down[256];
     uint32_t raw = r36sx_mfb_read_raw_keys();
     uint32_t pressed = raw & ~g_mfb.last_raw_keys;
-
-    r36sx_osk_release_pending(0);
 
     if (raw != g_mfb.last_raw_keys) {
         r36sx_pico286_debug_log("minifb: raw keys=0x%08x", raw);

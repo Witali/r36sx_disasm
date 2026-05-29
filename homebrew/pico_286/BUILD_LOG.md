@@ -660,3 +660,40 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-29 keyboard controller FIFO
+
+Replaced the temporary delayed-release on-screen keyboard workaround with a
+small FIFO behind the emulated keyboard controller ports.  `HandleInput()` now
+converts key events to PC scancodes and enqueues them instead of overwriting
+`port60` directly.  Reading port `0x60` pops one queued scancode, refreshes the
+controller status in `port64`, and raises another IRQ1 when more queued bytes
+remain.
+
+This matches the expected make/break flow more closely: the on-screen keyboard
+can send key-down and key-up events back-to-back, and the controller buffers
+both scancodes for DOS/BIOS to read in order.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,940,088 bytes
+- SHA256: `AB360DAE43112F5A4B72286E9BBE968C172A1F1241DBC86591ED0D6F5725681A`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

@@ -24,6 +24,64 @@ uint32_t vram_offset = 0x0;
 
 int sound_chips_clock = 0;
 
+#define R36SX_KEYBOARD_QUEUE_CAPACITY 32u
+#define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
+#define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
+
+static uint8_t keyboard_queue[R36SX_KEYBOARD_QUEUE_CAPACITY];
+static uint8_t keyboard_queue_head;
+static uint8_t keyboard_queue_count;
+
+static INLINE void r36sx_keyboard_refresh_status(void) {
+    if (keyboard_queue_count > 0) {
+        port60 = keyboard_queue[keyboard_queue_head];
+        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
+    } else {
+        port64 &= (uint8_t)~(R36SX_KBD_STATUS_OUTPUT_FULL |
+                             R36SX_KBD_STATUS_COMPAT_DATA);
+    }
+}
+
+void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
+    uint8_t was_empty = keyboard_queue_count == 0;
+
+    if (keyboard_queue_count >= R36SX_KEYBOARD_QUEUE_CAPACITY) {
+        r36sx_pico286_debug_log("kbd: queue full, drop scancode=0x%02x",
+                                scancode);
+        return;
+    }
+
+    keyboard_queue[(keyboard_queue_head + keyboard_queue_count) %
+                   R36SX_KEYBOARD_QUEUE_CAPACITY] = scancode;
+    keyboard_queue_count++;
+    r36sx_keyboard_refresh_status();
+    r36sx_pico286_debug_log("kbd: enqueue scancode=0x%02x count=%u",
+                            scancode, (unsigned int)keyboard_queue_count);
+
+    if (was_empty) {
+        doirq(1);
+    }
+}
+
+static INLINE uint8_t r36sx_keyboard_read_data(void) {
+    uint8_t data = port60;
+
+    if (keyboard_queue_count > 0) {
+        data = keyboard_queue[keyboard_queue_head];
+        keyboard_queue_head =
+            (keyboard_queue_head + 1u) % R36SX_KEYBOARD_QUEUE_CAPACITY;
+        keyboard_queue_count--;
+        r36sx_keyboard_refresh_status();
+        r36sx_pico286_debug_log("kbd: read scancode=0x%02x remaining=%u",
+                                data, (unsigned int)keyboard_queue_count);
+        if (keyboard_queue_count > 0) {
+            doirq(1);
+        }
+    }
+
+    return data;
+}
+
 static uint16_t adlibregmem[5], adlib_register = 0;
 static uint8_t adlibstatus = 0;
 
@@ -146,7 +204,8 @@ void portout(uint16_t portnum, uint16_t value) {
 #if PICO_ON_DEVICE
             keyboard_send(value);
 #endif
-            port64 = value;
+            port64 = (uint8_t)value;
+            r36sx_keyboard_refresh_status();
             break;
 // i8237 DMA
         case 0x81:
@@ -409,10 +468,11 @@ uint16_t portin(uint16_t portnum) {
 
 // Keyboard
         case 0x60:
-            return port60;
+            return r36sx_keyboard_read_data();
         case 0x61:
             return port61;
         case 0x64:
+            r36sx_keyboard_refresh_status();
             return port64;
 // i8237 DMA Page Registers
         case 0x81:

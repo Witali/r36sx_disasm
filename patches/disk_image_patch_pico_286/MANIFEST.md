@@ -126,3 +126,16 @@ Size: 7938128 bytes
 SHA256: 51D01BF7DC78EC2C38E9428C7C42FDE3E0FDDAF42538D3984C8E488001B79E99
 Defender scan: found no threats
 ```
+
+## 2026-05-29 keyboard controller FIFO
+
+The binary was rebuilt again to replace the temporary on-screen keyboard
+delayed-release workaround with a proper FIFO behind emulated ports `0x60` and
+`0x64`.  Key make/break scancodes are now queued, and reads from port `0x60`
+pop one byte at a time while raising another IRQ1 if more bytes remain.
+
+```text
+Size: 7940088 bytes
+SHA256: AB360DAE43112F5A4B72286E9BBE968C172A1F1241DBC86591ED0D6F5725681A
+Defender scan: found no threats
+```

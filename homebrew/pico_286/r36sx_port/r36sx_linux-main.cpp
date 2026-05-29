@@ -18,6 +18,7 @@ int cursor_blink_state = 0;
 uint8_t log_debug = 0;
 
 extern OPL *emu8950_opl;
+extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
@@ -635,9 +636,9 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
         scancode |= 0x80;
     }
 
-    port60 = scancode;
-    port64 |= 2;
-    doirq(1);
+    if (scancode != 0) {
+        r36sx_keyboard_enqueue_scancode((uint8_t)scancode);
+    }
 }
 
 extern "C" void HandleMouse(int x, int y, int buttons) {
