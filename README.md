@@ -405,6 +405,9 @@ Notable patch history:
 - `disk_image_patch_066`: rebuilds Pico-286 with an optional right-side
   cursor-key block in the on-screen keyboard, enabled by
   `osk_cursor_keys=on` in `pico_286.conf`.
+- `disk_image_patch_067`: rebuilds Pico-286 with Fn chord controls and a disk
+  binding menu: tap Fn toggles the keyboard, Fn+Select opens disk image
+  bindings, and Fn+Start opens key presets.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

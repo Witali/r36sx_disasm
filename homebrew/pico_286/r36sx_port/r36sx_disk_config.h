@@ -17,6 +17,19 @@ typedef struct {
 const char *r36sx_pico286_disk_path(uint8_t bios_drive,
                                     const char *fallback_path);
 
+// Return the configured image value as written to pico_286.conf.
+const char *r36sx_pico286_disk_value(uint8_t bios_drive,
+                                     const char *fallback_value);
+
+// Update the configured image value in memory. Call save_config to persist it.
+void r36sx_pico286_set_disk_value(uint8_t bios_drive, const char *value);
+
+// Return the directory that contains pico_286.conf, or an empty string.
+const char *r36sx_pico286_config_dir(void);
+
+// Write the current Pico-286 configuration back to pico_286.conf.
+int r36sx_pico286_save_config(void);
+
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 

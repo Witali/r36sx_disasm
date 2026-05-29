@@ -15,19 +15,26 @@ typedef struct {
     uint8_t bios_drive;
     const char *name;
     const char *alias;
+    char value[R36SX_PICO286_MAX_DISK_PATH];
     char path[R36SX_PICO286_MAX_DISK_PATH];
     int configured;
 } r36sx_pico286_disk_entry_t;
 
 static r36sx_pico286_disk_entry_t disk_entries[] = {
-    { 0, "fdd0", "drive0", "", 0 },
-    { 1, "fdd1", "drive1", "", 0 },
-    { 128, "hdd0", "drive128", "", 0 },
-    { 129, "hdd1", "drive129", "", 0 },
+    { 0, "fdd0", "drive0", "FreeDOS1.img", "FreeDOS1.img", 1 },
+    { 1, "fdd1", "drive1", "sopwith.img", "sopwith.img", 1 },
+    { 128, "hdd0", "drive128", "hdd.img", "hdd.img", 1 },
+    { 129, "hdd1", "drive129", "hdd2.img", "hdd2.img", 1 },
 };
 
 static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
+static char disk_config_path[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_CONFIG_PATH;
+static char cpu_mhz_text[32] = "32.768";
+static char boot_mode_text[32] = "normal";
+static char boot_order_text[64] = "fdd0,hdd0";
+static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
 static int osk_cursor_keys = 1;
@@ -156,6 +163,24 @@ static int is_absolute_path(const char *path)
            (isalpha((unsigned char)path[0]) && path[1] == ':');
 }
 
+static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
+                                 const char *value)
+{
+    if (!entry) {
+        return;
+    }
+
+    snprintf(entry->value, sizeof(entry->value), "%s", value ? value : "");
+    if (entry->value[0] == '\0' || is_absolute_path(entry->value) ||
+        disk_config_dir[0] == '\0') {
+        snprintf(entry->path, sizeof(entry->path), "%s", entry->value);
+    } else {
+        snprintf(entry->path, sizeof(entry->path), "%s/%s", disk_config_dir,
+                 entry->value);
+    }
+    entry->configured = 1;
+}
+
 static void set_config_dir(const char *config_path)
 {
     const char *last_slash = strrchr(config_path, '/');
@@ -177,6 +202,10 @@ static void set_config_dir(const char *config_path)
     }
     memcpy(disk_config_dir, config_path, len);
     disk_config_dir[len] = '\0';
+
+    for (size_t i = 0; i < sizeof(disk_entries) / sizeof(disk_entries[0]); i++) {
+        set_disk_entry_value(&disk_entries[i], disk_entries[i].value);
+    }
 }
 
 static int set_cpu_mhz(const char *value, int line_no)
@@ -202,6 +231,7 @@ static int set_cpu_mhz(const char *value, int line_no)
         loops = 1;
     }
     cpu_exec_loops = loops;
+    snprintf(cpu_mhz_text, sizeof(cpu_mhz_text), "%s", value);
     r36sx_pico286_debug_log("diskcfg: cpu_mhz=%.3f exec_loops=%u",
                             mhz, cpu_exec_loops);
     return 1;
@@ -213,6 +243,7 @@ static int set_boot_mode(const char *value, int line_no)
         key_equals(value, "disk") ||
         key_equals(value, "auto")) {
         boot_bios_prompt = 0;
+        snprintf(boot_mode_text, sizeof(boot_mode_text), "normal");
         r36sx_pico286_debug_log("diskcfg: boot_mode=normal");
         return 1;
     }
@@ -221,6 +252,7 @@ static int set_boot_mode(const char *value, int line_no)
         key_equals(value, "bios_prompt") ||
         key_equals(value, "prompt")) {
         boot_bios_prompt = 1;
+        snprintf(boot_mode_text, sizeof(boot_mode_text), "bios_prompt");
         r36sx_pico286_debug_log("diskcfg: boot_mode=bios_prompt");
         return 1;
     }
@@ -274,10 +306,14 @@ static int set_boot_order(char *value, int line_no)
     uint8_t parsed[4] = { 0, 0, 0, 0 };
     uint8_t count = 0;
     char *token = value;
+    char original[sizeof(boot_order_text)];
+
+    snprintf(original, sizeof(original), "%s", value);
 
     if (key_equals(value, "rom") || key_equals(value, "bios")) {
         boot_order_count = 0;
         boot_order_configured = 1;
+        snprintf(boot_order_text, sizeof(boot_order_text), "rom");
         r36sx_pico286_debug_log("diskcfg: boot_order=rom");
         return 1;
     }
@@ -324,6 +360,7 @@ static int set_boot_order(char *value, int line_no)
     memcpy(boot_order, parsed, count);
     boot_order_count = count;
     boot_order_configured = 1;
+    snprintf(boot_order_text, sizeof(boot_order_text), "%s", original);
     r36sx_pico286_debug_log(
         "diskcfg: boot_order count=%u first=0x%02x",
         (unsigned int)boot_order_count, boot_order[0]);
@@ -384,6 +421,8 @@ static int set_hdd_geometry(const char *key, const char *value, int line_no)
     geometry.sects = (uint16_t)parsed[2];
     hdd_geometries[index] = geometry;
     hdd_geometry_configured[index] = 1;
+    snprintf(hdd_geometry_text[index], sizeof(hdd_geometry_text[index]),
+             "%u,%u,%u", geometry.cyls, geometry.heads, geometry.sects);
     r36sx_pico286_debug_log("diskcfg: %s=%u,%u,%u",
                             key, geometry.cyls, geometry.heads,
                             geometry.sects);
@@ -421,12 +460,7 @@ static int set_config_value(const char *key, const char *value, int line_no)
         return 0;
     }
 
-    if (value[0] == '\0' || is_absolute_path(value) || disk_config_dir[0] == '\0') {
-        snprintf(entry->path, sizeof(entry->path), "%s", value);
-    } else {
-        snprintf(entry->path, sizeof(entry->path), "%s/%s", disk_config_dir, value);
-    }
-    entry->configured = 1;
+    set_disk_entry_value(entry, value);
     r36sx_pico286_debug_log("diskcfg: %s drive=%u path='%s'",
                             entry->name, entry->bios_drive,
                             entry->path[0] ? entry->path : "<disabled>");
@@ -458,6 +492,7 @@ static void load_disk_config(void)
     }
 
     r36sx_pico286_debug_log("diskcfg: loading %s", loaded_path);
+    snprintf(disk_config_path, sizeof(disk_config_path), "%s", loaded_path);
     set_config_dir(loaded_path);
 
     while (fgets(line, sizeof(line), fp)) {
@@ -499,6 +534,83 @@ const char *r36sx_pico286_disk_path(uint8_t bios_drive, const char *fallback_pat
     }
 
     return fallback_path;
+}
+
+const char *r36sx_pico286_disk_value(uint8_t bios_drive,
+                                     const char *fallback_value)
+{
+    size_t i;
+
+    load_disk_config();
+
+    for (i = 0; i < sizeof(disk_entries) / sizeof(disk_entries[0]); i++) {
+        if (disk_entries[i].bios_drive == bios_drive) {
+            return disk_entries[i].configured ?
+                disk_entries[i].value : fallback_value;
+        }
+    }
+
+    return fallback_value;
+}
+
+void r36sx_pico286_set_disk_value(uint8_t bios_drive, const char *value)
+{
+    size_t i;
+
+    load_disk_config();
+
+    for (i = 0; i < sizeof(disk_entries) / sizeof(disk_entries[0]); i++) {
+        if (disk_entries[i].bios_drive == bios_drive) {
+            set_disk_entry_value(&disk_entries[i], value);
+            r36sx_pico286_debug_log("diskcfg: set %s='%s'",
+                                    disk_entries[i].name,
+                                    disk_entries[i].value);
+            return;
+        }
+    }
+}
+
+const char *r36sx_pico286_config_dir(void)
+{
+    load_disk_config();
+
+    return disk_config_dir;
+}
+
+int r36sx_pico286_save_config(void)
+{
+    FILE *fp;
+
+    load_disk_config();
+
+    fp = fopen(disk_config_path, "w");
+    if (!fp) {
+        r36sx_pico286_debug_log("diskcfg: save failed path='%s'",
+                                disk_config_path);
+        return 0;
+    }
+
+    fprintf(fp, "# Pico-286 disk image bindings for the R36SX native port.\n");
+    fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
+    fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
+    fprintf(fp, "boot_mode=%s\n", boot_mode_text);
+    fprintf(fp, "osk_cursor_keys=%s\n", osk_cursor_keys ? "on" : "off");
+    fprintf(fp, "boot_order=%s\n\n", boot_order_text);
+    fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
+    fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
+    fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
+    fprintf(fp, "hdd0_geometry=%s\n", hdd_geometry_text[0]);
+    fprintf(fp, "hdd1=%s\n", disk_entries[3].value);
+    fprintf(fp, "hdd1_geometry=%s\n", hdd_geometry_text[1]);
+
+    if (fclose(fp) != 0) {
+        r36sx_pico286_debug_log("diskcfg: save close failed path='%s'",
+                                disk_config_path);
+        return 0;
+    }
+
+    r36sx_pico286_debug_log("diskcfg: saved %s", disk_config_path);
+    return 1;
 }
 
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)

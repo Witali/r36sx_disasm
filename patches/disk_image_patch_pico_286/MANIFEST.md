@@ -24,6 +24,26 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 Fn chord disk menu
+
+The current `pico_286` binary changes Fn handling:
+
+- tap Fn: toggle the on-screen keyboard,
+- Fn+Select: open the disk image binding menu,
+- Fn+Start: open the key preset editor.
+
+The disk menu scans `.img` files next to `pico_286.conf`, lets the user bind
+images to `FDD0`, `FDD1`, `HDD0`, and `HDD1`, and includes `SAVE/APPLY`,
+`EXIT APP`, and `CANCEL` rows.  `SAVE/APPLY` writes `pico_286.conf` and calls
+`insertdisk()` for the running emulator.  The `EXIT APP` row is useful after
+hard-disk changes because DOS can cache drive state.
+
+```text
+pico_286 size: 8113476 bytes
+pico_286 SHA256: FC94F00C0F93F611F6C52CDEA587C3DF8A7F685594ED82A773B8D3376E0FFFCD
+Defender scan: found no threats
+```
+
 ## 2026-05-29 optional on-screen cursor-key block
 
 The current `pico_286` binary includes an optional right-side cursor-key block

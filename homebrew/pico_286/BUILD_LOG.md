@@ -1,5 +1,59 @@
 # pico-286 Build Log
 
+## 2026-05-29 Fn chord disk menu
+
+Rebuilt Pico-286 with a new Fn chord layer and a disk image binding menu.
+
+Input changes:
+
+- tapping and releasing Fn toggles the on-screen keyboard,
+- holding Fn and pressing Select opens the disk menu,
+- holding Fn and pressing Start opens the key preset editor,
+- Select alone no longer opens the key preset editor,
+- Select+Start still exits the app.
+
+The disk menu scans `.img` files next to `pico_286.conf`, lets the user cycle
+bindings for `FDD0`, `FDD1`, `HDD0`, and `HDD1`, and includes `SAVE/APPLY`,
+`EXIT APP`, and `CANCEL` rows.  `SAVE/APPLY` updates `pico_286.conf` and calls
+`insertdisk()` for the current emulator session.  Hard-disk changes may still
+need an emulator restart because DOS can cache mounted drive state; the menu's
+`EXIT APP` row is intended for that path.
+
+The config layer now keeps writable in-memory values for disk image bindings
+and can write the current config back to `pico_286.conf`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_067\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,113,476 bytes
+- SHA256: `FC94F00C0F93F611F6C52CDEA587C3DF8A7F685594ED82A773B8D3376E0FFFCD`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_067/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_067/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 optional on-screen cursor-key block
 
 Rebuilt Pico-286 after adding an optional cursor-key cluster to the shared

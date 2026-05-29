@@ -67,8 +67,9 @@ Default input mapping:
 - L: Alt.
 - R: Shift.
 - L2/R2: F1/F2.
-- Fn: toggle the on-screen keyboard.
-- Select: toggle the key preset editor when the on-screen keyboard is hidden.
+- Tap Fn: toggle the on-screen keyboard.
+- Hold Fn and press Select: open the disk image binding menu.
+- Hold Fn and press Start: open the key preset editor.
 - Select+Start: exit back to TinyMC.
 
 The default game/input mapping is stored in `keypresets.conf` next to the
@@ -93,11 +94,19 @@ r=SHIFT
 r2=F2
 ```
 
-While DOS is running and the on-screen keyboard is hidden, pressing Select
-opens the full-screen preset editor.  D-pad moves between rows, Left/Right or
-A/Start changes a binding, B moves backward through key choices, Y clears a
-binding, and the `ADD NEW PRESET` row creates a new preset by copying the
-current one.
+While DOS is running and the on-screen keyboard is hidden, holding Fn and
+pressing Start opens the full-screen preset editor.  D-pad moves between rows,
+Left/Right or A/Start changes a binding, B moves backward through key choices,
+Y clears a binding, and the `ADD NEW PRESET` row creates a new preset by
+copying the current one.
+
+Holding Fn and pressing Select opens the disk image binding menu.  The menu
+lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
+or A/Start cycles through `.img` files found next to `pico_286.conf`.
+`SAVE/APPLY` writes the selected bindings to `pico_286.conf` and calls
+`insertdisk()` for the running emulator.  For hard-disk changes, DOS may still
+cache drive state, so the `EXIT APP` row is available for a clean restart
+through TinyMC.
 
 On-screen keyboard controls:
 

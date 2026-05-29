@@ -21,6 +21,7 @@
 #include "MiniFB.h"
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
+#include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
 #include "r36sx_port/r36sx_disk_config.h"
 
@@ -54,8 +55,12 @@ struct r36sx_mfb_driver {
     uint64_t last_present_us;
     uint32_t last_raw_keys;
     struct r36sx_screen_keyboard osk;
+    struct r36sx_disk_menu disk_menu;
     struct r36sx_key_presets key_presets;
     uint8_t input_release_guard;
+    uint8_t fn_down;
+    uint8_t fn_chord_used;
+    uint8_t exit_requested;
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -180,6 +185,44 @@ static void r36sx_osk_draw(void)
                                g_mfb.height, g_mfb.width);
 }
 
+static void r36sx_mfb_disk_menu_set_visible(int visible)
+{
+    int old_visible = r36sx_disk_menu_is_visible(&g_mfb.disk_menu);
+    visible = visible != 0;
+    if (old_visible == visible) {
+        return;
+    }
+    r36sx_mfb_release_all_keys();
+    r36sx_osk_set_visible(0);
+    r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
+    r36sx_disk_menu_set_visible(&g_mfb.disk_menu, visible);
+    g_mfb.input_release_guard = 1;
+    r36sx_pico286_debug_log("minifb: disk menu %s",
+                            visible ? "open" : "close");
+}
+
+static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
+{
+    uint32_t result = r36sx_disk_menu_handle_buttons(&g_mfb.disk_menu,
+                                                     pressed);
+    if ((result & R36SX_DISK_MENU_RESULT_EXIT_APP) != 0) {
+        r36sx_pico286_debug_log("minifb: disk menu exit requested");
+        g_mfb.exit_requested = 1;
+    }
+    if ((result & (R36SX_DISK_MENU_RESULT_CLOSED |
+                   R36SX_DISK_MENU_RESULT_EXIT_APP)) != 0) {
+        g_mfb.input_release_guard = 1;
+        r36sx_pico286_debug_log("minifb: disk menu close");
+    }
+    return result;
+}
+
+static void r36sx_disk_menu_draw_overlay(void)
+{
+    r36sx_disk_menu_draw(&g_mfb.disk_menu, g_mfb.frame, g_mfb.width,
+                         g_mfb.height, g_mfb.width);
+}
+
 static void r36sx_presets_set_visible(int visible)
 {
     int old_visible = r36sx_key_presets_is_visible(&g_mfb.key_presets);
@@ -188,6 +231,8 @@ static void r36sx_presets_set_visible(int visible)
         return;
     }
     r36sx_mfb_release_all_keys();
+    r36sx_osk_set_visible(0);
+    r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, visible);
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: key presets %s",
@@ -345,6 +390,7 @@ static int r36sx_mfb_poll_input(void)
     uint8_t new_down[256];
     uint32_t raw = r36sx_mfb_read_raw_keys();
     uint32_t pressed = raw & ~g_mfb.last_raw_keys;
+    uint32_t released = ~raw & g_mfb.last_raw_keys;
 
     if (raw != g_mfb.last_raw_keys) {
         r36sx_pico286_debug_log("minifb: raw keys=0x%08x", raw);
@@ -364,6 +410,12 @@ static int r36sx_mfb_poll_input(void)
         return 0;
     }
 
+    if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
+        r36sx_disk_menu_handle(pressed);
+        g_mfb.last_raw_keys = raw;
+        return g_mfb.exit_requested ? -1 : 0;
+    }
+
     if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
         r36sx_presets_handle_buttons(pressed);
         g_mfb.last_raw_keys = raw;
@@ -371,19 +423,43 @@ static int r36sx_mfb_poll_input(void)
     }
 
     if ((pressed & R36SX_RKGAME_KEY_FN) != 0) {
-        r36sx_osk_set_visible(!r36sx_screen_keyboard_is_visible(&g_mfb.osk));
+        g_mfb.fn_down = 1;
+        g_mfb.fn_chord_used = 0;
+        g_mfb.last_raw_keys = raw;
+        return 0;
+    }
+
+    if ((raw & R36SX_RKGAME_KEY_FN) != 0) {
+        uint32_t fn_chord_pressed = pressed & ~R36SX_RKGAME_KEY_FN;
+        if (fn_chord_pressed != 0) {
+            g_mfb.fn_chord_used = 1;
+        }
+        if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
+            r36sx_mfb_disk_menu_set_visible(1);
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
+        if ((pressed & R36SX_RKGAME_KEY_START) != 0) {
+            r36sx_presets_set_visible(1);
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
+        g_mfb.last_raw_keys = raw;
+        return 0;
+    }
+
+    if ((released & R36SX_RKGAME_KEY_FN) != 0) {
+        if (g_mfb.fn_down && !g_mfb.fn_chord_used) {
+            r36sx_osk_set_visible(!r36sx_screen_keyboard_is_visible(&g_mfb.osk));
+        }
+        g_mfb.fn_down = 0;
+        g_mfb.fn_chord_used = 0;
         g_mfb.last_raw_keys = raw;
         return 0;
     }
 
     if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
         r36sx_osk_handle_buttons(pressed);
-        g_mfb.last_raw_keys = raw;
-        return 0;
-    }
-
-    if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
-        r36sx_presets_set_visible(1);
         g_mfb.last_raw_keys = raw;
         return 0;
     }
@@ -429,6 +505,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     r36sx_screen_keyboard_init(&g_mfb.osk);
     r36sx_screen_keyboard_set_cursor_block(
         &g_mfb.osk, r36sx_pico286_osk_cursor_keys());
+    r36sx_disk_menu_init(&g_mfb.disk_menu);
     r36sx_key_presets_load(&g_mfb.key_presets);
     g_mfb.width = width;
     g_mfb.height = height;
@@ -590,7 +667,9 @@ int mfb_update(void *buffer, int fps_limit)
                             r36sx_mfb_rgb565(0, 0, 0));
     }
     r36sx_mfb_draw_disk_led((uint32_t)(now / 1000ull));
-    if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
+    if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
+        r36sx_disk_menu_draw_overlay();
+    } else if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
         r36sx_presets_draw();
     } else {
         r36sx_osk_draw();
