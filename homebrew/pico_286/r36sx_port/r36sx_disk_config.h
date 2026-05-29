@@ -23,6 +23,9 @@ uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 // Return non-zero when boot should stop at the ROM BIOS boot prompt.
 int r36sx_pico286_boot_bios_prompt(void);
 
+// Return non-zero when the on-screen keyboard should show cursor keys.
+int r36sx_pico286_osk_cursor_keys(void);
+
 // Return the configured boot drive order. Empty result means use ROM behavior.
 uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives);
 

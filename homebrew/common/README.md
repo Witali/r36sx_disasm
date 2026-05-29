@@ -34,6 +34,7 @@ static void emit_key(void *user, uint16_t keycode, int is_down)
 }
 
 r36sx_screen_keyboard_init(&keyboard);
+r36sx_screen_keyboard_set_cursor_block(&keyboard, 1);
 r36sx_screen_keyboard_set_visible(&keyboard, 1);
 r36sx_screen_keyboard_handle_buttons(&keyboard, pressed, emit_key, NULL);
 r36sx_screen_keyboard_draw(&keyboard, frame, width, height, stride_pixels);
@@ -49,6 +50,11 @@ renaming presets.
 The keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.  Use
 `r36sx_screen_keyboard_content_height()` when the underlying app screen should
 be vertically compressed or clipped while the keyboard is visible.
+
+`r36sx_screen_keyboard_set_cursor_block()` optionally adds a compact cursor-key
+cluster to the right side of the keyboard.  The main keys are narrowed to keep
+the whole keyboard inside the same panel, and the cursor keys use a physical
+inverted-T layout with Up above Left/Down/Right.
 
 Current physical button bindings while the keyboard is visible:
 

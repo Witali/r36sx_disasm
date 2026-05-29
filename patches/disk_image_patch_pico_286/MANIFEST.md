@@ -24,6 +24,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 optional on-screen cursor-key block
+
+The current `pico_286` binary includes an optional right-side cursor-key block
+in the on-screen keyboard.  It is enabled by `pico_286.conf`:
+
+```ini
+osk_cursor_keys=on
+```
+
+The cursor block uses an inverted-T physical keyboard layout: Up above
+Left/Down/Right.  The main on-screen keys are narrowed while the block is
+enabled so the keyboard still fits in the existing bottom panel.
+
+```text
+pico_286 size: 8076964 bytes
+pico_286 SHA256: F8FA17D225EBF84BAE8AE5D1D7364FE1AD11B3D5D36002BE1DD8D9C67C6DFC4F
+Defender scan: found no threats
+```
+
 ## 2026-05-29 boot order and HDD geometry config
 
 `pico_286.conf` now includes:

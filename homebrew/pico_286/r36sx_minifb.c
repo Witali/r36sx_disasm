@@ -22,6 +22,7 @@
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
 #include "r36sx_key_presets.h"
+#include "r36sx_port/r36sx_disk_config.h"
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_PICO286_FRAME_USEC 16666u
@@ -426,6 +427,8 @@ int mfb_open(const char *name, int width, int height, int scale)
 
     memset(&g_mfb, 0, sizeof(g_mfb));
     r36sx_screen_keyboard_init(&g_mfb.osk);
+    r36sx_screen_keyboard_set_cursor_block(
+        &g_mfb.osk, r36sx_pico286_osk_cursor_keys());
     r36sx_key_presets_load(&g_mfb.key_presets);
     g_mfb.width = width;
     g_mfb.height = height;

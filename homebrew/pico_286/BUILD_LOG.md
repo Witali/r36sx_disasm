@@ -1,5 +1,61 @@
 # pico-286 Build Log
 
+## 2026-05-29 optional on-screen cursor-key block
+
+Rebuilt Pico-286 after adding an optional cursor-key cluster to the shared
+on-screen keyboard module.  The cluster is drawn on the right side of the
+keyboard in an inverted-T physical keyboard layout: Up above Left/Down/Right.
+When enabled, the normal on-screen keys shrink from 44 to 36 pixels wide so the
+full keyboard still fits in the existing 96-pixel panel.
+
+The shared module defaults to no cursor block for compatibility.  Pico-286 now
+enables it from `pico_286.conf`:
+
+```ini
+osk_cursor_keys=on
+```
+
+The option accepts `on`, `off`, `yes`, `no`, `true`, `false`, `1`, and `0`.
+
+Checked local TTF coverage for arrow glyphs.  DejaVu Sans Mono, Hack,
+JetBrains Mono NL, Liberation Mono, Noto Sans Mono, and Source Code Pro contain
+`U+2190..U+2193`; Roboto Mono does not.  The runtime keyboard still uses its
+small built-in 5x7 bitmap glyphs, so no new font dependency was added.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.  The remaining compiler warnings are the known upstream
+network redirector pointer-sign warnings and one VGA palette sequencing
+warning.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_066\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,076,964 bytes
+- SHA256: `F8FA17D225EBF84BAE8AE5D1D7364FE1AD11B3D5D36002BE1DD8D9C67C6DFC4F`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_066/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_066/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 FAT16 hard disk images and disk read diagnostics
 
 Investigated DOS `DIR` failing with `Cannot read` / retry / abort.  The local

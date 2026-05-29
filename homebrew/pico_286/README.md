@@ -48,8 +48,9 @@ directory is only for compiler output:
   teletype output, mode query, active page selection, and write string.
 - `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
   `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
-  `81h`.  If the file is absent, it falls back to the legacy internal names
-  `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
+  `81h`.  The same config also controls the optional on-screen keyboard cursor
+  block.  If the file is absent, it falls back to the legacy internal disk
+  names `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
   writes notify the R36SX MiniFB layer for the on-screen disk activity LED.
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
@@ -110,7 +111,8 @@ On-screen keyboard controls:
 
 The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
 F1-F10, Delete, and common DOS punctuation such as `:`, `\`, `.`, `/`, `-`,
-and `=`.
+and `=`.  When `osk_cursor_keys=on`, it also shows a compact right-side
+cursor-key block laid out like a physical keyboard: Up above Left/Down/Right.
 
 When the keyboard is visible it occupies the bottom 96 pixels, about 20% of the
 640x480 framebuffer.  The DOS screen is vertically compressed into the
@@ -124,6 +126,7 @@ devices:
 ```ini
 cpu_mhz=32.768
 boot_mode=normal
+osk_cursor_keys=on
 boot_order=fdd0,hdd0
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
@@ -137,6 +140,9 @@ hdd1_geometry=65,16,63
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
 millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
+
+`osk_cursor_keys` accepts `on`/`off` and controls whether the shared on-screen
+keyboard reserves a right-side inverted-T cursor-key block.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

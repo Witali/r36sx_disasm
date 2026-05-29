@@ -402,6 +402,9 @@ Notable patch history:
 - `disk_image_patch_065`: rebuilds Pico-286 with the key preset editor laid out
   by physical console sides: d-pad/L/L2/Select on the left and X/Y/A/B/R/R2/Start
   on the right, with Select and Start at the bottom of their columns.
+- `disk_image_patch_066`: rebuilds Pico-286 with an optional right-side
+  cursor-key block in the on-screen keyboard, enabled by
+  `osk_cursor_keys=on` in `pico_286.conf`.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

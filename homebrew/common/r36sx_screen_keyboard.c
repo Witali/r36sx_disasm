@@ -4,15 +4,33 @@
 
 #define R36SX_OSK_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_OSK_KEY_W 44
+#define R36SX_OSK_COMPACT_KEY_W 36
 #define R36SX_OSK_KEY_H 13
 #define R36SX_OSK_KEY_GAP 2
 #define R36SX_OSK_TEXT_SCALE 1
+#define R36SX_OSK_CURSOR_KEY_W 28
+#define R36SX_OSK_CURSOR_GAP 2
+#define R36SX_OSK_CURSOR_BLOCK_GAP 10
+#define R36SX_OSK_CURSOR_BLOCK_COLS 3
+#define R36SX_OSK_CURSOR_BLOCK_ROWS 2
+#define R36SX_OSK_CURSOR_BLOCK_Y_ROW 3
+#define R36SX_OSK_CURSOR_BLOCK_W \
+    (R36SX_OSK_CURSOR_BLOCK_COLS * R36SX_OSK_CURSOR_KEY_W + \
+     (R36SX_OSK_CURSOR_BLOCK_COLS - 1) * R36SX_OSK_CURSOR_GAP)
 
 #define R36SX_OSK_FLAG_SHIFTED 0x01u
 #define R36SX_OSK_FLAG_SHIFT_MOD 0x02u
 #define R36SX_OSK_FLAG_CTRL_MOD 0x04u
 #define R36SX_OSK_FLAG_ALT_MOD 0x08u
 #define R36SX_OSK_FLAG_CLOSE 0x10u
+
+#define R36SX_OSK_ZONE_MAIN 0u
+#define R36SX_OSK_ZONE_CURSOR 1u
+#define R36SX_OSK_NO_CURSOR_KEY (-1)
+#define R36SX_OSK_LABEL_LEFT "\x11"
+#define R36SX_OSK_LABEL_UP "\x12"
+#define R36SX_OSK_LABEL_RIGHT "\x13"
+#define R36SX_OSK_LABEL_DOWN "\x14"
 
 struct r36sx_osk_key {
     const char *label;
@@ -72,6 +90,19 @@ static const struct r36sx_osk_key g_osk_row4[] = {
     { "ALT", R36SX_SCREEN_KEY_MENU, R36SX_OSK_FLAG_ALT_MOD },
     { "DEL", R36SX_SCREEN_KEY_DELETE, 0 },
     { "CLOSE", 0, R36SX_OSK_FLAG_CLOSE }
+};
+
+static const struct r36sx_osk_key g_osk_cursor_keys[] = {
+    { R36SX_OSK_LABEL_UP, R36SX_SCREEN_KEY_UP, 0 },
+    { R36SX_OSK_LABEL_LEFT, R36SX_SCREEN_KEY_LEFT, 0 },
+    { R36SX_OSK_LABEL_DOWN, R36SX_SCREEN_KEY_DOWN, 0 },
+    { R36SX_OSK_LABEL_RIGHT, R36SX_SCREEN_KEY_RIGHT, 0 },
+};
+
+static const int8_t g_osk_cursor_grid
+    [R36SX_OSK_CURSOR_BLOCK_ROWS][R36SX_OSK_CURSOR_BLOCK_COLS] = {
+    { R36SX_OSK_NO_CURSOR_KEY, 0, R36SX_OSK_NO_CURSOR_KEY },
+    { 1, 2, 3 },
 };
 
 static const struct r36sx_osk_key *const g_osk_rows[] = {
@@ -135,7 +166,7 @@ static void stroke_rect(uint16_t *frame, int width, int height, int stride,
     fill_rect(frame, width, height, stride, x + w - 1, y, 1, h, color);
 }
 
-static uint8_t glyph_row(char c, int row)
+static uint8_t glyph_row(unsigned char c, int row)
 {
     static const uint8_t blank[7] = {0, 0, 0, 0, 0, 0, 0};
     static const uint8_t glyph_a[7] = {14, 17, 17, 31, 17, 17, 17};
@@ -182,10 +213,14 @@ static uint8_t glyph_row(char c, int row)
     static const uint8_t glyph_period[7] = {0, 0, 0, 0, 0, 12, 12};
     static const uint8_t glyph_slash[7] = {1, 1, 2, 4, 8, 16, 16};
     static const uint8_t glyph_backslash[7] = {16, 16, 8, 4, 2, 1, 1};
+    static const uint8_t glyph_left[7] = {0, 4, 8, 31, 8, 4, 0};
+    static const uint8_t glyph_up[7] = {0, 4, 14, 21, 4, 4, 0};
+    static const uint8_t glyph_right[7] = {0, 4, 2, 31, 2, 4, 0};
+    static const uint8_t glyph_down[7] = {0, 4, 4, 21, 14, 4, 0};
     const uint8_t *glyph = blank;
 
     if (c >= 'a' && c <= 'z') {
-        c = (char)(c - ('a' - 'A'));
+        c = (unsigned char)(c - ('a' - 'A'));
     }
 
     switch (c) {
@@ -233,6 +268,10 @@ static uint8_t glyph_row(char c, int row)
     case '.': glyph = glyph_period; break;
     case '/': glyph = glyph_slash; break;
     case '\\': glyph = glyph_backslash; break;
+    case 0x11: glyph = glyph_left; break;
+    case 0x12: glyph = glyph_up; break;
+    case 0x13: glyph = glyph_right; break;
+    case 0x14: glyph = glyph_down; break;
     default: break;
     }
     return glyph[row];
@@ -251,7 +290,7 @@ static void draw_char(uint16_t *frame, int width, int height, int stride,
                       int x, int y, char c, uint16_t color, int scale)
 {
     for (int row = 0; row < 7; row++) {
-        uint8_t bits = glyph_row(c, row);
+        uint8_t bits = glyph_row((unsigned char)c, row);
         for (int col = 0; col < 5; col++) {
             if ((bits & (uint8_t)(1u << (4 - col))) != 0) {
                 fill_rect(frame, width, height, stride,
@@ -309,8 +348,113 @@ static void emit_key(struct r36sx_screen_keyboard *keyboard,
     }
 }
 
-static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
-                           int dy)
+static int key_width(const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->cursor_block ?
+        R36SX_OSK_COMPACT_KEY_W : R36SX_OSK_KEY_W;
+}
+
+static int cursor_key_index(int row, int col)
+{
+    if (row < 0 || row >= R36SX_OSK_CURSOR_BLOCK_ROWS ||
+        col < 0 || col >= R36SX_OSK_CURSOR_BLOCK_COLS) {
+        return R36SX_OSK_NO_CURSOR_KEY;
+    }
+    return g_osk_cursor_grid[row][col];
+}
+
+static const struct r36sx_osk_key *cursor_key_at(int row, int col)
+{
+    int index = cursor_key_index(row, col);
+    if (index < 0 ||
+        index >= (int)R36SX_OSK_ARRAY_COUNT(g_osk_cursor_keys)) {
+        return NULL;
+    }
+    return &g_osk_cursor_keys[index];
+}
+
+static void normalize_cursor_selection(struct r36sx_screen_keyboard *keyboard)
+{
+    if (!keyboard->cursor_block || keyboard->zone != R36SX_OSK_ZONE_CURSOR) {
+        keyboard->zone = R36SX_OSK_ZONE_MAIN;
+        return;
+    }
+
+    if (keyboard->row >= R36SX_OSK_CURSOR_BLOCK_ROWS) {
+        keyboard->row = 0;
+    }
+    if (keyboard->col >= R36SX_OSK_CURSOR_BLOCK_COLS) {
+        keyboard->col = 1;
+    }
+    if (!cursor_key_at(keyboard->row, keyboard->col)) {
+        keyboard->row = 0;
+        keyboard->col = 1;
+    }
+}
+
+static int cursor_row_for_main_row(int row)
+{
+    return row >= R36SX_OSK_CURSOR_BLOCK_Y_ROW + 1 ? 1 : 0;
+}
+
+static void enter_cursor_block(struct r36sx_screen_keyboard *keyboard)
+{
+    keyboard->zone = R36SX_OSK_ZONE_CURSOR;
+    keyboard->row = (uint8_t)cursor_row_for_main_row(keyboard->row);
+    keyboard->col = 1;
+}
+
+static void leave_cursor_block(struct r36sx_screen_keyboard *keyboard)
+{
+    int row = R36SX_OSK_CURSOR_BLOCK_Y_ROW + (int)keyboard->row;
+    int row_count = (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows);
+
+    if (row >= row_count) {
+        row = row_count - 1;
+    }
+    keyboard->zone = R36SX_OSK_ZONE_MAIN;
+    keyboard->row = (uint8_t)row;
+    keyboard->col = (uint8_t)(g_osk_row_counts[row] - 1);
+}
+
+static void move_cursor_selection(struct r36sx_screen_keyboard *keyboard,
+                                  int dx, int dy)
+{
+    if (dy != 0) {
+        int row = (int)keyboard->row + dy;
+        if (row < 0) {
+            row = R36SX_OSK_CURSOR_BLOCK_ROWS - 1;
+        } else if (row >= R36SX_OSK_CURSOR_BLOCK_ROWS) {
+            row = 0;
+        }
+        keyboard->row = (uint8_t)row;
+        if (row == 0) {
+            keyboard->col = 1;
+        } else if (keyboard->col >= R36SX_OSK_CURSOR_BLOCK_COLS) {
+            keyboard->col = R36SX_OSK_CURSOR_BLOCK_COLS - 1;
+        }
+        if (!cursor_key_at(keyboard->row, keyboard->col)) {
+            keyboard->col = 1;
+        }
+        return;
+    }
+
+    if (dx < 0) {
+        if (keyboard->row == 1 && keyboard->col > 0) {
+            keyboard->col--;
+        } else {
+            leave_cursor_block(keyboard);
+        }
+    } else if (dx > 0) {
+        if (keyboard->row == 1 &&
+            keyboard->col + 1 < R36SX_OSK_CURSOR_BLOCK_COLS) {
+            keyboard->col++;
+        }
+    }
+}
+
+static void move_main_selection(struct r36sx_screen_keyboard *keyboard, int dx,
+                                int dy)
 {
     int row_count = (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows);
     int row = (int)keyboard->row + dy;
@@ -329,6 +473,11 @@ static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
         }
     } else {
         int count = (int)g_osk_row_counts[row];
+        if (dx > 0 && keyboard->cursor_block && col >= count) {
+            keyboard->row = (uint8_t)row;
+            enter_cursor_block(keyboard);
+            return;
+        }
         if (col < 0) {
             col = count - 1;
         } else if (col >= count) {
@@ -340,9 +489,31 @@ static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
     keyboard->col = (uint8_t)col;
 }
 
+static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
+                           int dy)
+{
+    normalize_cursor_selection(keyboard);
+    if (keyboard->zone == R36SX_OSK_ZONE_CURSOR) {
+        move_cursor_selection(keyboard, dx, dy);
+    } else {
+        move_main_selection(keyboard, dx, dy);
+    }
+}
+
 static const struct r36sx_osk_key *current_key(
     struct r36sx_screen_keyboard *keyboard)
 {
+    normalize_cursor_selection(keyboard);
+    if (keyboard->zone == R36SX_OSK_ZONE_CURSOR) {
+        const struct r36sx_osk_key *key =
+            cursor_key_at(keyboard->row, keyboard->col);
+        if (key) {
+            return key;
+        }
+        keyboard->zone = R36SX_OSK_ZONE_MAIN;
+        keyboard->row = 0;
+        keyboard->col = 0;
+    }
     if (keyboard->row >= R36SX_OSK_ARRAY_COUNT(g_osk_rows)) {
         keyboard->row = 0;
     }
@@ -389,6 +560,7 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
                      int stride,
                      int x,
                      int y,
+                     int key_w,
                      int selected)
 {
     uint16_t bg = rgb565(32, 42, 54);
@@ -409,13 +581,13 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
         border = rgb565(255, 238, 168);
     }
 
-    fill_rect(frame, width, height, stride, x, y, R36SX_OSK_KEY_W,
+    fill_rect(frame, width, height, stride, x, y, key_w,
               R36SX_OSK_KEY_H, bg);
-    stroke_rect(frame, width, height, stride, x, y, R36SX_OSK_KEY_W,
+    stroke_rect(frame, width, height, stride, x, y, key_w,
                 R36SX_OSK_KEY_H, border);
     {
         int text_w = text_width(key->label, R36SX_OSK_TEXT_SCALE);
-        int text_x = x + (R36SX_OSK_KEY_W - text_w) / 2;
+        int text_x = x + (key_w - text_w) / 2;
         int text_y = y + (R36SX_OSK_KEY_H - 7 * R36SX_OSK_TEXT_SCALE) / 2;
         draw_text(frame, width, height, stride, text_x, text_y, key->label, fg,
                   R36SX_OSK_TEXT_SCALE);
@@ -428,11 +600,13 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
         return;
     }
     keyboard->visible = 0;
+    keyboard->zone = R36SX_OSK_ZONE_MAIN;
     keyboard->row = 0;
     keyboard->col = 0;
     keyboard->shift = 0;
     keyboard->ctrl = 0;
     keyboard->alt = 0;
+    keyboard->cursor_block = 0;
 }
 
 int r36sx_screen_keyboard_is_visible(
@@ -453,6 +627,26 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->ctrl = 0;
         keyboard->alt = 0;
     }
+}
+
+void r36sx_screen_keyboard_set_cursor_block(
+    struct r36sx_screen_keyboard *keyboard, int enabled)
+{
+    if (!keyboard) {
+        return;
+    }
+    keyboard->cursor_block = (uint8_t)(enabled != 0);
+    if (!keyboard->cursor_block && keyboard->zone == R36SX_OSK_ZONE_CURSOR) {
+        keyboard->zone = R36SX_OSK_ZONE_MAIN;
+        keyboard->row = 0;
+        keyboard->col = 0;
+    }
+}
+
+int r36sx_screen_keyboard_cursor_block_enabled(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->cursor_block != 0;
 }
 
 int r36sx_screen_keyboard_panel_y(int framebuffer_height)
@@ -579,6 +773,14 @@ void r36sx_screen_keyboard_draw(
     const int panel_x = 8;
     const int panel_w = width - 16;
     const int panel_y = r36sx_screen_keyboard_panel_y(height);
+    const int content_x = panel_x + 8;
+    const int content_w = panel_w - 16;
+    const int compact = r36sx_screen_keyboard_cursor_block_enabled(keyboard);
+    const int main_key_w = key_width(keyboard);
+    const int cursor_x = content_x + content_w - R36SX_OSK_CURSOR_BLOCK_W;
+    const int main_w = compact ?
+        content_w - R36SX_OSK_CURSOR_BLOCK_W - R36SX_OSK_CURSOR_BLOCK_GAP :
+        content_w;
     const uint16_t panel = rgb565(12, 18, 24);
     const uint16_t header = rgb565(24, 54, 70);
     const uint16_t border = rgb565(160, 192, 204);
@@ -600,16 +802,39 @@ void r36sx_screen_keyboard_draw(
 
     for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
         int count = g_osk_row_counts[row];
-        int row_w = count * R36SX_OSK_KEY_W +
+        int row_w = count * main_key_w +
                     (count - 1) * R36SX_OSK_KEY_GAP;
-        int x = panel_x + (panel_w - row_w) / 2;
+        int x = content_x + (main_w - row_w) / 2;
         int y = panel_y + 18 +
                 (int)row * (R36SX_OSK_KEY_H + R36SX_OSK_KEY_GAP);
         for (int col = 0; col < count; col++) {
             draw_key(keyboard, &g_osk_rows[row][col], frame, width, height,
-                     stride_pixels, x, y,
+                     stride_pixels, x, y, main_key_w,
+                     keyboard->zone == R36SX_OSK_ZONE_MAIN &&
                      row == keyboard->row && col == keyboard->col);
-            x += R36SX_OSK_KEY_W + R36SX_OSK_KEY_GAP;
+            x += main_key_w + R36SX_OSK_KEY_GAP;
+        }
+    }
+
+    if (compact) {
+        int cursor_y = panel_y + 18 +
+            R36SX_OSK_CURSOR_BLOCK_Y_ROW *
+            (R36SX_OSK_KEY_H + R36SX_OSK_KEY_GAP);
+        for (int row = 0; row < R36SX_OSK_CURSOR_BLOCK_ROWS; row++) {
+            for (int col = 0; col < R36SX_OSK_CURSOR_BLOCK_COLS; col++) {
+                const struct r36sx_osk_key *key = cursor_key_at(row, col);
+                if (!key) {
+                    continue;
+                }
+                draw_key(keyboard, key, frame, width, height, stride_pixels,
+                         cursor_x + col * (R36SX_OSK_CURSOR_KEY_W +
+                                           R36SX_OSK_CURSOR_GAP),
+                         cursor_y + row * (R36SX_OSK_KEY_H +
+                                           R36SX_OSK_CURSOR_GAP),
+                         R36SX_OSK_CURSOR_KEY_W,
+                         keyboard->zone == R36SX_OSK_ZONE_CURSOR &&
+                         row == keyboard->row && col == keyboard->col);
+            }
         }
     }
 }
