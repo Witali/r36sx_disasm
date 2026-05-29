@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-05-29 ticks thread 1 ms sleep
+
+Increased `R36SX_TICKS_THREAD_SLEEP_US` in the R36SX Pico-286 Linux entrypoint
+from `250u` to `1000u`.  The ticks thread still catches up timer, audio,
+Sound Blaster, Disney Sound Source, cursor blink, and video frame events in
+batches, but it now wakes the Linux scheduler about 1000 times per second
+instead of up to 4000 times per second.
+
+This should reduce scheduler overhead while keeping audio batching modest
+at roughly 44 output samples per 1 ms wakeup.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `zig objcopy --strip-all` step still reports `error: unimplemented`; the
+script kept the working unstripped binary.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_087\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 902,332 bytes
+- SHA256: `CF3AD6C1C68D5640F9C4EE2C59C62ECF85A1DB39001EFD7E005C4D596BDE89F0`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_087/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 HLT idle wake-on-IRQ
 
 Implemented real `HLT` idle behavior in the R36SX CPU core.  Opcode `F4` now

@@ -14,10 +14,10 @@
 - Follow up on the RGB565 video present cache added in commit `32e7a3a`.
   Test on hardware, then consider rendering directly to RGB565 for modes that
   do not need keyboard scaling or overlays.
-- Try increasing `R36SX_TICKS_THREAD_SLEEP_US` in
-  `homebrew/pico_286/r36sx_port/r36sx_linux-main.cpp` from `250` to `500` or
-  `1000`.  The current setting can wake the timer/audio thread up to 4000
-  times per second.
+- Hardware-test `R36SX_TICKS_THREAD_SLEEP_US=1000` in
+  `homebrew/pico_286/r36sx_port/r36sx_linux-main.cpp`.  This reduces the
+  timer/audio thread wakeup rate from up to 4000/s to about 1000/s; confirm
+  audio remains stable and keyboard/timer responsiveness is still good.
 - Batch common `REP MOVS/STOS` string operations in
   `homebrew/pico_286/r36sx_port/r36sx_cpu.c`, especially RAM-to-RAM and
   RAM-to-video copies.  Keep batches capped so timer and keyboard interrupts

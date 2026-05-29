@@ -30,6 +30,27 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 ticks thread 1 ms sleep
+
+The current `pico_286` binary increases `R36SX_TICKS_THREAD_SLEEP_US` from
+`250u` to `1000u`.  The ticks thread still catches up timer, audio, Sound
+Blaster, Disney Sound Source, cursor blink, and video frame events in batches,
+but it now wakes the Linux scheduler about 1000 times per second instead of up
+to 4000 times per second.
+
+Expected effect:
+
+- lower scheduler overhead,
+- audio batching of about 44 output samples per 1 ms wakeup,
+- no intended guest-visible timing change because missed ticks are still
+  generated in catch-up loops.
+
+```text
+pico_286 size: 902332 bytes
+pico_286 SHA256: CF3AD6C1C68D5640F9C4EE2C59C62ECF85A1DB39001EFD7E005C4D596BDE89F0
+Defender scan: found no threats
+```
+
 ## 2026-05-29 HLT idle wake-on-IRQ
 
 The current `pico_286` binary implements real CPU halt behavior for opcode

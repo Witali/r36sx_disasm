@@ -24,7 +24,7 @@ extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
-#define R36SX_TICKS_THREAD_SLEEP_US 250u
+#define R36SX_TICKS_THREAD_SLEEP_US 1000u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
 
