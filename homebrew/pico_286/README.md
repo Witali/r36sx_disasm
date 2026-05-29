@@ -70,6 +70,11 @@ The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
 F1-F10, Delete, and common DOS punctuation such as `:`, `\`, `.`, `/`, `-`,
 and `=`.
 
+When the keyboard is visible it occupies the bottom 96 pixels, about 20% of the
+640x480 framebuffer.  The DOS screen is vertically compressed into the
+remaining top 384 pixels with a halftone-style area filter instead of being
+covered by the keyboard.
+
 The upstream PC disk images are still expected by the emulator.  In this port,
 put images next to the executable as `fdd0.img`, `fdd1.img`, `hdd.img`, and
 `hdd2.img`.  A compatibility `fdd2.img` can also be placed there for older

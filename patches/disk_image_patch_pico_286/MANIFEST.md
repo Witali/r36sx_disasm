@@ -94,3 +94,8 @@ The current binary includes a joystick-controlled on-screen keyboard:
 
 F1-F10, Delete, common DOS punctuation, and latched Shift/Ctrl/Alt modifiers
 are available from the on-screen keyboard.
+
+The keyboard uses a compact bottom layout: 96 pixels tall, about 20% of the
+640x480 framebuffer.  While it is visible, the DOS screen is vertically
+compressed with a halftone-style area filter into the remaining 384 pixels
+above the keyboard instead of being covered.

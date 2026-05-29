@@ -26,10 +26,10 @@
 #define R36SX_PICO286_DISK_LED_HOLD_MS 350u
 #define R36SX_PICO286_DISK_LED_BLINK_MS 120u
 #define R36SX_PICO286_DISK_LED_RADIUS 8
-#define R36SX_OSK_PANEL_H 186
+#define R36SX_OSK_PANEL_H 96
 #define R36SX_OSK_KEY_W 44
-#define R36SX_OSK_KEY_H 25
-#define R36SX_OSK_KEY_GAP 4
+#define R36SX_OSK_KEY_H 13
+#define R36SX_OSK_KEY_GAP 2
 #define R36SX_OSK_TEXT_SCALE 1
 
 enum {
@@ -200,6 +200,12 @@ static uint16_t r36sx_mfb_rgb888_to_rgb565(uint32_t color)
     uint32_t g = (color >> 8) & 0xffu;
     uint32_t b = color & 0xffu;
     return (uint16_t)(((r & 0xf8u) << 8) | ((g & 0xfcu) << 3) | (b >> 3));
+}
+
+static int r36sx_osk_panel_y(void)
+{
+    return g_mfb.height > R36SX_OSK_PANEL_H ?
+        g_mfb.height - R36SX_OSK_PANEL_H : 0;
 }
 
 static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
@@ -571,7 +577,7 @@ static void r36sx_osk_draw(void)
 {
     const int panel_x = 8;
     const int panel_w = g_mfb.width - 16;
-    const int panel_y = g_mfb.height - R36SX_OSK_PANEL_H - 6;
+    const int panel_y = r36sx_osk_panel_y();
     const uint16_t panel = r36sx_mfb_rgb565(12, 18, 24);
     const uint16_t header = r36sx_mfb_rgb565(24, 54, 70);
     const uint16_t border = r36sx_mfb_rgb565(160, 192, 204);
@@ -583,9 +589,9 @@ static void r36sx_osk_draw(void)
 
     r36sx_mfb_fill_rect(panel_x, panel_y, panel_w, R36SX_OSK_PANEL_H, panel);
     r36sx_mfb_stroke_rect(panel_x, panel_y, panel_w, R36SX_OSK_PANEL_H, border);
-    r36sx_mfb_fill_rect(panel_x + 2, panel_y + 2, panel_w - 4, 20, header);
-    r36sx_osk_draw_text(panel_x + 10, panel_y + 8,
-                        "FN KBD  D-PAD MOVE  A/START TYPE  B/SELECT CLOSE  X SHIFT",
+    r36sx_mfb_fill_rect(panel_x + 2, panel_y + 2, panel_w - 4, 12, header);
+    r36sx_osk_draw_text(panel_x + 10, panel_y + 5,
+                        "FN KBD  D-PAD MOVE  A/START TYPE  B/SELECT CLOSE",
                         text, 1);
 
     for (size_t row = 0; row < R36SX_PICO286_ARRAY_COUNT(g_osk_rows); row++) {
@@ -593,7 +599,7 @@ static void r36sx_osk_draw(void)
         int row_w = count * R36SX_OSK_KEY_W +
                     (count - 1) * R36SX_OSK_KEY_GAP;
         int x = panel_x + (panel_w - row_w) / 2;
-        int y = panel_y + 30 + (int)row * (R36SX_OSK_KEY_H +
+        int y = panel_y + 18 + (int)row * (R36SX_OSK_KEY_H +
                                            R36SX_OSK_KEY_GAP);
         for (int col = 0; col < count; col++) {
             r36sx_osk_draw_key(&g_osk_rows[row][col], x, y,
@@ -622,7 +628,8 @@ static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
     }
 
     cx = g_mfb.width - radius - 12;
-    cy = g_mfb.height - radius - 12;
+    cy = (g_mfb.osk_visible ? r36sx_osk_panel_y() : g_mfb.height) -
+         radius - 12;
     for (int y = -outer_radius; y <= outer_radius; y++) {
         int py = cy + y;
         if (py < 0 || py >= g_mfb.height) {
@@ -864,6 +871,7 @@ int mfb_update(void *buffer, int fps_limit)
 {
     uint64_t now;
     uint32_t *src = (uint32_t *)buffer;
+    int content_h;
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
@@ -882,15 +890,86 @@ int mfb_update(void *buffer, int fps_limit)
         return 0;
     }
 
-    for (int y = 0; y < g_mfb.height; y++) {
+    content_h = g_mfb.osk_visible ? r36sx_osk_panel_y() : g_mfb.height;
+    for (int y = 0; y < content_h; y++) {
         uint16_t *dst_row = g_mfb.frame + (size_t)y * (size_t)g_mfb.width;
-        uint32_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
-        for (int x = 0; x < g_mfb.width; x++) {
-            dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
+
+        if (g_mfb.osk_visible) {
+            int start = y * g_mfb.height;
+            int end = (y + 1) * g_mfb.height;
+            int sy0 = start / content_h;
+            int sy1 = (end - 1) / content_h;
+            int weight0;
+            int weight1;
+            const uint32_t *src_row0;
+            const uint32_t *src_row1;
+
+            if (sy1 >= g_mfb.height) {
+                sy1 = g_mfb.height - 1;
+            }
+            weight0 = (sy0 + 1) * content_h - start;
+            if (weight0 > g_mfb.height) {
+                weight0 = g_mfb.height;
+            }
+            if (sy0 == sy1) {
+                weight1 = 0;
+                weight0 = g_mfb.height;
+            } else {
+                weight1 = g_mfb.height - weight0;
+            }
+
+            src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
+            src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
+            if (g_mfb.height == 480 && content_h == 384) {
+                uint32_t w0 = (uint32_t)(weight0 / 96);
+                uint32_t w1 = (uint32_t)(weight1 / 96);
+                for (int x = 0; x < g_mfb.width; x++) {
+                    uint32_t c0 = src_row0[x];
+                    uint32_t c1 = src_row1[x];
+                    uint32_t r = (((c0 >> 16) & 0xffu) * w0 +
+                                  ((c1 >> 16) & 0xffu) * w1 + 2u) / 5u;
+                    uint32_t g = (((c0 >> 8) & 0xffu) * w0 +
+                                  ((c1 >> 8) & 0xffu) * w1 + 2u) / 5u;
+                    uint32_t b = ((c0 & 0xffu) * w0 +
+                                  (c1 & 0xffu) * w1 + 2u) / 5u;
+                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
+                                            ((g & 0xfcu) << 3) | (b >> 3));
+                }
+            } else {
+                for (int x = 0; x < g_mfb.width; x++) {
+                    uint32_t c0 = src_row0[x];
+                    uint32_t c1 = src_row1[x];
+                    uint32_t r = (((c0 >> 16) & 0xffu) *
+                                  (uint32_t)weight0 +
+                                  ((c1 >> 16) & 0xffu) *
+                                  (uint32_t)weight1) /
+                                 (uint32_t)g_mfb.height;
+                    uint32_t g = (((c0 >> 8) & 0xffu) *
+                                  (uint32_t)weight0 +
+                                  ((c1 >> 8) & 0xffu) *
+                                  (uint32_t)weight1) /
+                                 (uint32_t)g_mfb.height;
+                    uint32_t b = ((c0 & 0xffu) * (uint32_t)weight0 +
+                                  (c1 & 0xffu) * (uint32_t)weight1) /
+                                 (uint32_t)g_mfb.height;
+                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
+                                            ((g & 0xfcu) << 3) | (b >> 3));
+                }
+            }
+        } else {
+            uint32_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
+            for (int x = 0; x < g_mfb.width; x++) {
+                dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
+            }
         }
     }
-    r36sx_osk_draw();
+    if (content_h < g_mfb.height) {
+        r36sx_mfb_fill_rect(0, content_h, g_mfb.width,
+                            g_mfb.height - content_h,
+                            r36sx_mfb_rgb565(0, 0, 0));
+    }
     r36sx_mfb_draw_disk_led((uint32_t)(now / 1000ull));
+    r36sx_osk_draw();
     g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     g_mfb.last_present_us = now;
     return 0;

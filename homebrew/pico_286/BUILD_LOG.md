@@ -515,3 +515,30 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-29 compact on-screen keyboard layout
+
+Adjusted the joystick keyboard so it stays on the bottom of the screen and uses
+only 96 vertical pixels, roughly 20% of the 640x480 framebuffer.  Fn still
+toggles the keyboard.
+
+When the keyboard is visible, the DOS framebuffer is vertically compressed into
+the remaining 384-pixel area above it instead of being overdrawn by the
+keyboard.  The compression uses a halftone-style area filter, blending the
+overlapping source rows rather than dropping rows.  The disk activity LED is
+also moved to the lower-right corner of the compressed DOS area while the
+keyboard is open.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,935,924 bytes
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
