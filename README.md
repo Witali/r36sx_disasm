@@ -18,6 +18,17 @@ Project video:
 The inspected image is not a single monolithic firmware blob. It looks like the
 contents of a FAT/SD partition plus an extracted or companion `rootfs` tree.
 
+## Original SD Card Warning
+
+The SD card shipped with the console was labeled as `64 GB`, but its actual
+capacity was only `16 GB`.  The partition table had been erased or damaged, so
+the card was not recognized as a usable volume and Windows offered to format
+it.  TestDisk was able to recover the partition table.
+
+Before doing any experiments, writes, repairs, or filesystem operations on a
+stock card, make a full raw backup image first with a tool such as
+Win32DiskImager.  Work on copies of that image whenever possible.
+
 Important platform facts:
 
 - Main userspace architecture: ELF32 little-endian MIPS, O32 ABI.
