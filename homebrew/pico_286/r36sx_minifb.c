@@ -30,6 +30,7 @@
 #define R36SX_PICO286_DISK_LED_HOLD_MS 350u
 #define R36SX_PICO286_DISK_LED_BLINK_MS 120u
 #define R36SX_PICO286_DISK_LED_RADIUS 8
+#define R36SX_PICO286_FN_HOLD_EXIT_USEC 3000000ull
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -60,6 +61,8 @@ struct r36sx_mfb_driver {
     uint8_t input_release_guard;
     uint8_t fn_down;
     uint8_t fn_chord_used;
+    uint8_t fn_hold_exit_fired;
+    uint64_t fn_down_since_us;
     uint8_t exit_requested;
 };
 
@@ -396,12 +399,6 @@ static int r36sx_mfb_poll_input(void)
         r36sx_pico286_debug_log("minifb: raw keys=0x%08x", raw);
     }
 
-    if ((raw & (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_START)) ==
-        (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_START)) {
-        r36sx_pico286_debug_log("minifb: Select+Start exit requested");
-        return -1;
-    }
-
     if (g_mfb.input_release_guard) {
         if (raw == 0) {
             g_mfb.input_release_guard = 0;
@@ -425,6 +422,8 @@ static int r36sx_mfb_poll_input(void)
     if ((pressed & R36SX_RKGAME_KEY_FN) != 0) {
         g_mfb.fn_down = 1;
         g_mfb.fn_chord_used = 0;
+        g_mfb.fn_hold_exit_fired = 0;
+        g_mfb.fn_down_since_us = r36sx_mfb_now_us();
         g_mfb.last_raw_keys = raw;
         return 0;
     }
@@ -433,6 +432,18 @@ static int r36sx_mfb_poll_input(void)
         uint32_t fn_chord_pressed = pressed & ~R36SX_RKGAME_KEY_FN;
         if (fn_chord_pressed != 0) {
             g_mfb.fn_chord_used = 1;
+        }
+        if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
+            r36sx_pico286_debug_log("minifb: Fn+X exit requested");
+            return -1;
+        }
+        if (g_mfb.fn_down && !g_mfb.fn_chord_used &&
+            g_mfb.fn_down_since_us != 0 &&
+            r36sx_mfb_now_us() - g_mfb.fn_down_since_us >=
+                R36SX_PICO286_FN_HOLD_EXIT_USEC) {
+            g_mfb.fn_hold_exit_fired = 1;
+            r36sx_pico286_debug_log("minifb: Fn hold exit requested");
+            return -1;
         }
         if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
             r36sx_mfb_disk_menu_set_visible(1);
@@ -449,11 +460,14 @@ static int r36sx_mfb_poll_input(void)
     }
 
     if ((released & R36SX_RKGAME_KEY_FN) != 0) {
-        if (g_mfb.fn_down && !g_mfb.fn_chord_used) {
+        if (g_mfb.fn_down && !g_mfb.fn_chord_used &&
+            !g_mfb.fn_hold_exit_fired) {
             r36sx_osk_set_visible(!r36sx_screen_keyboard_is_visible(&g_mfb.osk));
         }
         g_mfb.fn_down = 0;
         g_mfb.fn_chord_used = 0;
+        g_mfb.fn_hold_exit_fired = 0;
+        g_mfb.fn_down_since_us = 0;
         g_mfb.last_raw_keys = raw;
         return 0;
     }

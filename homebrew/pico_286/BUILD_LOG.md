@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-05-29 Fn+X and long-Fn exit
+
+Rebuilt Pico-286 after changing the application exit gesture.  Select+Start no
+longer exits, so DOS programs and games can use that combination without
+closing the emulator.
+
+Current exit controls:
+
+- holding Fn and pressing X exits back to TinyMC,
+- holding Fn by itself for more than 3 seconds exits back to TinyMC.
+
+Existing Fn chord controls remain unchanged:
+
+- tapping and releasing Fn toggles the on-screen keyboard,
+- holding Fn and pressing Select opens the disk menu,
+- holding Fn and pressing Start opens the key preset editor.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_068\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,114,488 bytes
+- SHA256: `6DD9DC4A8528C38EE909FDF9CF2F13A6E42890CBBF61AAAC89FEEA98DBC809AD`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_068/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_068/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 Fn chord disk menu
 
 Rebuilt Pico-286 with a new Fn chord layer and a disk image binding menu.

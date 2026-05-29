@@ -70,7 +70,8 @@ Default input mapping:
 - Tap Fn: toggle the on-screen keyboard.
 - Hold Fn and press Select: open the disk image binding menu.
 - Hold Fn and press Start: open the key preset editor.
-- Select+Start: exit back to TinyMC.
+- Hold Fn and press X: exit back to TinyMC.
+- Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 
 The default game/input mapping is stored in `keypresets.conf` next to the
 executable:

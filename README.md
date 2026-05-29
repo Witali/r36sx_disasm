@@ -408,6 +408,8 @@ Notable patch history:
 - `disk_image_patch_067`: rebuilds Pico-286 with Fn chord controls and a disk
   binding menu: tap Fn toggles the keyboard, Fn+Select opens disk image
   bindings, and Fn+Start opens key presets.
+- `disk_image_patch_068`: rebuilds Pico-286 so application exit no longer uses
+  Select+Start.  Exit is now Fn+X, or holding Fn for more than 3 seconds.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

@@ -24,6 +24,27 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 Fn+X and long-Fn exit
+
+The current `pico_286` binary removes the Select+Start application exit.
+
+Current exit controls:
+
+- Fn+X: exit back to TinyMC,
+- hold Fn for more than 3 seconds: emergency exit back to TinyMC.
+
+Other Fn controls remain:
+
+- tap Fn: toggle the on-screen keyboard,
+- Fn+Select: open the disk image binding menu,
+- Fn+Start: open the key preset editor.
+
+```text
+pico_286 size: 8114488 bytes
+pico_286 SHA256: 6DD9DC4A8528C38EE909FDF9CF2F13A6E42890CBBF61AAAC89FEEA98DBC809AD
+Defender scan: found no threats
+```
+
 ## 2026-05-29 Fn chord disk menu
 
 The current `pico_286` binary changes Fn handling:
