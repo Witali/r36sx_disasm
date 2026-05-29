@@ -1,5 +1,55 @@
 # pico-286 Build Log
 
+## 2026-05-29 remaining FreeDOS package floppies
+
+Downloaded the official FreeDOS 1.4 Floppy Edition archive again:
+
+```powershell
+Invoke-WebRequest -Uri "https://download.freedos.org/1.4/FD14-FloppyEdition.zip" -OutFile ".tmp\FD14-FloppyEdition.zip"
+```
+
+The archive contains:
+
+- `144m/x86BOOT.img`
+- `144m/x86DSK01.img`
+- `144m/x86DSK02.img`
+- `144m/x86DSK03.img`
+- `144m/x86DSK04.img`
+- `144m/x86DSK05.img`
+- `144m/x86DSK06.img`
+
+The project already had `FreeDOS1.img` through `FreeDOS3.img`, so the remaining
+package floppies were copied as:
+
+- `FreeDOS4.img`: `144m/x86DSK03.img`
+- `FreeDOS5.img`: `144m/x86DSK04.img`
+- `FreeDOS6.img`: `144m/x86DSK05.img`
+- `FreeDOS7.img`: `144m/x86DSK06.img`
+
+Copied into:
+
+- `disk_image/MIPS_NATIVE/pico_286/`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/`
+- `patches/disk_image_patch_078/MIPS_NATIVE/pico_286/`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\.tmp\FD14-FloppyEdition.zip
+.\tools\scan-download.ps1 .\.tmp\FD14-FloppyEdition
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\FreeDOS4.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\FreeDOS5.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\FreeDOS6.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\FreeDOS7.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\FreeDOS4.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\FreeDOS5.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\FreeDOS6.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\FreeDOS7.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_078
+```
+
+Result: Microsoft Defender reported no threats.
+
 ## 2026-05-29 timing thread busy-loop reduction
 
 Reviewed the Pico-286 hot loops after the emulator felt slow on the device.

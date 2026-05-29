@@ -11,19 +11,43 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/FreeDOS1.img`
 - `MIPS_NATIVE/pico_286/FreeDOS2.img`
 - `MIPS_NATIVE/pico_286/FreeDOS3.img`
+- `MIPS_NATIVE/pico_286/FreeDOS4.img`
+- `MIPS_NATIVE/pico_286/FreeDOS5.img`
+- `MIPS_NATIVE/pico_286/FreeDOS6.img`
+- `MIPS_NATIVE/pico_286/FreeDOS7.img`
 - `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 
-This debug build writes a startup/runtime log to:
+The default binary is built with `DEBUG=0`.  Builds made with
+`build_pico_286.ps1 -DebugLog` write a startup/runtime log to:
 
 - `MIPS_NATIVE/pico_286/pico_286.log`
 
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-05-29 remaining FreeDOS package floppies
+
+The patch now includes the full official FreeDOS 1.4 Floppy Edition 1.44 MB
+image set:
+
+- `FreeDOS1.img`: `144m/x86BOOT.img`
+- `FreeDOS2.img`: `144m/x86DSK01.img`
+- `FreeDOS3.img`: `144m/x86DSK02.img`
+- `FreeDOS4.img`: `144m/x86DSK03.img`
+- `FreeDOS5.img`: `144m/x86DSK04.img`
+- `FreeDOS6.img`: `144m/x86DSK05.img`
+- `FreeDOS7.img`: `144m/x86DSK06.img`
+
+Use the Pico-286 disk image menu (`Fn+Select`) to mount the later package
+diskettes when the installer asks for them.  The downloaded archive, extracted
+tree, final `disk_image` copies, consolidated patch copies, and
+`disk_image_patch_078` were scanned with `tools/scan-download.ps1`; Microsoft
+Defender reported no threats.
 
 ## 2026-05-29 held on-screen-keyboard press animation
 
@@ -278,11 +302,14 @@ Optional PC disk images should be placed in the same directory:
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/FreeDOS1.img`
 - `MIPS_NATIVE/pico_286/FreeDOS2.img`
+- `MIPS_NATIVE/pico_286/FreeDOS3.img`
+- `MIPS_NATIVE/pico_286/FreeDOS4.img`
+- `MIPS_NATIVE/pico_286/FreeDOS5.img`
+- `MIPS_NATIVE/pico_286/FreeDOS6.img`
+- `MIPS_NATIVE/pico_286/FreeDOS7.img`
 - `MIPS_NATIVE/pico_286/sopwith.img`
 - `MIPS_NATIVE/pico_286/hdd.img`
 - `MIPS_NATIVE/pico_286/hdd2.img`
-- `MIPS_NATIVE/pico_286/FreeDOS3.img` for older test builds that request a third
-  floppy image
 
 Button presets are stored in:
 
@@ -320,6 +347,10 @@ The included image set is based on official FreeDOS 1.4 Floppy Edition:
 - `FreeDOS1.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
 - `FreeDOS2.img`: `144m/x86DSK01.img`.
 - `FreeDOS3.img`: `144m/x86DSK02.img`.
+- `FreeDOS4.img`: `144m/x86DSK03.img`.
+- `FreeDOS5.img`: `144m/x86DSK04.img`.
+- `FreeDOS6.img`: `144m/x86DSK05.img`.
+- `FreeDOS7.img`: `144m/x86DSK06.img`.
 - `hdd.img` and `hdd2.img`: 33,546,240-byte hard disk images with MBR and one
   FAT16 primary partition, 65/16/63 CHS.
 

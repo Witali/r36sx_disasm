@@ -180,8 +180,8 @@ hook.  Supported drive names are `fdd0`, `fdd1`, `hdd0`, and `hdd1`; use
 directory unless absolute paths are used.  Leaving a value empty disables that
 drive.  If `pico_286.conf` is missing, the same four default filenames are
 used from the legacy internal fallback (`fdd0.img`, `fdd1.img`, `hdd.img`,
-`hdd2.img`).  A compatibility `FreeDOS3.img` can also be placed there for
-older test builds that tried to attach a third floppy image.  The upstream network
+`hdd2.img`).  Additional FreeDOS package images can be placed in the same
+directory and selected through the disk image menu.  The upstream network
 redirector still maps DOS drive H: to `/tmp/`.
 
 `hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
@@ -194,6 +194,10 @@ a separate Sopwith game floppy:
 - `FreeDOS1.img`: `144m/x86BOOT.img`, bootable FreeDOS floppy.
 - `FreeDOS2.img`: `144m/x86DSK01.img`, first FreeDOS package floppy.
 - `FreeDOS3.img`: `144m/x86DSK02.img`, second FreeDOS package floppy.
+- `FreeDOS4.img`: `144m/x86DSK03.img`, third FreeDOS package floppy.
+- `FreeDOS5.img`: `144m/x86DSK04.img`, fourth FreeDOS package floppy.
+- `FreeDOS6.img`: `144m/x86DSK05.img`, fifth FreeDOS package floppy.
+- `FreeDOS7.img`: `144m/x86DSK06.img`, sixth FreeDOS package floppy.
 - `sopwith.img`: 1.44 MB FAT12 floppy with Sopwith (The Author's Edition),
   available as DOS `B:` in the current `pico_286.conf`.
 - `hdd.img`: 33,546,240-byte hard disk image with MBR and one FAT16 primary
