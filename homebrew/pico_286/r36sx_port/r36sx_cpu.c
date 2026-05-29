@@ -7,6 +7,7 @@
 #define CPU_NO_SALC
 //#define CPU_SET_HIGH_FLAGS
 #define CPU_286_STYLE_PUSH_SP
+#define R36SX_REP_BATCH_MAX 1024u
 #if PICO_ON_DEVICE
 
 #include "disks-rp2350.c.inl"
@@ -54,6 +55,108 @@ static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
 {
     return i8259_controller.interrupt_request_register &
            (uint8_t)(~i8259_controller.interrupt_mask_register);
+}
+
+static inline uint32_t r36sx_rep_batch_count(uint16_t count,
+                                             uint32_t loopcount,
+                                             uint32_t execloops)
+{
+    uint32_t batch = count;
+    uint32_t budget = execloops > loopcount ? execloops - loopcount : 1u;
+
+    if (batch > budget) {
+        batch = budget;
+    }
+    if (batch > R36SX_REP_BATCH_MAX) {
+        batch = R36SX_REP_BATCH_MAX;
+    }
+    return batch ? batch : 1u;
+}
+
+static inline void r36sx_rep_movsb(uint32_t count)
+{
+    uint16_t si = CPU_SI;
+    uint16_t di = CPU_DI;
+
+    if (df) {
+        while (count--) {
+            putmem8(CPU_ES, di, getmem8(useseg, si));
+            si--;
+            di--;
+        }
+    } else {
+        while (count--) {
+            putmem8(CPU_ES, di, getmem8(useseg, si));
+            si++;
+            di++;
+        }
+    }
+
+    CPU_SI = si;
+    CPU_DI = di;
+}
+
+static inline void r36sx_rep_movsw(uint32_t count)
+{
+    uint16_t si = CPU_SI;
+    uint16_t di = CPU_DI;
+
+    if (df) {
+        while (count--) {
+            putmem16(CPU_ES, di, getmem16(useseg, si));
+            si -= 2;
+            di -= 2;
+        }
+    } else {
+        while (count--) {
+            putmem16(CPU_ES, di, getmem16(useseg, si));
+            si += 2;
+            di += 2;
+        }
+    }
+
+    CPU_SI = si;
+    CPU_DI = di;
+}
+
+static inline void r36sx_rep_stosb(uint32_t count)
+{
+    uint16_t di = CPU_DI;
+    uint8_t value = CPU_AL;
+
+    if (df) {
+        while (count--) {
+            putmem8(CPU_ES, di, value);
+            di--;
+        }
+    } else {
+        while (count--) {
+            putmem8(CPU_ES, di, value);
+            di++;
+        }
+    }
+
+    CPU_DI = di;
+}
+
+static inline void r36sx_rep_stosw(uint32_t count)
+{
+    uint16_t di = CPU_DI;
+    uint16_t value = CPU_AX;
+
+    if (df) {
+        while (count--) {
+            putmem16(CPU_ES, di, value);
+            di -= 2;
+        }
+    } else {
+        while (count--) {
+            putmem16(CPU_ES, di, value);
+            di += 2;
+        }
+    }
+
+    CPU_DI = di;
 }
 
 static const bool __not_in_flash("cpu.pf") parity[0x100] = {
@@ -3210,26 +3313,23 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                putmem8(CPU_ES, CPU_DI, getmem8(useseg, CPU_SI)
-                );
-                if (df) {
-                    CPU_SI = CPU_SI - 1;
-                    CPU_DI = CPU_DI - 1;
-                } else {
-                    CPU_SI = CPU_SI + 1;
-                    CPU_DI = CPU_DI + 1;
-                }
-
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
-                }
-
-                loopcount++;
-                if (!reptype) {
+                    uint32_t batch =
+                        (tf || was_TF)
+                            ? 1u
+                            : r36sx_rep_batch_count(CPU_CX, loopcount,
+                                                    execloops);
+                    r36sx_rep_movsb(batch);
+                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    loopcount += batch;
+                    if (CPU_CX != 0) {
+                        CPU_IP = firstip;
+                    }
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_rep_movsb(1);
+                loopcount++;
                 break;
 
             case 0xA5: /* A5 MOVSW */
@@ -3239,26 +3339,23 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                putmem16(CPU_ES, CPU_DI, getmem16(useseg, CPU_SI)
-                );
-                if (df) {
-                    CPU_SI = CPU_SI - 2;
-                    CPU_DI = CPU_DI - 2;
-                } else {
-                    CPU_SI = CPU_SI + 2;
-                    CPU_DI = CPU_DI + 2;
-                }
-
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
-                }
-
-                loopcount++;
-                if (!reptype) {
+                    uint32_t batch =
+                        (tf || was_TF)
+                            ? 1u
+                            : r36sx_rep_batch_count(CPU_CX, loopcount,
+                                                    execloops);
+                    r36sx_rep_movsw(batch);
+                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    loopcount += batch;
+                    if (CPU_CX != 0) {
+                        CPU_IP = firstip;
+                    }
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_rep_movsw(1);
+                loopcount++;
                 break;
 
             case 0xA6: /* A6 CMPSB */
@@ -3360,24 +3457,23 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                putmem8(CPU_ES, CPU_DI, CPU_AL
-                );
-                if (df) {
-                    CPU_DI = CPU_DI - 1;
-                } else {
-                    CPU_DI = CPU_DI + 1;
-                }
-
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
-                }
-
-                loopcount++;
-                if (!reptype) {
+                    uint32_t batch =
+                        (tf || was_TF)
+                            ? 1u
+                            : r36sx_rep_batch_count(CPU_CX, loopcount,
+                                                    execloops);
+                    r36sx_rep_stosb(batch);
+                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    loopcount += batch;
+                    if (CPU_CX != 0) {
+                        CPU_IP = firstip;
+                    }
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_rep_stosb(1);
+                loopcount++;
                 break;
 
             case 0xAB: /* AB STOSW */
@@ -3387,24 +3483,23 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                putmem16(CPU_ES, CPU_DI, CPU_AX
-                );
-                if (df) {
-                    CPU_DI = CPU_DI - 2;
-                } else {
-                    CPU_DI = CPU_DI + 2;
-                }
-
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
-                }
-
-                loopcount++;
-                if (!reptype) {
+                    uint32_t batch =
+                        (tf || was_TF)
+                            ? 1u
+                            : r36sx_rep_batch_count(CPU_CX, loopcount,
+                                                    execloops);
+                    r36sx_rep_stosw(batch);
+                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    loopcount += batch;
+                    if (CPU_CX != 0) {
+                        CPU_IP = firstip;
+                    }
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_rep_stosw(1);
+                loopcount++;
                 break;
 
             case 0xAC: /* AC LODSB */

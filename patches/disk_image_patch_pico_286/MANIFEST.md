@@ -30,6 +30,34 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 REP MOVS/STOS batching
+
+The current `pico_286` binary batches common REP string move/store
+instructions in the R36SX CPU core:
+
+- `REP MOVSB`
+- `REP MOVSW`
+- `REP STOSB`
+- `REP STOSW`
+
+Each decoded REP instruction can now process up to 1024 byte/word elements
+before returning to the main CPU loop, instead of re-decoding the REP prefix
+and opcode for every element.  The implementation still uses the existing
+memory handlers, so RAM, VRAM, and mapped memory behavior is preserved.  The
+Trap Flag path falls back to one element at a time.
+
+Expected effect:
+
+- faster DOS screen clears and memory copies,
+- faster installer/file-manager style workloads,
+- less CPU time spent decoding repeated string instructions.
+
+```text
+pico_286 size: 908356 bytes
+pico_286 SHA256: 19C64013150F4A659BE965DCD8D12045E00CC30F7C3639E6FBDE33FD46137DF7
+Defender scan: found no threats
+```
+
 ## 2026-05-29 ticks thread 1 ms sleep
 
 The current `pico_286` binary increases `R36SX_TICKS_THREAD_SLEEP_US` from

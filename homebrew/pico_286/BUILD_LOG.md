@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-29 REP MOVS/STOS batching
+
+Optimized the R36SX CPU core string move/store path.  `REP MOVSB`,
+`REP MOVSW`, `REP STOSB`, and `REP STOSW` now execute up to 1024 elements per
+decoded REP instruction instead of re-decoding the REP prefix and opcode for
+every byte or word.  The batched path still uses the existing `getmem*()` and
+`putmem*()` handlers, so RAM, VRAM, and mapped memory side effects keep their
+current behavior.
+
+The batching preserves direction flag movement, 16-bit `SI`/`DI` wraparound,
+and partial progress through `CX`.  If the Trap Flag path is active, batching
+falls back to one element so single-step behavior stays close to the previous
+implementation.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The `zig objcopy --strip-all` step still reports `error: unimplemented`; the
+script kept the working unstripped binary.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_088\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 908,356 bytes
+- SHA256: `19C64013150F4A659BE965DCD8D12045E00CC30F7C3639E6FBDE33FD46137DF7`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_088/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 ticks thread 1 ms sleep
 
 Increased `R36SX_TICKS_THREAD_SLEEP_US` in the R36SX Pico-286 Linux entrypoint

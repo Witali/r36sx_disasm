@@ -18,10 +18,11 @@
   `homebrew/pico_286/r36sx_port/r36sx_linux-main.cpp`.  This reduces the
   timer/audio thread wakeup rate from up to 4000/s to about 1000/s; confirm
   audio remains stable and keyboard/timer responsiveness is still good.
-- Batch common `REP MOVS/STOS` string operations in
-  `homebrew/pico_286/r36sx_port/r36sx_cpu.c`, especially RAM-to-RAM and
-  RAM-to-video copies.  Keep batches capped so timer and keyboard interrupts
-  remain responsive.
+- Hardware-test batched `REP MOVSB/MOVSW/STOSB/STOSW` in
+  `homebrew/pico_286/r36sx_port/r36sx_cpu.c`.  The implementation now batches
+  up to 1024 elements per decoded REP instruction while preserving direction
+  flag, register wraparound, memory handlers, and one-element execution when
+  Trap Flag is active.
 - Optimize disk image I/O in `homebrew/pico_286/r36sx_port/disks-win32.c.inl`.
   Read/write multiple sectors per request instead of sector-by-sector loops,
   and consider a configurable `disk_flush=immediate|deferred` policy.
