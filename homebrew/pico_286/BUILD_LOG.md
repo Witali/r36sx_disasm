@@ -624,3 +624,39 @@ Result:
 - Updated copies:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+## 2026-05-29 delayed on-screen keyboard key release
+
+Fixed the Pico-286 on-screen keyboard event timing.  The previous implementation
+sent key-down and key-up back-to-back inside one input poll, which could let the
+emulated keyboard controller overwrite the make code with the break code before
+DOS had a chance to read it.
+
+The on-screen keyboard now sends the make code immediately, keeps the key and
+any selected modifiers held for about 80 ms, and releases them on a later poll.
+The backend logs `minifb: osk key down ...` and `minifb: osk key up ...` events
+to `MIPS_NATIVE/pico_286/pico_286.log` for device debugging.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,938,128 bytes
+- SHA256: `51D01BF7DC78EC2C38E9428C7C42FDE3E0FDDAF42538D3984C8E488001B79E99`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`

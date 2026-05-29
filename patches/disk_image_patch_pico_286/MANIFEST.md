@@ -113,3 +113,16 @@ Size: 7936004 bytes
 SHA256: CB9551333236CBEDEC8A173E212459D95B055A6FABAB6BC9DEC74BC1EF3A59DA
 Defender scan: found no threats
 ```
+
+## 2026-05-29 on-screen keyboard timing fix
+
+The binary was rebuilt so the joystick-controlled on-screen keyboard sends a
+PC-style make code first, holds it for about 80 ms, then sends the break code on
+a later input poll.  This avoids losing key presses when DOS reads the emulated
+keyboard controller after the old immediate key-down/key-up pair.
+
+```text
+Size: 7938128 bytes
+SHA256: 51D01BF7DC78EC2C38E9428C7C42FDE3E0FDDAF42538D3984C8E488001B79E99
+Defender scan: found no threats
+```
