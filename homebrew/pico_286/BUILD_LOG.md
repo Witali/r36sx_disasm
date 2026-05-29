@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-29 boot order and HDD geometry config
+
+Added two BIOS-like configuration controls to `pico_286.conf`:
+
+```ini
+boot_order=fdd0,hdd0
+hdd0_geometry=65,16,63
+hdd1_geometry=65,16,63
+```
+
+Behavior:
+
+- `boot_order` accepts `fdd0`, `fdd1`, `hdd0`, and `hdd1` in comma/space
+  separated order.  `boot_order=rom` disables the R36SX boot-sector loader and
+  lets the embedded ROM BIOS boot path run.
+- The R36SX `INT 19h` hook now attaches configured disks, probes boot sectors
+  in `boot_order`, checks the `55 AA` signature, loads the selected sector to
+  `0000:7C00`, sets `DL` to the selected BIOS drive, and jumps there.
+- `hdd0_geometry` and `hdd1_geometry` accept CHS triples in
+  `cylinders,heads,sectors` order.  Values are range checked and ignored if
+  they describe a disk larger than the backing image.
+- `INT 13h AH=15` now reports total sectors from active CHS geometry rather
+  than raw file size, so geometry overrides are visible to DOS.
+
+Commands used:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,037,084 bytes
+- SHA256: `DB5654656F9C97D19557E63E38E46D8A5E4A604916C4F52092670C5698088B58`
+- Defender scan: found no threats for the rebuilt binary and both copied
+  binaries
+
 ## 2026-05-29 BIOS boot prompt mode
 
 Checked whether Pico-286 can enter an interactive BIOS setup screen at startup.

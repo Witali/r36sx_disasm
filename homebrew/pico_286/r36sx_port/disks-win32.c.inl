@@ -58,6 +58,7 @@ static inline void ejectdisk(uint8_t drivenum) {
 }
 
 uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
+    uint8_t bios_drive = drivenum;
     if (drivenum & 0x80) drivenum -= 126;  // Normalize hard drive numbers
 
     FILE *file = fopen(pathname, "rb+");
@@ -82,9 +83,33 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     uint16_t cyls = 0, heads = 0, sects = 0;
 
     if (drivenum >= 2) {  // Hard disk
-        sects = 63;
-        heads = 16;
-        cyls = size / (sects * heads * 512);
+        r36sx_pico286_chs_t configured_geometry;
+
+        if (r36sx_pico286_hdd_geometry(bios_drive, &configured_geometry)) {
+            size_t configured_size =
+                (size_t)configured_geometry.cyls *
+                (size_t)configured_geometry.heads *
+                (size_t)configured_geometry.sects * 512UL;
+            if (configured_size <= size) {
+                cyls = configured_geometry.cyls;
+                heads = configured_geometry.heads;
+                sects = configured_geometry.sects;
+                r36sx_pico286_debug_log(
+                    "disk: drive %02xh using configured CHS=%u,%u,%u",
+                    bios_drive, cyls, heads, sects);
+            } else {
+                r36sx_pico286_debug_log(
+                    "disk: drive %02xh ignores CHS=%u,%u,%u larger than image",
+                    bios_drive, configured_geometry.cyls,
+                    configured_geometry.heads, configured_geometry.sects);
+            }
+        }
+
+        if (!cyls || !heads || !sects) {
+            sects = 63;
+            heads = 16;
+            cyls = size / (sects * heads * 512);
+        }
     } else {  // Floppy disk
         cyls = 80;
         sects = 18;
@@ -407,7 +432,10 @@ static INLINE void diskhandler() {
             if (disk[drivenum].inserted) {
                 CPU_FL_CF = 0;
                 if (drivenum >= 2) {
-                    uint32_t total_sectors = (uint32_t)(disk[drivenum].filesize / 512);
+                    uint32_t total_sectors =
+                        (uint32_t)disk[drivenum].cyls *
+                        (uint32_t)disk[drivenum].heads *
+                        (uint32_t)disk[drivenum].sects;
                     CPU_AH = 0x03;  // Fixed disk.
                     CPU_CX = (uint16_t)(total_sectors >> 16);
                     CPU_DX = (uint16_t)(total_sectors & 0xFFFF);

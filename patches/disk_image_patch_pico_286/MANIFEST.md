@@ -24,6 +24,34 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 boot order and HDD geometry config
+
+`pico_286.conf` now includes:
+
+```ini
+boot_order=fdd0,hdd0
+hdd0_geometry=65,16,63
+hdd1_geometry=65,16,63
+```
+
+`boot_order` accepts `fdd0`, `fdd1`, `hdd0`, and `hdd1`; `boot_order=rom`
+keeps the embedded ROM BIOS boot path.  The R36SX `INT 19h` hook probes boot
+sectors in the configured order, checks for the `55 AA` signature, loads the
+selected sector to `0000:7C00`, and sets `DL` to the selected BIOS drive.
+
+`hdd0_geometry` and `hdd1_geometry` are CHS overrides in
+`cylinders,heads,sectors` order.  The bundled hard disk images match
+`65,16,63`.
+
+The rebuilt binary was copied into this patch and scanned with
+`tools/scan-download.ps1`; Microsoft Defender reported no threats.
+
+```text
+Size: 8037084 bytes
+SHA256: DB5654656F9C97D19557E63E38E46D8A5E4A604916C4F52092670C5698088B58
+Defender scan: found no threats
+```
+
 ## 2026-05-29 BIOS boot prompt mode
 
 `pico_286.conf` now includes:
@@ -211,10 +239,13 @@ Disk image bindings are configurable through `MIPS_NATIVE/pico_286/pico_286.conf
 ```ini
 cpu_mhz=32.768
 boot_mode=normal
+boot_order=fdd0,hdd0
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
+hdd0_geometry=65,16,63
 hdd1=hdd2.img
+hdd1_geometry=65,16,63
 ```
 
 `cpu_mhz` controls the R36SX execution quantum passed to `exec86()`;
@@ -227,10 +258,18 @@ boots DOS.  `boot_mode=bios_prompt` leaves disks detached at `INT 19h`, so the
 embedded Turbo XT BIOS stops at its boot prompt.  The ROM does not include a
 full interactive CMOS/BIOS setup utility.
 
+`boot_order` selects the boot sector probe order used by the R36SX `INT 19h`
+hook.  Supported names are `fdd0`, `fdd1`, `hdd0`, and `hdd1`; use
+`boot_order=rom` to chain to the embedded ROM BIOS boot path instead.
+
 These map to BIOS drives `00h`, `01h`, `80h`, and `81h` respectively.  Paths
 are relative to the Pico-286 directory unless absolute paths are used.  Empty
 values disable a drive, and a missing config file falls back to the same four
 default filenames.
+
+`hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
+`cylinders,heads,sectors` order.  The bundled hard disk images are
+33,546,240 bytes, matching `65,16,63`.
 
 ## 2026-05-29 rebuild
 

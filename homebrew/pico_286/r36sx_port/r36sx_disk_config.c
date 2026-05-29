@@ -30,6 +30,11 @@ static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
+static uint8_t boot_order[4] = { 0, 128, 0, 0 };
+static uint8_t boot_order_count = 0;
+static int boot_order_configured = 0;
+static r36sx_pico286_chs_t hdd_geometries[2];
+static int hdd_geometry_configured[2] = { 0, 0 };
 
 static char *trim_space(char *text)
 {
@@ -94,6 +99,54 @@ static r36sx_pico286_disk_entry_t *find_disk_entry(const char *key)
     }
 
     return NULL;
+}
+
+static int drive_token_to_bios_drive(const char *token, uint8_t *bios_drive)
+{
+    if (key_equals(token, "fdd0") || key_equals(token, "a") ||
+        key_equals(token, "a:") || key_equals(token, "0") ||
+        key_equals(token, "00h") || key_equals(token, "0x00")) {
+        *bios_drive = 0;
+        return 1;
+    }
+    if (key_equals(token, "fdd1") || key_equals(token, "b") ||
+        key_equals(token, "b:") || key_equals(token, "1") ||
+        key_equals(token, "01h") || key_equals(token, "0x01")) {
+        *bios_drive = 1;
+        return 1;
+    }
+    if (key_equals(token, "hdd0") || key_equals(token, "c") ||
+        key_equals(token, "c:") || key_equals(token, "80h") ||
+        key_equals(token, "0x80") || key_equals(token, "drive80h")) {
+        *bios_drive = 128;
+        return 1;
+    }
+    if (key_equals(token, "hdd1") || key_equals(token, "d") ||
+        key_equals(token, "d:") || key_equals(token, "81h") ||
+        key_equals(token, "0x81") || key_equals(token, "drive81h")) {
+        *bios_drive = 129;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int geometry_key_to_index(const char *key, int *index)
+{
+    if (key_equals(key, "hdd0_geometry") ||
+        key_equals(key, "drive80h_geometry") ||
+        key_equals(key, "0x80_geometry")) {
+        *index = 0;
+        return 1;
+    }
+    if (key_equals(key, "hdd1_geometry") ||
+        key_equals(key, "drive81h_geometry") ||
+        key_equals(key, "0x81_geometry")) {
+        *index = 1;
+        return 1;
+    }
+
+    return 0;
 }
 
 static int is_absolute_path(const char *path)
@@ -177,9 +230,131 @@ static int set_boot_mode(const char *value, int line_no)
     return 0;
 }
 
+static int set_boot_order(char *value, int line_no)
+{
+    uint8_t parsed[4] = { 0, 0, 0, 0 };
+    uint8_t count = 0;
+    char *token = value;
+
+    if (key_equals(value, "rom") || key_equals(value, "bios")) {
+        boot_order_count = 0;
+        boot_order_configured = 1;
+        r36sx_pico286_debug_log("diskcfg: boot_order=rom");
+        return 1;
+    }
+
+    while (*token) {
+        char *end;
+        uint8_t drive;
+
+        while (*token == ',' || *token == ';' ||
+               isspace((unsigned char)*token)) {
+            token++;
+        }
+        if (!*token) {
+            break;
+        }
+
+        end = token;
+        while (*end && *end != ',' && *end != ';' &&
+               !isspace((unsigned char)*end)) {
+            end++;
+        }
+        if (*end) {
+            *end++ = '\0';
+        }
+
+        if (count >= sizeof(parsed) ||
+            !drive_token_to_bios_drive(token, &drive)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid boot_order '%s' at line %d",
+                value, line_no);
+            return 0;
+        }
+
+        parsed[count++] = drive;
+        token = end;
+    }
+
+    if (count == 0) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring empty boot_order at line %d", line_no);
+        return 0;
+    }
+
+    memcpy(boot_order, parsed, count);
+    boot_order_count = count;
+    boot_order_configured = 1;
+    r36sx_pico286_debug_log(
+        "diskcfg: boot_order count=%u first=0x%02x",
+        (unsigned int)boot_order_count, boot_order[0]);
+    return 1;
+}
+
+static int set_hdd_geometry(const char *key, const char *value, int line_no)
+{
+    const char *cursor = value;
+    unsigned long parsed[3];
+    r36sx_pico286_chs_t geometry;
+    int index;
+
+    if (!geometry_key_to_index(key, &index)) {
+        return 0;
+    }
+
+    for (int i = 0; i < 3; i++) {
+        char *end = NULL;
+
+        while (*cursor == ',' || *cursor == ';' || *cursor == ':' ||
+               *cursor == '/' || *cursor == 'x' || *cursor == 'X' ||
+               isspace((unsigned char)*cursor)) {
+            cursor++;
+        }
+        if (!isdigit((unsigned char)*cursor)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        parsed[i] = strtoul(cursor, &end, 10);
+        cursor = end;
+    }
+
+    while (*cursor && isspace((unsigned char)*cursor)) {
+        cursor++;
+    }
+    if (*cursor) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    if (parsed[0] < 1 || parsed[0] > 1023 ||
+        parsed[1] < 1 || parsed[1] > 255 ||
+        parsed[2] < 1 || parsed[2] > 63) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring out-of-range %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    geometry.cyls = (uint16_t)parsed[0];
+    geometry.heads = (uint16_t)parsed[1];
+    geometry.sects = (uint16_t)parsed[2];
+    hdd_geometries[index] = geometry;
+    hdd_geometry_configured[index] = 1;
+    r36sx_pico286_debug_log("diskcfg: %s=%u,%u,%u",
+                            key, geometry.cyls, geometry.heads,
+                            geometry.sects);
+    return 1;
+}
+
 static int set_config_value(const char *key, const char *value, int line_no)
 {
     r36sx_pico286_disk_entry_t *entry = find_disk_entry(key);
+    char mutable_value[384];
 
     if (key_equals(key, "cpu_mhz") ||
         key_equals(key, "cpu_frequency_mhz")) {
@@ -187,6 +362,13 @@ static int set_config_value(const char *key, const char *value, int line_no)
     }
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
+    }
+    if (key_equals(key, "boot_order")) {
+        snprintf(mutable_value, sizeof(mutable_value), "%s", value);
+        return set_boot_order(mutable_value, line_no);
+    }
+    if (set_hdd_geometry(key, value, line_no)) {
+        return 1;
     }
 
     if (!entry) {
@@ -287,4 +469,48 @@ int r36sx_pico286_boot_bios_prompt(void)
     load_disk_config();
 
     return boot_bios_prompt;
+}
+
+uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives)
+{
+    uint8_t count;
+
+    load_disk_config();
+
+    if (!boot_order_configured) {
+        static const uint8_t default_order[] = { 0, 128 };
+        count = max_drives < sizeof(default_order) ?
+                max_drives : (uint8_t)sizeof(default_order);
+        memcpy(drives, default_order, count);
+        return count;
+    }
+
+    count = max_drives < boot_order_count ? max_drives : boot_order_count;
+    if (count) {
+        memcpy(drives, boot_order, count);
+    }
+    return count;
+}
+
+int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
+                               r36sx_pico286_chs_t *geometry)
+{
+    int index;
+
+    load_disk_config();
+
+    if (bios_drive == 128) {
+        index = 0;
+    } else if (bios_drive == 129) {
+        index = 1;
+    } else {
+        return 0;
+    }
+
+    if (!hdd_geometry_configured[index]) {
+        return 0;
+    }
+
+    *geometry = hdd_geometries[index];
+    return 1;
 }

@@ -124,10 +124,13 @@ devices:
 ```ini
 cpu_mhz=32.768
 boot_mode=normal
+boot_order=fdd0,hdd0
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
+hdd0_geometry=65,16,63
 hdd1=hdd2.img
+hdd1_geometry=65,16,63
 ```
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
@@ -140,6 +143,10 @@ boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,
 which lets the embedded Turbo XT BIOS stop at its boot prompt.  The ROM does
 not contain a full interactive CMOS/BIOS setup utility.
 
+`boot_order` selects the boot sector probe order used by the R36SX `INT 19h`
+hook.  Supported drive names are `fdd0`, `fdd1`, `hdd0`, and `hdd1`; use
+`boot_order=rom` to chain to the embedded ROM BIOS boot path instead.
+
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
 `80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286
 directory unless absolute paths are used.  Leaving a value empty disables that
@@ -148,6 +155,10 @@ used from the legacy internal fallback (`fdd0.img`, `fdd1.img`, `hdd.img`,
 `hdd2.img`).  A compatibility `FreeDOS3.img` can also be placed there for
 older test builds that tried to attach a third floppy image.  The upstream network
 redirector still maps DOS drive H: to `/tmp/`.
+
+`hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
+`cylinders,heads,sectors` order.  The current bundled hard disk images are
+33,546,240 bytes, which matches `65,16,63`.
 
 The local test image set uses official FreeDOS 1.4 Floppy Edition images plus
 a separate Sopwith game floppy:

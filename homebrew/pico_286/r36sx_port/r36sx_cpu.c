@@ -16,9 +16,9 @@
 #include "swap.h"
 #else
 
+#include "r36sx_disk_config.h"
 #include "disks-win32.c.inl"
 #include "network-redirector.c.inl"
-#include "r36sx_disk_config.h"
 
 #endif
 
@@ -676,6 +676,84 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
     }
     r36sx_bios_set_cursor(page, col, row);
 }
+
+#if !PICO_ON_DEVICE
+static uint8_t r36sx_bios_drive_to_slot(uint8_t bios_drive)
+{
+    return (bios_drive & 0x80) ? (uint8_t)(bios_drive - 126u) : bios_drive;
+}
+
+static void r36sx_bios_attach_configured_disks(void)
+{
+    const char *fdd0_path = r36sx_pico286_disk_path(0, "fdd0.img");
+    const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
+    const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
+    const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
+    uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
+    uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
+    uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
+    uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
+
+    r36sx_pico286_debug_log(
+        "cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",
+        fdd0_ok, fdd0_path[0] ? fdd0_path : "<disabled>",
+        fdd1_ok, fdd1_path[0] ? fdd1_path : "<disabled>",
+        hdd0_ok, hdd0_path[0] ? hdd0_path : "<disabled>",
+        hdd1_ok, hdd1_path[0] ? hdd1_path : "<disabled>");
+}
+
+static int r36sx_bios_try_boot_drive(uint8_t bios_drive)
+{
+    uint8_t slot = r36sx_bios_drive_to_slot(bios_drive);
+    uint8_t boot_sector[512];
+
+    if (slot >= 4 || !disk[slot].inserted || !disk[slot].diskfile) {
+        r36sx_pico286_debug_log(
+            "cpu: boot_order skip drive 0x%02x not inserted", bios_drive);
+        return 0;
+    }
+
+    if (fseek(disk[slot].diskfile, 0, SEEK_SET) != 0 ||
+        fread(boot_sector, 512, 1, disk[slot].diskfile) != 1) {
+        r36sx_pico286_debug_log(
+            "cpu: boot_order failed reading drive 0x%02x", bios_drive);
+        return 0;
+    }
+
+    if (boot_sector[510] != 0x55 || boot_sector[511] != 0xaa) {
+        r36sx_pico286_debug_log(
+            "cpu: boot_order drive 0x%02x has no boot signature", bios_drive);
+        return 0;
+    }
+
+    for (uint16_t i = 0; i < sizeof(boot_sector); i++) {
+        write86(0x7c00u + i, boot_sector[i]);
+    }
+
+    CPU_CS = 0x0000;
+    CPU_IP = 0x7c00;
+    CPU_DL = bios_drive;
+    CPU_FL_CF = 0;
+    r36sx_pico286_debug_log(
+        "cpu: boot_order booting drive 0x%02x at 0000:7c00", bios_drive);
+    return 1;
+}
+
+static int r36sx_bios_boot_configured_order(void)
+{
+    uint8_t order[4];
+    uint8_t count = r36sx_pico286_boot_order(order, (uint8_t)sizeof(order));
+
+    for (uint8_t i = 0; i < count; i++) {
+        if (r36sx_bios_try_boot_drive(order[i])) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+#endif
+
 void intcall86(uint8_t intnum) {
     switch (intnum) {
         case 0x10: {
@@ -942,19 +1020,7 @@ void intcall86(uint8_t intnum) {
                     r36sx_pico286_debug_log(
                         "cpu: int19 boot_mode=bios_prompt; disks left detached");
                 } else {
-                    const char *fdd0_path = r36sx_pico286_disk_path(0, "fdd0.img");
-                    const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
-                    const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
-                    const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
-                    uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
-                    uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
-                    uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
-                    uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
-                    r36sx_pico286_debug_log("cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",
-                                            fdd0_ok, fdd0_path[0] ? fdd0_path : "<disabled>",
-                                            fdd1_ok, fdd1_path[0] ? fdd1_path : "<disabled>",
-                                            hdd0_ok, hdd0_path[0] ? hdd0_path : "<disabled>",
-                                            hdd1_ok, hdd1_path[0] ? hdd1_path : "<disabled>");
+                    r36sx_bios_attach_configured_disks();
                 }
             }
 #endif
@@ -978,6 +1044,12 @@ void intcall86(uint8_t intnum) {
                 writew86(0x46C, t->tm_min * 1092 + t->tm_sec * 18); // minute + second
 #endif
             }
+#if !PICO_ON_DEVICE
+            if (!r36sx_pico286_boot_bios_prompt() &&
+                r36sx_bios_boot_configured_order()) {
+                return;
+            }
+#endif
             break;
         case 0x1A: /* Timer I/O RTC */
             switch (CPU_AH) {
