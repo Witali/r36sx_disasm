@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-05-29 EGA mode 0Fh monochrome renderer
+
+Added renderer support for BIOS video mode `0Fh`, the standard EGA/VGA
+640x350 monochrome graphics mode.  The port now draws it as a 640x350 active
+image.  Because Pico-286 stores EGA/VGA memory as packed plane bytes in each
+`VIDEORAM` word, the mono renderer treats a pixel as foreground if the bit is
+set in any available plane; this keeps output visible for software that writes
+through different EGA plane configurations.
+
+`r36sx_pico286_video_active_height()` now reports 350 rows for mode `0Fh`, so
+the on-screen keyboard compression uses the correct active DOS image height.
+
+Reference notes:
+
+- HelpPC lists `0Fh` as 640x350 monochrome graphics for EGA/VGA.
+- PCjs / Norton Programmer's Guide likewise lists `0Fh` as 640x350 mono.
+
+Commands run:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still reports `error: unimplemented`, so the build
+keeps the unstripped executable.
+
+Output binary:
+
+- Path: `homebrew/pico_286/pico_286`
+- Size: `896284` bytes
+- SHA256: `C9280E6B8A3F8838D2C050AAE91C04D39E1784BFFBAE2DAAAC403088E7038600`
+- Defender scan: found no threats
+
 ## 2026-05-29 MDA mode 07h text renderer
 
 Fixed BIOS video mode `07h`.  It previously fell through into the Hercules

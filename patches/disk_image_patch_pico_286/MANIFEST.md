@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 EGA mode 0Fh monochrome renderer
+
+The current `pico_286` binary adds BIOS video mode `0Fh`, the standard
+EGA/VGA 640x350 monochrome graphics mode.  The renderer treats a pixel as
+foreground if the corresponding bit is set in any packed EGA/VGA plane, which
+keeps monochrome output visible across different plane-write paths.
+
+```text
+pico_286 size: 896284 bytes
+pico_286 SHA256: C9280E6B8A3F8838D2C050AAE91C04D39E1784BFFBAE2DAAAC403088E7038600
+Defender scan: found no threats
+```
+
 ## 2026-05-29 MDA mode 07h text renderer
 
 The current `pico_286` binary fixes BIOS video mode `07h`.  It now renders as

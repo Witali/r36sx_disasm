@@ -36,6 +36,7 @@ extern "C" int r36sx_pico286_video_active_height(void) {
      */
     switch (videomode) {
         case 0x07:
+        case 0x0f:
         case 0x10:
             return 350;
         case 0x1e:
@@ -109,6 +110,13 @@ static inline uint32_t mda_text_color(uint8_t attr, int is_foreground)
         fg = bg;
     }
     return is_foreground ? fg : bg;
+}
+
+static inline uint32_t ega_mono_pixel(uint32_t plane_bits, int bit)
+{
+    uint32_t mask = (1u << bit) | (1u << (bit + 8)) |
+                    (1u << (bit + 16)) | (1u << (bit + 24));
+    return (plane_bits & mask) ? 0xffffff : 0x000000;
 }
 
 
@@ -420,6 +428,20 @@ static inline void renderer() {
                                                 | (((plane2 >> bit) & 1) << 2)
                                                 | (((plane3 >> bit) & 1) << 3);
                             *pixels++ = vga_palette[color_index];
+                        }
+                    }
+                    break;
+                }
+                case 0x0F: /* EGA 640x350 monochrome */ {
+                    if (y >= 350) {
+                        fill_black_row(pixels);
+                        break;
+                    }
+                    uint32_t* vram_ptr = &VIDEORAM[y * (640 / 8)];
+                    for (int i = 0; i < (640 / 8); ++i) {
+                        uint32_t eight_pixels = vram_ptr[i];
+                        for (int bit = 7; bit >= 0; --bit) {
+                            *pixels++ = ega_mono_pixel(eight_pixels, bit);
                         }
                     }
                     break;
