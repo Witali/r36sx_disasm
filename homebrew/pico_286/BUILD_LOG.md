@@ -200,6 +200,68 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 key preset editor
+
+Added `keypresets.conf` and a full-screen key preset editor to the Pico-286
+MiniFB backend.  While DOS is running and the on-screen keyboard is hidden,
+Select opens or closes the editor.  D-pad chooses a row, Left/Right or A/Start
+changes a binding, B cycles backward, Y clears a binding, and the `ADD NEW
+PRESET` row creates a copy of the active preset with an automatic name.
+
+The default preset matches the previous direct mapping:
+
+```ini
+active=Default
+
+[preset Default]
+up=UP
+down=DOWN
+left=LEFT
+right=RIGHT
+a=ENTER
+b=ESC
+y=CTRL
+x=SPACE
+start=ENTER
+l=ALT
+l2=F1
+r=SHIFT
+r2=F2
+```
+
+Build command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Copy commands:
+
+```powershell
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,005,860 bytes
+- SHA256: `583587D4DFA6A0CD7D817370DBA8CDB4397957513818F6D454C30D9DC1F56BC5`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/keypresets.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/keypresets.conf`
+
 ## 2026-05-29 keyboard FIFO size reduction
 
 Reduced the emulated keyboard controller FIFO from 32 scancode bytes to 8.

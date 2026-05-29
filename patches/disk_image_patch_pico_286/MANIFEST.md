@@ -6,6 +6,7 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 
 - `MIPS_NATIVE/pico_286/pico_286`
 - `MIPS_NATIVE/pico_286/pico_286.conf`
+- `MIPS_NATIVE/pico_286/keypresets.conf`
 - `MIPS_NATIVE/pico_286/fdd0.img`
 - `MIPS_NATIVE/pico_286/fdd1.img`
 - `MIPS_NATIVE/pico_286/fdd2.img`
@@ -31,6 +32,37 @@ Optional PC disk images should be placed in the same directory:
 - `MIPS_NATIVE/pico_286/hdd2.img`
 - `MIPS_NATIVE/pico_286/fdd2.img` for older test builds that request a third
   floppy image
+
+Button presets are stored in:
+
+- `MIPS_NATIVE/pico_286/keypresets.conf`
+
+The default preset matches the original direct DOS mapping:
+
+```ini
+active=Default
+
+[preset Default]
+up=UP
+down=DOWN
+left=LEFT
+right=RIGHT
+a=ENTER
+b=ESC
+y=CTRL
+x=SPACE
+start=ENTER
+l=ALT
+l2=F1
+r=SHIFT
+r2=F2
+```
+
+When DOS is running and the on-screen keyboard is hidden, Select opens or
+closes the full-screen preset editor.  D-pad chooses a row, Left/Right or
+A/Start changes a binding, B cycles backward, Y clears a binding, and the
+`ADD NEW PRESET` row creates a copy of the active preset with an automatic
+name such as `Preset 2`.
 
 The included image set is based on official FreeDOS 1.4 Floppy Edition:
 
@@ -84,9 +116,11 @@ to the log as `screen_text:*` entries.
 Device testing confirmed that this patch set boots DOS successfully from the
 included FreeDOS `fdd0.img` floppy image.
 
-The current binary includes a joystick-controlled on-screen keyboard:
+The current binary includes a joystick-controlled on-screen keyboard and a key
+preset editor:
 
 - Fn toggles the keyboard.
+- Select opens the key preset editor when the keyboard is hidden.
 - D-pad moves the highlighted key.
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
@@ -244,5 +278,19 @@ Escape immediately.  Shift remains available through the on-screen `SHF` key.
 ```text
 Size: 7965676 bytes
 SHA256: 91D85743E2A32C304407E8BFA1B1D92F732C2FA024F6E73CD4F9DE82C4B66048
+Defender scan: found no threats
+```
+
+## 2026-05-29 key preset editor
+
+Added `MIPS_NATIVE/pico_286/keypresets.conf` and rebuilt Pico-286 with a
+full-screen key preset editor.  Select opens or closes it while DOS is running
+and the on-screen keyboard is hidden.  The editor can switch presets, copy the
+active preset into a new automatically named preset, and assign each game
+button to a supported keyboard key.
+
+```text
+Size: 8005860 bytes
+SHA256: 583587D4DFA6A0CD7D817370DBA8CDB4397957513818F6D454C30D9DC1F56BC5
 Defender scan: found no threats
 ```

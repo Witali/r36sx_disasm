@@ -21,6 +21,7 @@
 #include "MiniFB.h"
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
+#include "r36sx_key_presets.h"
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_PICO286_FRAME_USEC 16666u
@@ -52,12 +53,8 @@ struct r36sx_mfb_driver {
     uint64_t last_present_us;
     uint32_t last_raw_keys;
     struct r36sx_screen_keyboard osk;
+    struct r36sx_key_presets key_presets;
     uint8_t input_release_guard;
-};
-
-struct r36sx_key_map {
-    uint32_t raw_mask;
-    uint8_t keycode;
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -182,6 +179,37 @@ static void r36sx_osk_draw(void)
                                g_mfb.height, g_mfb.width);
 }
 
+static void r36sx_presets_set_visible(int visible)
+{
+    int old_visible = r36sx_key_presets_is_visible(&g_mfb.key_presets);
+    visible = visible != 0;
+    if (old_visible == visible) {
+        return;
+    }
+    r36sx_mfb_release_all_keys();
+    r36sx_key_presets_set_visible(&g_mfb.key_presets, visible);
+    g_mfb.input_release_guard = 1;
+    r36sx_pico286_debug_log("minifb: key presets %s",
+                            visible ? "open" : "close");
+}
+
+static void r36sx_presets_handle_buttons(uint32_t pressed)
+{
+    uint32_t result = r36sx_key_presets_handle_buttons(&g_mfb.key_presets,
+                                                       pressed);
+    if ((result & R36SX_KEY_PRESET_RESULT_CLOSED) != 0) {
+        r36sx_mfb_release_all_keys();
+        g_mfb.input_release_guard = 1;
+        r36sx_pico286_debug_log("minifb: key presets close");
+    }
+}
+
+static void r36sx_presets_draw(void)
+{
+    r36sx_key_presets_draw(&g_mfb.key_presets, g_mfb.frame, g_mfb.width,
+                           g_mfb.height, g_mfb.width);
+}
+
 static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
 {
     int cx;
@@ -298,21 +326,20 @@ static uint32_t r36sx_mfb_read_raw_keys(void)
 
 static int r36sx_mfb_poll_input(void)
 {
-    static const struct r36sx_key_map keys[] = {
-        { R36SX_RKGAME_KEY_LEFT, 37 },
-        { R36SX_RKGAME_KEY_UP, 38 },
-        { R36SX_RKGAME_KEY_RIGHT, 39 },
-        { R36SX_RKGAME_KEY_DOWN, 40 },
-        { R36SX_RKGAME_KEY_A, 13 },
-        { R36SX_RKGAME_KEY_B, 27 },
-        { R36SX_RKGAME_KEY_X, 32 },
-        { R36SX_RKGAME_KEY_Y, 17 },
-        { R36SX_RKGAME_KEY_L, 18 },
-        { R36SX_RKGAME_KEY_R, 16 },
-        { R36SX_RKGAME_KEY_L2, 112 },
-        { R36SX_RKGAME_KEY_R2, 113 },
-        { R36SX_RKGAME_KEY_START, 13 },
-        { R36SX_RKGAME_KEY_SELECT, 27 }
+    static const uint32_t preset_masks[] = {
+        R36SX_RKGAME_KEY_UP,
+        R36SX_RKGAME_KEY_DOWN,
+        R36SX_RKGAME_KEY_LEFT,
+        R36SX_RKGAME_KEY_RIGHT,
+        R36SX_RKGAME_KEY_A,
+        R36SX_RKGAME_KEY_B,
+        R36SX_RKGAME_KEY_Y,
+        R36SX_RKGAME_KEY_X,
+        R36SX_RKGAME_KEY_START,
+        R36SX_RKGAME_KEY_L,
+        R36SX_RKGAME_KEY_L2,
+        R36SX_RKGAME_KEY_R,
+        R36SX_RKGAME_KEY_R2
     };
     uint8_t new_down[256];
     uint32_t raw = r36sx_mfb_read_raw_keys();
@@ -336,6 +363,12 @@ static int r36sx_mfb_poll_input(void)
         return 0;
     }
 
+    if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
+        r36sx_presets_handle_buttons(pressed);
+        g_mfb.last_raw_keys = raw;
+        return 0;
+    }
+
     if ((pressed & R36SX_RKGAME_KEY_FN) != 0) {
         r36sx_osk_set_visible(!r36sx_screen_keyboard_is_visible(&g_mfb.osk));
         g_mfb.last_raw_keys = raw;
@@ -348,10 +381,21 @@ static int r36sx_mfb_poll_input(void)
         return 0;
     }
 
+    if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
+        r36sx_presets_set_visible(1);
+        g_mfb.last_raw_keys = raw;
+        return 0;
+    }
+
     memset(new_down, 0, sizeof(new_down));
-    for (size_t i = 0; i < R36SX_PICO286_ARRAY_COUNT(keys); i++) {
-        if ((raw & keys[i].raw_mask) != 0) {
-            new_down[keys[i].keycode] = 1;
+    for (size_t i = 0; i < R36SX_PICO286_ARRAY_COUNT(preset_masks); i++) {
+        if ((raw & preset_masks[i]) != 0) {
+            uint16_t keycode =
+                r36sx_key_presets_key_for_mask(&g_mfb.key_presets,
+                                                preset_masks[i]);
+            if (keycode > 0 && keycode < sizeof(new_down)) {
+                new_down[keycode] = 1;
+            }
         }
     }
 
@@ -382,6 +426,7 @@ int mfb_open(const char *name, int width, int height, int scale)
 
     memset(&g_mfb, 0, sizeof(g_mfb));
     r36sx_screen_keyboard_init(&g_mfb.osk);
+    r36sx_key_presets_load(&g_mfb.key_presets);
     g_mfb.width = width;
     g_mfb.height = height;
     g_mfb.stride = width * R36SX_RGB565_BYTES_PER_PIXEL;
@@ -542,7 +587,11 @@ int mfb_update(void *buffer, int fps_limit)
                             r36sx_mfb_rgb565(0, 0, 0));
     }
     r36sx_mfb_draw_disk_led((uint32_t)(now / 1000ull));
-    r36sx_osk_draw();
+    if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
+        r36sx_presets_draw();
+    } else {
+        r36sx_osk_draw();
+    }
     g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     g_mfb.last_present_us = now;
     return 0;

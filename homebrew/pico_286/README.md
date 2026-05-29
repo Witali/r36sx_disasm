@@ -56,18 +56,47 @@ directory is only for compiler output:
   before clamping to the emulator's `int16_t` stereo buffer, avoiding the
   upstream host cast from `int16_t *` to `int32_t *` on MIPS.
 
-Input mapping for the first build:
+Default input mapping:
 
 - D-pad: PC cursor keys.
 - A or Start: Enter.
-- B or Select: Escape.
+- B: Escape.
 - X: Space.
 - Y: Ctrl.
 - L: Alt.
 - R: Shift.
 - L2/R2: F1/F2.
 - Fn: toggle the on-screen keyboard.
+- Select: toggle the key preset editor when the on-screen keyboard is hidden.
 - Select+Start: exit back to TinyMC.
+
+The default game/input mapping is stored in `keypresets.conf` next to the
+executable:
+
+```ini
+active=Default
+
+[preset Default]
+up=UP
+down=DOWN
+left=LEFT
+right=RIGHT
+a=ENTER
+b=ESC
+y=CTRL
+x=SPACE
+start=ENTER
+l=ALT
+l2=F1
+r=SHIFT
+r2=F2
+```
+
+While DOS is running and the on-screen keyboard is hidden, pressing Select
+opens the full-screen preset editor.  D-pad moves between rows, Left/Right or
+A/Start changes a binding, B moves backward through key choices, Y clears a
+binding, and the `ADD NEW PRESET` row creates a new preset by copying the
+current one.
 
 On-screen keyboard controls:
 
