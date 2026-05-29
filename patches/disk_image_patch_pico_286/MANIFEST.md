@@ -30,6 +30,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 MDA mode 07h text renderer
+
+The current `pico_286` binary fixes BIOS video mode `07h`.  It now renders as
+MDA-compatible 80x25 monochrome text instead of falling through to the Hercules
+bitplane graphics renderer.  The real MDA layout is 720 pixels wide with
+9-pixel character cells; this build uses 8x14 cells so 80 columns fit exactly
+into the 640-pixel R36SX framebuffer.
+
+The BIOS text helper also uses the MDA `B000:` text memory base while mode
+`07h` is active.
+
+```text
+pico_286 size: 894948 bytes
+pico_286 SHA256: 230E13863C3760CF975602A5AA774B8269F48E85F81D1E4FD8C32EA2E5A2DD19
+Defender scan: found no threats
+```
+
 ## 2026-05-29 active-height keyboard compression
 
 The current `pico_286` binary compresses only the active DOS video area when

@@ -44,7 +44,9 @@ directory is only for compiler output:
   `0x20` and `0x30` are aliased to the normal 80x25 text renderer and scaled
   into the 640x480 output.  Normal 40/80-column text modes now read from the
   same logical `VIDEORAM` cell layout used by the emulator and the upstream
-  Win32 renderer.
+  Win32 renderer.  BIOS mode `0x07` renders as MDA-compatible 80x25
+  monochrome text using 8x14 cells, squeezed horizontally from the real
+  720-pixel MDA layout to the console's 640-pixel framebuffer.
 - `r36sx_cpu.c` changes the host disk image paths from upstream defaults to
   the R36SX disk config loaded by `r36sx_disk_config.c`.  It also adds missing
   text-mode BIOS `INT 10h` services used by BIOS/DOS boot screens: cursor

@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-05-29 MDA mode 07h text renderer
+
+Fixed BIOS video mode `07h`.  It previously fell through into the Hercules
+bitplane graphics renderer and did not behave like MDA-compatible 80x25
+monochrome text.  The renderer now draws mode `07h` as 80 columns by 25 rows
+with 8x14 cells, producing a 640x350 active image.  This intentionally drops
+the ninth MDA character pixel so the 720-pixel-wide text layout fits the R36SX
+640-pixel framebuffer without horizontal scaling.
+
+The BIOS text helper now also switches its text memory base to the MDA
+`B000:` region for mode `07h`; other text modes keep the CGA-compatible
+`B800:` base.
+
+Commands run:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still reports `error: unimplemented`, so the build
+keeps the unstripped executable.
+
+Output binary:
+
+- Path: `homebrew/pico_286/pico_286`
+- Size: `894948` bytes
+- SHA256: `230E13863C3760CF975602A5AA774B8269F48E85F81D1E4FD8C32EA2E5A2DD19`
+- Defender scan: found no threats
+
 ## 2026-05-29 clean object directory before build
 
 Updated `build_pico_286.ps1` so every Pico-286 build starts from a clean

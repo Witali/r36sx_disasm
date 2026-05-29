@@ -35,6 +35,7 @@ extern "C" int r36sx_pico286_video_active_height(void) {
      * first 400 rows of the 640x480 buffer, with the rest kept black.
      */
     switch (videomode) {
+        case 0x07:
         case 0x10:
             return 350;
         case 0x1e:
@@ -86,6 +87,28 @@ extern "C" void _putchar(char character) {
         x--;
         *vidramptr = 0;
     }
+}
+
+static inline void fill_black_row(uint32_t *pixels)
+{
+    for (int x = 0; x < 640; x++) {
+        *pixels++ = 0;
+    }
+}
+
+static inline uint32_t mda_text_color(uint8_t attr, int is_foreground)
+{
+    uint32_t fg = (attr & 0x08) ? 0xffffff : 0xc4c4c4;
+    uint32_t bg = 0x000000;
+
+    if ((attr & 0x70) != 0) {
+        bg = fg;
+        fg = 0x000000;
+    }
+    if ((attr & 0x80) && !cursor_blink_state) {
+        fg = bg;
+    }
+    return is_foreground ? fg : bg;
 }
 
 
@@ -238,11 +261,13 @@ static inline void renderer() {
 
                     break;
                 }
-                case 0x1e:
+                case 0x1e: {
                     cols = 90;
                     vram_offset = 5;
-                    if (y >= 348) break;
-                case 0x7: {
+                    if (y >= 348) {
+                        fill_black_row(pixels);
+                        break;
+                    }
                     uint8_t *cga_row = (uint8_t *)VIDEORAM + vram_offset + (y & 3) * 8192 + y / 4 * cols;
                     // Each byte containing 8 pixels
                     for (int x = 640 / 8; x--;) {
@@ -256,6 +281,46 @@ static inline void renderer() {
                         *pixels++ = cga_palette[(cga_byte >> 2 & 1) * 15];
                         *pixels++ = cga_palette[(cga_byte >> 1 & 1) * 15];
                         *pixels++ = cga_palette[(cga_byte >> 0 & 1) * 15];
+                    }
+
+                    break;
+                }
+                case 0x7: {
+                    if (y >= 350) {
+                        fill_black_row(pixels);
+                        break;
+                    }
+
+                    uint8_t glyph_line = (uint8_t)(y % 14);
+                    uint8_t font_line = glyph_line + 1;
+                    uint16_t text_row_index = (uint16_t)(y / 14);
+                    uint32_t *text_row = &VIDEORAM[((vram_offset & 0xffff) << 1) +
+                                                   text_row_index * 160];
+
+                    for (uint8_t column = 0; column < 80; column++) {
+                        uint8_t charcode =
+                            (uint8_t)(text_row[column * 2] & 0xffu);
+                        uint8_t attr =
+                            (uint8_t)(text_row[column * 2 + 1] & 0xffu);
+                        uint8_t glyph_row =
+                            font_8x16[charcode * 16 + font_line];
+                        uint8_t cursor_active =
+                            cursor_blink_state && text_row_index == CURSOR_Y &&
+                            column == CURSOR_X &&
+                            glyph_line >= cursor_start &&
+                            glyph_line <= cursor_end;
+
+                        if ((attr & 0x07) == 0x01 && glyph_line == 13) {
+                            glyph_row = 0xff;
+                        }
+
+                        for (int bit = 0; bit < 8; bit++) {
+                            int draw_pixel = (glyph_row >> bit) & 1;
+                            if (cursor_active) {
+                                draw_pixel = !draw_pixel;
+                            }
+                            *pixels++ = mda_text_color(attr, draw_pixel);
+                        }
                     }
 
                     break;
@@ -496,9 +561,7 @@ static inline void renderer() {
                     break;
             }
         else {
-            for (int x = 0; x < 640; x++) {
-                *pixels++ = 0;
-            }
+            fill_black_row(pixels);
         }
     }
 }

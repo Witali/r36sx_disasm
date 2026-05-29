@@ -484,6 +484,11 @@ static uint8_t r36sx_bios_active_page(void)
     return FIRST_RAM_PAGE[0x462] & 7u;
 }
 
+static uint32_t r36sx_bios_text_base(void)
+{
+    return videomode == 0x07 ? 0x0000u : R36SX_BIOS_TEXT_BASE;
+}
+
 static uint8_t r36sx_bios_text_cols(void)
 {
     uint8_t cols = FIRST_RAM_PAGE[0x44A];
@@ -529,7 +534,7 @@ static void r36sx_bios_set_cursor(uint8_t page, uint8_t col, uint8_t row)
 static uint32_t r36sx_bios_text_index(uint8_t page, uint8_t col, uint8_t row)
 {
     const uint32_t stride = (uint32_t)r36sx_bios_text_cols() * 2u;
-    return R36SX_BIOS_TEXT_BASE +
+    return r36sx_bios_text_base() +
            (uint32_t)(page & 7u) * R36SX_BIOS_TEXT_PAGE_CELLS +
            (uint32_t)row * stride +
            (uint32_t)col * 2u;
