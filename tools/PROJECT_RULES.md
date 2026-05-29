@@ -65,9 +65,13 @@ Meaningful completed changes include:
 Prefer small, topic-focused commits. Do not wait until many unrelated changes
 pile up.
 
-Push less often than commit. Default cadence: push after about three local
-commits, or sooner when the user explicitly asks for `git push`, when a remote
-backup is important, or before a risky next step.
+Push cadence: after each successful commit, check how many local commits are
+ahead of the remote branch. If the branch is ahead by three or more commits,
+run `git push` before continuing with more project changes.
+
+It is also fine to push sooner when the user explicitly asks for `git push`,
+when a remote backup is important, or before a risky next step. Do not let a
+long queue of local commits accumulate without pushing.
 
 ## Native App Exit Rule
 
