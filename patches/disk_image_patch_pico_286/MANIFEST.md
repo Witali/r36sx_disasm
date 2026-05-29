@@ -25,6 +25,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 edge-to-edge on-screen keyboard panel
+
+The current `pico_286` binary updates the shared R36SX on-screen keyboard
+layout.  The panel now touches the left, right, and bottom screen borders.  The
+old header/status text inside the panel was removed, and the key area uses
+compact equal inner padding.
+
+```text
+pico_286 size: 921312 bytes
+pico_286 SHA256: F818B656F70CD88212B16B4EC1B5F460489A9573966FC8102AD187336FC3C3C9
+Defender scan: found no threats
+```
+
 ## 2026-05-29 remove PSRAM payload from Linux executable
 
 The current `pico_286` binary no longer stores the Pico/ESP-style `.psram`

@@ -33,7 +33,8 @@ This file documents the `pico_286` native executable for TinyMC.
 
 The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  If
 `osk_cursor_keys=on` is set in `pico_286.conf`, the keyboard also shows a small
-right-side cursor-key block.
+right-side cursor-key block.  The keyboard panel is drawn edge-to-edge along
+the bottom of the screen, with compact equal padding around the key area.
 
 ## Disk Image Menu
 

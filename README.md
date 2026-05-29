@@ -419,6 +419,9 @@ Notable patch history:
 - `disk_image_patch_072`: rebuilds Pico-286 without storing the Pico/ESP-style
   `.psram` memory section in the Linux/MIPS executable, reducing `pico_286`
   from about 8 MB to about 0.9 MB.
+- `disk_image_patch_073`: rebuilds Pico-286 with the on-screen keyboard panel
+  drawn flush to the left, right, and bottom screen borders, plus compact equal
+  inner padding around the key area.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

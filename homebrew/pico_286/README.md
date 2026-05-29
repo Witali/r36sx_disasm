@@ -135,9 +135,10 @@ and `=`.  When `osk_cursor_keys=on`, it also shows a compact right-side
 cursor-key block laid out like a physical keyboard: Up above Left/Down/Right.
 
 When the keyboard is visible it occupies the bottom 96 pixels, about 20% of the
-640x480 framebuffer.  The DOS screen is vertically compressed into the
-remaining top 384 pixels with a halftone-style area filter instead of being
-covered by the keyboard.
+640x480 framebuffer.  Its panel is drawn edge-to-edge along the left, right,
+and bottom screen borders, and the key area uses compact equal inner padding.
+The DOS screen is vertically compressed into the remaining top 384 pixels with
+a halftone-style area filter instead of being covered by the keyboard.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
 `pico_286.conf` lives next to the executable and maps image files to emulated

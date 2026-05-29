@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-29 edge-to-edge on-screen keyboard panel
+
+Rebuilt Pico-286 after changing the shared R36SX on-screen keyboard geometry.
+The keyboard panel is now drawn flush with the left, right, and bottom screen
+borders.  The old header/status text was removed from the panel, and the key
+rows are vertically centered with compact equal inner padding around the key
+area.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_073\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 921,312 bytes
+- SHA256: `F818B656F70CD88212B16B4EC1B5F460489A9573966FC8102AD187336FC3C3C9`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_073/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_073/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_073/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 remove PSRAM payload from Linux executable
 
 Rebuilt Pico-286 after changing the upstream RAM/EMS/XMS storage attributes.
