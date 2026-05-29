@@ -75,7 +75,7 @@ On-screen keyboard controls:
 - A or Start: type the highlighted key.
 - B: Backspace.
 - Select: close the keyboard.
-- X: toggle Shift.
+- X: Escape.
 - Y: Enter.
 - Shift, Ctrl, and Alt keys on the keyboard act as latched modifiers.
 

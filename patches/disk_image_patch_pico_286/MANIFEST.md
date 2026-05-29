@@ -91,12 +91,13 @@ The current binary includes a joystick-controlled on-screen keyboard:
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Select closes the keyboard.
-- X toggles Shift.
+- X sends Escape immediately.
 - Y sends Enter immediately.
 - Select+Start still exits back to TinyMC.
 
 F1-F10, Delete, common DOS punctuation, and latched Shift/Ctrl/Alt modifiers
-are available from the on-screen keyboard.
+are available from the on-screen keyboard.  Shift is available as the on-screen
+`SHF` key.
 
 The keyboard uses a compact bottom layout: 96 pixels tall, about 20% of the
 640x480 framebuffer.  While it is visible, the DOS screen is vertically
@@ -231,5 +232,17 @@ same four filenames.
 ```text
 Size: 7965128 bytes
 SHA256: A63CD65C36BE12E56E59EFF677F5C298DE6BD701993DC6EBC0E004D5A1151623
+Defender scan: found no threats
+```
+
+## 2026-05-29 on-screen keyboard X Escape binding
+
+The Pico-286 binary was rebuilt after changing the shared on-screen keyboard
+bindings.  While the keyboard is visible, the physical `X` button now sends
+Escape immediately.  Shift remains available through the on-screen `SHF` key.
+
+```text
+Size: 7965676 bytes
+SHA256: 91D85743E2A32C304407E8BFA1B1D92F732C2FA024F6E73CD4F9DE82C4B66048
 Defender scan: found no threats
 ```

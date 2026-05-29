@@ -499,7 +499,7 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_BACK, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
-        keyboard->shift ^= 1u;
+        emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_ESCAPE, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_Y) != 0) {
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_RETURN, 0);
@@ -537,7 +537,7 @@ void r36sx_screen_keyboard_draw(
     fill_rect(frame, width, height, stride_pixels, panel_x + 2, panel_y + 2,
               panel_w - 4, 12, header);
     draw_text(frame, width, height, stride_pixels, panel_x + 10, panel_y + 5,
-              "FN KBD  D-PAD MOVE  A/START TYPE  B BS  Y ENT", text, 1);
+              "FN KBD  D-PAD MOVE  A/START TYPE  B BS  X ESC  Y ENT", text, 1);
 
     for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
         int count = g_osk_row_counts[row];

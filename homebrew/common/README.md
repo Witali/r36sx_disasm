@@ -49,5 +49,7 @@ Current physical button bindings while the keyboard is visible:
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Y sends Enter immediately.
-- X toggles Shift.
+- X sends Escape immediately.
 - Select closes the keyboard.
+
+Shift is still available as the on-screen `SHF` key.
