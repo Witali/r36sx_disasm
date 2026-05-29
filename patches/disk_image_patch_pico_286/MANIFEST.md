@@ -178,3 +178,16 @@ Size: 7948928 bytes
 SHA256: 1C1BC7F76802DB1B2974704AB0B73E13473A5A335B83280BB73DE1A4C07E85B3
 Defender scan: found no threats
 ```
+
+## 2026-05-29 on-screen keyboard face-button remap
+
+The Pico-286 binary was rebuilt after changing the shared on-screen keyboard
+bindings.  While the keyboard is visible, `B` now sends Backspace immediately
+and `Y` now sends Enter immediately.  `Select` closes the keyboard, and the
+on-screen `CLOSE` key remains available.
+
+```text
+Size: 7949544 bytes
+SHA256: B5A395D7A8CEDA18537659AC27339D950BD9F1E98C48061E6893073AD87BAE79
+Defender scan: found no threats
+```

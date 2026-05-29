@@ -661,6 +661,43 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-29 on-screen keyboard face-button remap
+
+Updated the shared on-screen keyboard physical button bindings:
+
+- `B` now sends Backspace immediately.
+- `Y` now sends Enter immediately.
+- `Select` closes the keyboard.
+- The on-screen `CLOSE` key is still available.
+
+Previously `Y` sent Backspace and `B` closed the keyboard.  Pico-286 was
+rebuilt against the updated shared module and the on-screen keyboard hint text
+was updated accordingly.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 7,949,544 bytes
+- SHA256: `B5A395D7A8CEDA18537659AC27339D950BD9F1E98C48061E6893073AD87BAE79`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-29 reusable on-screen keyboard module
 
 Moved the joystick-controlled on-screen keyboard out of Pico-286's MiniFB

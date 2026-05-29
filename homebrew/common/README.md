@@ -42,3 +42,12 @@ r36sx_screen_keyboard_draw(&keyboard, frame, width, height, stride_pixels);
 The keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.  Use
 `r36sx_screen_keyboard_content_height()` when the underlying app screen should
 be vertically compressed or clipped while the keyboard is visible.
+
+Current physical button bindings while the keyboard is visible:
+
+- D-pad moves the highlighted key.
+- A or Start types the highlighted key.
+- B sends Backspace immediately.
+- Y sends Enter immediately.
+- X toggles Shift.
+- Select closes the keyboard.
