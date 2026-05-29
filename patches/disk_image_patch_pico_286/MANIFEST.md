@@ -24,6 +24,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 settings menu button defaults
+
+The current `pico_286` binary normalizes settings-menu buttons:
+
+- `A` or `Y`: accept/activate the selected row, cycle a disk image, or accept
+  the highlighted on-screen key in picker mode,
+- `B` or `X`: cancel the disk menu, key preset editor, or picker mode.
+
+This affects the disk image binding menu, the key preset editor, and the
+on-screen keyboard picker used by preset binding/name editing.  The normal DOS
+on-screen keyboard keeps its existing direct shortcuts.
+
+```text
+pico_286 size: 8114624 bytes
+pico_286 SHA256: 0CC16E9BBD854D14EAF7DC5AF7D8E684383F4087A3B2EDE8E14A4E0AB27D99F5
+Defender scan: found no threats
+```
+
 ## 2026-05-29 preset rename cursor
 
 The current `pico_286` binary improves the key preset editor.  When editing a

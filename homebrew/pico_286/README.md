@@ -97,15 +97,17 @@ r2=F2
 
 While DOS is running and the on-screen keyboard is hidden, holding Fn and
 pressing Start opens the full-screen preset editor.  D-pad moves between rows,
-Left/Right or A/Start changes a binding, B moves backward through key choices,
-Y clears a binding, and the `ADD NEW PRESET` row creates a new preset by
-copying the current one.
+Left/Right changes the preset or column, A/Y activates the selected row, and
+B/X cancels the editor without saving.  The `ADD NEW PRESET` row creates a new
+preset by copying the current one.
 The `RENAME` row opens the on-screen keyboard for editing the current preset
-name and shows a blinking underscore cursor next to the text.
+name and shows a blinking underscore cursor next to the text.  In picker mode,
+A/Y accepts the highlighted on-screen key and B/X cancels the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
-or A/Start cycles through `.img` files found next to `pico_286.conf`.
+or A/Y cycles through `.img` files found next to `pico_286.conf`, while B/X
+cancels the menu.
 `SAVE/APPLY` writes the selected bindings to `pico_286.conf` and calls
 `insertdisk()` for the running emulator.  For hard-disk changes, DOS may still
 cache drive state, so the `EXIT APP` row is available for a clean restart

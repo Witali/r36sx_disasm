@@ -409,7 +409,7 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
         return 0;
     }
 
-    if ((pressed & (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_B)) != 0) {
+    if ((pressed & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_X)) != 0) {
         r36sx_disk_menu_set_visible(menu, 0);
         return R36SX_DISK_MENU_RESULT_CLOSED;
     }
@@ -429,7 +429,7 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
         (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_image(menu, menu->selected_row, 1);
     }
-    if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+    if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
         if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT) {
             cycle_image(menu, menu->selected_row, 1);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_SAVE) {
@@ -490,7 +490,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     draw_text(frame, width, height, stride_pixels, 28, 28, "DISK MENU",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
-              "LEFT/RIGHT IMAGE  A/START CHANGE  SAVE APPLIES  EXIT APP",
+              "LEFT/RIGHT IMAGE  A/Y CHANGE  X/B CANCEL  SAVE APPLIES",
               rgb565(180, 202, 208), 1);
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {

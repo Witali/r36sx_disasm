@@ -1,5 +1,51 @@
 # pico-286 Build Log
 
+## 2026-05-29 settings menu button defaults
+
+Rebuilt Pico-286 after normalizing button behavior in settings menus.
+
+Current settings-menu controls:
+
+- `A` or `Y`: accept/activate the selected row, cycle a disk image, or accept
+  the highlighted on-screen key in picker mode,
+- `B` or `X`: cancel the disk menu, key preset editor, or picker mode.
+
+This affects the disk image binding menu, the key preset editor, and the
+on-screen keyboard picker used by preset binding/name editing.  The normal DOS
+on-screen keyboard keeps its existing direct shortcuts.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_070\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 8,114,624 bytes
+- SHA256: `0CC16E9BBD854D14EAF7DC5AF7D8E684383F4087A3B2EDE8E14A4E0AB27D99F5`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_070/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_070/MIPS_NATIVE/pico_286/pico_286.conf`
+
 ## 2026-05-29 preset rename cursor
 
 Rebuilt Pico-286 after improving the preset-name editor.  While editing a

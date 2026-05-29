@@ -412,6 +412,8 @@ Notable patch history:
   Select+Start.  Exit is now Fn+X, or holding Fn for more than 3 seconds.
 - `disk_image_patch_069`: rebuilds Pico-286 so preset-name editing shows a
   blinking underscore cursor next to the edited name.
+- `disk_image_patch_070`: rebuilds Pico-286 so settings menus use `A`/`Y` for
+  accept/change and `B`/`X` for cancel.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

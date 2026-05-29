@@ -744,11 +744,11 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
     if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
         move_selection(keyboard, 0, 1);
     }
-    if ((pressed & (R36SX_RKGAME_KEY_SELECT | R36SX_RKGAME_KEY_B)) != 0) {
+    if ((pressed & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_X)) != 0) {
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
     }
-    if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) == 0) {
+    if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) == 0) {
         return 0;
     }
 

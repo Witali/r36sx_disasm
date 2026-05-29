@@ -948,7 +948,7 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
         return 0;
     }
 
-    if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
+    if ((pressed & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_X)) != 0) {
         cancel_edit_session(state);
         return R36SX_KEY_PRESET_RESULT_CLOSED;
     }
@@ -968,15 +968,14 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
 
     row = state->selected_row;
     if (row == 0) {
-        if ((pressed & (R36SX_RKGAME_KEY_A |
-                        R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             select_next_draft_preset(state, 1);
         }
         return 0;
     }
 
     if (row == 1) {
-        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             start_picker(state, R36SX_KEY_PRESET_PICKER_NAME,
                          R36SX_KEY_PRESET_PICKER_BUTTON_NONE);
         }
@@ -984,14 +983,14 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
     }
 
     if (row == 2) {
-        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             add_draft_preset(state);
         }
         return 0;
     }
 
     if (row == R36SX_KEY_PRESET_ROW_OK) {
-        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             commit_edit_session(state);
             return R36SX_KEY_PRESET_RESULT_CLOSED;
         }
@@ -999,9 +998,7 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
     }
 
     if (row == R36SX_KEY_PRESET_ROW_CANCEL) {
-        if ((pressed & (R36SX_RKGAME_KEY_A |
-                        R36SX_RKGAME_KEY_B |
-                        R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             cancel_edit_session(state);
             return R36SX_KEY_PRESET_RESULT_CLOSED;
         }
@@ -1011,11 +1008,8 @@ uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
     button = selected_button(state);
     preset = current_draft_preset(state);
     if (button >= 0 && preset) {
-        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
+        if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
             start_picker(state, R36SX_KEY_PRESET_PICKER_KEY, (uint8_t)button);
-        }
-        if ((pressed & R36SX_RKGAME_KEY_Y) != 0) {
-            preset->keycodes[button] = 0;
         }
     }
 
@@ -1081,7 +1075,7 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
     draw_text(frame, width, height, stride_pixels, 28, 28, "KEY PRESETS",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
-              "A/START EDIT  SELECT CANCEL  OK SAVES  Y NONE  LEFT/RIGHT PRESET/COLUMN",
+              "A/Y EDIT/OK  X/B CANCEL  LEFT/RIGHT PRESET/COLUMN",
               rgb565(180, 202, 208), 1);
 
     snprintf(line, sizeof(line), "PRESET: %s  %u/%u",
@@ -1121,7 +1115,7 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
     }
     draw_row(state, frame, width, height, stride_pixels, -1, x,
              button_y + (R36SX_KEY_PRESET_LAYOUT_ROWS - 1) *
-             (row_h + grid_gap), col_w, row_h, "SELECT CANCEL");
+             (row_h + grid_gap), col_w, row_h, "X/B CANCEL");
 
     y = height - 54;
     draw_row(state, frame, width, height, stride_pixels,
@@ -1133,10 +1127,11 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         int keyboard_y = r36sx_screen_keyboard_panel_y(height);
         if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY &&
             state->picker_button < R36SX_KEY_PRESET_BUTTON_COUNT) {
-            snprintf(line, sizeof(line), "PICK KEY FOR %s",
+            snprintf(line, sizeof(line), "PICK KEY FOR %s  A/Y OK  X/B CANCEL",
                      g_buttons[state->picker_button].label);
         } else {
-            snprintf(line, sizeof(line), "RENAME PRESET: %s%s",
+            snprintf(line, sizeof(line),
+                     "RENAME PRESET: %s%s  A/Y TYPE  X/B CANCEL",
                      preset->name, blink_cursor_visible() ? "_" : "");
         }
         fill_rect(frame, width, height, stride_pixels, 16, keyboard_y - 15,
