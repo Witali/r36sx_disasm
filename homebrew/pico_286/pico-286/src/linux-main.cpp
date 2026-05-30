@@ -25,6 +25,10 @@ static int sample_index = 0;
 
 extern "C" void adlib_getsample(int16_t *sndptr, intptr_t numsamples);
 
+static inline uint32_t vga_vram_cell(uint32_t index) {
+    return VIDEORAM[index & 0xFFFFu];
+}
+
 extern "C" void _putchar(char character) {
     putchar(character);
     static int x = 0, y = 0;
@@ -280,9 +284,9 @@ static inline void renderer() {
                 }
                 case 0x0D: /* EGA 320x200 16-color */ {
                     if (y >= 400) break;
-                    uint32_t* vram_ptr = &VIDEORAM[(y / 2) * (320 / 8)];
+                    uint32_t vram_base = vram_offset + (y / 2) * (320 / 8);
                     for (int i = 0; i < (320 / 8); ++i) {
-                        uint32_t eight_pixels = vram_ptr[i];
+                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
                         uint8_t plane0 =  eight_pixels        & 0xFF;
                         uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
                         uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
@@ -302,9 +306,9 @@ static inline void renderer() {
                 }
                 case 0x0E: /* EGA 640x200 16-color */ {
                     if (y >= 400) break;
-                    uint32_t* vram_ptr = &VIDEORAM[(y / 2) * (640 / 8)];
+                    uint32_t vram_base = vram_offset + (y / 2) * (640 / 8);
                     for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vram_ptr[i];
+                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
                         uint8_t plane0 =  eight_pixels        & 0xFF;
                         uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
                         uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
@@ -322,9 +326,9 @@ static inline void renderer() {
                 }
                 case 0x10: /* EGA 640x350 16-color */ {
                     if (y >= 350) break;
-                    uint32_t* vram_ptr = &VIDEORAM[y * (640 / 8)];
+                    uint32_t vram_base = vram_offset + y * (640 / 8);
                     for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vram_ptr[i];
+                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
                         uint8_t plane0 =  eight_pixels        & 0xFF;
                         uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
                         uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
@@ -341,10 +345,10 @@ static inline void renderer() {
                     break;
                 }
                 case 0x11: /* VGA 640x480 2-color */ {
-                    uint8_t *cga_row = (uint8_t *) (VIDEORAM + y * 80);
                     // Each byte containing 8 pixels
-                    for (int x = 640 / 8; x--;) {
-                        uint8_t cga_byte = *cga_row++;
+                    uint32_t vram_base = vram_offset + y * (640 / 8);
+                    for (int i = 0; i < (640 / 8); ++i) {
+                        uint8_t cga_byte = (uint8_t)(vga_vram_cell(vram_base + i) & 0xFFu);
 
                         *pixels++ = cga_palette[(cga_byte >> 7 & 1) * 15];
                         *pixels++ = cga_palette[(cga_byte >> 6 & 1) * 15];
@@ -360,9 +364,9 @@ static inline void renderer() {
                 }
                 case 0x12: /* VGA 640x480 16-color */ {
                     if (y >= 480) break;
-                    uint32_t* vram_ptr = &VIDEORAM[y * (640 / 8)];
+                    uint32_t vram_base = vram_offset + y * (640 / 8);
                     for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vram_ptr[i];
+                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
                         uint8_t plane0 =  eight_pixels        & 0xFF;
                         uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
                         uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
@@ -380,18 +384,18 @@ static inline void renderer() {
                 }
                 case 0x13: {
                     if (vga_planar_mode) {
-                        uint32_t *vga_row = &VIDEORAM[vram_offset + (y >> 1) * (320 / 4)];
+                        uint32_t vram_base = vram_offset + (y >> 1) * (320 / 4);
                         for (int x = 0; x < 320 / 4; x++) {
-                            uint32_t four_pixels = *vga_row++;
+                            uint32_t four_pixels = vga_vram_cell(vram_base + x);
                             *pixels++ = *pixels++ = vga_palette[four_pixels & 0xFFu];
                             *pixels++ = *pixels++ = vga_palette[(four_pixels >> 8) & 0xFFu];
                             *pixels++ = *pixels++ = vga_palette[(four_pixels >> 16) & 0xFFu];
                             *pixels++ = *pixels++ = vga_palette[(four_pixels >> 24) & 0xFFu];
                         }
                     } else {
-                        uint8_t *vga_row = VIDEORAM + (y >> 1) * 320;
+                        uint32_t vram_base = vram_offset + (y >> 1) * 320;
                         for (int x = 0; x < 320; x++) {
-                            uint32_t color = vga_palette[*vga_row++];
+                            uint32_t color = vga_palette[vga_vram_cell(vram_base + x) & 0xFFu];
                             *pixels++ = *pixels++ = color;
                         }
                     }
