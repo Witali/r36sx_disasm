@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 compiler warning cleanup
+
+The current `pico_286` binary was rebuilt after cleaning the remaining native
+R36SX compiler warnings:
+
+- DOS redirector 8.3 names now write into a byte buffer, avoiding pointer-sign
+  warnings for DTA file names.
+- VGA DAC block palette loading no longer increments `memloc` multiple times
+  inside a single `rgb()` macro call.
+
+pico_286 size: 1128984 bytes
+pico_286 SHA256: F14EC8268BD4B4CFF86DB65BCB16FE70C0675353EF658FC49DC1EA6A285B9D10
+
 ## 2026-05-30 CHKDSK invalid-opcode investigation
 
 The current `pico_286` binary adds the 80386 bit-test instruction family:

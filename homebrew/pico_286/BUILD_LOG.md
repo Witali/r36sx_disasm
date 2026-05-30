@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-30 compiler warning cleanup
+
+Cleaned up the remaining Pico-286 compile warnings seen in the native R36SX
+build:
+
+- `network-redirector.c.inl`: `to_dos_name()` now accepts a raw DOS 8.3 output
+  buffer and writes it as bytes, avoiding `char *` vs `unsigned char *`
+  pointer-sign warnings for DTA `fname[11]`.
+- `r36sx_cpu.c`: VGA DAC block palette loading now reads red, green, and blue
+  bytes into temporaries before calling the `rgb()` macro, avoiding multiple
+  unsequenced `memloc++` side effects inside one macro invocation.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The C/C++ compiler emitted no warnings.  `zig objcopy --strip-all` still
+returned `error: unimplemented`, so the unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1128984` bytes
+- SHA256: `F14EC8268BD4B4CFF86DB65BCB16FE70C0675353EF658FC49DC1EA6A285B9D10`
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 CHKDSK invalid-opcode investigation
 
 The FreeDOS `CHKDSK.EXE` screenshot showed an `Invalid Opcode` trap while

@@ -146,7 +146,8 @@ static void get_full_path(char *dest, const char *guest_path) {
 }
 
 // Convert filename to DOS 8.3 format
-static void to_dos_name(const char *input, char *output) {
+static void to_dos_name(const char *input, void *output_raw) {
+    uint8_t *output = (uint8_t *)output_raw;
     int i, j;
     memset(output, ' ', 11); // Fill with spaces
 
@@ -162,7 +163,9 @@ static void to_dos_name(const char *input, char *output) {
 
     // Copy name (up to 8 chars)
     for (i = 0, j = 0; input[i] && input[i] != '.' && j < 8; i++) {
-        if (input[i] != ' ') output[j++] = toupper(input[i]);
+        if (input[i] != ' ') {
+            output[j++] = (uint8_t)toupper((unsigned char)input[i]);
+        }
     }
 
     // Find extension
@@ -171,7 +174,9 @@ static void to_dos_name(const char *input, char *output) {
         i++;
         // Copy extension (up to 3 chars)
         for (j = 8; input[i] && j < 11; i++) {
-            if (input[i] != ' ') output[j++] = toupper(input[i]);
+            if (input[i] != ' ') {
+                output[j++] = (uint8_t)toupper((unsigned char)input[i]);
+            }
         }
     }
 }

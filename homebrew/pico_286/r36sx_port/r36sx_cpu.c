@@ -1318,8 +1318,11 @@ void intcall86(uint8_t intnum) {
                             // set block of DAC color registers               VGA
                             uint32_t memloc = CPU_ES * 16 + CPU_DX;
                             for (int color_index = CPU_BX; color_index < ((CPU_BX + CPU_CX) & 0xFF); color_index++) {
-                                vga_palette[color_index] = rgb((read86(memloc++) << 2), (read86(memloc++) << 2),
-                                                               (read86(memloc++) << 2));
+                                uint8_t red = read86(memloc++);
+                                uint8_t green = read86(memloc++);
+                                uint8_t blue = read86(memloc++);
+                                vga_palette[color_index] =
+                                    rgb((red << 2), (green << 2), (blue << 2));
 #if PICO_ON_DEVICE
                                 graphics_set_palette(color_index, vga_palette[color_index]);
 #endif
