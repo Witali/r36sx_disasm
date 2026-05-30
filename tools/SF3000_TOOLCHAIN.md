@@ -93,3 +93,87 @@ homebrew/libretro_button_demo/libemu_buttondemo.so
 - This matches the device family better than a generic bare-metal `mipsel-elf` compiler or a musl toolchain.
 
 For replacing `cubegm/cores/*.so`, prefer this SDK over bare-metal MIPS toolchains.
+
+## Windows-hosted GCC experiment
+
+Installed test toolchain:
+
+```text
+tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0
+```
+
+Source found through the PCSX-Redux build instructions:
+
+```text
+https://static.grumpycoder.net/pixel/mips/g++-mipsel-none-elf-10.3.0.zip
+```
+
+Security checks completed before keeping the toolchain:
+
+```powershell
+.\tools\scan-download.ps1 .\tools\downloads\g++-mipsel-none-elf-10.3.0.zip
+.\tools\scan-download.ps1 .\tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0
+```
+
+Both Windows Defender scans reported no threats.
+
+Compiler identity:
+
+```text
+mipsel-none-elf-gcc.exe (GCC) 10.3.0
+```
+
+This is a Windows executable GCC that generates little-endian MIPS, but its
+target is `mipsel-none-elf`, not `mipsel-linux-gnu`. It is useful for testing
+GCC code generation, CPU tuning, and DSP flags, but it is not a direct
+replacement for the Linux/uClibc SDK.
+
+Useful observations:
+
+- `-march=mips32r2 -mtune=74kc` is accepted.
+- `-mdsp` and `-mdspr2` are accepted.
+- A minimal `-nostdlib` bare-metal ELF can be linked by this toolchain.
+- Direct `.o` files from this GCC are not accepted cleanly by `zig ld.lld` in
+  our current Linux executable link step (`invalid binding` symbol errors).
+- The workable route is: GCC emits assembly, Zig/LLVM assembles it for
+  `mipsel-linux-gnu`, and Zig LLD links with the existing sysroot.
+
+Proof-of-concept command sequence for native Pong:
+
+```powershell
+& "tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0\bin\mipsel-none-elf-gcc.exe" `
+    -O2 -march=mips32r2 -mtune=74kc -mabicalls -fPIC -G0 -nostdinc `
+    "-isystemtools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0\lib\gcc\mipsel-none-elf\10.3.0\include" `
+    "-isystemtools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\usr\include" `
+    -Wall -Wextra -std=c99 -DR36SX_PONG_TARGET=2 `
+    -S "homebrew\pong\pong.c" -o ".tmp\pong_gcc_mtune74kc.s"
+
+& "tools\zig-x86_64-windows-0.16.0\zig.exe" clang `
+    --target=mipsel-linux-gnu -march=mips32r2 `
+    -c ".tmp\pong_gcc_mtune74kc.s" -o ".tmp\pong_gcc_via_zig_as.o"
+
+& "tools\zig-x86_64-windows-0.16.0\zig.exe" ld.lld `
+    "--sysroot=tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot" `
+    -EL -m elf32ltsmip "--dynamic-linker=/lib/ld.so.1" "--hash-style=sysv" `
+    "-Ltools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\lib" `
+    "-Ltools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\usr\lib" `
+    -o ".tmp\pong_gcc_via_zig_as" `
+    "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\usr\lib\crt1.o" `
+    "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\usr\lib\crti.o" `
+    ".tmp\pong_gcc_via_zig_as.o" "-ldl" "-lc" `
+    "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot\usr\lib\crtn.o"
+```
+
+The resulting test executable:
+
+```text
+.tmp\pong_gcc_via_zig_as
+ELF32, little-endian MIPS, o32, mips32r2, CPIC
+interpreter: /lib/ld.so.1
+needed: libdl.so.2, libc.so.6
+size: 16652 bytes
+```
+
+This path has not yet replaced the normal build scripts. Treat it as an
+experimental route for testing whether GCC 10.3.0 with `-mtune=74kc` produces
+better code than Zig/Clang for hot files.
