@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -30,6 +31,9 @@
 #define R36SX_PICO286_DISK_LED_BLINK_MS 120u
 #define R36SX_PICO286_DISK_LED_RADIUS 8
 #define R36SX_PICO286_FN_HOLD_EXIT_USEC 3000000ull
+#define R36SX_PICO286_SCREENSHOT_DIR \
+    "/mnt/sdcard/MIPS_NATIVE/pico_286/screenshots"
+#define R36SX_PICO286_SCREENSHOT_LOCAL_DIR "screenshots"
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -67,9 +71,11 @@ struct r36sx_mfb_driver {
     uint8_t base_frame_valid;
     uint8_t force_present;
     uint8_t disk_led_was_active;
+    uint8_t screenshot_requested;
     int base_content_h;
     int base_source_h;
     uint32_t base_generation;
+    uint32_t screenshot_counter;
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -127,6 +133,157 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
     return (uint16_t)(((uint16_t)(r & 0xf8u) << 8) |
                       ((uint16_t)(g & 0xfcu) << 3) |
                       ((uint16_t)b >> 3));
+}
+
+static void r36sx_mfb_put_le16(uint8_t *dst, uint16_t value)
+{
+    dst[0] = (uint8_t)(value & 0xffu);
+    dst[1] = (uint8_t)(value >> 8);
+}
+
+static void r36sx_mfb_put_le32(uint8_t *dst, uint32_t value)
+{
+    dst[0] = (uint8_t)(value & 0xffu);
+    dst[1] = (uint8_t)((value >> 8) & 0xffu);
+    dst[2] = (uint8_t)((value >> 16) & 0xffu);
+    dst[3] = (uint8_t)((value >> 24) & 0xffu);
+}
+
+static uint8_t r36sx_mfb_rgb565_to_r8(uint16_t color)
+{
+    uint8_t r = (uint8_t)((color >> 11) & 0x1fu);
+    return (uint8_t)((r << 3) | (r >> 2));
+}
+
+static uint8_t r36sx_mfb_rgb565_to_g8(uint16_t color)
+{
+    uint8_t g = (uint8_t)((color >> 5) & 0x3fu);
+    return (uint8_t)((g << 2) | (g >> 4));
+}
+
+static uint8_t r36sx_mfb_rgb565_to_b8(uint16_t color)
+{
+    uint8_t b = (uint8_t)(color & 0x1fu);
+    return (uint8_t)((b << 3) | (b >> 2));
+}
+
+static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
+                                 int width, int height)
+{
+    FILE *fp;
+    uint8_t header[54];
+    uint8_t *row;
+    uint32_t row_bytes;
+    uint32_t pixel_bytes;
+    uint32_t file_bytes;
+
+    if (!path || !pixels || width <= 0 || height <= 0) {
+        return -1;
+    }
+
+    row_bytes = (uint32_t)width * 3u;
+    pixel_bytes = row_bytes * (uint32_t)height;
+    file_bytes = 54u + pixel_bytes;
+    row = (uint8_t *)malloc(row_bytes);
+    if (!row) {
+        return -1;
+    }
+
+    memset(header, 0, sizeof(header));
+    header[0] = 'B';
+    header[1] = 'M';
+    r36sx_mfb_put_le32(&header[2], file_bytes);
+    r36sx_mfb_put_le32(&header[10], 54u);
+    r36sx_mfb_put_le32(&header[14], 40u);
+    r36sx_mfb_put_le32(&header[18], (uint32_t)width);
+    r36sx_mfb_put_le32(&header[22], (uint32_t)height);
+    r36sx_mfb_put_le16(&header[26], 1u);
+    r36sx_mfb_put_le16(&header[28], 24u);
+    r36sx_mfb_put_le32(&header[34], pixel_bytes);
+
+    fp = fopen(path, "wb");
+    if (!fp) {
+        free(row);
+        return -1;
+    }
+
+    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
+        fclose(fp);
+        free(row);
+        return -1;
+    }
+
+    for (int y = height - 1; y >= 0; y--) {
+        const uint16_t *src = pixels + (size_t)y * (size_t)width;
+        for (int x = 0; x < width; x++) {
+            uint16_t c = src[x];
+            row[(size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_b8(c);
+            row[(size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
+            row[(size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_r8(c);
+        }
+        if (fwrite(row, 1, row_bytes, fp) != row_bytes) {
+            fclose(fp);
+            free(row);
+            return -1;
+        }
+    }
+
+    if (fclose(fp) != 0) {
+        free(row);
+        return -1;
+    }
+
+    free(row);
+    return 0;
+}
+
+static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
+                                            const uint16_t *pixels,
+                                            char *saved_path,
+                                            size_t saved_path_size)
+{
+    time_t now;
+    struct tm tm_now;
+    char stamp[32];
+    char path[512];
+    uint32_t seq;
+
+    if (!dir || !pixels) {
+        return -1;
+    }
+
+    mkdir(dir, 0755);
+    now = time(NULL);
+    if (localtime_r(&now, &tm_now) == NULL) {
+        memset(&tm_now, 0, sizeof(tm_now));
+    }
+    strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_now);
+    seq = g_mfb.screenshot_counter++;
+
+    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.bmp",
+             dir, stamp, (unsigned)(seq % 1000u));
+    if (r36sx_mfb_write_bmp24(path, pixels, g_mfb.width, g_mfb.height) != 0) {
+        return -1;
+    }
+
+    if (saved_path && saved_path_size > 0) {
+        snprintf(saved_path, saved_path_size, "%s", path);
+    }
+    return 0;
+}
+
+static void r36sx_mfb_save_screenshot(const uint16_t *pixels)
+{
+    char path[512];
+
+    if (r36sx_mfb_save_screenshot_to_dir(R36SX_PICO286_SCREENSHOT_DIR,
+                                         pixels, path, sizeof(path)) == 0 ||
+        r36sx_mfb_save_screenshot_to_dir(R36SX_PICO286_SCREENSHOT_LOCAL_DIR,
+                                         pixels, path, sizeof(path)) == 0) {
+        r36sx_pico286_debug_log("minifb: screenshot saved %s", path);
+    } else {
+        r36sx_pico286_debug_log("minifb: screenshot save failed");
+    }
 }
 
 static uint16_t r36sx_mfb_blend_rgb565(uint16_t c0, uint16_t c1,
@@ -310,6 +467,13 @@ static void r36sx_mfb_request_soft_reset(void)
     g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: Fn+B soft reset requested");
+}
+
+static void r36sx_mfb_request_screenshot(void)
+{
+    g_mfb.screenshot_requested = 1;
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("minifb: Fn+Up screenshot requested");
 }
 
 static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
@@ -594,6 +758,11 @@ static int r36sx_mfb_poll_input(void)
             g_mfb.last_raw_keys = raw;
             return 0;
         }
+        if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
+            r36sx_mfb_request_screenshot();
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
         if (g_mfb.fn_down && !g_mfb.fn_chord_used &&
             g_mfb.fn_down_since_us != 0 &&
             r36sx_mfb_now_us() - g_mfb.fn_down_since_us >=
@@ -803,8 +972,16 @@ int mfb_update(void *buffer, int fps_limit)
         } else {
             r36sx_osk_draw();
         }
+        if (g_mfb.screenshot_requested) {
+            r36sx_mfb_save_screenshot(g_mfb.frame);
+            g_mfb.screenshot_requested = 0;
+        }
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     } else {
+        if (g_mfb.screenshot_requested) {
+            r36sx_mfb_save_screenshot(g_mfb.base_frame);
+            g_mfb.screenshot_requested = 0;
+        }
         g_mfb.disp_frame(g_mfb.base_frame, g_mfb.width, g_mfb.height,
                          g_mfb.stride);
     }

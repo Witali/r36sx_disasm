@@ -1,5 +1,20 @@
 # pico-286 Build Log
 
+## 2026-05-30 Fn+Up screenshots
+
+Added a native screenshot shortcut to the R36SX MiniFB backend. Holding `Fn`
+and pressing D-pad `Up` now captures the currently presented 640x480 RGB565
+frame and writes it as a 24-bit BMP file under:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/pico_286/screenshots/
+```
+
+Screenshots are named `pico_286_YYYYMMDD_HHMMSS_NNN.bmp`. If the SD-card
+absolute path is unavailable, the backend falls back to a local `screenshots`
+directory. The capture is handled as an Fn chord, so it does not toggle the
+on-screen keyboard or send the Up arrow to DOS.
+
 ## 2026-05-30 native RGB565 video buffer
 
 Converted the R36SX Pico-286 video path from a 32-bit intermediate screen
