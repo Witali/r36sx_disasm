@@ -1167,7 +1167,7 @@ int main() {
                             cpu_exec_loops_per_frame);
     if (r36sx_pico286_cpu_mode() == R36SX_PICO286_CPU_MODE_PROTECTED) {
         r36sx_pico286_debug_log(
-            "main: cpu_mode=protected requested; protected-mode CPU core is not implemented yet, booting real mode");
+            "main: cpu_mode=protected requested; guest still boots in real mode and may enter protected mode through CR0/LMSW");
     }
 
     unsigned int main_loop_count = 0;

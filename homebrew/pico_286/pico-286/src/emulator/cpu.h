@@ -42,7 +42,10 @@ void init_umb();
 // 14, 14
 
 
-#define StepIP(x)  ip += x
+void r36sx_cpu_step_ip(uint32_t delta);
+uint32_t r36sx_cpu_segbase(uint16_t selector);
+
+#define StepIP(x)  r36sx_cpu_step_ip(x)
 
 #define segregs ((uint16_t*)segregs32)
 #define getmem8(x, y) read86(segbase(x) + (y))
@@ -61,7 +64,7 @@ void init_umb();
 #define putreg8(regid, writeval)  byteregs[byteregtable[regid]] = writeval
 #define getsegreg(regid)            segregs[(regid) << 1]
 #define putsegreg(regid, writeval)  segregs[(regid) << 1] = writeval
-#define segbase(x)  ((uint32_t) (x) << 4)
+#define segbase(x)  r36sx_cpu_segbase((uint16_t)(x))
 
 #define cf  x86_flags.bits.CF
 #define pf  x86_flags.bits.PF

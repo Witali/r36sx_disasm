@@ -119,6 +119,24 @@ pico_286 SHA256: 14524A7A06ADB151CAD455BB42293D4165E6866075013B499E7FC935DB50446
 Defender scan: found no threats
 ```
 
+## 2026-05-30 experimental 386 protected mode core
+
+The current `pico_286` binary includes an experimental protected-mode layer.
+The VM still starts in real mode, but guest code can now enter protected mode
+through `LMSW` or `MOV CR0`, load `GDTR`/`IDTR`, reload GDT-backed segment
+descriptors through far control transfers, and dispatch basic protected
+interrupt/trap gates.  Implemented 386 system opcodes include `0F 00`,
+`0F 01`, `0F 20`, and `0F 22`.
+
+Still incomplete: paging, privilege checks, call gates, task switching, TSS
+stack switching, and full 32-bit `EIP` execution.
+
+```text
+pico_286 size: 1304904 bytes
+pico_286 SHA256: 3FCAADC76A38CE59A854A75E0AF2D6664C04FA20CE0DA94915801CEBAFB5564A
+Defender scan: found no threats
+```
+
 ## 2026-05-30 centered screenshot toast
 
 The screenshot confirmation toast now appears centered on the screen.  The

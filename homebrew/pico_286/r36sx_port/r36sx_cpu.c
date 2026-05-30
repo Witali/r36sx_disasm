@@ -63,6 +63,214 @@ uint32_t ea;
 
 uint32_t dwordregs[8];
 
+#define R36SX_CR0_PE 0x00000001u
+#define R36SX_CR0_MP 0x00000002u
+#define R36SX_CR0_EM 0x00000004u
+#define R36SX_CR0_TS 0x00000008u
+#define R36SX_CR0_ET 0x00000010u
+#define R36SX_DESCRIPTOR_PRESENT 0x80u
+#define R36SX_DESCRIPTOR_CODE_DATA 0x10u
+#define R36SX_DESCRIPTOR_EXECUTABLE 0x08u
+#define R36SX_DESCRIPTOR_WRITABLE 0x02u
+#define R36SX_DESCRIPTOR_READABLE 0x02u
+#define R36SX_DESCRIPTOR_FLAG_DB 0x04u
+#define R36SX_DESCRIPTOR_FLAG_GRANULAR 0x08u
+
+typedef struct {
+    uint16_t selector;
+    uint32_t base;
+    uint32_t limit;
+    uint8_t access;
+    uint8_t flags;
+    uint8_t valid;
+} r36sx_segment_cache_t;
+
+static r36sx_segment_cache_t r36sx_seg_cache[6];
+static uint32_t r36sx_cr0 = R36SX_CR0_ET;
+static uint32_t r36sx_cr2;
+static uint32_t r36sx_cr3;
+static uint32_t r36sx_gdtr_base;
+static uint32_t r36sx_idtr_base;
+static uint16_t r36sx_gdtr_limit;
+static uint16_t r36sx_idtr_limit = 0x03ffu;
+static uint16_t r36sx_ldtr_selector;
+static uint16_t r36sx_tr_selector;
+
+static inline uint8_t r36sx_cpu_protected_enabled(void)
+{
+    return (r36sx_cr0 & R36SX_CR0_PE) != 0;
+}
+
+static inline void r36sx_cpu_real_cache_segment(uint8_t segid)
+{
+    uint16_t selector = getsegreg(segid);
+    r36sx_seg_cache[segid].selector = selector;
+    r36sx_seg_cache[segid].base = (uint32_t)selector << 4;
+    r36sx_seg_cache[segid].limit = 0xffffu;
+    r36sx_seg_cache[segid].access =
+        R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
+        R36SX_DESCRIPTOR_READABLE | R36SX_DESCRIPTOR_WRITABLE;
+    r36sx_seg_cache[segid].flags = 0;
+    r36sx_seg_cache[segid].valid = 1;
+}
+
+static inline void r36sx_cpu_real_cache_all_segments(void)
+{
+    for (uint8_t segid = reges; segid <= reggs; segid++) {
+        r36sx_cpu_real_cache_segment(segid);
+    }
+}
+
+uint32_t r36sx_cpu_segbase(uint16_t selector)
+{
+    if (!r36sx_cpu_protected_enabled()) {
+        return (uint32_t)selector << 4;
+    }
+
+    for (uint8_t segid = reges; segid <= reggs; segid++) {
+        if (r36sx_seg_cache[segid].valid &&
+            r36sx_seg_cache[segid].selector == selector) {
+            return r36sx_seg_cache[segid].base;
+        }
+    }
+
+    return (uint32_t)selector << 4;
+}
+
+void r36sx_cpu_step_ip(uint32_t delta)
+{
+    CPU_IP = (uint16_t)(CPU_IP + delta);
+}
+
+static inline uint32_t r36sx_cpu_linear_ea(uint32_t offset)
+{
+    return segbase(useseg) + offset;
+}
+
+static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
+                                           r36sx_segment_cache_t *cache)
+{
+    if ((selector & 0xfffcu) == 0) {
+        cache->selector = selector;
+        cache->base = 0;
+        cache->limit = 0;
+        cache->access = 0;
+        cache->flags = 0;
+        cache->valid = 1;
+        return 1;
+    }
+
+    if (selector & 0x0004u) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode LDT selector not implemented selector=%04x",
+            selector);
+#endif
+        return 0;
+    }
+
+    uint32_t descriptor_offset = selector & 0xfff8u;
+    if (descriptor_offset + 7u > r36sx_gdtr_limit) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode GDT limit fault selector=%04x gdtr=%08lx:%04x",
+            selector, (unsigned long)r36sx_gdtr_base, r36sx_gdtr_limit);
+#endif
+        return 0;
+    }
+
+    uint32_t addr = r36sx_gdtr_base + descriptor_offset;
+    uint32_t lo = readdw86(addr);
+    uint32_t hi = readdw86(addr + 4u);
+    uint32_t limit = (lo & 0xffffu) | (hi & 0x000f0000u);
+    uint8_t flags = (uint8_t)((hi >> 20) & 0x0fu);
+
+    if (flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
+        limit = (limit << 12) | 0x0fffu;
+    }
+
+    cache->selector = selector;
+    cache->base = ((lo >> 16) & 0xffffu) |
+                  ((hi & 0x000000ffu) << 16) |
+                  (hi & 0xff000000u);
+    cache->limit = limit;
+    cache->access = (uint8_t)((hi >> 8) & 0xffu);
+    cache->flags = flags;
+    cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
+    return cache->valid;
+}
+
+static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
+{
+    putsegreg(segid, selector);
+
+    if (!r36sx_cpu_protected_enabled()) {
+        r36sx_cpu_real_cache_segment(segid);
+        return 1;
+    }
+
+    r36sx_segment_cache_t cache;
+    if (!r36sx_cpu_decode_descriptor(selector, &cache)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode failed to load segment seg=%u selector=%04x",
+            segid, selector);
+#endif
+        cache.selector = selector;
+        cache.base = 0;
+        cache.limit = 0;
+        cache.access = 0;
+        cache.flags = 0;
+        cache.valid = 0;
+    }
+
+    r36sx_seg_cache[segid] = cache;
+    return cache.valid;
+}
+
+static void r36sx_cpu_set_cr0(uint32_t value)
+{
+    uint8_t old_pe = r36sx_cpu_protected_enabled();
+    r36sx_cr0 = value | R36SX_CR0_ET;
+    uint8_t new_pe = r36sx_cpu_protected_enabled();
+
+    if (old_pe != new_pe) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log("[CPU] protected mode %s CR0=%08lx",
+                                new_pe ? "entered" : "left",
+                                (unsigned long)r36sx_cr0);
+#endif
+        if (!new_pe) {
+            r36sx_cpu_real_cache_all_segments();
+        }
+    }
+}
+
+static void r36sx_cpu_lmsw(uint16_t value)
+{
+    uint32_t low = value & 0x000fu;
+    if (r36sx_cr0 & R36SX_CR0_PE) {
+        low |= R36SX_CR0_PE;
+    }
+    r36sx_cpu_set_cr0((r36sx_cr0 & ~0x000fu) | low);
+}
+
+static void r36sx_cpu_store_descriptor_table(uint32_t addr,
+                                             uint16_t limit,
+                                             uint32_t base)
+{
+    writew86(addr, limit);
+    writedw86(addr + 2u, base);
+}
+
+static void r36sx_cpu_load_descriptor_table(uint32_t addr,
+                                            uint16_t *limit,
+                                            uint32_t *base)
+{
+    *limit = readw86(addr);
+    *base = readdw86(addr + 2u);
+}
+
 static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
 {
     return i8259_controller.interrupt_request_register &
@@ -691,7 +899,7 @@ __not_in_flash() void getea(uint8_t rmval) {
 #ifdef CPU_386_EXTENDED_OPS
     if (addressSizeOverride) {
         tempea = r36sx_cpu_ea32(rmval);
-        ea = tempea + ((uint32_t)useseg << 4);
+        ea = r36sx_cpu_linear_ea(tempea);
         return;
     }
 #endif
@@ -739,7 +947,7 @@ __not_in_flash() void getea(uint8_t rmval) {
             }
             break;
     }
-    ea = (tempea & 0xFFFF) + ((uint32_t)useseg << 4);
+    ea = r36sx_cpu_linear_ea(tempea & 0xffffu);
 }
 
 static INLINE void push(uint16_t pushval) {
@@ -1098,7 +1306,7 @@ static int r36sx_bios_try_boot_drive(uint8_t bios_drive)
         write86(0x7c00u + i, boot_sector[i]);
     }
 
-    CPU_CS = 0x0000;
+    r36sx_cpu_load_segment(regcs, 0x0000);
     CPU_IP = 0x7c00;
     CPU_DL = bios_drive;
     CPU_FL_CF = 0;
@@ -1122,7 +1330,64 @@ static int r36sx_bios_boot_configured_order(void)
 }
 #endif
 
+static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
+{
+    uint32_t gate_offset = (uint32_t)intnum * 8u;
+    if (gate_offset + 7u > r36sx_idtr_limit) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected interrupt IDT limit fault int=%02x idtr=%08lx:%04x",
+            intnum, (unsigned long)r36sx_idtr_base, r36sx_idtr_limit);
+#endif
+        return 0;
+    }
+
+    uint32_t addr = r36sx_idtr_base + gate_offset;
+    uint32_t lo = readdw86(addr);
+    uint32_t hi = readdw86(addr + 4u);
+    uint8_t access = (uint8_t)((hi >> 8) & 0xffu);
+    uint8_t type = access & 0x0fu;
+
+    if ((access & R36SX_DESCRIPTOR_PRESENT) == 0 ||
+        !(type == 0x06u || type == 0x07u ||
+          type == 0x0eu || type == 0x0fu)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected interrupt unsupported gate int=%02x access=%02x",
+            intnum, access);
+#endif
+        return 0;
+    }
+
+    uint16_t selector = (uint16_t)(lo >> 16);
+    uint32_t offset = (lo & 0xffffu) |
+                      ((type >= 0x0eu) ? (hi & 0xffff0000u) : 0u);
+
+    if (type >= 0x0eu) {
+        push32(makeflagsdword());
+        push32(CPU_CS);
+        push32(CPU_IP);
+    } else {
+        push(makeflagsword());
+        push(CPU_CS);
+        push(CPU_IP);
+    }
+
+    r36sx_cpu_load_segment(regcs, selector);
+    CPU_IP = (uint16_t)offset;
+    if (type == 0x06u || type == 0x0eu) {
+        ifl = 0;
+    }
+    tf = 0;
+    return 1;
+}
+
 void intcall86(uint8_t intnum) {
+    if (r36sx_cpu_protected_enabled() &&
+        r36sx_cpu_protected_interrupt(intnum)) {
+        return;
+    }
+
     switch (intnum) {
         case 0x10: {
             switch (CPU_AH) {
@@ -1455,7 +1720,7 @@ void intcall86(uint8_t intnum) {
                     CPU_AL = 0x80;
                     return;
                 case 0x4310: {
-                    CPU_ES = XMS_FN_CS; // to be handled by DOS memory manager using
+                    r36sx_cpu_load_segment(reges, XMS_FN_CS); // to be handled by DOS memory manager using
                     CPU_BX = XMS_FN_IP; // CALL FAR ES:BX
                     return;
                 default:
@@ -1470,7 +1735,7 @@ void intcall86(uint8_t intnum) {
     push(makeflagsword());
     push(CPU_CS);
     push(ip);
-    CPU_CS = getmem16(0, (uint16_t) intnum * 4 + 2);
+    r36sx_cpu_load_segment(regcs, getmem16(0, (uint16_t) intnum * 4 + 2));
     ip = getmem16(0, (uint16_t) intnum * 4);
     ifl = 0;
     tf = 0;
@@ -2352,7 +2617,9 @@ static __not_in_flash() void op_grp5() {
             push(ip);
             getea(rm);
             ip = (uint16_t) read86(ea) + (uint16_t) read86(ea + 1) * 256;
-            CPU_CS = (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256;
+            r36sx_cpu_load_segment(
+                regcs,
+                (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256);
             break;
 
         case 4: /* JMP Ev */
@@ -2362,7 +2629,9 @@ static __not_in_flash() void op_grp5() {
         case 5: /* JMP Mp */
             getea(rm);
             ip = (uint16_t) read86(ea) + (uint16_t) read86(ea + 1) * 256;
-            CPU_CS = (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256;
+            r36sx_cpu_load_segment(
+                regcs,
+                (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256);
             break;
 
         case 6: /* PUSH Ev */
@@ -2531,6 +2800,18 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             writerm32(rm, pop32());
             return true;
 
+        case 0x9A: {
+            uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
+            StepIP(4);
+            uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
+            StepIP(2);
+            push(CPU_CS);
+            push32(CPU_IP);
+            CPU_IP = (uint16_t)target_ip;
+            r36sx_cpu_load_segment(regcs, target_cs);
+            return true;
+        }
+
         case 0x90:
             return true;
 
@@ -2689,6 +2970,26 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             CPU_EBP = pop32();
             return true;
 
+        case 0xCA: {
+            uint16_t bytes = getmem16(CPU_CS, CPU_IP);
+            StepIP(2);
+            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_load_segment(regcs, pop());
+            CPU_SP = (uint16_t)(CPU_SP + bytes);
+            return true;
+        }
+
+        case 0xCB:
+            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_load_segment(regcs, pop());
+            return true;
+
+        case 0xCF:
+            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_load_segment(regcs, (uint16_t)pop32());
+            decodeflagsdword(pop32());
+            return true;
+
         case 0xD1:
             modregrm();
             writerm32(rm, op_grp2_32(1, readrm32(rm)));
@@ -2711,6 +3012,15 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             CPU_IP = (uint16_t)(CPU_IP + rel);
+            return true;
+        }
+
+        case 0xEA: {
+            uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
+            StepIP(4);
+            uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
+            CPU_IP = (uint16_t)target_ip;
+            r36sx_cpu_load_segment(regcs, target_cs);
             return true;
         }
 
@@ -2753,7 +3063,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     push(CPU_CS);
                     push32(CPU_IP);
                     CPU_IP = (uint16_t)target_ip;
-                    CPU_CS = target_cs;
+                    r36sx_cpu_load_segment(regcs, target_cs);
                     return true;
                 }
                 case 4: /* JMP Ev */
@@ -2762,7 +3072,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 case 5: { /* JMP Mp */
                     getea(rm);
                     CPU_IP = (uint16_t)readdw86(ea);
-                    CPU_CS = readw86(ea + 4);
+                    r36sx_cpu_load_segment(regcs, readw86(ea + 4));
                     return true;
                 }
                 case 6: /* PUSH Ev */
@@ -2825,13 +3135,14 @@ static __not_in_flash() void r36sx_cpu_exec_bit_test(uint8_t operation,
 
 static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
 {
-    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    uint8_t op2 = getmem8(CPU_CS, CPU_IP);
+    StepIP(1);
+
+    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+        op2 != 0x00 && op2 != 0x01) {
         r36sx_cpu_invalid_opcode(fault_ip);
         return;
     }
-
-    uint8_t op2 = getmem8(CPU_CS, CPU_IP);
-    StepIP(1);
 
     if (op2 >= 0x80 && op2 <= 0x8F) {
         uint8_t take = r36sx_cpu_condition(op2);
@@ -2858,6 +3169,134 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
     }
 
     switch (op2) {
+        case 0x00: { /* SLDT/STR/LLDT/LTR/VERR/VERW */
+            modregrm();
+            switch (reg) {
+                case 0: /* SLDT Ew */
+                    writerm16(rm, r36sx_ldtr_selector);
+                    return;
+                case 1: /* STR Ew */
+                    writerm16(rm, r36sx_tr_selector);
+                    return;
+                case 2: /* LLDT Ew */
+                    r36sx_ldtr_selector = readrm16(rm);
+                    return;
+                case 3: /* LTR Ew */
+                    r36sx_tr_selector = readrm16(rm);
+                    return;
+                case 4: /* VERR Ew */
+                case 5: { /* VERW Ew */
+                    r36sx_segment_cache_t cache;
+                    uint16_t selector = readrm16(rm);
+                    uint8_t ok = r36sx_cpu_decode_descriptor(selector, &cache) &&
+                                 (cache.access & R36SX_DESCRIPTOR_CODE_DATA);
+                    if (ok && reg == 4) {
+                        ok = ((cache.access & R36SX_DESCRIPTOR_EXECUTABLE) == 0) ||
+                             (cache.access & R36SX_DESCRIPTOR_READABLE);
+                    } else if (ok) {
+                        ok = ((cache.access & R36SX_DESCRIPTOR_EXECUTABLE) == 0) &&
+                             (cache.access & R36SX_DESCRIPTOR_WRITABLE);
+                    }
+                    zf = ok ? 1u : 0u;
+                    return;
+                }
+            }
+            r36sx_cpu_invalid_opcode(fault_ip);
+            return;
+        }
+
+        case 0x01: { /* SGDT/SIDT/LGDT/LIDT/SMSW/LMSW */
+            modregrm();
+            switch (reg) {
+                case 0: /* SGDT Ms */
+                    if (mode == 3) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                        return;
+                    }
+                    getea(rm);
+                    r36sx_cpu_store_descriptor_table(
+                        ea, r36sx_gdtr_limit, r36sx_gdtr_base);
+                    return;
+                case 1: /* SIDT Ms */
+                    if (mode == 3) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                        return;
+                    }
+                    getea(rm);
+                    r36sx_cpu_store_descriptor_table(
+                        ea, r36sx_idtr_limit, r36sx_idtr_base);
+                    return;
+                case 2: /* LGDT Ms */
+                    if (mode == 3) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                        return;
+                    }
+                    getea(rm);
+                    r36sx_cpu_load_descriptor_table(
+                        ea, &r36sx_gdtr_limit, &r36sx_gdtr_base);
+                    return;
+                case 3: /* LIDT Ms */
+                    if (mode == 3) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                        return;
+                    }
+                    getea(rm);
+                    r36sx_cpu_load_descriptor_table(
+                        ea, &r36sx_idtr_limit, &r36sx_idtr_base);
+                    return;
+                case 4: /* SMSW Ew */
+                    writerm16(rm, (uint16_t)r36sx_cr0);
+                    return;
+                case 6: /* LMSW Ew */
+                    r36sx_cpu_lmsw(readrm16(rm));
+                    return;
+            }
+            r36sx_cpu_invalid_opcode(fault_ip);
+            return;
+        }
+
+        case 0x20: { /* MOV Rd,Cd */
+            modregrm();
+            if (mode != 3) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            switch (reg) {
+                case 0:
+                    putreg32(rm, r36sx_cr0);
+                    return;
+                case 2:
+                    putreg32(rm, r36sx_cr2);
+                    return;
+                case 3:
+                    putreg32(rm, r36sx_cr3);
+                    return;
+            }
+            r36sx_cpu_invalid_opcode(fault_ip);
+            return;
+        }
+
+        case 0x22: { /* MOV Cd,Rd */
+            modregrm();
+            if (mode != 3) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            switch (reg) {
+                case 0:
+                    r36sx_cpu_set_cr0(getreg32(rm));
+                    return;
+                case 2:
+                    r36sx_cr2 = getreg32(rm);
+                    return;
+                case 3:
+                    r36sx_cr3 = getreg32(rm);
+                    return;
+            }
+            r36sx_cpu_invalid_opcode(fault_ip);
+            return;
+        }
+
         case 0xA0:
             if (operandSizeOverride) {
                 push32(CPU_FS);
@@ -2867,7 +3306,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             return;
 
         case 0xA1:
-            CPU_FS = operandSizeOverride ? (uint16_t)pop32() : pop();
+            r36sx_cpu_load_segment(
+                regfs, operandSizeOverride ? (uint16_t)pop32() : pop());
             return;
 
         case 0xA8:
@@ -2879,7 +3319,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             return;
 
         case 0xA9:
-            CPU_GS = operandSizeOverride ? (uint16_t)pop32() : pop();
+            r36sx_cpu_load_segment(
+                reggs, operandSizeOverride ? (uint16_t)pop32() : pop());
             return;
 
         case 0xA3: /* BT Ev,Gv */
@@ -3027,6 +3468,16 @@ void reset86() {
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
+    r36sx_cr0 = R36SX_CR0_ET;
+    r36sx_cr2 = 0;
+    r36sx_cr3 = 0;
+    r36sx_gdtr_base = 0;
+    r36sx_gdtr_limit = 0;
+    r36sx_idtr_base = 0;
+    r36sx_idtr_limit = 0x03ffu;
+    r36sx_ldtr_selector = 0;
+    r36sx_tr_selector = 0;
+    r36sx_cpu_real_cache_all_segments();
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));
     if (butter_psram_size) {
@@ -3347,7 +3798,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_07: ;
 #endif
                 /* 07 POP CPU_ES */
-                CPU_ES = pop();
+                r36sx_cpu_load_segment(reges, pop());
                 break;
 
             case 0x8:
@@ -3447,7 +3898,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
                     /* 8086/8088 only: 0F POP CS. */
-                    CPU_CS = pop();
+                    r36sx_cpu_load_segment(regcs, pop());
                 } else {
                     r36sx_cpu_exec_0f(firstip);
                 }
@@ -3543,7 +3994,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_17: ;
 #endif
                 /* 17 POP CPU_SS */
-                CPU_SS = pop();
+                r36sx_cpu_load_segment(regss, pop());
                 break;
 
             case 0x18:
@@ -3633,7 +4084,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_1F: ;
 #endif
                 /* 1F POP CPU_DS */
-                CPU_DS = pop();
+                r36sx_cpu_load_segment(regds, pop());
                 break;
 
             case 0x20:
@@ -5149,7 +5600,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                putsegreg(reg, readrm16(rm)
+                r36sx_cpu_load_segment(reg, readrm16(rm)
                 );
                 break;
 
@@ -5277,7 +5728,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 push(CPU_CS);
                 push(CPU_IP);
                 CPU_IP = oper1;
-                CPU_CS = oper2;
+                r36sx_cpu_load_segment(regcs, oper2);
                 break;
 
             case 0x9B:
@@ -5947,7 +6398,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
 
                 getea(rm);
                 putreg16(reg, read86(ea) + read86(ea + 1) * 256);
-                CPU_ES = read86(ea + 2) + read86(ea + 3) * 256;
+                r36sx_cpu_load_segment(
+                    reges, read86(ea + 2) + read86(ea + 3) * 256);
                 break;
 
             case 0xC5:
@@ -5959,7 +6411,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
 
                 getea(rm);
                 putreg16(reg, read86(ea) + read86(ea + 1) * 256);
-                CPU_DS = read86(ea + 2) + read86(ea + 3) * 256;
+                r36sx_cpu_load_segment(
+                    regds, read86(ea + 2) + read86(ea + 3) * 256);
                 break;
 
             case 0xC6:
@@ -6038,7 +6491,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* CA RETF Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 CPU_IP = pop();
-                CPU_CS = pop();
+                r36sx_cpu_load_segment(regcs, pop());
                 CPU_SP = CPU_SP + oper1;
                 break;
 
@@ -6048,7 +6501,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* CB RETF */
                 CPU_IP = pop();
-                CPU_CS = pop();
+                r36sx_cpu_load_segment(regcs, pop());
                 break;
 
             case 0xCC:
@@ -6085,7 +6538,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* CF IRET */
                 CPU_IP = pop();
-                CPU_CS = pop();
+                r36sx_cpu_load_segment(regcs, pop());
 #ifdef CPU_SET_HIGH_FLAGS
                 decodeflagsword(pop() | 0xF000);
 #else
@@ -6192,7 +6645,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_D7: ;
 #endif
                 /* D7 XLAT */
-                CPU_AL = read86(useseg * 16 + (CPU_BX) + CPU_AL);
+                CPU_AL = getmem8(useseg, (uint16_t)(CPU_BX + CPU_AL));
                 break;
 
             case 0xD8:
@@ -6354,7 +6807,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 CPU_IP = oper1;
-                CPU_CS = oper2;
+                r36sx_cpu_load_segment(regcs, oper2);
                 break;
 
             case 0xEB:

@@ -284,6 +284,58 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-30 experimental 386 protected mode core
+
+Added the first usable protected-mode layer to the R36SX Pico-286 CPU core.
+The guest still boots in real mode like a real PC, but it can now enter
+protected mode through `LMSW` or `MOV CR0`, load `GDTR`/`IDTR`, and reload
+segment descriptors through protected far control transfers.
+
+Implemented pieces:
+
+- `CR0`, `CR2`, `CR3`, `GDTR`, `IDTR`, `LDTR` selector, and `TR` selector
+  state;
+- hidden segment descriptor caches for `CS`, `DS`, `ES`, `SS`, `FS`, and `GS`;
+- GDT descriptor decoding with base, limit, access byte, and granularity bits;
+- protected-mode segment-base address calculation for normal memory operands;
+- system opcode handlers for `0F 00`, `0F 01`, `0F 20`, and `0F 22`;
+- descriptor-cache reloads for `MOV Sreg`, `POP Sreg`, `LES`, `LDS`, far
+  `CALL`, far `JMP`, far `RET`, and `IRET`;
+- basic protected interrupt/trap gate delivery through `IDTR`.
+
+Known limitations remain: paging, privilege checks, call gates, task switching,
+TSS stack switching, and full 32-bit `EIP` execution are not complete.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`-TryStrip` again reported Zig objcopy `unimplemented`, so the unstripped
+executable was kept.  The remaining compiler warnings are the known upstream
+FPU/pragma/audio-inline warnings; this change did not add warnings in
+`r36sx_cpu.c`.
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,304,904 bytes
+- SHA256: `3FCAADC76A38CE59A854A75E0AF2D6664C04FA20CE0DA94915801CEBAFB5564A`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.conf`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 default 80386 compatibility mode
 
 The R36SX Pico-286 port now defaults to `cpu_model=80386` when no config file

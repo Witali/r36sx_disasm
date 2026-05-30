@@ -235,7 +235,14 @@ overrides and `FS`/`GS` segment forms require `cpu_model=80386`, while
 `cpu_model=8086`.  The 386 real-mode path supports the common 32-bit
 operand-size forms used by DOS extenders/probes (`MOV`, ALU, stack, shifts,
 `MUL`/`DIV`, `MOVZX`/`MOVSX`, `SETcc`, near `Jcc`, `BSF`/`BSR`, and `IMUL`).
-Full protected-mode execution is still WIP.
+Protected mode is experimental: the guest still boots like a real PC in real
+mode, then may enter protected mode with `LMSW` or `MOV CR0`.  The port now
+emulates `CR0`, `CR2`, `CR3`, `GDTR`, `IDTR`, `LDTR`/`TR` selectors, basic
+GDT-backed segment descriptor caches, far `CALL`/`JMP`/`RET`/`IRET` segment
+reloads, protected-mode interrupt/trap gates, and the 386 system instructions
+`0F 00`, `0F 01`, `0F 20`, and `0F 22`.  Paging, privilege checks, task
+switching/TSS stack switching, call gates, and full 32-bit `EIP` execution are
+not complete yet, so keep `cpu_mode=real` for normal DOS use.
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
