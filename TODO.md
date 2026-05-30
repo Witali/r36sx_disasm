@@ -2,11 +2,39 @@
 
 ## Pico-286 Performance Optimizations
 
+- Use the new Pico-286 profiling log before deeper rewrites.  Enable
+  `[profiling] profiling_enabled=1` in `pico_286.conf` and compare time spent
+  in `exec86()`, `renderer()`, `mfb_update()`, audio generation, and disk I/O
+  over a fixed 5-10 second run on hardware.
+- Add a fast instruction-fetch path in
+  `homebrew/pico_286/r36sx_port/r36sx_cpu.c`.  Opcode and immediate reads
+  currently go through `getmem8()` -> `read86()` function pointers.  Fast-path
+  `CS:IP` reads that land in plain RAM/BIOS, and fall back to the existing
+  memory handlers only for video/EMS/HMA/A20-sensitive regions.
+- Add inline RAM read/write helpers for the CPU hot path.  Most guest memory
+  accesses are plain RAM; avoiding indirect function-pointer calls in common
+  `read86()`/`write86()` cases should help every decoded instruction.
+- Consider a CPU dispatch fast path for instructions without prefixes.  The
+  current `exec86()` loop does a prefix loop and then a large opcode `switch`;
+  a no-prefix path or computed-goto dispatch may reduce branch overhead, but
+  should be done after profiling because it is higher risk.
+- Extend REP batching with direct RAM operations.  `MOVSB/MOVSW/STOSB/STOSW`
+  already batch up to 1024 elements, but each element still uses `getmem` /
+  `putmem`.  For RAM-to-RAM and RAM-to-video cases, use specialized loops or
+  `memcpy()`/`memset()` where the emulator semantics allow it.
+- Add VRAM dirty page/row tracking.  `renderer()` currently renders a full
+  640x480 frame at 60 Hz and then marks a frame ready.  Mark dirty rows/pages
+  from `vga_mem_write()`/`vga_mem_write16()` and skip or partially render
+  unchanged text/graphics rows.
 - Add audio chip auto-gating in
   `homebrew/pico_286/r36sx_port/r36sx_ports.c`.
   `get_sound_sample()` currently mixes OPL, PC speaker, SN76489, MIDI/CMS
   paths every 44.1 kHz sample even when most chips are inactive.  Track writes
   to the relevant ports and skip inactive chip mixers.
+- Add config switches for optional audio chips: `audio_opl`, `audio_cms`,
+  `audio_sn76489`, and `audio_midi`.  Keep PC speaker and Sound Blaster paths
+  available, but allow Tandy/SN76489/CMS/MIDI to be disabled by default or
+  auto-enabled on port access.
 - Hardware-test the `HLT` idle behavior implemented in
   `homebrew/pico_286/r36sx_port/r36sx_cpu.c`.  The CPU now leaves `exec86()`
   while halted and wakes on the next unmasked PIC IRQ when `IF=1`; confirm DOS
@@ -26,6 +54,9 @@
 - Optimize disk image I/O in `homebrew/pico_286/r36sx_port/disks-win32.c.inl`.
   Read/write multiple sectors per request instead of sector-by-sector loops,
   and consider a configurable `disk_flush=immediate|deferred` policy.
+- Apply similar deferred flushing/buffering to the DOS network redirector if
+  it is used for host-file access.  `network-redirector.c.inl` still flushes
+  files directly after writes.
 - Rate-limit input polling in `homebrew/pico_286/r36sx_minifb.c`.  It is useful
   to poll often, but it does not need to happen on every early `mfb_update()`
   return if the loop is running much faster than the display.
@@ -35,6 +66,10 @@
   `-O3`, LTO, and `-ffunction-sections -fdata-sections` plus linker garbage
   collection.  Measure both speed and binary size, because Zig/MIPS LTO may be
   fragile.
+- Re-check `-fno-builtin-memset` and `-fno-builtin-memcpy` in
+  `homebrew/pico_286/build_pico_286.ps1`.  They may block useful compiler
+  lowering for the new bulk memory paths; keep them only for files that truly
+  need them.
 
 ## Native Audio Stream Stability
 

@@ -167,6 +167,9 @@ devices:
 cpu_mhz=32.768
 boot_mode=normal
 boot_order=fdd0,hdd0
+[profiling]
+profiling_enabled=0
+profiling_log_ms=5000
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
 hdd0=hdd.img
@@ -179,6 +182,10 @@ hdd1_geometry=65,16,63
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
 millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
+
+`profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
+`profiling_log_ms` controls the reporting interval.  Profiling can also be
+compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

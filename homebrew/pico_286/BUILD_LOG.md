@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-05-30 runtime profiling option
+
+Added an optional Pico-286 profiling helper, compiled by default and controlled
+at runtime through `pico_286.conf`:
+
+```text
+[profiling]
+profiling_enabled=0
+profiling_log_ms=5000
+```
+
+When enabled, it writes periodic summaries to `pico_286.log` independent of
+the normal `DEBUG` build flag.  It covers the main hot paths: `exec86()`,
+pending disk flush checks, `mfb_update()`, keyboard ticks, timer IRQ
+generation, DSS/Sound Blaster/audio sample generation, audio writes, renderer
+time, and soft reset.  Each line includes calls, units, total milliseconds,
+average microseconds, per-unit microseconds, and max microseconds.
+
+The build script also accepts `-DisableProfiling`, which sets
+`R36SX_ENABLE_PROFILING=0` so profiling macros compile out as no-ops.
+
 ## 2026-05-30 disk image I/O cache
 
 Split the host disk-image operations into `r36sx_host_disk_io.c/.h`. The BIOS

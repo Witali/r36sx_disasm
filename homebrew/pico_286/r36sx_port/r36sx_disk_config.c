@@ -16,6 +16,8 @@
 #define R36SX_PICO286_MAX_CACHE_FLUSH_SECTORS 1024UL
 #define R36SX_PICO286_MIN_CACHE_FLUSH_MS 100UL
 #define R36SX_PICO286_MAX_CACHE_FLUSH_MS 60000UL
+#define R36SX_PICO286_MIN_PROFILE_LOG_MS 500UL
+#define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
 
 typedef struct {
     uint8_t bios_drive;
@@ -44,11 +46,15 @@ static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
 static char disk_cache_buffer_kb_text[16] = "64";
 static char disk_cache_flush_sectors_text[16] = "4";
 static char disk_cache_flush_ms_text[16] = "2000";
+static char profiling_enabled_text[8] = "0";
+static char profiling_log_ms_text[16] = "5000";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
 static uint32_t disk_cache_flush_sectors = 4u;
 static uint32_t disk_cache_flush_ms = 2000u;
+static int profiling_enabled = 0;
+static uint32_t profiling_log_ms = 5000u;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -351,6 +357,68 @@ static int set_disk_cache_value(const char *key, const char *value,
     return 0;
 }
 
+static int parse_bool_value(const char *value, int *enabled)
+{
+    if (key_equals(value, "1") ||
+        key_equals(value, "yes") ||
+        key_equals(value, "true") ||
+        key_equals(value, "on") ||
+        key_equals(value, "enabled")) {
+        *enabled = 1;
+        return 1;
+    }
+    if (key_equals(value, "0") ||
+        key_equals(value, "no") ||
+        key_equals(value, "false") ||
+        key_equals(value, "off") ||
+        key_equals(value, "disabled")) {
+        *enabled = 0;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int set_profiling_value(const char *key, const char *value,
+                               int line_no)
+{
+    if (key_equals(key, "profiling") ||
+        key_equals(key, "profile") ||
+        key_equals(key, "profiling_enabled") ||
+        key_equals(key, "profile_enabled")) {
+        int enabled;
+
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        profiling_enabled = enabled;
+        snprintf(profiling_enabled_text, sizeof(profiling_enabled_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: profiling_enabled=%d",
+                                profiling_enabled);
+        return 1;
+    }
+
+    if (key_equals(key, "profiling_log_ms") ||
+        key_equals(key, "profile_log_ms")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_PROFILE_LOG_MS,
+            R36SX_PICO286_MAX_PROFILE_LOG_MS,
+            &profiling_log_ms,
+            profiling_log_ms_text,
+            sizeof(profiling_log_ms_text),
+            1UL,
+            line_no);
+    }
+
+    return 0;
+}
+
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -492,6 +560,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
         return set_boot_mode(value, line_no);
     }
     if (set_disk_cache_value(key, value, line_no)) {
+        return 1;
+    }
+    if (set_profiling_value(key, value, line_no)) {
         return 1;
     }
     if (key_equals(key, "osk_cursor_keys") ||
@@ -659,6 +730,10 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "disk_cache_buffer_kb=%s\n", disk_cache_buffer_kb_text);
     fprintf(fp, "disk_cache_flush_sectors=%s\n", disk_cache_flush_sectors_text);
     fprintf(fp, "disk_cache_flush_ms=%s\n\n", disk_cache_flush_ms_text);
+    fprintf(fp, "# Optional runtime profiling written to pico_286.log.\n");
+    fprintf(fp, "[profiling]\n");
+    fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
+    fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
     fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
     fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
@@ -762,4 +837,18 @@ uint32_t r36sx_pico286_disk_cache_flush_ms(void)
     load_disk_config();
 
     return disk_cache_flush_ms;
+}
+
+int r36sx_pico286_profiling_enabled(void)
+{
+    load_disk_config();
+
+    return profiling_enabled;
+}
+
+uint32_t r36sx_pico286_profiling_log_ms(void)
+{
+    load_disk_config();
+
+    return profiling_log_ms;
 }

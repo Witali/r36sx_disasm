@@ -74,11 +74,19 @@ stdio buffer controlled by:
 disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
 disk_cache_flush_ms=2000
+
+[profiling]
+profiling_enabled=0
+profiling_log_ms=5000
 ```
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
+
+Set `profiling_enabled=1` to write periodic performance summaries to
+`pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
+compiled out with `build_pico_286.ps1 -DisableProfiling`.
 
 ## Key Preset Editor
 

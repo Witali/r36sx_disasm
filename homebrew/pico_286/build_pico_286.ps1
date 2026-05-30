@@ -1,5 +1,6 @@
 param(
     [switch]$DebugLog,
+    [switch]$DisableProfiling,
     [switch]$TryStrip
 )
 
@@ -27,6 +28,7 @@ $CrtBegin = Join-Path $GccLib "crtbegin.o"
 $CrtEnd = Join-Path $GccLib "crtend.o"
 $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
 $DebugValue = if ($DebugLog) { "1" } else { "0" }
+$ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -71,6 +73,7 @@ $CommonArgs = @(
     "-DPICO_RP2040=0",
     "-DPICO_RP2350=0",
     "-DDEBUG=$DebugValue",
+    "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",
@@ -148,6 +151,7 @@ $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_minifb.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_linux_audio.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_host_disk_io.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_disk_config.c")
+$CFiles += Get-Item (Join-Path $PortRoot "r36sx_profile.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_ports.c")
 

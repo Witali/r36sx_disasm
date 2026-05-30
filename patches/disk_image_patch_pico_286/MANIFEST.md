@@ -30,6 +30,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 runtime profiling option
+
+The current binary includes optional profiling support controlled by
+`pico_286.conf`:
+
+```ini
+[profiling]
+profiling_enabled=0
+profiling_log_ms=5000
+```
+
+Set `profiling_enabled=1` to write periodic performance summaries to
+`pico_286.log`.  Profiling output does not require a `DEBUG=1` build.  To
+compile the profiling code out entirely, build with
+`build_pico_286.ps1 -DisableProfiling`.
+
 ## 2026-05-30 native RGB565 video buffer
 
 The current `pico_286` binary removes the 32-bit intermediate video frame from

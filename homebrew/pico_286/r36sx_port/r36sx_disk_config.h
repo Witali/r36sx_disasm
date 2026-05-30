@@ -55,6 +55,12 @@ uint32_t r36sx_pico286_disk_cache_flush_sectors(void);
 // Return the dirty-cache age in milliseconds that triggers fflush().
 uint32_t r36sx_pico286_disk_cache_flush_ms(void);
 
+// Return non-zero when runtime profiling log output is enabled.
+int r36sx_pico286_profiling_enabled(void);
+
+// Return how often profiling summaries should be written to the log.
+uint32_t r36sx_pico286_profiling_log_ms(void);
+
 #ifdef __cplusplus
 }
 #endif

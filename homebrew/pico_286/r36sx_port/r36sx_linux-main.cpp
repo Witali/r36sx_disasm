@@ -11,6 +11,7 @@
 #include "emu8950.h"
 #include "linux-audio.h"
 #include "r36sx_disk_config.h"
+#include "r36sx_profile.h"
 
 static uint16_t ALIGN(4, SCREEN[640 * 480]);
 uint8_t ALIGN(4, DEBUG_VRAM[80 * 10]) = {0};
@@ -894,7 +895,10 @@ void *sound_thread(void *arg) {
             r36sx_pico286_debug_log("sound_thread: write #%u sample_index=%d",
                                     sound_loop_count, sample_index);
         }
-        if (linux_audio_write(audio_buffer, AUDIO_BUFFER_LENGTH) != 0) {
+        R36SX_PROFILE_BEGIN(profile_audio_write);
+        int audio_write_rc = linux_audio_write(audio_buffer, AUDIO_BUFFER_LENGTH);
+        R36SX_PROFILE_END(R36SX_PROFILE_AUDIO_WRITE, profile_audio_write);
+        if (audio_write_rc != 0) {
             // Audio write failed, but continue running
             // printf("Audio write failed!\n");
             // usleep(1000); // 1ms delay
@@ -947,45 +951,59 @@ void *ticks_thread(void *arg) {
         uint64_t system_period = timer_period > 0 ? hostfreq / (uint64_t)timer_period : hostfreq / 18;
 
         // Timer interrupt (~18.2 Hz)
-        for (unsigned int catchup = 0;
+        unsigned int system_catchup_count = 0;
+        R36SX_PROFILE_BEGIN(profile_timer_irq);
+        for (;
              elapsedTime - elapsed_system_timer >= system_period;
-             catchup++) {
+             system_catchup_count++) {
             doirq(0);
             elapsed_system_timer += system_period;
-            if (catchup >= max_system_catchup) {
+            if (system_catchup_count >= max_system_catchup) {
                 elapsed_system_timer = elapsedTime;
                 break;
             }
         }
+        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_TIMER_IRQ, profile_timer_irq,
+                                system_catchup_count);
 
         // Disney Sound Source frequency ~7KHz
-        for (unsigned int catchup = 0;
+        unsigned int dss_catchup_count = 0;
+        R36SX_PROFILE_BEGIN(profile_dss_sample);
+        for (;
              elapsedTime - last_dss_tick >= dss_period;
-             catchup++) {
+             dss_catchup_count++) {
             last_dss_sample = dss_sample();
             last_dss_tick += dss_period;
-            if (catchup >= max_dss_catchup) {
+            if (dss_catchup_count >= max_dss_catchup) {
                 last_dss_tick = elapsedTime;
                 break;
             }
         }
+        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_DSS_SAMPLE, profile_dss_sample,
+                                dss_catchup_count);
 
         // Sound Blaster
-        for (unsigned int catchup = 0;
+        unsigned int sb_catchup_count = 0;
+        R36SX_PROFILE_BEGIN(profile_sb_sample);
+        for (;
              elapsedTime - last_sb_tick >= sb_period;
-             catchup++) {
+             sb_catchup_count++) {
             last_sb_sample = blaster_sample();
             last_sb_tick += sb_period;
-            if (catchup >= max_sb_catchup) {
+            if (sb_catchup_count >= max_sb_catchup) {
                 last_sb_tick = elapsedTime;
                 break;
             }
         }
+        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_SB_SAMPLE, profile_sb_sample,
+                                sb_catchup_count);
 
         // Audio samples
-        for (unsigned int catchup = 0;
+        unsigned int audio_catchup_count = 0;
+        R36SX_PROFILE_BEGIN(profile_audio_sample);
+        for (;
              elapsedTime - last_sound_tick >= sound_period;
-             catchup++) {
+             audio_catchup_count++) {
             get_sound_sample(last_dss_sample + last_sb_sample, &audio_buffer[sample_index]);
             sample_index += 2;
 
@@ -998,11 +1016,14 @@ void *ticks_thread(void *arg) {
             }
 
             last_sound_tick += sound_period;
-            if (catchup >= max_audio_catchup) {
+            if (audio_catchup_count >= max_audio_catchup) {
                 last_sound_tick = elapsedTime;
                 break;
             }
         }
+        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_AUDIO_SAMPLE,
+                                profile_audio_sample,
+                                audio_catchup_count);
 
         // Cursor blink
         if (elapsedTime - elapsed_blink_tics >= blink_period) {
@@ -1014,7 +1035,9 @@ void *ticks_thread(void *arg) {
         // Frame rendering (60 FPS)
         if (elapsedTime - elapsed_frame_tics >= frame_period) {
             // ~60Hz
+            R36SX_PROFILE_BEGIN(profile_renderer);
             renderer();
+            R36SX_PROFILE_END(R36SX_PROFILE_RENDERER, profile_renderer);
             elapsed_frame_tics = elapsedTime;
         }
 
@@ -1028,6 +1051,7 @@ void *ticks_thread(void *arg) {
 int main() {
     r36sx_pico286_debug_reset();
     r36sx_pico286_debug_log("main: start");
+    r36sx_profile_init();
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGSEGV, fatal_signal_handler);
@@ -1088,16 +1112,27 @@ int main() {
     unsigned int main_loop_count = 0;
     while (running) {
         if (soft_reset_requested) {
+            R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
+            R36SX_PROFILE_END(R36SX_PROFILE_SOFT_RESET, profile_soft_reset);
         }
+        R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_keyboard_tick();
+        R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_1);
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
         }
+        R36SX_PROFILE_BEGIN(profile_exec86);
         exec86(cpu_exec_loops);
+        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
+                                cpu_exec_loops);
+        R36SX_PROFILE_BEGIN(profile_disk_flush);
         r36sx_pico286_disk_flush_pending();
+        R36SX_PROFILE_END(R36SX_PROFILE_DISK_FLUSH, profile_disk_flush);
+        R36SX_PROFILE_BEGIN(profile_keyboard_tick_2);
         r36sx_keyboard_tick();
+        R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_2);
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
@@ -1110,16 +1145,22 @@ int main() {
             r36sx_pico286_debug_log("main: before mfb_update loop=%u",
                                     main_loop_count);
         }
-        if (mfb_update(SCREEN, 0) < 0) {
+        R36SX_PROFILE_BEGIN(profile_mfb_update);
+        int mfb_update_rc = mfb_update(SCREEN, 0);
+        R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
+        if (mfb_update_rc < 0) {
             r36sx_pico286_debug_log("main: mfb_update requested stop");
             running = 0;
             break;
         }
+        R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
         r36sx_keyboard_tick();
+        R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_3);
         if (main_loop_count <= 8u) {
             r36sx_pico286_debug_log("main: after mfb_update loop=%u",
                                     main_loop_count);
         }
+        r36sx_profile_maybe_log();
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);
 
