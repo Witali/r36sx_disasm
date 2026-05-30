@@ -219,8 +219,8 @@ shortcuts.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a lower-right
 two-column overlay above the disk LED.  It shows decoded x86 instruction loops
-per second, host disk image read/write KB/s, and presented FPS.  Set it to `0`
-to disable the shortcut and overlay.
+in K/s, host disk image read/write KB/s, and presented FPS.  Set it to `0` to
+disable the shortcut and overlay.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

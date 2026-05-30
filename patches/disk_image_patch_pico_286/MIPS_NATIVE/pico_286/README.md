@@ -121,8 +121,8 @@ Set `screenshot_format=png` for compressed screenshots or
 
 Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
-instruction loops per second, host disk image read/write KB/s, and presented
-FPS.  Set it to `0` to disable the shortcut and overlay.
+instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
+Set it to `0` to disable the shortcut and overlay.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,

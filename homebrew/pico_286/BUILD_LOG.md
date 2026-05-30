@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-05-30 statistics x86 rate in K/s
+
+The `X86` row in the on-screen statistics table now displays thousands of
+decoded x86 instruction loops per second, matching the compact `K/s` style used
+for disk read/write rates.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,009,336 bytes
+- SHA256: `16F3DD7ED93EADB8557433A71EF576AE297F7F6C993110870BDA34FD58BE9FCF`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 lower-right statistics table
 
 Changed the `Fn` + D-pad `Down` statistics overlay from a single top-left text
@@ -8,7 +38,7 @@ above the disk activity LED.  Metric names now stay in one column and values in
 the next column:
 
 ```text
-X86    123456/s
+X86    123K/s
 READ   0K/s
 WRITE  0K/s
 FPS    60

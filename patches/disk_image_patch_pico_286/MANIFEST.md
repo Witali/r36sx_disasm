@@ -30,6 +30,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 statistics x86 rate in K/s
+
+The `X86` row in the on-screen statistics table now displays thousands of
+decoded x86 instruction loops per second as `K/s`, matching the compact disk
+read/write rate style.
+
+```text
+pico_286 size: 1009336 bytes
+pico_286 SHA256: 16F3DD7ED93EADB8557433A71EF576AE297F7F6C993110870BDA34FD58BE9FCF
+Defender scan: found no threats
+```
+
 ## 2026-05-30 lower-right statistics table
 
 The `Fn` + D-pad `Down` statistics overlay now draws a compact lower-right

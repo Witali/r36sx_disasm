@@ -263,8 +263,8 @@ static void r36sx_mfb_draw_stats_overlay(uint16_t *target)
     }
 
     r36sx_app_stats_snapshot(&stats);
-    snprintf(values[0], sizeof(values[0]), "%lu/s",
-             (unsigned long)stats.x86_per_sec);
+    snprintf(values[0], sizeof(values[0]), "%luK/s",
+             (unsigned long)(stats.x86_per_sec / 1000u));
     snprintf(values[1], sizeof(values[1]), "%luK/s",
              (unsigned long)stats.disk_read_kb_per_sec);
     snprintf(values[2], sizeof(values[2]), "%luK/s",
