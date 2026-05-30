@@ -756,9 +756,20 @@ int r36sx_pico286_save_config(void)
 
     fprintf(fp, "# Pico-286 disk image bindings for the R36SX native port.\n");
     fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
-    fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
+
+    fprintf(fp, "# CPU speed knob for this port.\n");
+    fprintf(fp, "[cpu]\n");
+    fprintf(fp, "cpu_mhz=%s\n\n", cpu_mhz_text);
+
+    fprintf(fp, "# Boot behavior and boot-sector probe order.\n");
+    fprintf(fp, "[boot]\n");
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
+
+    fprintf(fp, "# Screenshot output format: png or bmp.\n");
+    fprintf(fp, "[screenshot]\n");
+    fprintf(fp, "screenshot_format=%s\n\n", screenshot_format_text);
+
     fprintf(fp, "# Disk image I/O cache.\n");
     fprintf(fp, "# disk_cache_buffer_kb is the stdio buffer allocated per image file.\n");
     fprintf(fp, "# fflush runs after disk_cache_flush_sectors dirty sectors or after\n");
@@ -771,11 +782,14 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[profiling]\n");
     fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
     fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
-    fprintf(fp, "# Screenshot output format: png or bmp.\n");
-    fprintf(fp, "[screenshot]\n");
-    fprintf(fp, "screenshot_format=%s\n\n", screenshot_format_text);
+
+    fprintf(fp, "# BIOS floppy drives 00h and 01h, DOS A: and B:.\n");
+    fprintf(fp, "[floppy_drives]\n");
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
-    fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
+    fprintf(fp, "fdd1=%s\n\n", disk_entries[1].value);
+
+    fprintf(fp, "# BIOS hard drives 80h and 81h, DOS C: and D:.\n");
+    fprintf(fp, "[hard_drives]\n");
     fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
     fprintf(fp, "hdd0_geometry=%s\n", hdd_geometry_text[0]);
     fprintf(fp, "hdd1=%s\n", disk_entries[3].value);

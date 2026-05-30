@@ -1,5 +1,13 @@
 # pico-286 Build Log
 
+## 2026-05-30 grouped configuration sections
+
+Grouped all `pico_286.conf` options under INI section headers.  The parser
+continues to accept keys by name, but the default template and
+`r36sx_pico286_save_config()` now write `[cpu]`, `[boot]`, `[screenshot]`,
+`[disk_cache]`, `[profiling]`, `[floppy_drives]`, and `[hard_drives]`
+sections so no option remains at top level.
+
 ## 2026-05-30 configurable screenshot format
 
 Added `screenshot_format` to `pico_286.conf`.  Supported values are `png` and

@@ -166,16 +166,25 @@ The upstream PC disk images are still expected by the emulator.  In this port,
 devices:
 
 ```ini
+[cpu]
 cpu_mhz=32.768
+
+[boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
+
 [screenshot]
 screenshot_format=png
+
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
+
+[floppy_drives]
 fdd0=FreeDOS1.img
 fdd1=sopwith.img
+
+[hard_drives]
 hdd0=hdd.img
 hdd0_geometry=65,16,63
 hdd1=hdd2.img

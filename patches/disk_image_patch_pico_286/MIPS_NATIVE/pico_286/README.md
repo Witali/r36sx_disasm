@@ -72,17 +72,34 @@ bulk when the DOS DMA buffer is ordinary RAM.  Each opened image also gets a
 stdio buffer controlled by:
 
 ```text
+[cpu]
+cpu_mhz=32.768
+
+[boot]
+boot_mode=normal
+boot_order=fdd0,hdd0
+
+[screenshot]
+screenshot_format=png
+
 [disk_cache]
 disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
 disk_cache_flush_ms=2000
 
-[screenshot]
-screenshot_format=png
-
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
+
+[floppy_drives]
+fdd0=FreeDOS1.img
+fdd1=sopwith.img
+
+[hard_drives]
+hdd0=hdd.img
+hdd0_geometry=65,16,63
+hdd1=hdd2.img
+hdd1_geometry=65,16,63
 ```
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another

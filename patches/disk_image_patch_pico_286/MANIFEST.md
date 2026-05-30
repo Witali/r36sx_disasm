@@ -30,6 +30,12 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 grouped configuration sections
+
+The current `pico_286.conf` template and the runtime config writer group every
+option under an INI section: `[cpu]`, `[boot]`, `[screenshot]`,
+`[disk_cache]`, `[profiling]`, `[floppy_drives]`, and `[hard_drives]`.
+
 ## 2026-05-30 configurable screenshot format
 
 The current `pico_286` binary reads `screenshot_format` from `pico_286.conf`.
