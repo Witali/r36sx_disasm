@@ -168,6 +168,10 @@ static inline void vga_update_gc_cache(void) {
 uint8_t __not_in_flash() vga_mem_read(const uint32_t address) {
     vga_latch32 = VIDEORAM[address & 0xFFFF];
 
+    if (videomode == 0x13 && !vga_planar_mode) {
+        return (uint8_t)(vga_latch32 & 0xFFu);
+    }
+
     if (vga.read_mode == 0) {
         // return the selected byte from latch
         const uint32_t shift = (vga.read_map_select & 3u) << 3;
@@ -185,6 +189,12 @@ uint8_t __not_in_flash() vga_mem_read(const uint32_t address) {
 
 uint16_t __not_in_flash() vga_mem_read16(uint32_t address) {
     address &= 0xFFFF;
+
+    if (videomode == 0x13 && !vga_planar_mode) {
+        const uint16_t byte_low = (uint8_t)(VIDEORAM[address] & 0xFFu);
+        const uint16_t byte_high = (uint8_t)(VIDEORAM[(address + 1u) & 0xFFFFu] & 0xFFu);
+        return byte_low | byte_high << 8;
+    }
 
     // Load two DWORDs from VRAM
     const uint32_t plane_lo = VIDEORAM[address];
@@ -318,6 +328,11 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
     const uint32_t set_reset32 = vga.set_reset32;
     uint32_t *videoram_data = &VIDEORAM[address & 0xFFFF]; // current data pointer
 
+    if (videomode == 0x13 && !vga_planar_mode) {
+        *videoram_data = cpu_data;
+        return;
+    }
+
     switch (vga.write_mode) {
         case 0: {
             // Mode 0: Normal write with set/reset + ALU
@@ -378,6 +393,12 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
     const uint32_t index0 = address & 0xFFFFu;
     uint32_t *p0 = &VIDEORAM[index0];
     uint32_t *p1 = &VIDEORAM[(index0 + 1u) & 0xFFFFu];
+
+    if (videomode == 0x13 && !vga_planar_mode) {
+        *p0 = (uint8_t)(cpu_data_x2 & 0xFFu);
+        *p1 = (uint8_t)(cpu_data_x2 >> 8);
+        return;
+    }
 
     if (wmode == 1) {
         // Mode 1: latch -> enabled planes

@@ -1,5 +1,60 @@
 # pico-286 Build Log
 
+## 2026-05-30 3DBENCH VGA Mode 13h rendering fix
+
+Investigated `C:\Temp\3DBENCH.EXE` with Ghidra 12.0.4.  The DOS EXE is
+self-relocating, so the default analysis only found the startup stub.  Added
+`ghidra_scripts/DumpDisasmRanges.java` and dumped the relevant video ranges.
+
+Findings:
+
+- `3DBENCH.EXE` enters graphics with `MOV AX,0013h` / `INT 10h`, so it uses
+  standard VGA Mode 13h, 320x200x256.
+- It loads palette blocks with `MOV AX,1012h` / `INT 10h`.
+- It clears and draws the screen with direct writes to `A000:0000`.
+- No direct VGA sequencer/graphics-controller port programming was found in
+  the inspected video setup path.
+
+Fix:
+
+- `vga_mem_read()` / `vga_mem_write()` / 16-bit variants now treat non-planar
+  Mode 13h as linear 8-bit video memory: one emulated byte per
+  `VIDEORAM[offset]` cell.
+- The R36SX renderer no longer reads non-planar Mode 13h by casting
+  `VIDEORAM` to `uint8_t *`; it reads the low byte from the logical
+  `VIDEORAM[]` cell instead.
+
+Ghidra commands:
+
+```powershell
+.\ghidra_12.0.4_PUBLIC\support\analyzeHeadless.bat .\ghidra_projects 3dbench_dos -import C:\Temp\3DBENCH.EXE -scriptPath .\ghidra_scripts -postScript ExportDisasmAndDecompile.java .\ghidra_exports\3DBENCH.EXE -deleteProject
+.\ghidra_12.0.4_PUBLIC\support\analyzeHeadless.bat .\ghidra_projects 3dbench_disasm_ranges -import C:\Temp\3DBENCH.EXE -scriptPath .\ghidra_scripts -postScript DumpDisasmRanges.java .\ghidra_exports\3DBENCH.EXE\video_ranges.s 1000:3d8f 0x80 1000:3f50 0xd0 1000:40c8 0x40 1000:44c0 0x30 1000:69d8 0x30 -deleteProject
+```
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,079,928 bytes
+- SHA256: `DDD866F5E2550E4B9A046F44E1C3247257DDFF4B47C1BDD9E54644B70ED199C3`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 memory bounds hardening
 
 Audited emulator memory access paths and fixed host-array boundary hazards:

@@ -564,9 +564,9 @@ static inline void renderer() {
                             *pixels++ = *pixels++ = color;
                         }
                     } else {
-                        uint8_t *vga_row = (uint8_t *)VIDEORAM + (y >> 1) * 320;
+                        uint32_t *vga_row = &VIDEORAM[vram_offset + (y >> 1) * 320];
                         for (int x = 0; x < 320; x++) {
-                            uint16_t color = vga_palette565[*vga_row++];
+                            uint16_t color = vga_palette565[*vga_row++ & 0xFFu];
                             *pixels++ = *pixels++ = color;
                         }
                     }
