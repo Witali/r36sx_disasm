@@ -52,7 +52,9 @@ static inline uint8_t videoram_read8_raw(const uint32_t address)
 static inline void videoram_write8(const uint32_t address, const uint8_t value)
 {
     if (videoram_uses_vga_path()) {
-        vga_mem_write(address, value);
+        if (vga_memory_address_visible(address)) {
+            vga_mem_write(vga_memory_address_offset(address), value);
+        }
         return;
     }
     videoram_write8_raw(address, value);
@@ -61,7 +63,10 @@ static inline void videoram_write8(const uint32_t address, const uint8_t value)
 static inline uint8_t videoram_read8(const uint32_t address)
 {
     if (videoram_uses_vga_path()) {
-        return vga_mem_read(address);
+        if (vga_memory_address_visible(address)) {
+            return vga_mem_read(vga_memory_address_offset(address));
+        }
+        return 0xFFu;
     }
     return videoram_read8_raw(address);
 }
@@ -69,7 +74,8 @@ static inline uint8_t videoram_read8(const uint32_t address)
 static inline void videoram_write16(const uint32_t address, const uint16_t value)
 {
     if (videoram_uses_vga_path()) {
-        vga_mem_write16(address, value);
+        videoram_write8(address, (uint8_t)value);
+        videoram_write8(address + 1u, (uint8_t)(value >> 8));
         return;
     }
     videoram_write8_raw(address, (uint8_t)value);
@@ -79,7 +85,8 @@ static inline void videoram_write16(const uint32_t address, const uint16_t value
 static inline uint16_t videoram_read16(const uint32_t address)
 {
     if (videoram_uses_vga_path()) {
-        return vga_mem_read16(address);
+        return (uint16_t)videoram_read8(address) |
+               ((uint16_t)videoram_read8(address + 1u) << 8);
     }
     return (uint16_t)videoram_read8_raw(address) |
            ((uint16_t)videoram_read8_raw(address + 1u) << 8);

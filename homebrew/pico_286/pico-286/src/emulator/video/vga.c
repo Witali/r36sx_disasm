@@ -165,6 +165,31 @@ static inline void vga_update_gc_cache(void) {
     vga.bit_mask32 = expand_to_u32(vga.graphics_controller[8]);
 }
 
+int vga_memory_address_visible(const uint32_t address) {
+    switch ((vga.graphics_controller[6] >> 2) & 0x03u) {
+        case 0:
+            return address >= 0xA0000u && address < 0xC0000u;
+        case 1:
+            return address >= 0xA0000u && address < 0xB0000u;
+        case 2:
+            return address >= 0xB0000u && address < 0xB8000u;
+        case 3:
+            return address >= 0xB8000u && address < 0xC0000u;
+    }
+    return 0;
+}
+
+uint32_t vga_memory_address_offset(const uint32_t address) {
+    switch ((vga.graphics_controller[6] >> 2) & 0x03u) {
+        case 2:
+            return (address - 0xB0000u) & 0x7FFFu;
+        case 3:
+            return (address - 0xB8000u) & 0x7FFFu;
+        default:
+            return address & 0xFFFFu;
+    }
+}
+
 // ---------------------- Read path ----------------------
 
 // Read a byte from VGA memory (emulates CPU byte read from VGA window).

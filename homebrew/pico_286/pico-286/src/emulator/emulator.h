@@ -235,6 +235,8 @@ uint32_t readdw86_sw(uint32_t address);
 void vga_portout(uint16_t portnum, uint16_t value);
 uint16_t vga_portin(uint16_t portnum);
 void vga_attribute_reset_flipflop(void);
+int vga_memory_address_visible(uint32_t address);
+uint32_t vga_memory_address_offset(uint32_t address);
 extern void portout(uint16_t portnum, uint16_t value);
 extern void portout16(uint16_t portnum, uint16_t value);
 extern uint16_t portin(uint16_t portnum);
