@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-30 emulator key auto-repeat
+
+Added typematic-style auto-repeat for keys that are sent into the emulated PC:
+
+- physical R36SX buttons mapped by the active key preset now send one PC make
+  scancode on press, repeated make scancodes while held, and one break scancode
+  on release;
+- Shift, Ctrl, and Alt are not repeated;
+- the on-screen keyboard now repeats emitted keys while holding A, Start, B, X,
+  or Y, so Backspace/Escape/Enter and the highlighted virtual key can repeat;
+- the existing on-screen keyboard D-pad navigation repeat is unchanged.
+
+The repeat timing is currently fixed in code: 420 ms initial delay, then one
+repeat about every 70 ms.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,058,080 bytes
+- SHA256: `3C59964570128A81702E1645508CDC4694573ADCFE7F068A74AEB60B84525222`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 configurable 386 CPU model mode
 
 Added a configurable CPU identity layer for the R36SX Pico-286 port:

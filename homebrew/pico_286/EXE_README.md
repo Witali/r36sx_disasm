@@ -19,6 +19,8 @@ The default key preset maps physical buttons like this:
 
 These mappings can be changed in the key preset editor.  There is no
 Select+Start exit shortcut; use Fn+X or the long Fn hold described below.
+Held mapped keys auto-repeat after a short delay, except modifier keys such as
+Shift, Ctrl, and Alt.
 
 ## Fn Shortcuts
 
@@ -52,6 +54,7 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 - Y: Enter.
 - Select: close the keyboard.
 
+Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
 DOS keyboard does not show the right-side cursor-key block; that block is only
 shown by the key picker inside the preset editor.  The keyboard panel is drawn

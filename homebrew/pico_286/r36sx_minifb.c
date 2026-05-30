@@ -45,6 +45,8 @@
 #define R36SX_PICO286_SCREENSHOT_TOAST_MS 500u
 #define R36SX_PICO286_SCREENSHOT_PREVIEW_W 160
 #define R36SX_PICO286_SCREENSHOT_PREVIEW_H 120
+#define R36SX_PICO286_KEY_REPEAT_DELAY_US 420000ull
+#define R36SX_PICO286_KEY_REPEAT_INTERVAL_US 70000ull
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -69,6 +71,7 @@ struct r36sx_mfb_driver {
     uint32_t cube_key_addr;
     volatile uint32_t *cube_key_mem;
     uint8_t key_down[256];
+    uint64_t key_repeat_next_us[256];
     uint64_t last_present_us;
     uint32_t last_raw_keys;
     struct r36sx_screen_keyboard osk;
@@ -795,7 +798,52 @@ static void r36sx_mfb_release_all_keys(void)
             HandleInput((unsigned int)code, 0);
             g_mfb.key_down[code] = 0;
         }
+        g_mfb.key_repeat_next_us[code] = 0;
     }
+}
+
+static int r36sx_mfb_key_is_repeatable(uint16_t keycode)
+{
+    switch (keycode) {
+    case R36SX_SCREEN_KEY_SHIFT:
+    case R36SX_SCREEN_KEY_CONTROL:
+    case R36SX_SCREEN_KEY_MENU:
+        return 0;
+    default:
+        return keycode > 0 && keycode < 256;
+    }
+}
+
+static void r36sx_mfb_update_key_state(unsigned int keycode, int is_down,
+                                       uint64_t now_us)
+{
+    if (keycode >= sizeof(g_mfb.key_down)) {
+        return;
+    }
+
+    if (is_down != 0) {
+        if (!g_mfb.key_down[keycode]) {
+            HandleInput(keycode, 1);
+            g_mfb.key_down[keycode] = 1;
+            g_mfb.key_repeat_next_us[keycode] =
+                r36sx_mfb_key_is_repeatable((uint16_t)keycode) ?
+                    now_us + R36SX_PICO286_KEY_REPEAT_DELAY_US : 0;
+            return;
+        }
+        if (g_mfb.key_repeat_next_us[keycode] != 0 &&
+            (int64_t)(now_us - g_mfb.key_repeat_next_us[keycode]) >= 0) {
+            HandleInput(keycode, 1);
+            g_mfb.key_repeat_next_us[keycode] =
+                now_us + R36SX_PICO286_KEY_REPEAT_INTERVAL_US;
+        }
+        return;
+    }
+
+    if (g_mfb.key_down[keycode]) {
+        HandleInput(keycode, 0);
+        g_mfb.key_down[keycode] = 0;
+    }
+    g_mfb.key_repeat_next_us[keycode] = 0;
 }
 
 static void r36sx_mfb_emit_osk_key(void *user, uint16_t keycode, int is_down)
@@ -1271,6 +1319,7 @@ static int r36sx_mfb_poll_input(void)
         R36SX_RKGAME_KEY_R2
     };
     uint8_t new_down[256];
+    uint64_t now_us = r36sx_mfb_now_us();
     uint32_t raw = r36sx_mfb_read_raw_keys();
     uint32_t pressed = raw & ~g_mfb.last_raw_keys;
     uint32_t released = ~raw & g_mfb.last_raw_keys;
@@ -1391,10 +1440,8 @@ static int r36sx_mfb_poll_input(void)
     }
 
     for (size_t code = 0; code < sizeof(new_down); code++) {
-        if (new_down[code] != g_mfb.key_down[code]) {
-            HandleInput((unsigned int)code, new_down[code] != 0);
-            g_mfb.key_down[code] = new_down[code];
-        }
+        r36sx_mfb_update_key_state((unsigned int)code, new_down[code] != 0,
+                                   now_us);
     }
     g_mfb.last_raw_keys = raw;
     return 0;

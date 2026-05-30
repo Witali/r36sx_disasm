@@ -20,8 +20,13 @@
 #define R36SX_OSK_NAV_MASK \
     (R36SX_RKGAME_KEY_LEFT | R36SX_RKGAME_KEY_RIGHT | \
      R36SX_RKGAME_KEY_UP | R36SX_RKGAME_KEY_DOWN)
+#define R36SX_OSK_KEY_REPEAT_MASK \
+    (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START | R36SX_RKGAME_KEY_B | \
+     R36SX_RKGAME_KEY_X | R36SX_RKGAME_KEY_Y)
 #define R36SX_OSK_NAV_REPEAT_DELAY_US 280000ull
 #define R36SX_OSK_NAV_REPEAT_INTERVAL_US 85000ull
+#define R36SX_OSK_KEY_REPEAT_DELAY_US 420000ull
+#define R36SX_OSK_KEY_REPEAT_INTERVAL_US 70000ull
 #define R36SX_OSK_CURSOR_BLOCK_W \
     (R36SX_OSK_CURSOR_BLOCK_COLS * R36SX_OSK_CURSOR_KEY_W + \
      (R36SX_OSK_CURSOR_BLOCK_COLS - 1) * R36SX_OSK_CURSOR_GAP)
@@ -541,6 +546,80 @@ static void reset_nav_repeat(struct r36sx_screen_keyboard *keyboard)
     keyboard->nav_repeat_next_us = 0;
 }
 
+static void reset_key_repeat(struct r36sx_screen_keyboard *keyboard)
+{
+    if (!keyboard) {
+        return;
+    }
+    keyboard->key_repeat_button = 0;
+    keyboard->key_repeat_keycode = 0;
+    keyboard->key_repeat_force_shift = 0;
+    keyboard->key_repeat_next_us = 0;
+}
+
+static uint32_t first_key_repeat_button(uint32_t buttons)
+{
+    if ((buttons & R36SX_RKGAME_KEY_A) != 0) {
+        return R36SX_RKGAME_KEY_A;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_START) != 0) {
+        return R36SX_RKGAME_KEY_START;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_B) != 0) {
+        return R36SX_RKGAME_KEY_B;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_X) != 0) {
+        return R36SX_RKGAME_KEY_X;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_Y) != 0) {
+        return R36SX_RKGAME_KEY_Y;
+    }
+    return 0;
+}
+
+static void start_key_repeat(struct r36sx_screen_keyboard *keyboard,
+                             uint32_t buttons,
+                             uint16_t keycode,
+                             int force_shift)
+{
+    uint32_t repeat_button = first_key_repeat_button(buttons);
+
+    if (!keyboard || repeat_button == 0 || keycode == 0) {
+        return;
+    }
+
+    keyboard->key_repeat_button = repeat_button;
+    keyboard->key_repeat_keycode = keycode;
+    keyboard->key_repeat_force_shift = (uint8_t)(force_shift != 0);
+    keyboard->key_repeat_next_us = now_us() + R36SX_OSK_KEY_REPEAT_DELAY_US;
+}
+
+static void handle_key_repeat(struct r36sx_screen_keyboard *keyboard,
+                              uint32_t held,
+                              r36sx_screen_keyboard_emit_fn emit,
+                              void *emit_user)
+{
+    uint64_t now;
+
+    if (!keyboard || keyboard->key_repeat_button == 0 ||
+        keyboard->key_repeat_keycode == 0) {
+        return;
+    }
+    if ((held & keyboard->key_repeat_button) == 0) {
+        reset_key_repeat(keyboard);
+        return;
+    }
+
+    now = now_us();
+    if ((int64_t)(now - keyboard->key_repeat_next_us) < 0) {
+        return;
+    }
+
+    emit_key(keyboard, emit, emit_user, keyboard->key_repeat_keycode,
+             keyboard->key_repeat_force_shift != 0);
+    keyboard->key_repeat_next_us = now + R36SX_OSK_KEY_REPEAT_INTERVAL_US;
+}
+
 static uint32_t nav_buttons_with_repeat(struct r36sx_screen_keyboard *keyboard,
                                         uint32_t pressed,
                                         uint32_t held)
@@ -707,6 +786,8 @@ static uint32_t activate_current(struct r36sx_screen_keyboard *keyboard,
     if (key->keycode != 0) {
         emit_key(keyboard, emit, emit_user, key->keycode,
                  (key->flags & R36SX_OSK_FLAG_SHIFTED) != 0);
+        start_key_repeat(keyboard, buttons, key->keycode,
+                         (key->flags & R36SX_OSK_FLAG_SHIFTED) != 0);
     }
     return 0;
 }
@@ -798,6 +879,10 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->press_buttons = 0;
     keyboard->nav_repeat_button = 0;
     keyboard->nav_repeat_next_us = 0;
+    keyboard->key_repeat_button = 0;
+    keyboard->key_repeat_keycode = 0;
+    keyboard->key_repeat_force_shift = 0;
+    keyboard->key_repeat_next_us = 0;
 }
 
 int r36sx_screen_keyboard_is_visible(
@@ -819,6 +904,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->alt = 0;
         keyboard->press_buttons = 0;
         reset_nav_repeat(keyboard);
+        reset_key_repeat(keyboard);
     }
 }
 
@@ -897,22 +983,30 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_BACK,
                                       pressed & R36SX_RKGAME_KEY_B);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_BACK, 0);
+        start_key_repeat(keyboard, pressed & R36SX_RKGAME_KEY_B,
+                         R36SX_SCREEN_KEY_BACK, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
         start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_ESCAPE,
                                       pressed & R36SX_RKGAME_KEY_X);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_ESCAPE, 0);
+        start_key_repeat(keyboard, pressed & R36SX_RKGAME_KEY_X,
+                         R36SX_SCREEN_KEY_ESCAPE, 0);
     }
     if ((pressed & R36SX_RKGAME_KEY_Y) != 0) {
         start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_RETURN,
                                       pressed & R36SX_RKGAME_KEY_Y);
         emit_key(keyboard, emit, emit_user, R36SX_SCREEN_KEY_RETURN, 0);
+        start_key_repeat(keyboard, pressed & R36SX_RKGAME_KEY_Y,
+                         R36SX_SCREEN_KEY_RETURN, 0);
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START)) != 0) {
         result |= activate_current(
             keyboard, emit, emit_user,
             pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_START));
     }
+    handle_key_repeat(keyboard, held & R36SX_OSK_KEY_REPEAT_MASK, emit,
+                      emit_user);
     return result;
 }
 

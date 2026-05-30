@@ -67,4 +67,5 @@ Current physical button bindings while the keyboard is visible:
 - X sends Escape immediately.
 - Select closes the keyboard.
 
+Holding A, Start, B, X, or Y repeats the emitted key after a short delay.
 Shift is still available as the on-screen `SHF` key.
