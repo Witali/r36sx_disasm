@@ -2,8 +2,8 @@
 #include <stdbool.h>
 #include "emulator.h"
 
-//#define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
-//#define CPU_LIMIT_SHIFT_COUNT
+#define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
+#define CPU_LIMIT_SHIFT_COUNT
 #define CPU_NO_SALC
 //#define CPU_SET_HIGH_FLAGS
 #define CPU_286_STYLE_PUSH_SP
@@ -1851,6 +1851,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
         segoverride = 0;
         useseg = CPU_DS;
         uint8_t docontinue = 0;
+        uint8_t prefix_exception = 0;
         firstip = CPU_IP;
         register uint8_t opcode;
 
@@ -1891,6 +1892,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     segoverride = 1;
                     break;
 
+#if CPU_386_EXTENDED_OPS
                 case 0x64: /* segment CPU_FS */
                     useseg = CPU_FS;
                     segoverride = 1;
@@ -1900,6 +1902,15 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     useseg = CPU_GS;
                     segoverride = 1;
                     break;
+#else
+                case 0x64:
+                case 0x65:
+                    CPU_IP = firstip;
+                    intcall86(6);
+                    prefix_exception = 1;
+                    docontinue = 1;
+                    break;
+#endif
 
                 case 0xF0: /* LOCK (?????????? ????, ??? ????????? ????????) */
                     /// TODO:
@@ -1918,6 +1929,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     docontinue = 1;
                     break;
             }
+        }
+        if (prefix_exception) {
+            continue;
         }
 
         register uint32_t res32;
@@ -3235,17 +3249,15 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_6C: ;
 #endif
-                /* 6E INSB */
+                /* 6C INSB */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
 
                 putmem8(CPU_ES, CPU_DI, portin(CPU_DX));
                 if (df) {
-                    CPU_SI = CPU_SI - 1;
                     CPU_DI = CPU_DI - 1;
                 } else {
-                    CPU_SI = CPU_SI + 1;
                     CPU_DI = CPU_DI + 1;
                 }
 
@@ -3265,17 +3277,15 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_6D: ;
 #endif
-                /* 6F INSW */
+                /* 6D INSW */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
 
                 putmem16(CPU_ES, CPU_DI, portin16(CPU_DX));
                 if (df) {
-                    CPU_SI = CPU_SI - 2;
                     CPU_DI = CPU_DI - 2;
                 } else {
-                    CPU_SI = CPU_SI + 2;
                     CPU_DI = CPU_DI + 2;
                 }
 
@@ -3303,10 +3313,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 portout(CPU_DX, getmem8(useseg, CPU_SI));
                 if (df) {
                     CPU_SI = CPU_SI - 1;
-                    CPU_DI = CPU_DI - 1;
                 } else {
                     CPU_SI = CPU_SI + 1;
-                    CPU_DI = CPU_DI + 1;
                 }
 
                 if (reptype) {
@@ -3333,10 +3341,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 portout16(CPU_DX, getmem16(useseg, CPU_SI));
                 if (df) {
                     CPU_SI = CPU_SI - 2;
-                    CPU_DI = CPU_DI - 2;
                 } else {
                     CPU_SI = CPU_SI + 2;
-                    CPU_DI = CPU_DI + 2;
                 }
 
                 if (reptype) {
@@ -3757,6 +3763,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* 8C MOV Ew Sw */
                 modregrm();
+                if (reg > regds) {
+                    CPU_IP = firstip;
+                    intcall86(6);
+                    break;
+                }
 
                 writerm16(rm, getsegreg(reg)
                 );
@@ -3782,6 +3793,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* 8E MOV Sw Ew */
                 modregrm();
+                if (reg == regcs || reg > regds) {
+                    CPU_IP = firstip;
+                    intcall86(6);
+                    break;
+                }
 
                 putsegreg(reg, readrm16(rm)
                 );
@@ -4792,6 +4808,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #ifndef CPU_NO_SALC
                 CPU_AL = CPU_FL_CF ? 0xFF : 0x00;
                 break;
+#else
+                /* Undefined on 80286; documented as a no-op compatibility hole. */
+                break;
 #endif
 
             case 0xD7:
@@ -5218,9 +5237,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_default: ;
 #endif
 #ifdef CPU_ALLOW_ILLEGAL_OP_EXCEPTION
+                CPU_IP = firstip;
                 intcall86(6); /* trip invalid opcode exception. this occurs on the 80186+, 8086/8088 CPUs treat them as NOPs. */
                 /* technically they aren't exactly like NOPs in most cases, but for our pursoses, that's accurate enough. */
-                printf("[CPU] Invalid opcode 0x%02x exception at %04X:%04X\r\n", opcode, CPU_CS, firstip);
+                r36sx_pico286_debug_log("[CPU] Invalid opcode 0x%02x exception at %04X:%04X",
+                                        opcode, CPU_CS, firstip);
 #endif
                 break;
         }

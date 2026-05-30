@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-30 80286 real-mode correctness fixes
+
+Fixed several obvious 80286 real-mode CPU emulation mismatches found during
+the ISA audit:
+
+- enabled 80286+ shift/rotate count masking to the low 5 bits;
+- made default invalid opcodes raise `INT 6` at the faulting instruction;
+- rejected 386-only `FS`/`GS` segment prefixes and segment-register encodings;
+- fixed `INSB`/`INSW` to update only `DI`, and `OUTSB`/`OUTSW` to update only
+  `SI`;
+- made opcode `D6h` a no-op compatibility hole instead of falling through into
+  `XLAT`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,026,204 bytes
+- SHA256: `786758A39DEC9DCF4D7D0EE86152640C3596C4C553FAF8F6FE0ECBEBEEBF24D3`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 realistic CGA status port timing
 
 Moved CGA status port `3DAh` emulation out of the renderer path.  `cga_portin`
