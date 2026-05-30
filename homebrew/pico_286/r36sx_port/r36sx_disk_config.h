@@ -18,6 +18,17 @@ typedef enum {
     R36SX_PICO286_SCREENSHOT_FORMAT_BMP = 1,
 } r36sx_pico286_screenshot_format_t;
 
+typedef enum {
+    R36SX_PICO286_CPU_8086 = 0,
+    R36SX_PICO286_CPU_80286 = 1,
+    R36SX_PICO286_CPU_80386 = 2,
+} r36sx_pico286_cpu_model_t;
+
+typedef enum {
+    R36SX_PICO286_CPU_MODE_REAL = 0,
+    R36SX_PICO286_CPU_MODE_PROTECTED = 1,
+} r36sx_pico286_cpu_mode_t;
+
 // Return the configured host image path for a BIOS disk drive, or fallback_path.
 const char *r36sx_pico286_disk_path(uint8_t bios_drive,
                                     const char *fallback_path);
@@ -37,6 +48,21 @@ int r36sx_pico286_save_config(void);
 
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
+
+// Return the configured CPU compatibility model.
+r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void);
+
+// Return non-zero when the configured CPU model is at least the requested one.
+int r36sx_pico286_cpu_model_at_least(r36sx_pico286_cpu_model_t model);
+
+// Return the configured CPU model text used when rewriting config.
+const char *r36sx_pico286_cpu_model_name(void);
+
+// Return the configured initial CPU execution mode.
+r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void);
+
+// Return the configured CPU execution mode text used when rewriting config.
+const char *r36sx_pico286_cpu_mode_name(void);
 
 // Return non-zero when boot should stop at the ROM BIOS boot prompt.
 int r36sx_pico286_boot_bios_prompt(void);

@@ -191,13 +191,12 @@ __not_in_flash() void modregrm() {
     if (addressSizeOverride) {
         // 32-?????? ?????
         if (mode != 3 && rm == 4) {
-            // SIB ????????????
             sib = getmem8(CPU_CS, CPU_IP);
             StepIP(1);
         }
         switch (mode) {
             case 0:
-                if (rm == 5) {
+                if (rm == 5 || (rm == 4 && (sib & 7u) == 5u)) {
                     disp32 = getmem32(CPU_CS, CPU_IP);
                     StepIP(4);
                 } else {
@@ -249,7 +248,8 @@ __not_in_flash() void modregrm() {
     }
 }
 
-__not_in_flash() void getea(uint8_t rmval) {
+#if 0
+__not_in_flash() void r36sx_cpu_getea_legacy_unused(uint8_t rmval) {
     register uint32_t tempea = 0;
 #ifdef CPU_386_EXTENDED_OPS
     if (addressSizeOverride) {
@@ -521,6 +521,136 @@ __not_in_flash() void getea(uint8_t rmval) {
     ea = (tempea & 0xFFFF) + (useseg << 4);
 }
 
+#endif
+
+static inline uint32_t r36sx_cpu_get_sib_base(uint8_t sib_value,
+                                              uint32_t displacement,
+                                              uint8_t mode_value,
+                                              uint8_t *base_uses_ss)
+{
+    uint8_t base = sib_value & 7u;
+
+    if (base_uses_ss) {
+        *base_uses_ss = (base == regsp || base == regbp) &&
+                        !(mode_value == 0 && base == regbp);
+    }
+
+    if (mode_value == 0 && base == regbp) {
+        return displacement;
+    }
+
+    return getreg32(base);
+}
+
+static inline uint32_t r36sx_cpu_get_sib_index(uint8_t sib_value)
+{
+    uint8_t scale = sib_value >> 6;
+    uint8_t index = (sib_value >> 3) & 7u;
+
+    if (index == regsp) {
+        return 0;
+    }
+
+    return getreg32(index) << scale;
+}
+
+static inline uint32_t r36sx_cpu_ea32(uint8_t rmval)
+{
+    uint32_t tempea = 0;
+    uint8_t base_uses_ss = 0;
+
+    switch (rmval) {
+        case regax:
+        case regcx:
+        case regdx:
+        case regbx:
+        case regsi:
+        case regdi:
+            tempea = getreg32(rmval);
+            break;
+
+        case regsp:
+            tempea = r36sx_cpu_get_sib_base(sib, disp32, mode, &base_uses_ss) +
+                     r36sx_cpu_get_sib_index(sib);
+            break;
+
+        case regbp:
+            if (mode == 0) {
+                tempea = disp32;
+            } else {
+                tempea = CPU_EBP;
+                base_uses_ss = 1;
+            }
+            break;
+    }
+
+    if (mode == 1 || mode == 2) {
+        tempea += disp32;
+    }
+
+    if (base_uses_ss && !segoverride) {
+        useseg = CPU_SS;
+    }
+
+    return tempea;
+}
+
+__not_in_flash() void getea(uint8_t rmval) {
+    register uint32_t tempea = 0;
+#ifdef CPU_386_EXTENDED_OPS
+    if (addressSizeOverride) {
+        tempea = r36sx_cpu_ea32(rmval);
+        ea = tempea + ((uint32_t)useseg << 4);
+        return;
+    }
+#endif
+    switch (mode) {
+        case 0:
+            switch (rmval) {
+                case 0: tempea = CPU_BX + CPU_SI;
+                    break;
+                case 1: tempea = CPU_BX + CPU_DI;
+                    break;
+                case 2: tempea = CPU_BP + CPU_SI;
+                    break;
+                case 3: tempea = CPU_BP + CPU_DI;
+                    break;
+                case 4: tempea = CPU_SI;
+                    break;
+                case 5: tempea = CPU_DI;
+                    break;
+                case 6: tempea = disp16;
+                    break;
+                case 7: tempea = CPU_BX;
+                    break;
+            }
+            break;
+
+        case 1:
+        case 2:
+            switch (rmval) {
+                case 0: tempea = CPU_BX + CPU_SI + disp16;
+                    break;
+                case 1: tempea = CPU_BX + CPU_DI + disp16;
+                    break;
+                case 2: tempea = CPU_BP + CPU_SI + disp16;
+                    break;
+                case 3: tempea = CPU_BP + CPU_DI + disp16;
+                    break;
+                case 4: tempea = CPU_SI + disp16;
+                    break;
+                case 5: tempea = CPU_DI + disp16;
+                    break;
+                case 6: tempea = CPU_BP + disp16;
+                    break;
+                case 7: tempea = CPU_BX + disp16;
+                    break;
+            }
+            break;
+    }
+    ea = (tempea & 0xFFFF) + ((uint32_t)useseg << 4);
+}
+
 static INLINE void push(uint16_t pushval) {
     CPU_SP = CPU_SP - 2;
     putmem16(CPU_SS, CPU_SP, pushval);
@@ -535,7 +665,7 @@ static INLINE uint16_t pop() {
 static INLINE uint32_t readrm32(uint8_t rmval) {
     if (mode < 3) {
         getea(rmval);
-        return readw86(ea);
+        return readdw86(ea);
     }
     return getreg32(rmval);
 }
@@ -1232,6 +1362,12 @@ void intcall86(uint8_t intnum) {
     tf = 0;
 }
 
+static inline void r36sx_cpu_invalid_opcode(uint16_t fault_ip)
+{
+    CPU_IP = fault_ip;
+    intcall86(6);
+}
+
 static inline void flag_szp8(uint8_t value) {
     zf = value == 0;
     sf = value >> 7;
@@ -1849,6 +1985,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
         reptype = 0;
         segoverride = 0;
+        operandSizeOverride = false;
+        addressSizeOverride = false;
         useseg = CPU_DS;
         uint8_t docontinue = 0;
         uint8_t prefix_exception = 0;
@@ -1894,11 +2032,25 @@ void __not_in_flash() exec86(uint32_t execloops) {
 
 #if CPU_386_EXTENDED_OPS
                 case 0x64: /* segment CPU_FS */
+                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                        CPU_IP = firstip;
+                        intcall86(6);
+                        prefix_exception = 1;
+                        docontinue = 1;
+                        break;
+                    }
                     useseg = CPU_FS;
                     segoverride = 1;
                     break;
 
                 case 0x65: /* segment CPU_GS */
+                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                        CPU_IP = firstip;
+                        intcall86(6);
+                        prefix_exception = 1;
+                        docontinue = 1;
+                        break;
+                    }
                     useseg = CPU_GS;
                     segoverride = 1;
                     break;
@@ -1909,6 +2061,30 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     intcall86(6);
                     prefix_exception = 1;
                     docontinue = 1;
+                    break;
+#endif
+
+#if CPU_386_EXTENDED_OPS
+                case 0x66: /* operand-size override */
+                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                        CPU_IP = firstip;
+                        intcall86(6);
+                        prefix_exception = 1;
+                        docontinue = 1;
+                        break;
+                    }
+                    operandSizeOverride = true;
+                    break;
+
+                case 0x67: /* address-size override */
+                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                        CPU_IP = firstip;
+                        intcall86(6);
+                        prefix_exception = 1;
+                        docontinue = 1;
+                        break;
+                    }
+                    addressSizeOverride = true;
                     break;
 #endif
 
@@ -1953,7 +2129,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             &&r36sx_opcode_48, &&r36sx_opcode_49, &&r36sx_opcode_4A, &&r36sx_opcode_4B, &&r36sx_opcode_4C, &&r36sx_opcode_4D, &&r36sx_opcode_4E, &&r36sx_opcode_4F,
             &&r36sx_opcode_50, &&r36sx_opcode_51, &&r36sx_opcode_52, &&r36sx_opcode_53, &&r36sx_opcode_54, &&r36sx_opcode_55, &&r36sx_opcode_56, &&r36sx_opcode_57,
             &&r36sx_opcode_58, &&r36sx_opcode_59, &&r36sx_opcode_5A, &&r36sx_opcode_5B, &&r36sx_opcode_5C, &&r36sx_opcode_5D, &&r36sx_opcode_5E, &&r36sx_opcode_5F,
-            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default,
+            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_66, &&r36sx_opcode_67,
             &&r36sx_opcode_68, &&r36sx_opcode_69, &&r36sx_opcode_6A, &&r36sx_opcode_6B, &&r36sx_opcode_6C, &&r36sx_opcode_6D, &&r36sx_opcode_6E, &&r36sx_opcode_6F,
             &&r36sx_opcode_70, &&r36sx_opcode_71, &&r36sx_opcode_72, &&r36sx_opcode_73, &&r36sx_opcode_74, &&r36sx_opcode_75, &&r36sx_opcode_76, &&r36sx_opcode_77,
             &&r36sx_opcode_78, &&r36sx_opcode_79, &&r36sx_opcode_7A, &&r36sx_opcode_7B, &&r36sx_opcode_7C, &&r36sx_opcode_7D, &&r36sx_opcode_7E, &&r36sx_opcode_7F,
@@ -2169,14 +2345,14 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_0F: ;
 #endif
-#ifdef CPU_8086 //only the 8086/8088 does this.
-                //0F POP CS
-                CPU_CS = pop();
-#else
-                /* 286+: 0F is not CPUID yet; report invalid opcode for CPU probes. */
-                CPU_IP = firstip;
-                intcall86(6);
-#endif
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    /* 8086/8088 only: 0F POP CS. */
+                    CPU_CS = pop();
+                } else {
+                    /* 286/386: 0F is an extended opcode prefix; unsupported subops fault. */
+                    CPU_IP = firstip;
+                    intcall86(6);
+                }
                 break;
 
             case 0x10:
@@ -3020,11 +3196,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_54: ;
 #endif
                 /* 54 PUSH eSP */
-#ifdef CPU_286_STYLE_PUSH_SP
-                push(CPU_SP);
-#else
-                push(CPU_SP - 2);
-#endif
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    push(CPU_SP - 2);
+                } else {
+                    push(CPU_SP);
+                }
                 break;
 
             case 0x55:
@@ -3121,6 +3297,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_60: ;
 #endif
                 /* 60 PUSHA (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 oldsp = CPU_SP;
                 push(CPU_AX);
                 push(CPU_CX);
@@ -3137,6 +3317,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_61: ;
 #endif
                 /* 61 POPA (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 CPU_DI = pop();
                 CPU_SI = pop();
                 CPU_BP = pop();
@@ -3152,6 +3336,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_62: ;
 #endif
                 /* 62 BOUND Gv, Ev (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 modregrm();
 
                 getea(rm);
@@ -3178,6 +3366,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_66: ;
 #endif
                 /* Operand-Size Override (???????? ?????? ?????????: 16 ? 32 ???) */
+                if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 operandSizeOverride = true;
                 break;
             case 0x67:
@@ -3185,6 +3377,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_67: ;
 #endif
                 /* Address-Size Override (???????? ?????? ??????: 16 ? 32 ???) */
+                if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 addressSizeOverride = true;
                 break;
 #endif
@@ -3193,6 +3389,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_68: ;
 #endif
                 /* 68 PUSH Iv (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 push(getmem16(CPU_CS, CPU_IP)
                 );
                 StepIP(2);
@@ -3204,6 +3404,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 {
                 /* 69 IMUL Gv Ev Iv (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 modregrm();
                 register int32_t temp1 = (int32_t)(int16_t)readrm16(rm);
                 register int32_t temp2 = (int32_t)(int16_t)getmem16(CPU_CS, CPU_IP);
@@ -3222,6 +3426,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_6A: ;
 #endif
                 /* 6A PUSH Ib (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 push((uint16_t) signext(getmem8(CPU_CS, CPU_IP)));
                 StepIP(1);
                 break;
@@ -3232,6 +3440,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 {
                 /* 6B IMUL Gv Eb Ib (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 modregrm();
                 register int32_t temp1 = (int32_t)(int16_t)readrm16(rm);
                 register int32_t temp2 = (int32_t)(int16_t)signext(getmem8(CPU_CS, CPU_IP));
@@ -3250,6 +3462,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_6C: ;
 #endif
                 /* 6C INSB */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -3278,6 +3494,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_6D: ;
 #endif
                 /* 6D INSW */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -3306,6 +3526,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_6E: ;
 #endif
                 /* 6E OUTSB */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -3334,6 +3558,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_6F: ;
 #endif
                 /* 6F OUTSW */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -3763,9 +3991,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* 8C MOV Ew Sw */
                 modregrm();
-                if (reg > regds) {
-                    CPU_IP = firstip;
-                    intcall86(6);
+                if ((!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) && reg > regds) ||
+                    reg > reggs) {
+                    r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
 
@@ -3793,9 +4021,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* 8E MOV Sw Ew */
                 modregrm();
-                if (reg == regcs || reg > regds) {
-                    CPU_IP = firstip;
-                    intcall86(6);
+                if (reg == regcs ||
+                    (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) && reg > regds) ||
+                    reg > reggs) {
+                    r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
 
@@ -4532,6 +4761,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_C0: ;
 #endif
                 /* C0 GRP2 byte imm8 (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -4545,6 +4778,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_C1: ;
 #endif
                 /* C1 GRP2 word imm8 (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -4625,6 +4862,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_C8: ;
 #endif
                 /* C8 ENTER (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 stacksize = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 nestlev = getmem8(CPU_CS, CPU_IP);
@@ -4653,6 +4894,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_C9: ;
 #endif
                 /* C9 LEAVE (80186+) */
+                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 CPU_SP = CPU_BP;
                 CPU_BP = pop();
                 break;

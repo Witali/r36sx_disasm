@@ -1,5 +1,61 @@
 # pico-286 Build Log
 
+## 2026-05-30 configurable 386 CPU model mode
+
+Added a configurable CPU identity layer for the R36SX Pico-286 port:
+
+- `cpu_model=8086`, `80286`, or `80386` can now be parsed from the `[cpu]`
+  config section;
+- `cpu_mode=real` or `protected` can now be parsed and logged;
+- the build enables the existing `CPU_386_EXTENDED_OPS` code path;
+- `FS`/`GS`, `66h`, and `67h` are now accepted only when `cpu_model=80386`;
+- 80186+ opcodes are rejected with `INT 6` when `cpu_model=8086`;
+- 386 address-size override handling was corrected to use real 32-bit ModR/M
+  and SIB addressing;
+- 32-bit memory operands now read/write full dwords instead of truncating
+  memory reads to 16 bits.
+
+Important limitation: full 386 protected-mode execution is not implemented
+yet.  `cpu_mode=protected` is accepted so configs can express the requested
+mode, but startup logs that the protected-mode CPU core is still WIP and boots
+the normal real-mode path.  A real protected-mode implementation still needs
+descriptor-table state, segment descriptor cache, CR0/CR3 handling, protection
+faults, privilege checks, interrupt/task gates, and the 386 `0F xx` system
+instruction subset.
+
+Example config:
+
+```ini
+[cpu]
+cpu_model=80386
+cpu_mode=real
+cpu_mhz=32.768
+```
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,051,696 bytes
+- SHA256: `D6CAC3199D3DD75CB883798743524786893D8C0D2531BB860BDA7A0CCBC470B0`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 80286 real-mode correctness fixes
 
 Fixed several obvious 80286 real-mode CPU emulation mismatches found during

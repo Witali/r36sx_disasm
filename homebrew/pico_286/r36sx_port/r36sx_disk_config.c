@@ -47,6 +47,8 @@ static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
 static char disk_config_path[R36SX_PICO286_MAX_DISK_PATH] =
     R36SX_PICO286_CONFIG_PATH;
+static char cpu_model_text[16] = "80286";
+static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
 static char boot_mode_text[32] = "normal";
 static char boot_order_text[64] = "fdd0,hdd0";
@@ -63,6 +65,8 @@ static char upper_memory_kb_text[16] = "176";
 static char extended_memory_kb_text[16] = "64";
 static char xms_memory_kb_text[16] = "4096";
 static uint32_t cpu_exec_loops = 0;
+static r36sx_pico286_cpu_model_t cpu_model = R36SX_PICO286_CPU_80286;
+static r36sx_pico286_cpu_mode_t cpu_mode = R36SX_PICO286_CPU_MODE_REAL;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
 static uint32_t disk_cache_flush_sectors = 4u;
@@ -273,6 +277,69 @@ static int set_cpu_mhz(const char *value, int line_no)
     r36sx_pico286_debug_log("diskcfg: cpu_mhz=%.3f exec_loops=%u",
                             mhz, cpu_exec_loops);
     return 1;
+}
+
+static int set_cpu_model(const char *value, int line_no)
+{
+    if (key_equals(value, "8086") ||
+        key_equals(value, "i8086") ||
+        key_equals(value, "86") ||
+        key_equals(value, "xt")) {
+        cpu_model = R36SX_PICO286_CPU_8086;
+        snprintf(cpu_model_text, sizeof(cpu_model_text), "8086");
+        r36sx_pico286_debug_log("diskcfg: cpu_model=8086");
+        return 1;
+    }
+
+    if (key_equals(value, "80286") ||
+        key_equals(value, "286") ||
+        key_equals(value, "i286") ||
+        key_equals(value, "at")) {
+        cpu_model = R36SX_PICO286_CPU_80286;
+        snprintf(cpu_model_text, sizeof(cpu_model_text), "80286");
+        r36sx_pico286_debug_log("diskcfg: cpu_model=80286");
+        return 1;
+    }
+
+    if (key_equals(value, "80386") ||
+        key_equals(value, "386") ||
+        key_equals(value, "i386")) {
+        cpu_model = R36SX_PICO286_CPU_80386;
+        snprintf(cpu_model_text, sizeof(cpu_model_text), "80386");
+        r36sx_pico286_debug_log("diskcfg: cpu_model=80386");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid cpu_model '%s' at line %d",
+        value, line_no);
+    return 0;
+}
+
+static int set_cpu_mode(const char *value, int line_no)
+{
+    if (key_equals(value, "real") ||
+        key_equals(value, "real_mode") ||
+        key_equals(value, "rm")) {
+        cpu_mode = R36SX_PICO286_CPU_MODE_REAL;
+        snprintf(cpu_mode_text, sizeof(cpu_mode_text), "real");
+        r36sx_pico286_debug_log("diskcfg: cpu_mode=real");
+        return 1;
+    }
+
+    if (key_equals(value, "protected") ||
+        key_equals(value, "protected_mode") ||
+        key_equals(value, "pm")) {
+        cpu_mode = R36SX_PICO286_CPU_MODE_PROTECTED;
+        snprintf(cpu_mode_text, sizeof(cpu_mode_text), "protected");
+        r36sx_pico286_debug_log("diskcfg: cpu_mode=protected");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid cpu_mode '%s' at line %d",
+        value, line_no);
+    return 0;
 }
 
 static int set_boot_mode(const char *value, int line_no)
@@ -695,6 +762,15 @@ static int set_config_value(const char *key, const char *value, int line_no)
         key_equals(key, "cpu_frequency_mhz")) {
         return set_cpu_mhz(value, line_no);
     }
+    if (key_equals(key, "cpu_model") ||
+        key_equals(key, "processor") ||
+        key_equals(key, "processor_model")) {
+        return set_cpu_model(value, line_no);
+    }
+    if (key_equals(key, "cpu_mode") ||
+        key_equals(key, "processor_mode")) {
+        return set_cpu_mode(value, line_no);
+    }
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
     }
@@ -868,8 +944,13 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# Pico-286 disk image bindings for the R36SX native port.\n");
     fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
 
-    fprintf(fp, "# CPU speed knob for this port.\n");
+    fprintf(fp, "# CPU compatibility model: 8086, 80286, or 80386.\n");
+    fprintf(fp, "# cpu_mode=real is the normal PC boot mode. cpu_mode=protected is\n");
+    fprintf(fp, "# parsed for experiments; full protected-mode execution is still WIP.\n");
+    fprintf(fp, "# CPU speed knob maps to exec86 loops per host scheduler slice.\n");
     fprintf(fp, "[cpu]\n");
+    fprintf(fp, "cpu_model=%s\n", cpu_model_text);
+    fprintf(fp, "cpu_mode=%s\n", cpu_mode_text);
     fprintf(fp, "cpu_mhz=%s\n\n", cpu_mhz_text);
 
     fprintf(fp, "# Boot behavior and boot-sector probe order.\n");
@@ -936,6 +1017,41 @@ uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
     load_disk_config();
 
     return cpu_exec_loops ? cpu_exec_loops : fallback_loops;
+}
+
+r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void)
+{
+    load_disk_config();
+
+    return cpu_model;
+}
+
+int r36sx_pico286_cpu_model_at_least(r36sx_pico286_cpu_model_t model)
+{
+    load_disk_config();
+
+    return cpu_model >= model;
+}
+
+const char *r36sx_pico286_cpu_model_name(void)
+{
+    load_disk_config();
+
+    return cpu_model_text;
+}
+
+r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void)
+{
+    load_disk_config();
+
+    return cpu_mode;
+}
+
+const char *r36sx_pico286_cpu_mode_name(void)
+{
+    load_disk_config();
+
+    return cpu_mode_text;
 }
 
 int r36sx_pico286_boot_bios_prompt(void)

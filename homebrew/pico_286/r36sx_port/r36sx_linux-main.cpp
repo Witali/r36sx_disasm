@@ -1099,7 +1099,14 @@ int main() {
                             sound_thread_rc, ticks_thread_rc);
 
     const uint32_t cpu_exec_loops = r36sx_pico286_cpu_exec_loops(32768u);
-    r36sx_pico286_debug_log("main: cpu_exec_loops=%u", cpu_exec_loops);
+    r36sx_pico286_debug_log("main: cpu_model=%s cpu_mode=%s cpu_exec_loops=%u",
+                            r36sx_pico286_cpu_model_name(),
+                            r36sx_pico286_cpu_mode_name(),
+                            cpu_exec_loops);
+    if (r36sx_pico286_cpu_mode() == R36SX_PICO286_CPU_MODE_PROTECTED) {
+        r36sx_pico286_debug_log(
+            "main: cpu_mode=protected requested; protected-mode CPU core is not implemented yet, booting real mode");
+    }
 
     unsigned int main_loop_count = 0;
     while (running) {
