@@ -26,6 +26,27 @@ extraction instead of per-pixel `SDL_GetRGB()`.
 It does not yet contain the Pico-286 style R36SX menu overlays or on-screen
 keyboard.
 
+## Fast Config
+
+`dosbox.conf` is tuned for maximum first-pass speed on the console:
+
+```text
+machine=vgaonly
+frameskip=3
+core=normal
+cputype=auto
+cycles=max
+nosound=true
+sbtype=none
+pcspeaker=false
+serial*=disabled
+ems=false
+umb=false
+```
+
+This trades compatibility and audio for speed. SVGA programs or games that
+require SoundBlaster, EMS, or UMB may need those options restored.
+
 Known dynamic dependencies:
 
 ```text

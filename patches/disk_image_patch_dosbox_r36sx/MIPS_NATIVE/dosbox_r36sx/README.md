@@ -24,7 +24,20 @@ This build is an early baseline:
   display debugging;
 - no R36SX on-screen keyboard yet;
 - no R36SX disk/key preset menus yet;
-- conservative `dosbox.conf` with a small mounted `drive_c` folder.
+- speed-focused `dosbox.conf` with a small mounted `drive_c` folder.
+
+The current config favors speed over compatibility:
+
+- `cycles=max`;
+- `cputype=auto`;
+- `machine=vgaonly`;
+- `frameskip=3`;
+- all DOSBox audio devices disabled;
+- serial ports disabled;
+- EMS and UMB disabled.
+
+Restore `machine=svga_s3`, audio, EMS, or UMB only when a specific program
+needs them.
 
 Expected next porting steps are to replace or wrap SDL input/audio with the
 same driver.so, keyboard, menu, screenshot, and stats helpers used by Pico-286.
