@@ -1475,6 +1475,23 @@ void intcall86(uint8_t intnum) {
 
 static inline void r36sx_cpu_invalid_opcode(uint16_t fault_ip)
 {
+#if DEBUG
+    r36sx_pico286_debug_log(
+        "[CPU] INT6 invalid opcode at %04X:%04X bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
+        CPU_CS, fault_ip,
+        getmem8(CPU_CS, fault_ip),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 1u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 2u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 3u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 4u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 5u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 6u)),
+        getmem8(CPU_CS, (uint16_t)(fault_ip + 7u)),
+        (uint16_t)(2u | x86_flags.value),
+        CPU_AX, CPU_BX, CPU_CX, CPU_DX,
+        CPU_SI, CPU_DI, CPU_BP, CPU_SP,
+        CPU_DS, CPU_ES, CPU_SS);
+#endif
     CPU_IP = fault_ip;
     intcall86(6);
 }
@@ -2756,6 +2773,53 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
     return false;
 }
 
+static __not_in_flash() void r36sx_cpu_exec_bit_test(uint8_t operation,
+                                                     uint32_t bit_offset,
+                                                     uint8_t register_offset)
+{
+    uint8_t width = operandSizeOverride ? 32u : 16u;
+    uint8_t bit = (uint8_t)(bit_offset & (uint32_t)(width - 1u));
+    uint32_t mask = 1u << bit;
+    uint32_t value;
+
+    if (mode < 3) {
+        getea(rm);
+        if (register_offset) {
+            ea += (bit_offset / width) * (uint32_t)(width / 8u);
+        }
+        value = operandSizeOverride ? readdw86(ea) : readw86(ea);
+    } else {
+        value = operandSizeOverride ? getreg32(rm) : getreg16(rm);
+    }
+
+    cf = (value & mask) != 0;
+    switch (operation) {
+        case 1: /* BTS */
+            value |= mask;
+            break;
+        case 2: /* BTR */
+            value &= ~mask;
+            break;
+        case 3: /* BTC */
+            value ^= mask;
+            break;
+        default: /* BT */
+            return;
+    }
+
+    if (mode < 3) {
+        if (operandSizeOverride) {
+            writedw86(ea, value);
+        } else {
+            writew86(ea, (uint16_t)value);
+        }
+    } else if (operandSizeOverride) {
+        putreg32(rm, value);
+    } else {
+        putreg16(rm, (uint16_t)value);
+    }
+}
+
 static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
 {
     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
@@ -2815,6 +2879,18 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             CPU_GS = operandSizeOverride ? (uint16_t)pop32() : pop();
             return;
 
+        case 0xA3: /* BT Ev,Gv */
+            modregrm();
+            r36sx_cpu_exec_bit_test(
+                0, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
+            return;
+
+        case 0xAB: /* BTS Ev,Gv */
+            modregrm();
+            r36sx_cpu_exec_bit_test(
+                1, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
+            return;
+
         case 0xAF: {
             modregrm();
             if (operandSizeOverride) {
@@ -2839,6 +2915,12 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             return;
         }
 
+        case 0xB3: /* BTR Ev,Gv */
+            modregrm();
+            r36sx_cpu_exec_bit_test(
+                2, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
+            return;
+
         case 0xB6:
             modregrm();
             if (operandSizeOverride) {
@@ -2855,6 +2937,24 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             } else {
                 putreg16(reg, readrm16(rm));
             }
+            return;
+
+        case 0xBA: { /* BT/BTS/BTR/BTC Ev,Ib */
+            modregrm();
+            if (reg < 4 || reg > 7) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            uint8_t bit = getmem8(CPU_CS, CPU_IP);
+            StepIP(1);
+            r36sx_cpu_exec_bit_test((uint8_t)(reg - 4u), bit, 0);
+            return;
+        }
+
+        case 0xBB: /* BTC Ev,Gv */
+            modregrm();
+            r36sx_cpu_exec_bit_test(
+                3, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
             return;
 
         case 0xBC: {

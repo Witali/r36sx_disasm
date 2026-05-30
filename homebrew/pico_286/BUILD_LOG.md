@@ -1,5 +1,51 @@
 # pico-286 Build Log
 
+## 2026-05-30 CHKDSK invalid-opcode investigation
+
+The FreeDOS `CHKDSK.EXE` screenshot showed an `Invalid Opcode` trap while
+checking drive C:.  The executable is UPX-packed, so the bytes shown by the DOS
+exception handler are from the unpacked in-memory image rather than a direct
+file offset in `CHKDSK.EXE`.
+
+Added two CPU-core updates:
+
+- debug builds now log the exact faulting `CS:IP`, the next 8 opcode bytes, key
+  registers, and flags before raising `INT 6`;
+- implemented the 80386 bit-test instruction family `BT`, `BTS`, `BTR`, and
+  `BTC` for register and memory operands, including the `0F BA /4..7`
+  immediate-bit forms.  These instructions are common in bitmap/FAT scanning
+  code and were still missing from the 386 real-mode path.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1128748` bytes
+- SHA256: `F8D3502B5D27E1ED9DA73EE624E20933C4E38AB7732DE5B962BF45ED39E2FCC9`
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 60 Hz main-loop frame pacing
 
 Changed the native R36SX main loop to run on a fixed 60 Hz cadence.  Each loop

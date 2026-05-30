@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 CHKDSK invalid-opcode investigation
+
+The current `pico_286` binary adds the 80386 bit-test instruction family:
+`BT`, `BTS`, `BTR`, `BTC`, and the `0F BA /4..7` immediate-bit forms.  These
+were still missing from the 386 real-mode path and are plausible candidates for
+the FreeDOS `CHKDSK.EXE` `Invalid Opcode` trap shown while checking drive C:.
+
+Debug builds also log the exact faulting `CS:IP`, the next 8 opcode bytes,
+flags, and key registers before raising `INT 6`.
+
+pico_286 size: 1128748 bytes
+pico_286 SHA256: F8D3502B5D27E1ED9DA73EE624E20933C4E38AB7732DE5B962BF45ED39E2FCC9
+
 ## 2026-05-30 60 Hz main-loop frame pacing
 
 The current `pico_286` binary now paces the native main loop to 60 Hz.  Each
