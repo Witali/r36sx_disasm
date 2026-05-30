@@ -14,6 +14,8 @@ struct r36sx_disk_menu {
     uint8_t selected_row;
     uint8_t image_count;
     uint8_t selected_image[4];
+    uint8_t boot_order_choice;
+    uint8_t boot_order_changed;
     char images[R36SX_DISK_MENU_MAX_IMAGES][R36SX_DISK_MENU_IMAGE_NAME_LEN];
     char message[96];
 };

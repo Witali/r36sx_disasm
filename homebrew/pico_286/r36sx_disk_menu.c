@@ -11,10 +11,15 @@
 
 #define R36SX_DISK_MENU_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_DISK_MENU_DRIVE_COUNT 4
-#define R36SX_DISK_MENU_ROW_SAVE 4
-#define R36SX_DISK_MENU_ROW_EXIT 5
-#define R36SX_DISK_MENU_ROW_CANCEL 6
-#define R36SX_DISK_MENU_ROW_COUNT 7
+#define R36SX_DISK_MENU_ROW_BOOT_ORDER 4
+#define R36SX_DISK_MENU_ROW_SAVE 5
+#define R36SX_DISK_MENU_ROW_EXIT 6
+#define R36SX_DISK_MENU_ROW_CANCEL 7
+#define R36SX_DISK_MENU_ROW_COUNT 8
+
+#define R36SX_DISK_BOOT_ORDER_AC 0u
+#define R36SX_DISK_BOOT_ORDER_CA 1u
+#define R36SX_DISK_BOOT_ORDER_ROM 2u
 
 extern uint8_t insertdisk(uint8_t drivenum, const char *pathname);
 
@@ -309,6 +314,9 @@ static void scan_images(struct r36sx_disk_menu *menu)
 
 static void refresh_menu(struct r36sx_disk_menu *menu)
 {
+    uint8_t order[4];
+    uint8_t count;
+
     memset(menu->images, 0, sizeof(menu->images));
     menu->image_count = 0;
     scan_images(menu);
@@ -326,6 +334,16 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
     if (menu->image_count == 0) {
         add_image(menu, "hdd.img");
     }
+
+    count = r36sx_pico286_boot_order(order, (uint8_t)sizeof(order));
+    if (count == 0) {
+        menu->boot_order_choice = R36SX_DISK_BOOT_ORDER_ROM;
+    } else if (count >= 2 && order[0] == 128 && order[1] == 0) {
+        menu->boot_order_choice = R36SX_DISK_BOOT_ORDER_CA;
+    } else {
+        menu->boot_order_choice = R36SX_DISK_BOOT_ORDER_AC;
+    }
+    menu->boot_order_changed = 0;
 }
 
 static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
@@ -346,6 +364,39 @@ static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
     menu->selected_image[drive] = (uint8_t)next;
 }
 
+static void cycle_boot_order(struct r36sx_disk_menu *menu, int direction)
+{
+    if (!menu) {
+        return;
+    }
+
+    if (menu->boot_order_choice == R36SX_DISK_BOOT_ORDER_ROM) {
+        menu->boot_order_choice = direction < 0 ?
+            R36SX_DISK_BOOT_ORDER_CA : R36SX_DISK_BOOT_ORDER_AC;
+    } else {
+        menu->boot_order_choice =
+            menu->boot_order_choice == R36SX_DISK_BOOT_ORDER_AC ?
+            R36SX_DISK_BOOT_ORDER_CA : R36SX_DISK_BOOT_ORDER_AC;
+    }
+    menu->boot_order_changed = 1;
+}
+
+static const char *boot_order_label(uint8_t choice)
+{
+    if (choice == R36SX_DISK_BOOT_ORDER_CA) {
+        return "C,A";
+    }
+    if (choice == R36SX_DISK_BOOT_ORDER_ROM) {
+        return "ROM";
+    }
+    return "A,C";
+}
+
+static const char *boot_order_config_value(uint8_t choice)
+{
+    return choice == R36SX_DISK_BOOT_ORDER_CA ? "hdd0,fdd0" : "fdd0,hdd0";
+}
+
 static int apply_disk_bindings(struct r36sx_disk_menu *menu)
 {
     int failures = 0;
@@ -353,6 +404,10 @@ static int apply_disk_bindings(struct r36sx_disk_menu *menu)
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
         const char *image = menu->images[menu->selected_image[i]];
         r36sx_pico286_set_disk_value(g_drives[i].bios_drive, image);
+    }
+    if (menu->boot_order_changed) {
+        r36sx_pico286_set_boot_order_value(
+            boot_order_config_value(menu->boot_order_choice));
     }
     if (!r36sx_pico286_save_config()) {
         snprintf(menu->message, sizeof(menu->message), "SAVE FAILED");
@@ -424,14 +479,22 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
         (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_image(menu, menu->selected_row, -1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
+               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        cycle_boot_order(menu, -1);
     }
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
         (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_image(menu, menu->selected_row, 1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
+               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        cycle_boot_order(menu, 1);
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
         if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT) {
             cycle_image(menu, menu->selected_row, 1);
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER) {
+            cycle_boot_order(menu, 1);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_SAVE) {
             apply_disk_bindings(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
@@ -490,7 +553,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     draw_text(frame, width, height, stride_pixels, 28, 28, "DISK MENU",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
-              "LEFT/RIGHT IMAGE  A/Y CHANGE  X/B CANCEL  SAVE APPLIES",
+              "LEFT/RIGHT CHANGE  A/Y CHANGE  X/B CANCEL  SAVE APPLIES",
               rgb565(180, 202, 208), 1);
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
@@ -503,6 +566,11 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     }
 
     y += 10;
+    snprintf(line, sizeof(line), "BOOT ORDER  %s",
+             boot_order_label(menu->boot_order_choice));
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_BOOT_ORDER, x, y, full_w, row_h, line);
+    y += row_h + gap;
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_SAVE, x, y, full_w, row_h, "SAVE/APPLY");
     y += row_h + gap;

@@ -30,6 +30,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-29 disk menu boot order row
+
+The current `pico_286` binary adds a `BOOT ORDER` row to the disk image menu.
+Use it to switch between:
+
+- `A,C`: try the floppy drive before the hard disk.
+- `C,A`: try the hard disk before the floppy drive.
+
+Left/Right or A/Y cycles the row.  `SAVE/APPLY` writes the selected order to
+`pico_286.conf` as `boot_order=fdd0,hdd0` or `boot_order=hdd0,fdd0` and then
+applies the current disk bindings.
+
+```text
+pico_286 size: 915372 bytes
+pico_286 SHA256: F9CBF5F875428A33E568E07110E814597D13177C69C8CBA07099D0438D58D429
+Defender scan: found no threats
+```
+
 ## 2026-05-29 on-screen keyboard D-pad repeat
 
 The current `pico_286` binary adds auto-repeat for D-pad navigation in the

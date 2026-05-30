@@ -39,6 +39,9 @@ int r36sx_pico286_boot_bios_prompt(void);
 // Return the configured boot drive order. Empty result means use ROM behavior.
 uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives);
 
+// Update the configured boot order text in memory. Call save_config to persist.
+int r36sx_pico286_set_boot_order_value(const char *value);
+
 // Return non-zero when a configured hard-disk CHS geometry exists.
 int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
                                r36sx_pico286_chs_t *geometry);

@@ -608,6 +608,15 @@ uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives)
     return count;
 }
 
+int r36sx_pico286_set_boot_order_value(const char *value)
+{
+    char mutable_value[sizeof(boot_order_text)];
+
+    load_disk_config();
+    snprintf(mutable_value, sizeof(mutable_value), "%s", value ? value : "");
+    return set_boot_order(mutable_value, 0);
+}
+
 int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
                                r36sx_pico286_chs_t *geometry)
 {

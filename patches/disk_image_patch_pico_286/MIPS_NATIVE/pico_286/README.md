@@ -52,6 +52,7 @@ Open it with Fn+Select.
 - Left/Right: change the selected disk image.
 - A or Y: accept/change the selected row.
 - B or X: cancel and close the menu.
+- `BOOT ORDER`: choose `A,C` or `C,A`.
 - `SAVE/APPLY`: write current bindings to `pico_286.conf` and apply them.
 - `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 

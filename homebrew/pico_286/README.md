@@ -119,12 +119,13 @@ means B deletes a character and X closes the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
-or A/Y cycles through `.img` files found next to `pico_286.conf`, while B/X
-cancels the menu.
-`SAVE/APPLY` writes the selected bindings to `pico_286.conf` and calls
-`insertdisk()` for the running emulator.  For hard-disk changes, DOS may still
-cache drive state, so the `EXIT APP` row is available for a clean restart
-through TinyMC.
+or A/Y cycles through `.img` files found next to `pico_286.conf`.  The
+`BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try the
+floppy or hard disk first.  B/X cancels the menu.
+`SAVE/APPLY` writes the selected bindings and boot order to `pico_286.conf`
+and calls `insertdisk()` for the running emulator.  For hard-disk changes, DOS
+may still cache drive state, so the `EXIT APP` row is available for a clean
+restart through TinyMC.
 
 On-screen keyboard controls:
 

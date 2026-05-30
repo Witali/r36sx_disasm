@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-29 disk menu boot order row
+
+Added a `BOOT ORDER` row to the Pico-286 disk image menu.  It displays
+`A,C` or `C,A`; Left/Right or A/Y cycles between them.  `SAVE/APPLY` writes
+canonical `boot_order=fdd0,hdd0` or `boot_order=hdd0,fdd0` to
+`pico_286.conf`.  Existing `boot_order=rom` is preserved if the row is not
+touched; touching the row switches to a normal A/C order.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_091\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 915,372 bytes
+- SHA256: `F9CBF5F875428A33E568E07110E814597D13177C69C8CBA07099D0438D58D429`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_091/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_091/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 on-screen keyboard D-pad repeat
 
 Added D-pad auto-repeat to the shared on-screen keyboard helper.  In normal
