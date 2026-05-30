@@ -193,6 +193,51 @@ Result:
 - Microsoft Defender scans of both the build output and overlay copy reported
   no threats.
 
+Device log analysis:
+
+```text
+r36sx_video: dlopen ok path=/mnt/sdcard/cubegm/driver.so
+r36sx_video: video_drivers_init rc=36
+```
+
+Observations:
+
+- `driver.so` loads successfully and display initialization returns a positive
+  value, matching the vendor driver's verbose stdout;
+- no `r36sx_video: present #...` frame summary appears, so the build entered
+  the first R36SX present path but did not reach the post-conversion log;
+- likely causes were slow per-pixel `SDL_GetRGB()` conversion, failed
+  `SDL_LockSurface()`, or a stall while reading the SDL surface.
+
+Fast conversion/diagnostic rebuild:
+
+```powershell
+.\homebrew\dosbox_r36sx\build_dosbox_r36sx.ps1
+.\tools\scan-download.ps1 .\homebrew\dosbox_r36sx\dosbox_r36sx
+Copy-Item -Force homebrew\dosbox_r36sx\dosbox_r36sx patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+.\tools\scan-download.ps1 .\patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0\bin\mipsel-none-elf-readelf.exe -d homebrew\dosbox_r36sx\dosbox_r36sx
+```
+
+Changes:
+
+- replaced per-pixel `SDL_GetRGB()` calls with direct SDL pixel-format mask
+  extraction and fast pass-through for RGB565 surfaces;
+- added `begin`, `converted`, and `displayed` log lines for the first 30 frame
+  presents;
+- added explicit `SDL_LockSurface` failure logging.
+
+Result:
+
+- output size: `8033552` bytes;
+- SHA256:
+  `09FEDCDF5612B36B8A19A90DF386245596C39E20EDC698BA8B63F46EA875066A`;
+- dynamic dependencies unchanged:
+  `libSDL-1.2.so.0`, `libpthread.so.0`, `libdl.so.2`, `libm.so.6`,
+  `libstdc++.so.6`, `libgcc_s.so.1`, `libc.so.6`;
+- Microsoft Defender scans of both the build output and overlay copy reported
+  no threats.
+
 Device test feedback after direct-present build:
 
 - the device now shows a blinking cursor, confirming that `driver.so`

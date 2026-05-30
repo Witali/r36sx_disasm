@@ -20,7 +20,8 @@ runtime, but also mirrors every DOSBox `GFX_EndUpdate()` surface to
 
 This revision forces RGB SDL output instead of 8bpp paletted output for the
 mirrored video path, and logs the first 30 frame presents to
-`dosbox.stderr.log`.
+`dosbox.stderr.log`. Frame conversion now uses direct SDL pixel-format mask
+extraction instead of per-pixel `SDL_GetRGB()`.
 
 It does not yet contain the Pico-286 style R36SX menu overlays or on-screen
 keyboard.
@@ -42,7 +43,7 @@ These libraries are present in the inspected firmware image.
 Current binary:
 
 ```text
-size:   8032184 bytes
-sha256: A94F7C4BFA20C6B38FF218FE799FAEA371251301BF3A8D354BF09514E1228B7D
+size:   8033552 bytes
+sha256: 09FEDCDF5612B36B8A19A90DF386245596C39E20EDC698BA8B63F46EA875066A
 scan:   Microsoft Defender found no threats
 ```

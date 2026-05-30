@@ -43,7 +43,9 @@ The R36SX build also forces DOSBox away from 8bpp paletted SDL output and into
 RGB output before the `driver.so` mirror. On the device, the palette path can
 show only the blinking VGA cursor while normal shell text stays invisible. The
 first 30 mirrored frames are summarized in `dosbox.stderr.log` with surface
-size, bpp, non-black pixel count, and bounding box.
+size, bpp, non-black pixel count, and bounding box. The conversion path uses
+direct SDL pixel-format mask extraction, including a fast pass-through for
+RGB565 surfaces, instead of calling `SDL_GetRGB()` for every pixel.
 
 Next steps are:
 

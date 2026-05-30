@@ -369,6 +369,39 @@ static uint32_t R36SX_ReadSurfacePixel(const SDL_Surface *surface,int x,int y) {
 	}
 }
 
+static uint8_t R36SX_ExpandChannel(uint32_t value,uint8_t loss) {
+	if (!loss)
+		return (uint8_t)value;
+	value <<= loss;
+	return (uint8_t)(value | (value >> (8 - loss)));
+}
+
+static uint16_t R36SX_SurfacePixelToRGB565(const SDL_PixelFormat *format,
+                                           uint32_t pixel) {
+	if (format->BitsPerPixel == 16 &&
+	    format->Rmask == 0xf800 &&
+	    format->Gmask == 0x07e0 &&
+	    format->Bmask == 0x001f)
+		return (uint16_t)pixel;
+	if (format->BitsPerPixel == 16 &&
+	    format->Rmask == 0x7c00 &&
+	    format->Gmask == 0x03e0 &&
+	    format->Bmask == 0x001f) {
+		uint16_t p=(uint16_t)pixel;
+		return (uint16_t)(((p & 0x7c00) << 1) |
+		                  ((p & 0x03e0) << 1) |
+		                  (p & 0x001f));
+	}
+
+	uint8_t r=R36SX_ExpandChannel((pixel & format->Rmask) >> format->Rshift,
+	                              format->Rloss);
+	uint8_t g=R36SX_ExpandChannel((pixel & format->Gmask) >> format->Gshift,
+	                              format->Gloss);
+	uint8_t b=R36SX_ExpandChannel((pixel & format->Bmask) >> format->Bshift,
+	                              format->Bloss);
+	return R36SX_RGB888ToRGB565(r,g,b);
+}
+
 static void R36SX_PresentSurface(SDL_Surface *surface) {
 	if (!surface || !surface->pixels)
 		return;
@@ -382,9 +415,32 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 	int maxx=-1;
 	int maxy=-1;
 	if (SDL_MUSTLOCK(surface)) {
-		if (SDL_LockSurface(surface) != 0)
+		if (SDL_LockSurface(surface) != 0) {
+			if (r36sx_video.present_count < 30)
+				fprintf(stderr,
+				        "r36sx_video: present #%u SDL_LockSurface failed: %s\n",
+				        r36sx_video.present_count,SDL_GetError());
 			return;
+		}
 		locked=true;
+	}
+
+	if (r36sx_video.present_count < 30) {
+		fprintf(stderr,
+		        "r36sx_video: present #%u begin surface=%dx%d bpp=%d bytes=%d pitch=%d clip=%d,%d %dx%d masks=%08x/%08x/%08x\n",
+		        r36sx_video.present_count,
+		        surface->w,
+		        surface->h,
+		        surface->format ? surface->format->BitsPerPixel : 0,
+		        surface->format ? surface->format->BytesPerPixel : 0,
+		        surface->pitch,
+		        sdl.clip.x,
+		        sdl.clip.y,
+		        sdl.clip.w,
+		        sdl.clip.h,
+		        surface->format ? surface->format->Rmask : 0,
+		        surface->format ? surface->format->Gmask : 0,
+		        surface->format ? surface->format->Bmask : 0);
 	}
 
 	for (int y=0;y<R36SX_SCREEN_HEIGHT;y++) {
@@ -394,10 +450,8 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 		for (int x=0;x<R36SX_SCREEN_WIDTH;x++) {
 			int sx=(int)(((int64_t)x * surface->w) / R36SX_SCREEN_WIDTH);
 			if (sx >= surface->w) sx=surface->w-1;
-			uint8_t r,g,b;
 			uint32_t pixel=R36SX_ReadSurfacePixel(surface,sx,sy);
-			SDL_GetRGB(pixel,surface->format,&r,&g,&b);
-			uint16_t out=R36SX_RGB888ToRGB565(r,g,b);
+			uint16_t out=R36SX_SurfacePixelToRGB565(surface->format,pixel);
 			dst[x]=out;
 			if (out != 0) {
 				nonblack++;
@@ -414,16 +468,8 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 
 	if (r36sx_video.present_count < 30) {
 		fprintf(stderr,
-		        "r36sx_video: present #%u surface=%dx%d bpp=%d pitch=%d clip=%d,%d %dx%d nonblack=%u bbox=%d,%d..%d,%d\n",
+		        "r36sx_video: present #%u converted nonblack=%u bbox=%d,%d..%d,%d\n",
 		        r36sx_video.present_count,
-		        surface->w,
-		        surface->h,
-		        surface->format ? surface->format->BitsPerPixel : 0,
-		        surface->pitch,
-		        sdl.clip.x,
-		        sdl.clip.y,
-		        sdl.clip.w,
-		        sdl.clip.h,
 		        nonblack,
 		        minx,
 		        miny,
@@ -436,6 +482,9 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 	                       R36SX_SCREEN_WIDTH,
 	                       R36SX_SCREEN_HEIGHT,
 	                       R36SX_RGB565_STRIDE);
+	if (r36sx_video.present_count <= 30)
+		fprintf(stderr,"r36sx_video: present #%u displayed\n",
+		        r36sx_video.present_count - 1);
 }
 
 #define SETMODE_SAVES 1  //Don't set Video Mode if nothing changes.

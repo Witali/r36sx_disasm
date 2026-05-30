@@ -16,6 +16,8 @@ This build is an early baseline:
   path that can leave only the VGA cursor visible;
 - direct R36SX display mirror: each DOSBox frame is converted to 640x480 RGB565
   and sent to `/mnt/sdcard/cubegm/driver.so` with `video_driver_disp_frame()`;
+- direct SDL pixel-format mask conversion, with fast pass-through for RGB565
+  surfaces;
 - wrapper main sets `LD_LIBRARY_PATH`, changes into this directory, loads
   `dosbox.conf`, and writes `dosbox.stdout.log` / `dosbox.stderr.log`;
 - `dosbox.stderr.log` includes the first 30 frame-present summaries for
