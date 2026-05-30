@@ -33,10 +33,17 @@ disk_image/cubegm/usr/lib/libSDL-1.2.so.0
 ```
 
 This is intentionally less invasive than writing a full custom DOSBox frontend
-immediately. Once the stock SDL path builds and starts, the next steps are:
+immediately. The current build keeps the stock SDL frontend, but additionally
+mirrors each `GFX_EndUpdate()` surface to the firmware `driver.so` display path
+as a 640x480 RGB565 frame. This is the same final presentation route used by
+Pico-286 and the native apps, and avoids relying on the firmware SDL video
+backend to make the frame visible.
 
-- route video/audio/input through the same driver.so path used by Pico-286 and
-  native apps;
+Next steps are:
+
+- route input through the same raw `cube_ioctl()`/joy shared-memory path used by
+  Pico-286 and native apps;
+- route audio through `sound_driver_playframe()` if SDL audio is unreliable;
 - reuse `homebrew/common/r36sx_screen_keyboard.*`;
 - reuse or adapt the Pico-286 disk menu, key preset menu, screenshot, and stats
   overlays;

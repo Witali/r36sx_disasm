@@ -192,3 +192,39 @@ Result:
   `libstdc++.so.6`, `libgcc_s.so.1`, `libc.so.6`;
 - Microsoft Defender scans of both the build output and overlay copy reported
   no threats.
+
+Device test feedback:
+
+- the baseline SDL build reached execution but showed a black screen;
+- likely cause: the firmware SDL 1.2 video path does not reliably present the
+  SDL surface when DOSBox is launched as a native app.
+
+R36SX direct-present rebuild:
+
+```powershell
+.\homebrew\dosbox_r36sx\build_dosbox_r36sx.ps1
+.\tools\scan-download.ps1 .\homebrew\dosbox_r36sx\dosbox_r36sx
+Copy-Item -Force homebrew\dosbox_r36sx\dosbox_r36sx patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+.\tools\scan-download.ps1 .\patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0\bin\mipsel-none-elf-readelf.exe -d homebrew\dosbox_r36sx\dosbox_r36sx
+```
+
+Changes:
+
+- `src/gui/sdlmain.cpp` now loads `/mnt/sdcard/cubegm/driver.so`;
+- each `GFX_EndUpdate()` converts the current SDL surface to a 640x480 RGB565
+  framebuffer;
+- the converted framebuffer is sent to `video_driver_disp_frame()`;
+- the SDL path remains compiled in for now, so this is a conservative mirror of
+  the final frame rather than a full custom frontend.
+
+Result:
+
+- output size: `8031028` bytes;
+- SHA256:
+  `E43BC187D7373D117080675A35FDC5ED5B4829B22DF0EE8973DEFE12113B8FBF`;
+- dynamic dependencies unchanged:
+  `libSDL-1.2.so.0`, `libpthread.so.0`, `libdl.so.2`, `libm.so.6`,
+  `libstdc++.so.6`, `libgcc_s.so.1`, `libc.so.6`;
+- Microsoft Defender scans of both the build output and overlay copy reported
+  no threats.

@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <sys/types.h>
+#include <stdint.h>
+#include <dlfcn.h>
 #ifdef WIN32
 #include <signal.h>
 #include <process.h>
@@ -220,6 +222,187 @@ struct SDL_Block {
 };
 
 static SDL_Block sdl;
+
+#define R36SX_SCREEN_WIDTH 640
+#define R36SX_SCREEN_HEIGHT 480
+#define R36SX_RGB565_STRIDE (R36SX_SCREEN_WIDTH * 2)
+#define R36SX_DRIVER_SETTING_0 1
+#define R36SX_DRIVER_SETTING_1 1
+#define R36SX_DRIVER_SETTING_2 1
+#define R36SX_DRIVER_SETTING_WIDTH 0x356
+#define R36SX_DRIVER_SETTING_HEIGHT 0x1e0
+
+typedef int (*r36sx_video_driver_setting_fn)(int *);
+typedef int (*r36sx_video_drivers_init_fn)(void);
+typedef void (*r36sx_video_driver_disp_frame_fn)(void *, int, int, int);
+typedef void (*r36sx_video_driver_deinit_fn)(void);
+
+struct R36SX_DriverVideo {
+	void *handle;
+	r36sx_video_driver_setting_fn setting;
+	r36sx_video_drivers_init_fn init;
+	r36sx_video_driver_disp_frame_fn disp_frame;
+	r36sx_video_driver_deinit_fn deinit;
+	uint16_t *frame;
+	bool active;
+	bool tried;
+};
+
+static R36SX_DriverVideo r36sx_video;
+
+static uint16_t R36SX_RGB888ToRGB565(uint8_t r,uint8_t g,uint8_t b) {
+	return (uint16_t)(((uint16_t)(r & 0xf8) << 8) |
+	                  ((uint16_t)(g & 0xfc) << 3) |
+	                  ((uint16_t)b >> 3));
+}
+
+static void R36SX_VideoClose(void) {
+	if (r36sx_video.active && r36sx_video.deinit)
+		r36sx_video.deinit();
+	if (r36sx_video.frame)
+		free(r36sx_video.frame);
+	if (r36sx_video.handle)
+		dlclose(r36sx_video.handle);
+	memset(&r36sx_video,0,sizeof(r36sx_video));
+}
+
+static bool R36SX_VideoOpen(void) {
+	static const char *paths[] = {
+		"/mnt/sdcard/cubegm/driver.so",
+		"./driver.so",
+		"driver.so"
+	};
+
+	if (r36sx_video.active)
+		return true;
+	if (r36sx_video.tried)
+		return false;
+	r36sx_video.tried=true;
+
+	r36sx_video.frame=(uint16_t *)calloc(
+		R36SX_SCREEN_WIDTH * R36SX_SCREEN_HEIGHT,
+		sizeof(r36sx_video.frame[0]));
+	if (!r36sx_video.frame) {
+		fprintf(stderr,"r36sx_video: framebuffer allocation failed\n");
+		return false;
+	}
+
+	for (size_t i=0;i<sizeof(paths)/sizeof(paths[0]);i++) {
+		r36sx_video.handle=dlopen(paths[i],RTLD_NOW);
+		if (r36sx_video.handle) {
+			fprintf(stderr,"r36sx_video: dlopen ok path=%s\n",paths[i]);
+			break;
+		}
+		fprintf(stderr,"r36sx_video: dlopen failed path=%s err=%s\n",
+		        paths[i],dlerror());
+	}
+	if (!r36sx_video.handle) {
+		R36SX_VideoClose();
+		r36sx_video.tried=true;
+		return false;
+	}
+
+	r36sx_video.setting=(r36sx_video_driver_setting_fn)
+		dlsym(r36sx_video.handle,"video_driver_setting");
+	r36sx_video.init=(r36sx_video_drivers_init_fn)
+		dlsym(r36sx_video.handle,"video_drivers_init");
+	r36sx_video.disp_frame=(r36sx_video_driver_disp_frame_fn)
+		dlsym(r36sx_video.handle,"video_driver_disp_frame");
+	r36sx_video.deinit=(r36sx_video_driver_deinit_fn)
+		dlsym(r36sx_video.handle,"video_driver_deinit");
+	if (!r36sx_video.setting || !r36sx_video.init ||
+	    !r36sx_video.disp_frame || !r36sx_video.deinit) {
+		fprintf(stderr,
+		        "r36sx_video: missing driver.so symbols setting=%p init=%p disp=%p deinit=%p\n",
+		        (void *)r36sx_video.setting,(void *)r36sx_video.init,
+		        (void *)r36sx_video.disp_frame,(void *)r36sx_video.deinit);
+		R36SX_VideoClose();
+		r36sx_video.tried=true;
+		return false;
+	}
+
+	{
+		int cfg[5] = {
+			R36SX_DRIVER_SETTING_0,
+			R36SX_DRIVER_SETTING_1,
+			R36SX_DRIVER_SETTING_2,
+			R36SX_DRIVER_SETTING_WIDTH,
+			R36SX_DRIVER_SETTING_HEIGHT
+		};
+		r36sx_video.setting(cfg);
+	}
+	{
+		int rc=r36sx_video.init();
+		fprintf(stderr,"r36sx_video: video_drivers_init rc=%d\n",rc);
+		if (rc < 0) {
+			R36SX_VideoClose();
+			r36sx_video.tried=true;
+			return false;
+		}
+	}
+
+	r36sx_video.active=true;
+	atexit(R36SX_VideoClose);
+	return true;
+}
+
+static uint32_t R36SX_ReadSurfacePixel(const SDL_Surface *surface,int x,int y) {
+	const uint8_t *p=(const uint8_t *)surface->pixels +
+		(size_t)y * (size_t)surface->pitch +
+		(size_t)x * (size_t)surface->format->BytesPerPixel;
+	switch (surface->format->BytesPerPixel) {
+	case 1:
+		return *p;
+	case 2:
+		return *(const uint16_t *)p;
+	case 3:
+#ifdef WORDS_BIGENDIAN
+		return ((uint32_t)p[0] << 16) | ((uint32_t)p[1] << 8) | p[2];
+#else
+		return ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | p[0];
+#endif
+	case 4:
+		return *(const uint32_t *)p;
+	default:
+		return 0;
+	}
+}
+
+static void R36SX_PresentSurface(SDL_Surface *surface) {
+	if (!surface || !surface->pixels)
+		return;
+	if (!R36SX_VideoOpen())
+		return;
+
+	bool locked=false;
+	if (SDL_MUSTLOCK(surface)) {
+		if (SDL_LockSurface(surface) != 0)
+			return;
+		locked=true;
+	}
+
+	for (int y=0;y<R36SX_SCREEN_HEIGHT;y++) {
+		int sy=(int)(((int64_t)y * surface->h) / R36SX_SCREEN_HEIGHT);
+		if (sy >= surface->h) sy=surface->h-1;
+		uint16_t *dst=r36sx_video.frame + y * R36SX_SCREEN_WIDTH;
+		for (int x=0;x<R36SX_SCREEN_WIDTH;x++) {
+			int sx=(int)(((int64_t)x * surface->w) / R36SX_SCREEN_WIDTH);
+			if (sx >= surface->w) sx=surface->w-1;
+			uint8_t r,g,b;
+			uint32_t pixel=R36SX_ReadSurfacePixel(surface,sx,sy);
+			SDL_GetRGB(pixel,surface->format,&r,&g,&b);
+			dst[x]=R36SX_RGB888ToRGB565(r,g,b);
+		}
+	}
+
+	if (locked)
+		SDL_UnlockSurface(surface);
+
+	r36sx_video.disp_frame(r36sx_video.frame,
+	                       R36SX_SCREEN_WIDTH,
+	                       R36SX_SCREEN_HEIGHT,
+	                       R36SX_RGB565_STRIDE);
+}
 
 #define SETMODE_SAVES 1  //Don't set Video Mode if nothing changes.
 #define SETMODE_SAVES_CLEAR 1 //Clear the screen, when the Video Mode is reused
@@ -954,6 +1137,7 @@ void GFX_EndUpdate( const Bit16u *changedLines ) {
 	default:
 		break;
 	}
+	R36SX_PresentSurface(sdl.surface);
 }
 
 
