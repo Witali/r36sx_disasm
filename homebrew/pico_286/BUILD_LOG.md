@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-05-30 60 Hz main-loop frame pacing
+
+Changed the native R36SX main loop to run on a fixed 60 Hz cadence.  Each loop
+now targets a `16666 us` frame period and yields the remaining time to Linux
+with `usleep()`.
+
+The configured `cpu_mhz` value still maps to an execution quantum per
+millisecond.  To avoid slowing the emulated CPU by the new 16 ms pacing, the
+main loop scales it to a per-frame quantum before calling `exec86()`:
+
+```c
+cpu_exec_loops_per_frame =
+    cpu_exec_loops_per_ms * R36SX_MAIN_LOOP_FRAME_US / 1000;
+```
+
+If a frame overruns, the loop skips the normal frame sleep.  If the emulated
+CPU is also halted in that overrun state, it still performs the short HLT idle
+sleep.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1126056` bytes
+- SHA256: `B4AC18F1E4C0D75B16A5FD2BA8EFEDBC3034DDA9E75A9C4F190C9CA1BD8083C7`
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 sleep only while emulated CPU is halted
 
 Changed the R36SX main loop so it no longer needs a fixed sleep/yield in every

@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 60 Hz main-loop frame pacing
+
+The current `pico_286` binary now paces the native main loop to 60 Hz.  Each
+iteration targets a `16666 us` frame period and yields the remaining time to
+Linux with `usleep()`.
+
+The configured `cpu_mhz` value still means CPU work per millisecond; the binary
+scales that value to a per-frame `exec86()` quantum so the emulator does not
+become roughly 16 times slower after the loop pacing change.
+
+pico_286 size: 1126056 bytes
+pico_286 SHA256: B4AC18F1E4C0D75B16A5FD2BA8EFEDBC3034DDA9E75A9C4F190C9CA1BD8083C7
+
 ## 2026-05-30 sleep only on emulated HLT
 
 The current `pico_286` binary now yields to Linux only when the emulated CPU has

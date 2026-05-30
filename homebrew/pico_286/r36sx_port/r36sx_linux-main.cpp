@@ -3,6 +3,7 @@
 #include <cstring>
 #include <signal.h>
 #include <sys/time.h>
+#include <time.h>
 #include <cstdio>
 #include "MiniFB.h"
 #include "emulator/emulator.h"
@@ -35,6 +36,8 @@ extern "C" void r36sx_pico286_disk_flush_all(void);
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
 #define R36SX_HLT_SLEEP_US 1000u
+#define R36SX_MAIN_LOOP_FPS 60u
+#define R36SX_MAIN_LOOP_FRAME_US 16666u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
 static volatile int soft_reset_requested = 0;
@@ -51,6 +54,47 @@ extern "C" void r36sx_pico286_request_soft_reset(void) {
 }
 
 static void r36sx_pico286_soft_reset(void);
+
+static uint64_t r36sx_pico286_now_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
+}
+
+static uint32_t r36sx_pico286_frame_exec_loops(uint32_t loops_per_ms)
+{
+    uint64_t loops =
+        ((uint64_t)loops_per_ms * R36SX_MAIN_LOOP_FRAME_US + 500ull) / 1000ull;
+
+    if (loops == 0) {
+        return 1;
+    }
+    if (loops > 0xffffffffull) {
+        return 0xffffffffu;
+    }
+    return (uint32_t)loops;
+}
+
+static void r36sx_pico286_wait_for_next_main_frame(uint64_t *next_frame_us)
+{
+    uint64_t now_us = r36sx_pico286_now_us();
+
+    if (now_us < *next_frame_us) {
+        uint64_t sleep_us = *next_frame_us - now_us;
+        if (sleep_us > 1000000ull) {
+            sleep_us = 1000000ull;
+        }
+        usleep((unsigned int)sleep_us);
+        *next_frame_us += R36SX_MAIN_LOOP_FRAME_US;
+        return;
+    }
+
+    *next_frame_us = now_us + R36SX_MAIN_LOOP_FRAME_US;
+    if (r36sx_cpu_waiting_for_interrupt()) {
+        usleep(R36SX_HLT_SLEEP_US);
+    }
+}
 
 extern "C" int r36sx_pico286_video_active_height(void) {
     /*
@@ -1110,17 +1154,25 @@ int main() {
     r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=%d",
                             sound_thread_rc, ticks_thread_rc);
 
-    const uint32_t cpu_exec_loops = r36sx_pico286_cpu_exec_loops(32768u);
-    r36sx_pico286_debug_log("main: cpu_model=%s cpu_mode=%s cpu_exec_loops=%u",
+    const uint32_t cpu_exec_loops_per_ms =
+        r36sx_pico286_cpu_exec_loops(32768u);
+    const uint32_t cpu_exec_loops_per_frame =
+        r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms);
+    r36sx_pico286_debug_log(
+        "main: cpu_model=%s cpu_mode=%s cpu_exec_loops_per_ms=%u main_loop_fps=%u cpu_exec_loops_per_frame=%u",
                             r36sx_pico286_cpu_model_name(),
                             r36sx_pico286_cpu_mode_name(),
-                            cpu_exec_loops);
+                            cpu_exec_loops_per_ms,
+                            R36SX_MAIN_LOOP_FPS,
+                            cpu_exec_loops_per_frame);
     if (r36sx_pico286_cpu_mode() == R36SX_PICO286_CPU_MODE_PROTECTED) {
         r36sx_pico286_debug_log(
             "main: cpu_mode=protected requested; protected-mode CPU core is not implemented yet, booting real mode");
     }
 
     unsigned int main_loop_count = 0;
+    uint64_t next_main_loop_us =
+        r36sx_pico286_now_us() + R36SX_MAIN_LOOP_FRAME_US;
     while (running) {
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
@@ -1135,9 +1187,9 @@ int main() {
                                     main_loop_count, videomode);
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
-        exec86(cpu_exec_loops);
+        exec86(cpu_exec_loops_per_frame);
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
-                                cpu_exec_loops);
+                                cpu_exec_loops_per_frame);
         R36SX_PROFILE_BEGIN(profile_disk_flush);
         r36sx_pico286_disk_flush_pending();
         R36SX_PROFILE_END(R36SX_PROFILE_DISK_FLUSH, profile_disk_flush);
@@ -1172,9 +1224,7 @@ int main() {
                                     main_loop_count);
         }
         r36sx_profile_maybe_log();
-        if (r36sx_cpu_waiting_for_interrupt()) {
-            usleep(R36SX_HLT_SLEEP_US);
-        }
+        r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us);
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);
 
