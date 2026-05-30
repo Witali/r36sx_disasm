@@ -42,6 +42,9 @@
 #define R36SX_PICO286_SCREENSHOT_DIR \
     "/mnt/sdcard/MIPS_NATIVE/pico_286/screenshots"
 #define R36SX_PICO286_SCREENSHOT_LOCAL_DIR "screenshots"
+#define R36SX_PICO286_SCREENSHOT_TOAST_MS 500u
+#define R36SX_PICO286_SCREENSHOT_PREVIEW_W 160
+#define R36SX_PICO286_SCREENSHOT_PREVIEW_H 120
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -58,6 +61,7 @@ struct r36sx_mfb_driver {
     cube_ioctl_fn cube_ioctl;
     uint16_t *frame;
     uint16_t *base_frame;
+    uint16_t *screenshot_preview;
     int width;
     int height;
     int stride;
@@ -80,11 +84,15 @@ struct r36sx_mfb_driver {
     uint8_t force_present;
     uint8_t disk_led_was_active;
     uint8_t screenshot_requested;
+    uint8_t screenshot_toast_was_visible;
+    uint8_t screenshot_toast_success;
+    uint8_t screenshot_preview_valid;
     int base_content_h;
     int base_source_h;
     uint32_t base_generation;
     uint32_t presented_generation;
     uint32_t screenshot_counter;
+    uint32_t screenshot_toast_until_ms;
 };
 
 struct r36sx_mfb_saved_rect {
@@ -104,6 +112,7 @@ static volatile uint32_t g_disk_activity_until_ms;
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
 extern void r36sx_pico286_request_soft_reset(void);
+extern void r36sx_pico286_audio_play_shutter(void);
 
 static uint64_t r36sx_mfb_now_us(void)
 {
@@ -526,7 +535,7 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     return 0;
 }
 
-static void r36sx_mfb_save_screenshot(const uint16_t *pixels)
+static int r36sx_mfb_save_screenshot(const uint16_t *pixels)
 {
     char path[512];
 
@@ -535,9 +544,109 @@ static void r36sx_mfb_save_screenshot(const uint16_t *pixels)
         r36sx_mfb_save_screenshot_to_dir(R36SX_PICO286_SCREENSHOT_LOCAL_DIR,
                                          pixels, path, sizeof(path)) == 0) {
         r36sx_pico286_debug_log("minifb: screenshot saved %s", path);
+        return 1;
     } else {
         r36sx_pico286_debug_log("minifb: screenshot save failed");
+        return 0;
     }
+}
+
+static void r36sx_mfb_capture_screenshot_preview(const uint16_t *pixels)
+{
+    if (!pixels || !g_mfb.screenshot_preview ||
+        g_mfb.width <= 0 || g_mfb.height <= 0) {
+        g_mfb.screenshot_preview_valid = 0;
+        return;
+    }
+
+    for (int y = 0; y < R36SX_PICO286_SCREENSHOT_PREVIEW_H; y++) {
+        int sy = y * g_mfb.height / R36SX_PICO286_SCREENSHOT_PREVIEW_H;
+        const uint16_t *src = pixels + (size_t)sy * (size_t)g_mfb.width;
+        uint16_t *dst = g_mfb.screenshot_preview +
+                        (size_t)y * R36SX_PICO286_SCREENSHOT_PREVIEW_W;
+
+        for (int x = 0; x < R36SX_PICO286_SCREENSHOT_PREVIEW_W; x++) {
+            int sx = x * g_mfb.width / R36SX_PICO286_SCREENSHOT_PREVIEW_W;
+            dst[x] = src[sx];
+        }
+    }
+
+    g_mfb.screenshot_preview_valid = 1;
+}
+
+static int r36sx_mfb_screenshot_toast_visible(uint32_t now_ms)
+{
+    return (int32_t)(g_mfb.screenshot_toast_until_ms - now_ms) > 0;
+}
+
+static void r36sx_mfb_show_screenshot_toast(const uint16_t *pixels,
+                                            int success)
+{
+    r36sx_mfb_capture_screenshot_preview(pixels);
+    g_mfb.screenshot_toast_success = success ? 1u : 0u;
+    g_mfb.screenshot_toast_until_ms =
+        r36sx_mfb_now_ms32() + R36SX_PICO286_SCREENSHOT_TOAST_MS;
+    g_mfb.force_present = 1;
+}
+
+static void r36sx_mfb_finish_screenshot(uint16_t *pixels)
+{
+    int saved = r36sx_mfb_save_screenshot(pixels);
+
+    r36sx_mfb_show_screenshot_toast(pixels, saved);
+    g_mfb.screenshot_requested = 0;
+}
+
+static void r36sx_mfb_draw_screenshot_toast(uint16_t *target,
+                                            uint32_t now_ms)
+{
+    const char *message;
+    const int margin = 10;
+    const int preview_pad = 6;
+    const int text_h = 18;
+    int box_w = R36SX_PICO286_SCREENSHOT_PREVIEW_W + preview_pad * 2;
+    int box_h = text_h + R36SX_PICO286_SCREENSHOT_PREVIEW_H + preview_pad;
+    int x = g_mfb.width - box_w - margin;
+    int y = margin;
+    int preview_x;
+    int preview_y;
+
+    if (!target || !r36sx_mfb_screenshot_toast_visible(now_ms)) {
+        return;
+    }
+
+    if (x < margin) {
+        x = margin;
+    }
+    message = g_mfb.screenshot_toast_success ?
+              "SCREENSHOT SAVED" : "SCREENSHOT FAILED";
+    r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h,
+                               r36sx_mfb_rgb565(6, 10, 14));
+    r36sx_mfb_stroke_rect(target, x, y, box_w, box_h,
+                          g_mfb.screenshot_toast_success ?
+                              r36sx_mfb_rgb565(120, 180, 150) :
+                              r36sx_mfb_rgb565(190, 90, 80));
+    r36sx_mfb_draw_text8(target, x + preview_pad, y + 6, message,
+                         r36sx_mfb_rgb565(240, 244, 228));
+
+    if (!g_mfb.screenshot_preview_valid || !g_mfb.screenshot_preview) {
+        return;
+    }
+
+    preview_x = x + preview_pad;
+    preview_y = y + text_h;
+    for (int row = 0; row < R36SX_PICO286_SCREENSHOT_PREVIEW_H; row++) {
+        memcpy(target + (size_t)(preview_y + row) * (size_t)g_mfb.width +
+                   (size_t)preview_x,
+               g_mfb.screenshot_preview +
+                   (size_t)row * R36SX_PICO286_SCREENSHOT_PREVIEW_W,
+               R36SX_PICO286_SCREENSHOT_PREVIEW_W *
+                   sizeof(g_mfb.screenshot_preview[0]));
+    }
+    r36sx_mfb_stroke_rect(target, preview_x - 1, preview_y - 1,
+                          R36SX_PICO286_SCREENSHOT_PREVIEW_W + 2,
+                          R36SX_PICO286_SCREENSHOT_PREVIEW_H + 2,
+                          r36sx_mfb_rgb565(42, 52, 60));
 }
 
 static uint16_t r36sx_mfb_blend_rgb565(uint16_t c0, uint16_t c1,
@@ -727,6 +836,7 @@ static void r36sx_mfb_request_screenshot(void)
 {
     g_mfb.screenshot_requested = 1;
     g_mfb.force_present = 1;
+    r36sx_pico286_audio_play_shutter();
     r36sx_pico286_debug_log("minifb: Fn+Up screenshot requested");
 }
 
@@ -879,12 +989,14 @@ static int r36sx_mfb_video_source_height(void)
     return source_h;
 }
 
-static int r36sx_mfb_large_overlay_active(void)
+static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
 {
     return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
            r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
-           r36sx_app_stats_is_visible();
+           r36sx_app_stats_is_visible() ||
+           g_mfb.screenshot_requested ||
+           r36sx_mfb_screenshot_toast_visible(now_ms);
 }
 
 static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
@@ -1203,10 +1315,17 @@ int mfb_open(const char *name, int width, int height, int scale)
                                      sizeof(g_mfb.frame[0]));
     g_mfb.base_frame = (uint16_t *)calloc((size_t)width * (size_t)height,
                                           sizeof(g_mfb.base_frame[0]));
+    g_mfb.screenshot_preview =
+        (uint16_t *)calloc((size_t)R36SX_PICO286_SCREENSHOT_PREVIEW_W *
+                               R36SX_PICO286_SCREENSHOT_PREVIEW_H,
+                           sizeof(g_mfb.screenshot_preview[0]));
     if (!g_mfb.frame || !g_mfb.base_frame) {
         r36sx_pico286_debug_log("minifb: framebuffer allocation failed");
         mfb_close();
         return 0;
+    }
+    if (!g_mfb.screenshot_preview) {
+        r36sx_pico286_debug_log("minifb: screenshot preview allocation failed");
     }
     if (r36sx_mfb_load_driver() != 0) {
         mfb_close();
@@ -1269,6 +1388,7 @@ int mfb_update(void *buffer, int fps_limit)
     int source_changed;
     int large_overlay_active;
     int disk_led_active;
+    int screenshot_toast_visible;
     int need_present;
     (void)fps_limit;
 
@@ -1298,13 +1418,16 @@ int mfb_update(void *buffer, int fps_limit)
         frame_generation != g_mfb.base_generation ||
         content_h != g_mfb.base_content_h ||
         source_h != g_mfb.base_source_h;
-    large_overlay_active = r36sx_mfb_large_overlay_active();
+    screenshot_toast_visible = r36sx_mfb_screenshot_toast_visible(now_ms);
+    large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
     need_present =
         source_changed ||
         large_overlay_active ||
         disk_led_active ||
         g_mfb.disk_led_was_active ||
+        screenshot_toast_visible ||
+        g_mfb.screenshot_toast_was_visible ||
         g_mfb.force_present ||
         g_mfb.screenshot_requested;
 
@@ -1334,9 +1457,10 @@ int mfb_update(void *buffer, int fps_limit)
         }
         r36sx_mfb_draw_stats_overlay(g_mfb.frame);
         if (g_mfb.screenshot_requested) {
-            r36sx_mfb_save_screenshot(g_mfb.frame);
-            g_mfb.screenshot_requested = 0;
+            r36sx_mfb_finish_screenshot(g_mfb.frame);
+            now_ms = r36sx_mfb_now_ms32();
         }
+        r36sx_mfb_draw_screenshot_toast(g_mfb.frame, now_ms);
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
     } else {
@@ -1345,8 +1469,7 @@ int mfb_update(void *buffer, int fps_limit)
             r36sx_mfb_draw_disk_led_saved(src, now_ms, &saved_led);
 
         if (g_mfb.screenshot_requested) {
-            r36sx_mfb_save_screenshot(src);
-            g_mfb.screenshot_requested = 0;
+            r36sx_mfb_finish_screenshot(src);
         }
         g_mfb.disp_frame(src, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
@@ -1356,6 +1479,8 @@ int mfb_update(void *buffer, int fps_limit)
     }
 
     g_mfb.disk_led_was_active = disk_led_active;
+    g_mfb.screenshot_toast_was_visible =
+        r36sx_mfb_screenshot_toast_visible(r36sx_mfb_now_ms32());
     g_mfb.force_present = 0;
     g_mfb.presented_generation = frame_generation;
     g_mfb.last_present_us = now;
@@ -1391,6 +1516,9 @@ void mfb_close(void)
     }
     if (g_mfb.base_frame) {
         free(g_mfb.base_frame);
+    }
+    if (g_mfb.screenshot_preview) {
+        free(g_mfb.screenshot_preview);
     }
     if (g_mfb.handle) {
         dlclose(g_mfb.handle);

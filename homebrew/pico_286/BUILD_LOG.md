@@ -1,5 +1,15 @@
 # pico-286 Build Log
 
+## 2026-05-30 screenshot feedback
+
+`Fn` + D-pad `Up` now gives immediate feedback when a screenshot is requested:
+the R36SX audio backend mixes a short camera-shutter click into the normal
+`driver.so` PCM stream, and the MiniFB compositor shows a half-second
+`SCREENSHOT SAVED`/`SCREENSHOT FAILED` message with a 160x120 preview of the
+captured frame.  The preview is drawn only as an overlay after the saved frame
+has already been written, so the screenshot file itself does not include the
+confirmation UI.
+
 ## 2026-05-30 on-screen app statistics
 
 Added an optional on-screen runtime statistics overlay for Pico-286.  When

@@ -20,7 +20,7 @@ This file documents the `pico_286` native executable for TinyMC.
 - Tap Fn: show or hide the on-screen keyboard.
 - Fn+Select: open the disk image menu.
 - Fn+Start: open the key preset editor.
-- Fn+D-pad Up: save a 640x480 screenshot.
+- Fn+D-pad Up: save a 640x480 screenshot, play a shutter click, and briefly show a preview.
 - Fn+D-pad Down: show or hide app statistics.
 - Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
@@ -30,7 +30,8 @@ Screenshots are written to `MIPS_NATIVE/pico_286/screenshots` as
 `pico_286_YYYYMMDD_HHMMSS_NNN.png` or
 `pico_286_YYYYMMDD_HHMMSS_NNN.bmp`, depending on `screenshot_format` in
 `pico_286.conf`.  If that absolute SD-card path is not available, Pico-286
-falls back to a local `screenshots` directory.
+falls back to a local `screenshots` directory.  After each capture, the screen
+briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 ## On-Screen Keyboard
 

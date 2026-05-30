@@ -429,6 +429,9 @@ Notable patch history:
   remappable key preset entry; the default preset maps it to `Space`.
 - `disk_image_patch_076`: rebuilds Pico-286 with a pressed-key animation for
   the shared on-screen keyboard.
+- `disk_image_patch_104`: rebuilds Pico-286 so `Fn` + D-pad `Up` saves a
+  screenshot, plays a camera-shutter click, and briefly shows a saved/failed
+  message with a small preview.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.

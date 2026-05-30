@@ -30,6 +30,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 screenshot feedback
+
+`Fn` + D-pad `Up` still saves the configured PNG/BMP screenshot, and now also
+mixes a short camera-shutter click into the normal `driver.so` audio stream.
+After the frame is saved, Pico-286 shows a half-second `SCREENSHOT SAVED` or
+`SCREENSHOT FAILED` overlay with a 160x120 preview.
+
+```text
+pico_286 size: 1001852 bytes
+pico_286 SHA256: F3338BF89F34057B38C1DD8135544D93D664F56AE8FE5F7A4E255AE8A35E5743
+```
+
 ## 2026-05-30 on-screen app statistics
 
 The current `pico_286` binary supports a compact top-left runtime statistics

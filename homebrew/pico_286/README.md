@@ -209,6 +209,8 @@ compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 `screenshot_format=png` saves compressed screenshots through zlib.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
+`Fn` + D-pad `Up` also plays a short shutter click and shows a half-second
+confirmation overlay with a small screenshot preview.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a top-left overlay
 with decoded x86 instruction loops per second, host disk image read/write

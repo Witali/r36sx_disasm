@@ -66,6 +66,7 @@ int linux_audio_start();
 int linux_audio_write(const int16_t* buffer, size_t samples);
 void linux_audio_stop();
 void linux_audio_close();
+void r36sx_pico286_audio_play_shutter(void);
 
 // Get current backend
 linux_audio_backend_t linux_audio_get_backend();

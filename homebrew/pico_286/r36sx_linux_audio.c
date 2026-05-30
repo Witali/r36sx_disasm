@@ -11,6 +11,7 @@
 #endif
 
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -24,10 +25,16 @@ struct r36sx_pico286_audio {
     void *handle;
     r36sx_cube_ioctl_fn cube_ioctl;
     struct r36sx_driver_audio_state driver;
+    int16_t *mix_buffer;
+    size_t mix_buffer_frames;
+    uint32_t shutter_pos;
+    uint32_t shutter_len;
+    uint32_t shutter_noise;
     int initialized;
 };
 
 static struct r36sx_pico286_audio g_audio;
+static pthread_mutex_t g_audio_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void *r36sx_pico286_audio_open_driver(void)
 {
@@ -50,10 +57,57 @@ static void *r36sx_pico286_audio_open_driver(void)
     return NULL;
 }
 
+static int16_t r36sx_pico286_audio_clamp_i16(int32_t sample)
+{
+    if (sample > 32767) {
+        return 32767;
+    }
+    if (sample < -32768) {
+        return -32768;
+    }
+    return (int16_t)sample;
+}
+
+static int16_t r36sx_pico286_audio_next_shutter_sample(void)
+{
+    const uint32_t rate = R36SX_DRIVER_AUDIO_RATE;
+    uint32_t pos = g_audio.shutter_pos++;
+    uint32_t amp = 0;
+    int32_t noise;
+
+    if (pos >= g_audio.shutter_len) {
+        return 0;
+    }
+
+    if (pos < rate / 180u) {
+        amp = 18000u;
+    } else if (pos < rate / 70u) {
+        amp = 9000u;
+    } else if (pos >= rate / 34u && pos < rate / 23u) {
+        amp = 12000u;
+    } else if (pos >= rate / 23u && pos < rate / 12u) {
+        uint32_t tail = pos - rate / 23u;
+        uint32_t tail_len = rate / 12u - rate / 23u;
+        amp = 5000u - (4000u * tail) / tail_len;
+    }
+
+    g_audio.shutter_noise =
+        g_audio.shutter_noise * 1664525u + 1013904223u;
+    noise = (int32_t)((g_audio.shutter_noise >> 16) & 0xffffu) - 32768;
+    return (int16_t)((noise * (int32_t)amp) / 32768);
+}
+
+void r36sx_pico286_audio_play_shutter(void)
+{
+    pthread_mutex_lock(&g_audio_lock);
+    g_audio.shutter_pos = 0;
+    g_audio.shutter_len = R36SX_DRIVER_AUDIO_RATE / 8u;
+    g_audio.shutter_noise = 0x5eed1234u;
+    pthread_mutex_unlock(&g_audio_lock);
+}
+
 int linux_audio_init(int sample_rate, int channels, int buffer_size)
 {
-    (void)buffer_size;
-
     r36sx_pico286_debug_log("audio: init rate=%d channels=%d buffer=%d",
                             sample_rate, channels, buffer_size);
     linux_audio_close();
@@ -66,9 +120,21 @@ int linux_audio_init(int sample_rate, int channels, int buffer_size)
 
     memset(&g_audio, 0, sizeof(g_audio));
     r36sx_driver_audio_init(&g_audio.driver);
+    if (buffer_size > 0) {
+        g_audio.mix_buffer_frames = (size_t)buffer_size;
+        g_audio.mix_buffer =
+            (int16_t *)calloc(g_audio.mix_buffer_frames *
+                                  R36SX_DRIVER_AUDIO_CHANNELS,
+                              sizeof(g_audio.mix_buffer[0]));
+        if (!g_audio.mix_buffer) {
+            r36sx_pico286_debug_log("audio: mix buffer allocation failed");
+            return -1;
+        }
+    }
     g_audio.handle = r36sx_pico286_audio_open_driver();
     if (!g_audio.handle) {
         r36sx_pico286_debug_log("audio: driver.so open failed");
+        linux_audio_close();
         return -1;
     }
 
@@ -96,6 +162,7 @@ int linux_audio_start(void)
 int linux_audio_write(const int16_t *buffer, size_t samples)
 {
     int rc;
+    const int16_t *play_buffer = buffer;
     static int logged_failures;
 
     if (!g_audio.initialized || !g_audio.driver.playframe || !buffer) {
@@ -107,7 +174,30 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
         }
         return -1;
     }
-    rc = g_audio.driver.playframe(buffer, (int)samples);
+
+    pthread_mutex_lock(&g_audio_lock);
+    if (g_audio.shutter_pos < g_audio.shutter_len &&
+        g_audio.mix_buffer && samples <= g_audio.mix_buffer_frames) {
+        size_t stereo_samples = samples * R36SX_DRIVER_AUDIO_CHANNELS;
+
+        memcpy(g_audio.mix_buffer, buffer,
+               stereo_samples * sizeof(g_audio.mix_buffer[0]));
+        for (size_t frame = 0; frame < samples; frame++) {
+            int16_t click = r36sx_pico286_audio_next_shutter_sample();
+            size_t idx = frame * R36SX_DRIVER_AUDIO_CHANNELS;
+
+            g_audio.mix_buffer[idx] =
+                r36sx_pico286_audio_clamp_i16(
+                    (int32_t)g_audio.mix_buffer[idx] + click);
+            g_audio.mix_buffer[idx + 1u] =
+                r36sx_pico286_audio_clamp_i16(
+                    (int32_t)g_audio.mix_buffer[idx + 1u] + click);
+        }
+        play_buffer = g_audio.mix_buffer;
+    }
+    pthread_mutex_unlock(&g_audio_lock);
+
+    rc = g_audio.driver.playframe(play_buffer, (int)samples);
     if (rc != 0 && logged_failures < 8) {
         r36sx_pico286_debug_log("audio: playframe rc=%d samples=%lu",
                                 rc, (unsigned long)samples);
@@ -125,11 +215,16 @@ void linux_audio_close(void)
 {
     r36sx_pico286_debug_log("audio: close initialized=%d handle=%p",
                             g_audio.initialized, g_audio.handle);
+    pthread_mutex_lock(&g_audio_lock);
     r36sx_driver_audio_close(&g_audio.driver);
     if (g_audio.handle) {
         dlclose(g_audio.handle);
     }
+    if (g_audio.mix_buffer) {
+        free(g_audio.mix_buffer);
+    }
     memset(&g_audio, 0, sizeof(g_audio));
+    pthread_mutex_unlock(&g_audio_lock);
 }
 
 linux_audio_backend_t linux_audio_get_backend(void)
