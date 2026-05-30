@@ -44,7 +44,7 @@ static const struct r36sx_key_preset_button_info g_buttons[] = {
     { "y", "Y", R36SX_RKGAME_KEY_Y, R36SX_SCREEN_KEY_CONTROL },
     { "x", "X", R36SX_RKGAME_KEY_X, R36SX_SCREEN_KEY_SPACE },
     { "start", "START", R36SX_RKGAME_KEY_START, R36SX_SCREEN_KEY_RETURN },
-    { "select", "SELECT", R36SX_RKGAME_KEY_SELECT, R36SX_SCREEN_KEY_SPACE },
+    { "select", "SELECT", R36SX_RKGAME_KEY_SELECT, R36SX_SCREEN_KEY_SHIFT },
     { "l", "L", R36SX_RKGAME_KEY_L, R36SX_SCREEN_KEY_MENU },
     { "l2", "L2", R36SX_RKGAME_KEY_L2, R36SX_SCREEN_KEY_F1 },
     { "r", "R", R36SX_RKGAME_KEY_R, R36SX_SCREEN_KEY_SHIFT },
@@ -1116,10 +1116,6 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         draw_row(state, frame, width, height, stride_pixels, item, draw_x,
                  draw_y, col_w, row_h, line);
     }
-    draw_row(state, frame, width, height, stride_pixels, -1, x,
-             button_y + (R36SX_KEY_PRESET_LAYOUT_ROWS - 1) *
-             (row_h + grid_gap), col_w, row_h, "X/B CANCEL");
-
     y = height - 54;
     draw_row(state, frame, width, height, stride_pixels,
              R36SX_KEY_PRESET_ROW_OK, ok_x, y, ok_w, 28, "OK");

@@ -385,16 +385,22 @@ pico_286 SHA256: 570E55DE4A0357D392A30C418B6152F88DD4A70F76B137F24DB997E9935699A
 Defender scan: found no threats
 ```
 
-## 2026-05-29 remappable Select preset key
+## 2026-05-30 Select preset row default
 
 The current `pico_286` binary makes physical `Select` a normal remappable key
-preset entry.  The default preset maps `Select` to `Space`, and the preset
-editor shows `SELECT` in the left column bottom slot opposite `START`.
+preset entry.  The preset editor now shows `SELECT` in the left column bottom
+slot opposite `START` instead of drawing the old `X/B CANCEL` label over that
+slot.  The default preset maps `Select` to `Shift`.
 
 Older `keypresets.conf` presets that do not contain `select=...` are filled
 from current defaults before explicit values are applied, so they receive the
-new `Select = Space` binding.  An explicit `select=NONE` or another value still
+new `Select = Shift` binding.  An explicit `select=NONE` or another value still
 overrides the default.
+
+```text
+pico_286 size: 981136 bytes
+pico_286 SHA256: 980E3291F2227EE9109551C83DB4D6679FBC3FFB665D80C4BCA3CDBD86FB5AD3
+```
 
 ```text
 pico_286 size: 914632 bytes

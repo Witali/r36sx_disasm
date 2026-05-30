@@ -1,5 +1,18 @@
 # pico-286 Build Log
 
+## 2026-05-30 Select key preset row
+
+Changed the key preset editor so the lower-left physical button slot shows the
+actual `SELECT` assignment row instead of drawing the old `X/B CANCEL` label
+over it.  The editor still has the visual `CANCEL` button at the bottom and
+B/X still cancel the editor when no picker keyboard is open.
+
+The default preset now maps physical `Select` to `Shift`:
+
+```ini
+select=SHIFT
+```
+
 ## 2026-05-30 computed-goto opcode dispatch
 
 Added an optional GNU labels-as-values dispatch table to the main `exec86()`
