@@ -13,6 +13,7 @@ MC is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 - D-pad / left stick up and down: select a file.
 - Left, B, or Select: parent directory.
 - Right: enter the selected directory.
+- Y: view the selected regular file as text, regardless of extension.
 - A or Start: enter a directory, view a configured text file, or run the
   selected executable.
 - In the text viewer, Up/Down scroll, Select pages up, A/Start pages down,
@@ -106,8 +107,9 @@ at least `large_px + 3`. `text_extensions` is a comma-separated list of file
 extensions opened by the built-in text viewer.
 
 Files matching `text_extensions` are shown as `[TXT]` in the list. Press
-`A`/`Start` to open them, `Up`/`Down` to scroll, `Select` for page up,
-`A`/`Start` for page down, and `Left`/`B` to return to the file list.
+`A`/`Start` to open those files automatically, or press `Y` on any regular
+file to force-open it as text. In the viewer, `Up`/`Down` scroll, `Select`
+pages up, `A`/`Start` pages down, and `Left`/`B` returns to the file list.
 
 ## Input model
 

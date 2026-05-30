@@ -36,6 +36,13 @@ Useful keys are font, small_px, large_px, and list_row_h.
 If FreeType or the TTF file is unavailable, Tiny MC falls back to its old
 built-in 5x7 bitmap font.
 
+Controls:
+
+  Up/Down selects a file.
+  A/Start opens directories, configured text files, or executables.
+  Y views the selected regular file as text, regardless of extension.
+  Left/B/Select moves to the parent directory.
+
 Fn handling is enabled in Tiny MC. The shortcut is armed only after Fn has been
 released once, so a raised Fn bit during startup is ignored. A later Fn press
 closes Tiny MC and starts /mnt/sdcard/cubegm/icube directly, not icube.sh, to

@@ -84,10 +84,11 @@ enum button_bits {
     BTN_A_BIT = 1u << 4,
     BTN_B_BIT = 1u << 5,
     BTN_START_BIT = 1u << 6,
-    BTN_SELECT_BIT = 1u << 7
+    BTN_SELECT_BIT = 1u << 7,
+    BTN_Y_BIT = 1u << 8
 #if ENABLE_FN_ICUBE_SHORTCUT
     ,
-    BTN_FN_BIT = 1u << 8
+    BTN_FN_BIT = 1u << 9
 #endif
 };
 
@@ -358,7 +359,7 @@ static int g_entry_count;
 static int g_selected;
 static int g_scroll;
 static char g_cwd[PATH_MAX] = "/mnt/sdcard";
-static char g_status[256] = "A/Start runs files or opens text. Right/A enters dirs. Fn starts iCube.";
+static char g_status[256] = "A/Start opens. Y views selected file as text. Fn starts iCube.";
 static uint32_t g_prev_buttons;
 static uint32_t g_repeat_buttons;
 static long g_next_repeat_ms;
@@ -1844,8 +1845,11 @@ static uint32_t input_translate_rkgame_keys(uint32_t raw)
     if ((raw & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_X)) != 0) {
         b |= BTN_A_BIT;
     }
-    if ((raw & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_Y)) != 0) {
+    if ((raw & R36SX_RKGAME_KEY_B) != 0) {
         b |= BTN_B_BIT;
+    }
+    if ((raw & R36SX_RKGAME_KEY_Y) != 0) {
+        b |= BTN_Y_BIT;
     }
     if ((raw & R36SX_RKGAME_KEY_START) != 0) {
         b |= BTN_START_BIT;
@@ -1975,8 +1979,11 @@ static uint32_t input_buttons(void)
         g_input.ev_key[BTN_A_LOCAL] || g_input.ev_key[BTN_B_LOCAL]) {
         b |= BTN_A_BIT;
     }
-    if (g_input.ev_key[KEY_ESC_LOCAL] || g_input.ev_key[BTN_X_LOCAL] || g_input.ev_key[BTN_Y_LOCAL]) {
+    if (g_input.ev_key[KEY_ESC_LOCAL] || g_input.ev_key[BTN_X_LOCAL]) {
         b |= BTN_B_BIT;
+    }
+    if (g_input.ev_key[BTN_Y_LOCAL]) {
+        b |= BTN_Y_BIT;
     }
     if (g_input.ev_key[BTN_START_LOCAL]) {
         b |= BTN_START_BIT;
@@ -2421,7 +2428,7 @@ static void draw_ui(void)
     draw_scrollbar(top, rows);
 
     draw_text(12, g_fb.height - FOOTER_H + 8,
-              "UP/DOWN SELECT  A/START OPEN  RIGHT ENTER  LEFT/B BACK  FN ICUBE",
+              "UP/DOWN SELECT  A/START OPEN  Y VIEW  RIGHT ENTER  LEFT/B BACK  FN ICUBE",
               rgb565(230, 240, 220), 1, g_fb.width - 24);
     draw_text(12, g_fb.height - 17, g_status, rgb565(220, 210, 180), 1, g_fb.width - 24);
 
@@ -2591,6 +2598,29 @@ static int launch_selected(void)
     return 1;
 }
 
+static int open_selected_as_text(int force)
+{
+    if (g_entry_count <= 0) {
+        snprintf(g_status, sizeof(g_status), "No file selected");
+        return 0;
+    }
+
+    struct entry *e = &g_entries[g_selected];
+    if (e->is_dir || strcmp(e->name, "..") == 0) {
+        snprintf(g_status, sizeof(g_status), "Y views files as text");
+        return 0;
+    }
+    if (!force && !(e->is_text || has_text_suffix(e->name))) {
+        return 0;
+    }
+
+    char path[PATH_MAX];
+    join_path(path, sizeof(path), g_cwd, e->name);
+    save_dir_state(g_cwd);
+    text_viewer_open(path, e->name);
+    return 1;
+}
+
 #if ENABLE_FN_ICUBE_SHORTCUT
 static void launch_icube(void)
 {
@@ -2747,6 +2777,12 @@ static void handle_buttons(uint32_t buttons)
         g_next_repeat_ms = now + ((changed & BTN_DOWN_BIT) ? 360 : 110);
     } else if (nav == 0) {
         g_repeat_buttons = 0;
+    }
+
+    if ((changed & BTN_Y_BIT) != 0) {
+        open_selected_as_text(1);
+        finish_button_frame(buttons);
+        return;
     }
 
     if ((changed & (BTN_LEFT_BIT | BTN_B_BIT | BTN_SELECT_BIT)) != 0) {
