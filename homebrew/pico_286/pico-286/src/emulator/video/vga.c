@@ -13,6 +13,9 @@ static uint8_t graphics_control_register = 0;
 
 static uint8_t color_index = 0, read_color_index = 0, vga_register;
 static uint8_t attribute_data_mode = 0;
+static uint8_t attribute_controller[0x20];
+static uint8_t dac_mask = 0xFF;
+static uint8_t misc_output_register = 0x63;
 uint32_t vga_plane_offset = 0;
 uint8_t vga_planar_mode = 0;
 
@@ -490,6 +493,12 @@ void vga_init(void) {
     vga_latch32 = 0;
     sequencer_register = graphics_control_register = 0;
     attribute_data_mode = 0;
+    dac_mask = 0xFF;
+    misc_output_register = 0x63;
+    for (uint8_t i = 0; i < 0x10; i++) {
+        attribute_controller[i] = i;
+    }
+    memset(&attribute_controller[0x10], 0, sizeof(attribute_controller) - 0x10);
 }
 
 void vga_attribute_reset_flipflop(void) {
@@ -505,6 +514,7 @@ void vga_portout(uint16_t portnum, uint16_t value) {
         /* Attribute Address Register */
         case 0x3C0: {
             if (attribute_data_mode) {
+                attribute_controller[vga_register & 0x1Fu] = value;
                 // Palette registers
                 if (vga_register <= 0x0f) {
                     const uint8_t r = (((value >> 2) & 1) << 1) + ((value >> 5) & 1);
@@ -521,12 +531,15 @@ void vga_portout(uint16_t portnum, uint16_t value) {
                     cga_blinking = (value >> 5) & 1 ? 0x7F : 0xFF;
                 }
             } else {
-                vga_register = value & 0b1111;
+                vga_register = value & 0x1Fu;
             }
 
             attribute_data_mode ^= 1;
             break;
         }
+        case 0x3C2:
+            misc_output_register = value & 0xFFu;
+            break;
         // http://www.osdever.net/FreeVGA/vga/seqreg.htm
         // https://vtda.org/books/Computing/Programming/EGA-VGA-ProgrammersReferenceGuide2ndEd_BradleyDyckKliewer.pdf
         case 0x3C4:
@@ -543,6 +556,9 @@ void vga_portout(uint16_t portnum, uint16_t value) {
             break;
         case 0x3C7:
             read_color_index = value & 0xff;
+            break;
+        case 0x3C6:
+            dac_mask = value & 0xFFu;
             break;
         case 0x3C8: //color index register (write operations)
             color_index = value & 0xff;
@@ -582,7 +598,13 @@ uint16_t vga_portin(uint16_t portnum) {
     //printf("vga_portin %x\n", portnum);
 
     switch (portnum) {
+        case 0x3C1:
+            return attribute_controller[vga_register & 0x1Fu];
+        case 0x3C2:
+            return 0;
         case 0x3C5: return vga.sequencer[sequencer_register];
+        case 0x3C6: return dac_mask;
+        case 0x3CC: return misc_output_register;
         case 0x3CF: return vga.graphics_controller[graphics_control_register];
         case 0x3C8:
             return read_color_index;

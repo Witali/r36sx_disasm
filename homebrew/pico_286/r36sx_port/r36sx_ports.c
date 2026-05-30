@@ -382,6 +382,7 @@ if (sound_chips_clock) {
         case 0x3C4:
         case 0x3CE:
         case 0x3C0:
+        case 0x3C2:
         case 0x3C5:
         case 0x3C6:
         case 0x3C7:
