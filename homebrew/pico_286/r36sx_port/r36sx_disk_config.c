@@ -10,6 +10,12 @@
 #define R36SX_PICO286_MAX_DISK_PATH 192
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 250.000
+#define R36SX_PICO286_MIN_CACHE_BUFFER_KB 0UL
+#define R36SX_PICO286_MAX_CACHE_BUFFER_KB 1024UL
+#define R36SX_PICO286_MIN_CACHE_FLUSH_SECTORS 1UL
+#define R36SX_PICO286_MAX_CACHE_FLUSH_SECTORS 1024UL
+#define R36SX_PICO286_MIN_CACHE_FLUSH_MS 100UL
+#define R36SX_PICO286_MAX_CACHE_FLUSH_MS 60000UL
 
 typedef struct {
     uint8_t bios_drive;
@@ -35,8 +41,14 @@ static char cpu_mhz_text[32] = "32.768";
 static char boot_mode_text[32] = "normal";
 static char boot_order_text[64] = "fdd0,hdd0";
 static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
+static char disk_cache_buffer_kb_text[16] = "64";
+static char disk_cache_flush_sectors_text[16] = "4";
+static char disk_cache_flush_ms_text[16] = "2000";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
+static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
+static uint32_t disk_cache_flush_sectors = 4u;
+static uint32_t disk_cache_flush_ms = 2000u;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -262,6 +274,83 @@ static int set_boot_mode(const char *value, int line_no)
     return 0;
 }
 
+static int set_disk_cache_uint(const char *key, const char *value,
+                               unsigned long min_value,
+                               unsigned long max_value,
+                               uint32_t *target,
+                               char *target_text,
+                               size_t target_text_size,
+                               unsigned long multiplier,
+                               int line_no)
+{
+    char *end = NULL;
+    unsigned long parsed = strtoul(value, &end, 10);
+
+    if (end) {
+        end = trim_space(end);
+    }
+    if (value[0] == '\0' || (end && end[0] != '\0') ||
+        parsed < min_value || parsed > max_value) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    *target = (uint32_t)(parsed * multiplier);
+    snprintf(target_text, target_text_size, "%lu", parsed);
+    r36sx_pico286_debug_log("diskcfg: %s=%lu", key, parsed);
+    return 1;
+}
+
+static int set_disk_cache_value(const char *key, const char *value,
+                                int line_no)
+{
+    if (key_equals(key, "disk_cache_buffer_kb") ||
+        key_equals(key, "cache_buffer_kb") ||
+        key_equals(key, "image_cache_buffer_kb")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_CACHE_BUFFER_KB,
+            R36SX_PICO286_MAX_CACHE_BUFFER_KB,
+            &disk_cache_buffer_bytes,
+            disk_cache_buffer_kb_text,
+            sizeof(disk_cache_buffer_kb_text),
+            1024UL,
+            line_no);
+    }
+
+    if (key_equals(key, "disk_cache_flush_sectors") ||
+        key_equals(key, "cache_flush_sectors") ||
+        key_equals(key, "image_cache_flush_sectors")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_CACHE_FLUSH_SECTORS,
+            R36SX_PICO286_MAX_CACHE_FLUSH_SECTORS,
+            &disk_cache_flush_sectors,
+            disk_cache_flush_sectors_text,
+            sizeof(disk_cache_flush_sectors_text),
+            1UL,
+            line_no);
+    }
+
+    if (key_equals(key, "disk_cache_flush_ms") ||
+        key_equals(key, "cache_flush_ms") ||
+        key_equals(key, "image_cache_flush_ms")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_CACHE_FLUSH_MS,
+            R36SX_PICO286_MAX_CACHE_FLUSH_MS,
+            &disk_cache_flush_ms,
+            disk_cache_flush_ms_text,
+            sizeof(disk_cache_flush_ms_text),
+            1UL,
+            line_no);
+    }
+
+    return 0;
+}
+
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -402,9 +491,15 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
     }
+    if (set_disk_cache_value(key, value, line_no)) {
+        return 1;
+    }
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
+        return 1;
+    }
+    if (key[0] == '[') {
         return 1;
     }
     if (key_equals(key, "boot_order")) {
@@ -556,6 +651,14 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
+    fprintf(fp, "# Disk image I/O cache.\n");
+    fprintf(fp, "# disk_cache_buffer_kb is the stdio buffer allocated per image file.\n");
+    fprintf(fp, "# fflush runs after disk_cache_flush_sectors dirty sectors or after\n");
+    fprintf(fp, "# disk_cache_flush_ms milliseconds since the latest cached write.\n");
+    fprintf(fp, "[disk_cache]\n");
+    fprintf(fp, "disk_cache_buffer_kb=%s\n", disk_cache_buffer_kb_text);
+    fprintf(fp, "disk_cache_flush_sectors=%s\n", disk_cache_flush_sectors_text);
+    fprintf(fp, "disk_cache_flush_ms=%s\n\n", disk_cache_flush_ms_text);
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
     fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
     fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
@@ -638,4 +741,25 @@ int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
 
     *geometry = hdd_geometries[index];
     return 1;
+}
+
+uint32_t r36sx_pico286_disk_cache_buffer_bytes(void)
+{
+    load_disk_config();
+
+    return disk_cache_buffer_bytes;
+}
+
+uint32_t r36sx_pico286_disk_cache_flush_sectors(void)
+{
+    load_disk_config();
+
+    return disk_cache_flush_sectors;
+}
+
+uint32_t r36sx_pico286_disk_cache_flush_ms(void)
+{
+    load_disk_config();
+
+    return disk_cache_flush_ms;
 }

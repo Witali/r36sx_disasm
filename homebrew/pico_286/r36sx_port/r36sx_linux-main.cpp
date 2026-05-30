@@ -28,6 +28,8 @@ extern OPL *emu8950_opl;
 extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
 extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
+extern "C" void r36sx_pico286_disk_flush_pending(void);
+extern "C" void r36sx_pico286_disk_flush_all(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
@@ -840,6 +842,7 @@ static void r36sx_pico286_soft_reset(void) {
     soft_reset_requested = 0;
     soft_reset_in_progress = 1;
     __sync_synchronize();
+    r36sx_pico286_disk_flush_all();
 
     r36sx_keyboard_reset();
     port60 = 0;
@@ -1093,6 +1096,7 @@ int main() {
                                     main_loop_count, videomode);
         }
         exec86(cpu_exec_loops);
+        r36sx_pico286_disk_flush_pending();
         r36sx_keyboard_tick();
         if (main_loop_count < 8u) {
             r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
@@ -1132,6 +1136,7 @@ int main() {
 
     // Clean up audio
     r36sx_pico286_debug_log("main: cleanup begin");
+    r36sx_pico286_disk_flush_all();
     linux_audio_close();
 
     mfb_close();

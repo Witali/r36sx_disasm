@@ -1,31 +1,18 @@
 #pragma once
 
 #include "emulator.h"
+#include "r36sx_host_disk_io.h"
 
 extern void r36sx_pico286_disk_activity(void);
 
 int hdcount = 0, fdcount = 0;
 
 static uint8_t sectorbuffer[512];
-typedef struct _IO_FILE FILE;
 typedef unsigned long DWORD;
-
-extern FILE *fopen(const char *pathname, const char *mode);
-extern int fclose(FILE *stream);
-extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-extern size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
-extern int	fflush (FILE *);
-extern int fseek(FILE *stream, long offset, int whence);
-extern long ftell(FILE *stream);
-extern void rewind(FILE *stream);
-
-
-#define SEEK_CUR    1
-#define SEEK_END    2
-#define SEEK_SET    0
 
 struct struct_drive {
     FILE *diskfile;
+    r36sx_host_disk_cache_t cache;
     size_t filesize;
     uint16_t cyls;
     uint16_t sects;
@@ -42,11 +29,8 @@ static inline void ejectdisk(uint8_t drivenum) {
     if (drivenum & 0x80) drivenum -= 126;
 
     if (disk[drivenum].inserted) {
-        if (disk[drivenum].diskfile) {
-            fflush(disk[drivenum].diskfile);
-            fclose(disk[drivenum].diskfile);
-            disk[drivenum].diskfile = 0;
-        }
+        r36sx_host_disk_close(&disk[drivenum].diskfile,
+                              &disk[drivenum].cache, drivenum);
         disk[drivenum].inserted = 0;
         if (drivenum >= 2) {
             if (hdcount > 0) hdcount--;
@@ -61,20 +45,17 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     uint8_t bios_drive = drivenum;
     if (drivenum & 0x80) drivenum -= 126;  // Normalize hard drive numbers
 
-    FILE *file = fopen(pathname, "rb+");
+    r36sx_host_disk_cache_t cache;
+    size_t size = 0;
+    FILE *file = r36sx_host_disk_open(pathname, &cache, &size);
     if (!file) {
         printf( "DISK: ERROR: cannot open disk file %s for drive %02Xh\n", pathname, drivenum);
         return 0;
     }
 
-    // Find the file size
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    rewind(file);
-
     // Validate size constraints
     if (size < 360 * 1024 || size > 0x1f782000UL || (size & 511)) {
-        fclose(file);
+        r36sx_host_disk_close(&file, &cache, drivenum);
 //        fprintf(stderr, "DISK: ERROR: invalid disk size for drive %02Xh (%lu bytes)\n", drivenum, (unsigned long) size);
         return 0;
     }
@@ -137,6 +118,7 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     ejectdisk(drivenum);
 
     disk[drivenum].diskfile = file;
+    disk[drivenum].cache = cache;
     disk[drivenum].filesize = size;
     disk[drivenum].inserted = 1;  // Using 1 instead of true for consistency with uint8_t
     disk[drivenum].readonly = 0;  // Default to read-write
@@ -175,6 +157,37 @@ static inline int disk_transfer_is_inside_image(uint8_t drivenum,
            bytecount <= disk[drivenum].filesize - fileoffset;
 }
 
+static inline int disk_memory_range_is_plain_ram(uint32_t address,
+                                                 size_t bytecount) {
+    return bytecount > 0 &&
+           address < RAM_SIZE &&
+           bytecount <= (size_t)(RAM_SIZE - address);
+}
+
+static int disk_flush_drive(uint8_t drivenum, const char *reason) {
+    if (drivenum & 0x80) drivenum -= 126;
+    if (drivenum >= 4 || !disk[drivenum].inserted) {
+        return 0;
+    }
+    return r36sx_host_disk_flush(disk[drivenum].diskfile,
+                                 &disk[drivenum].cache, drivenum, reason);
+}
+
+void r36sx_pico286_disk_flush_pending(void) {
+    for (uint8_t drivenum = 0; drivenum < 4; drivenum++) {
+        if (disk[drivenum].inserted) {
+            r36sx_host_disk_flush_due(disk[drivenum].diskfile,
+                                      &disk[drivenum].cache, drivenum);
+        }
+    }
+}
+
+void r36sx_pico286_disk_flush_all(void) {
+    for (uint8_t drivenum = 0; drivenum < 4; drivenum++) {
+        disk_flush_drive(drivenum, "flush-all");
+    }
+}
+
 static void readdisk(uint8_t drivenum,
               uint16_t dstseg, uint16_t dstoff,
               uint16_t cyl, uint16_t sect, uint16_t head,
@@ -208,6 +221,7 @@ static void readdisk(uint8_t drivenum,
 
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
+    size_t bytecount = (size_t)sectcount * 512UL;
 
     // Check if fileoffset is valid
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
@@ -222,14 +236,22 @@ static void readdisk(uint8_t drivenum,
         return;
     }
 
-    // Set file position
-    if (fseek(disk[drivenum].diskfile, fileoffset, SEEK_SET) != 0) {
-        r36sx_pico286_debug_log(
-            "disk: read fail drive=%u fseek offset=%lu",
-            drivenum, (unsigned long)fileoffset);
-        CPU_AH = 0x04;    // sector not found
-        CPU_AL = 0;
-        CPU_FL_CF = 1;
+    if (!is_verify && disk_memory_range_is_plain_ram(memdest, bytecount)) {
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
+                                    &RAM[memdest], bytecount) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: read fail drive=%u bulk offset=%lu bytes=%lu",
+                drivenum, (unsigned long)fileoffset,
+                (unsigned long)bytecount);
+            CPU_AH = 0x04;    // sector not found
+            CPU_AL = 0;
+            CPU_FL_CF = 1;
+            return;
+        }
+        CPU_AL = sectcount;
+        CPU_FL_CF = 0;
+        CPU_AH = 0;
         return;
     }
 
@@ -238,7 +260,8 @@ static void readdisk(uint8_t drivenum,
         r36sx_pico286_disk_activity();
 
         // Read the sector into buffer
-        if (fread(&sectorbuffer[0], 512, 1, disk[drivenum].diskfile) != 1) {
+        if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
+                                    &sectorbuffer[0], 512) != 0) {
 //            printf("Disk read error on drive %i\r\n", drivenum);
             r36sx_pico286_debug_log(
                 "disk: read fail drive=%u fread sector_index=%u offset=%lu",
@@ -320,6 +343,7 @@ static void writedisk(uint8_t drivenum,
 
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
+    size_t bytecount = (size_t)sectcount * 512UL;
 
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
         r36sx_pico286_debug_log(
@@ -341,17 +365,26 @@ static void writedisk(uint8_t drivenum,
         return;
     }
 
-    // Set file position
-    if (fseek(disk[drivenum].diskfile, fileoffset, SEEK_SET) != 0) {
-        r36sx_pico286_debug_log(
-            "disk: write fail drive=%u fseek offset=%lu",
-            drivenum, (unsigned long)fileoffset);
-        CPU_AH = 0x04;    // sector not found
-        CPU_AL = 0;
-        CPU_FL_CF = 1;
+    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                     &disk[drivenum].cache, drivenum,
+                                     fileoffset, &RAM[memdest], bytecount,
+                                     sectcount) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: write fail drive=%u bulk offset=%lu bytes=%lu",
+                drivenum, (unsigned long)fileoffset,
+                (unsigned long)bytecount);
+            CPU_AH = 0xCC;    // write fault
+            CPU_AL = 0;
+            CPU_FL_CF = 1;
+            return;
+        }
+        CPU_AL = sectcount;
+        CPU_FL_CF = 0;
+        CPU_AH = 0;
         return;
     }
-
 
     // Write each sector
     for (cursect = 0; cursect < sectcount; cursect++) {
@@ -364,7 +397,10 @@ static void writedisk(uint8_t drivenum,
         r36sx_pico286_disk_activity();
 
         // Write the buffer to the file
-        if (fwrite(sectorbuffer, 512, 1, disk[drivenum].diskfile) != 1) {
+        if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                     &disk[drivenum].cache, drivenum,
+                                     fileoffset + (size_t)cursect * 512UL,
+                                     sectorbuffer, 512, 1) != 0) {
             r36sx_pico286_debug_log(
                 "disk: write fail drive=%u fwrite sector_index=%u offset=%lu",
                 drivenum, cursect,
@@ -374,14 +410,6 @@ static void writedisk(uint8_t drivenum,
             CPU_FL_CF = 1;
             return;
         }
-    }
-
-    if (fflush(disk[drivenum].diskfile) != 0) {
-        r36sx_pico286_debug_log("disk: write fail drive=%u fflush", drivenum);
-        CPU_AH = 0xCC;    // write fault
-        CPU_AL = cursect;
-        CPU_FL_CF = 1;
-        return;
     }
 
     // Handle the case where no sectors were written
@@ -419,6 +447,7 @@ static INLINE void diskhandler() {
     switch (CPU_AH) {
         case 0x00:  // Reset disk system
             if (disk[drivenum].inserted) {
+                disk_flush_drive(drivenum, "int13-reset");
                 CPU_AH = 0;
                 CPU_FL_CF = 0;  // Successful reset (no-op in emulator)
             } else {

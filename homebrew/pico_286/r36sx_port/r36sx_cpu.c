@@ -828,8 +828,9 @@ static int r36sx_bios_try_boot_drive(uint8_t bios_drive)
         return 0;
     }
 
-    if (fseek(disk[slot].diskfile, 0, SEEK_SET) != 0 ||
-        fread(boot_sector, 512, 1, disk[slot].diskfile) != 1) {
+    disk_flush_drive(slot, "boot-sector-read");
+    if (r36sx_host_disk_read_at(disk[slot].diskfile, 0, boot_sector,
+                                sizeof(boot_sector)) != 0) {
         r36sx_pico286_debug_log(
             "cpu: boot_order failed reading drive 0x%02x", bios_drive);
         return 0;

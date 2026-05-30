@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-05-30 disk image I/O cache
+
+Split the host disk-image operations into `r36sx_host_disk_io.c/.h`. The BIOS
+INT 13h layer now keeps CHS/DMA validation in `disks-win32.c.inl`, while the
+new helper owns host `FILE*` reads/writes, per-image stdio buffering, and dirty
+flush policy.
+
+The default config now enables:
+
+```text
+[disk_cache]
+disk_cache_buffer_kb=64
+disk_cache_flush_sectors=4
+disk_cache_flush_ms=2000
+```
+
+Contiguous sector transfers into ordinary DOS RAM use bulk `fread()`/`fwrite()`
+directly against `RAM[]`. Writes flush after 4 dirty sectors, after 2 seconds
+without another write, on INT 13h reset, before boot-sector reads, when an image
+is closed, during soft reset, and on emulator exit.
+
 ## 2026-05-30 Fn+Up screenshots
 
 Added a native screenshot shortcut to the R36SX MiniFB backend. Holding `Fn`

@@ -63,6 +63,23 @@ Open it with Fn+Select.
 
 The menu searches for `.img` files next to `pico_286.conf`.
 
+## Disk Image Cache
+
+The host image I/O layer reads and writes contiguous BIOS sector transfers in
+bulk when the DOS DMA buffer is ordinary RAM.  Each opened image also gets a
+stdio buffer controlled by:
+
+```text
+[disk_cache]
+disk_cache_buffer_kb=64
+disk_cache_flush_sectors=4
+disk_cache_flush_ms=2000
+```
+
+Dirty writes are flushed after 4 sectors, after 2 seconds without another
+write, on INT 13h disk reset, when an image is changed/closed, and when the
+application exits.
+
 ## Key Preset Editor
 
 Open it with Fn+Start.

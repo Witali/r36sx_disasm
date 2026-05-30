@@ -46,6 +46,15 @@ int r36sx_pico286_set_boot_order_value(const char *value);
 int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
                                r36sx_pico286_chs_t *geometry);
 
+// Return the stdio buffer size to use for each host disk image file.
+uint32_t r36sx_pico286_disk_cache_buffer_bytes(void);
+
+// Return the number of dirty 512-byte sectors that triggers fflush().
+uint32_t r36sx_pico286_disk_cache_flush_sectors(void);
+
+// Return the dirty-cache age in milliseconds that triggers fflush().
+uint32_t r36sx_pico286_disk_cache_flush_ms(void);
+
 #ifdef __cplusplus
 }
 #endif
