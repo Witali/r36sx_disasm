@@ -9,7 +9,10 @@ The port reuses the upstream Linux/host emulator core and replaces only the host
 integration pieces:
 
 - `r36sx_minifb.c` implements the small upstream `MiniFB` API through
-  `/mnt/sdcard/cubegm/driver.so` video and joypad input.
+  `/mnt/sdcard/cubegm/driver.so` video and joypad input.  The R36SX renderer
+  now uses a 16-bit RGB565 `SCREEN` buffer end-to-end; `mfb_update()` copies or
+  scales RGB565 rows directly instead of converting a 32-bit RGB888 frame each
+  present.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.

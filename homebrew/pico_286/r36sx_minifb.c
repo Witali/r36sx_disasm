@@ -2,8 +2,8 @@
  * MiniFB-compatible backend for running xrip/pico-286 as a native R36SX app.
  *
  * The upstream Linux backend uses X11.  On the console we keep the same tiny
- * MiniFB API surface, but present RGB888 pixels through the stock driver.so
- * RGB565 framebuffer path and translate console buttons to PC key codes.
+ * MiniFB API surface, but present RGB565 pixels directly through the stock
+ * driver.so framebuffer path and translate console buttons to PC key codes.
  */
 
 #ifndef _GNU_SOURCE
@@ -73,7 +73,7 @@ struct r36sx_mfb_driver {
 };
 
 static struct r36sx_mfb_driver g_mfb;
-static uint32_t g_palette[256];
+static uint16_t g_palette[256];
 static volatile uint32_t g_frame_generation;
 static volatile uint32_t g_disk_activity_until_ms;
 
@@ -127,6 +127,23 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
     return (uint16_t)(((uint16_t)(r & 0xf8u) << 8) |
                       ((uint16_t)(g & 0xfcu) << 3) |
                       ((uint16_t)b >> 3));
+}
+
+static uint16_t r36sx_mfb_blend_rgb565(uint16_t c0, uint16_t c1,
+                                       uint32_t w0, uint32_t w1,
+                                       uint32_t denominator)
+{
+    uint32_t r = (((c0 >> 11) & 0x1fu) * w0 +
+                  ((c1 >> 11) & 0x1fu) * w1 + denominator / 2u) /
+                 denominator;
+    uint32_t g = (((c0 >> 5) & 0x3fu) * w0 +
+                  ((c1 >> 5) & 0x3fu) * w1 + denominator / 2u) /
+                 denominator;
+    uint32_t b = ((c0 & 0x1fu) * w0 +
+                  (c1 & 0x1fu) * w1 + denominator / 2u) /
+                 denominator;
+
+    return (uint16_t)((r << 11) | (g << 5) | b);
 }
 
 static void r36sx_mfb_fill_rect(int x, int y, int w, int h, uint16_t color)
@@ -363,8 +380,8 @@ static int r36sx_mfb_overlay_active(uint32_t now_ms)
            g_mfb.force_present;
 }
 
-static void r36sx_mfb_convert_source(uint32_t *src, int content_h,
-                                     int source_h)
+static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
+                                  int source_h)
 {
     int keyboard_visible = r36sx_screen_keyboard_is_visible(&g_mfb.osk);
     int rows_to_copy = content_h;
@@ -387,8 +404,8 @@ static void r36sx_mfb_convert_source(uint32_t *src, int content_h,
             int sy1 = (end - 1) / content_h;
             int weight0;
             int weight1;
-            const uint32_t *src_row0;
-            const uint32_t *src_row1;
+            const uint16_t *src_row0;
+            const uint16_t *src_row1;
 
             if (sy1 >= source_h) {
                 sy1 = source_h - 1;
@@ -410,43 +427,20 @@ static void r36sx_mfb_convert_source(uint32_t *src, int content_h,
                 uint32_t w0 = (uint32_t)(weight0 / 96);
                 uint32_t w1 = (uint32_t)(weight1 / 96);
                 for (int x = 0; x < g_mfb.width; x++) {
-                    uint32_t c0 = src_row0[x];
-                    uint32_t c1 = src_row1[x];
-                    uint32_t r = (((c0 >> 16) & 0xffu) * w0 +
-                                  ((c1 >> 16) & 0xffu) * w1 + 2u) / 5u;
-                    uint32_t g = (((c0 >> 8) & 0xffu) * w0 +
-                                  ((c1 >> 8) & 0xffu) * w1 + 2u) / 5u;
-                    uint32_t b = ((c0 & 0xffu) * w0 +
-                                  (c1 & 0xffu) * w1 + 2u) / 5u;
-                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
-                                            ((g & 0xfcu) << 3) | (b >> 3));
+                    dst_row[x] = r36sx_mfb_blend_rgb565(src_row0[x],
+                                                        src_row1[x],
+                                                        w0, w1, 5u);
                 }
             } else {
                 for (int x = 0; x < g_mfb.width; x++) {
-                    uint32_t c0 = src_row0[x];
-                    uint32_t c1 = src_row1[x];
-                    uint32_t r = (((c0 >> 16) & 0xffu) *
-                                  (uint32_t)weight0 +
-                                  ((c1 >> 16) & 0xffu) *
-                                  (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    uint32_t g = (((c0 >> 8) & 0xffu) *
-                                  (uint32_t)weight0 +
-                                  ((c1 >> 8) & 0xffu) *
-                                  (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    uint32_t b = ((c0 & 0xffu) * (uint32_t)weight0 +
-                                  (c1 & 0xffu) * (uint32_t)weight1) /
-                                 (uint32_t)source_h;
-                    dst_row[x] = (uint16_t)(((r & 0xf8u) << 8) |
-                                            ((g & 0xfcu) << 3) | (b >> 3));
+                    dst_row[x] = r36sx_mfb_blend_rgb565(
+                        src_row0[x], src_row1[x], (uint32_t)weight0,
+                        (uint32_t)weight1, (uint32_t)source_h);
                 }
             }
         } else {
-            uint32_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
-            for (int x = 0; x < g_mfb.width; x++) {
-                dst_row[x] = r36sx_mfb_rgb888_to_rgb565(src_row[x]);
-            }
+            const uint16_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
+            memcpy(dst_row, src_row, (size_t)g_mfb.width * sizeof(dst_row[0]));
         }
     }
 
@@ -749,7 +743,7 @@ int mfb_update(void *buffer, int fps_limit)
 {
     uint64_t now;
     uint32_t now_ms;
-    uint32_t *src = (uint32_t *)buffer;
+    uint16_t *src = (uint16_t *)buffer;
     uint32_t frame_generation;
     int content_h;
     int source_h;
@@ -790,7 +784,7 @@ int mfb_update(void *buffer, int fps_limit)
     }
 
     if (source_dirty) {
-        r36sx_mfb_convert_source(src, content_h, source_h);
+        r36sx_mfb_copy_source(src, content_h, source_h);
         g_mfb.base_generation = frame_generation;
         g_mfb.base_content_h = content_h;
         g_mfb.base_source_h = source_h;
@@ -829,13 +823,14 @@ void mfb_set_pallete_array(const uint32_t *new_palette, uint8_t start,
         return;
     }
     for (uint8_t i = 0; i < count; i++) {
-        g_palette[(uint8_t)(start + i)] = new_palette[i];
+        g_palette[(uint8_t)(start + i)] =
+            r36sx_mfb_rgb888_to_rgb565(new_palette[i]);
     }
 }
 
 void mfb_set_pallete(const uint8_t color_index, const uint32_t color)
 {
-    g_palette[color_index] = color;
+    g_palette[color_index] = r36sx_mfb_rgb888_to_rgb565(color);
 }
 
 void mfb_close(void)

@@ -12,11 +12,17 @@
 #include "linux-audio.h"
 #include "r36sx_disk_config.h"
 
-static uint32_t ALIGN(4, SCREEN[640 * 480]);
+static uint16_t ALIGN(4, SCREEN[640 * 480]);
 uint8_t ALIGN(4, DEBUG_VRAM[80 * 10]) = {0};
 
 int cursor_blink_state = 0;
 uint8_t log_debug = 0;
+
+static uint16_t cga_palette565[16];
+static uint16_t cga_composite_palette565[3][16];
+static uint16_t tga_palette565[16];
+static uint16_t vga_palette565[256];
+static int static_palettes565_ready = 0;
 
 extern OPL *emu8950_opl;
 extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
@@ -99,17 +105,46 @@ extern "C" void _putchar(char character) {
     }
 }
 
-static inline void fill_black_row(uint32_t *pixels)
+static inline uint16_t rgb888_to_rgb565(uint32_t color)
+{
+    uint32_t r = (color >> 16) & 0xffu;
+    uint32_t g = (color >> 8) & 0xffu;
+    uint32_t b = color & 0xffu;
+    return (uint16_t)(((r & 0xf8u) << 8) | ((g & 0xfcu) << 3) | (b >> 3));
+}
+
+static void refresh_palettes565(void)
+{
+    if (!static_palettes565_ready) {
+        for (int i = 0; i < 16; i++) {
+            cga_palette565[i] = rgb888_to_rgb565(cga_palette[i]);
+            for (int p = 0; p < 3; p++) {
+                cga_composite_palette565[p][i] =
+                    rgb888_to_rgb565(cga_composite_palette[p][i]);
+            }
+        }
+        static_palettes565_ready = 1;
+    }
+
+    for (int i = 0; i < 16; i++) {
+        tga_palette565[i] = rgb888_to_rgb565(tga_palette[i]);
+    }
+    for (int i = 0; i < 256; i++) {
+        vga_palette565[i] = rgb888_to_rgb565(vga_palette[i]);
+    }
+}
+
+static inline void fill_black_row(uint16_t *pixels)
 {
     for (int x = 0; x < 640; x++) {
         *pixels++ = 0;
     }
 }
 
-static inline uint32_t mda_text_color(uint8_t attr, int is_foreground)
+static inline uint16_t mda_text_color(uint8_t attr, int is_foreground)
 {
-    uint32_t fg = (attr & 0x08) ? 0xffffff : 0xc4c4c4;
-    uint32_t bg = 0x000000;
+    uint16_t fg = (attr & 0x08) ? 0xffff : rgb888_to_rgb565(0xc4c4c4u);
+    uint16_t bg = 0x0000;
 
     if ((attr & 0x70) != 0) {
         bg = fg;
@@ -121,11 +156,11 @@ static inline uint32_t mda_text_color(uint8_t attr, int is_foreground)
     return is_foreground ? fg : bg;
 }
 
-static inline uint32_t ega_mono_pixel(uint32_t plane_bits, int bit)
+static inline uint16_t ega_mono_pixel(uint32_t plane_bits, int bit)
 {
     uint32_t mask = (1u << bit) | (1u << (bit + 8)) |
                     (1u << (bit + 16)) | (1u << (bit + 24));
-    return (plane_bits & mask) ? 0xffffff : 0x000000;
+    return (plane_bits & mask) ? 0xffff : 0x0000;
 }
 
 static inline uint32_t cga_graphics_base(void)
@@ -141,6 +176,8 @@ static inline uint32_t cga_graphics_row_offset(int screen_y)
 
 static inline void renderer() {
     static uint8_t v = 0;
+    refresh_palettes565();
+
     if (v != videomode) {
         printf("videomode %x %x\n", videomode, v);
         v = videomode;
@@ -156,7 +193,7 @@ static inline void renderer() {
         if (y & 1)
             port3DA |= 1;
 
-        uint32_t *pixels = SCREEN + y * 640;
+        uint16_t *pixels = SCREEN + y * 640;
 
         if (y < 400)
             switch (videomode) {
@@ -190,7 +227,7 @@ static inline void renderer() {
                             }
 
                             // Write the pixel twice (horizontal scaling)
-                            *pixels++ = *pixels++ = cga_palette[pixel_color];
+                            *pixels++ = *pixels++ = cga_palette565[pixel_color];
                         }
                     }
 
@@ -237,7 +274,7 @@ static inline void renderer() {
                                 pixel_color = glyph_row >> bit & 1 ? color & 0x0f : color >> 4;
                             }
 
-                            *pixels++ = cga_palette[pixel_color];
+                            *pixels++ = cga_palette565[pixel_color];
                         }
                     }
                     break;
@@ -253,16 +290,16 @@ static inline void renderer() {
 
                         // Extract all four 2-bit pixels from the CGA byte
                         // and write each pixel twice for horizontal scaling
-                        *pixels++ = *pixels++ = cga_palette[cga_byte >> 6 & 3
+                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 6 & 3
                                                                 ? current_cga_palette[cga_byte >> 6 & 3]
                                                                 : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette[cga_byte >> 4 & 3
+                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 4 & 3
                                                                 ? current_cga_palette[cga_byte >> 4 & 3]
                                                                 : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette[cga_byte >> 2 & 3
+                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 2 & 3
                                                                 ? current_cga_palette[cga_byte >> 2 & 3]
                                                                 : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette[cga_byte >> 0 & 3
+                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 0 & 3
                                                                 ? current_cga_palette[cga_byte >> 0 & 3]
                                                                 : cga_foreground_color];
                     }
@@ -275,14 +312,14 @@ static inline void renderer() {
                     for (int x = 640 / 8; x--;) {
                         uint8_t cga_byte = (uint8_t)(*cga_row++ & 0xffu);
 
-                        *pixels++ = cga_palette[(cga_byte >> 7 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 6 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 5 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 4 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 3 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 2 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 1 & 1) * cga_foreground_color];
-                        *pixels++ = cga_palette[(cga_byte >> 0 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 6 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 5 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 4 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 3 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 2 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 1 & 1) * cga_foreground_color];
+                        *pixels++ = cga_palette565[(cga_byte >> 0 & 1) * cga_foreground_color];
                     }
 
                     break;
@@ -299,14 +336,14 @@ static inline void renderer() {
                     for (int x = 640 / 8; x--;) {
                         uint8_t cga_byte = *cga_row++;
 
-                        *pixels++ = cga_palette[(cga_byte >> 7 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 6 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 5 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 4 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 3 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 2 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 1 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 0 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 6 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 5 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 4 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 3 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 2 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 1 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 0 & 1) * 15];
                     }
 
                     break;
@@ -355,16 +392,16 @@ static inline void renderer() {
                 case 0x8:
                 case 0x74: /* 160x200x16    */
                 case 0x76: /* cga composite / tandy */ {
-                    uint32_t *palette;
+                    const uint16_t *palette = tga_palette565;
                     switch (videomode) {
                         case 0x08:
-                            palette = tga_palette;
+                            palette = tga_palette565;
                             break;
                         case 0x74:
-                            palette = cga_composite_palette[cga_intensity << 1];
+                            palette = cga_composite_palette565[cga_intensity << 1];
                             break;
                         case 0x76:
-                            palette = cga_composite_palette[0];
+                            palette = cga_composite_palette565[0];
                             break;
                     }
 
@@ -392,8 +429,8 @@ static inline void renderer() {
                     // Each byte containing 4 pixels
                     for (int x = 320 / 2; x--;) {
                         uint8_t tga_byte = *tga_row++;
-                        *pixels++ = *pixels++ = tga_palette[tga_palette_map[tga_byte >> 4 & 15]];
-                        *pixels++ = *pixels++ = tga_palette[tga_palette_map[tga_byte & 15]];
+                        *pixels++ = *pixels++ = tga_palette565[tga_palette_map[tga_byte >> 4 & 15]];
+                        *pixels++ = *pixels++ = tga_palette565[tga_palette_map[tga_byte & 15]];
                     }
                     break;
                 }
@@ -403,8 +440,8 @@ static inline void renderer() {
                     // Each byte contains 2 pixels
                     for (int x = 640 / 2; x--;) {
                         uint8_t tga_byte = *tga_row++;
-                        *pixels++ = tga_palette[tga_palette_map[tga_byte >> 4 & 15]];
-                        *pixels++ = tga_palette[tga_palette_map[tga_byte & 15]];
+                        *pixels++ = tga_palette565[tga_palette_map[tga_byte >> 4 & 15]];
+                        *pixels++ = tga_palette565[tga_palette_map[tga_byte & 15]];
                     }
                     break;
                 }
@@ -423,7 +460,7 @@ static inline void renderer() {
                                                 | (((plane1 >> bit) & 1) << 1)
                                                 | (((plane2 >> bit) & 1) << 2)
                                                 | (((plane3 >> bit) & 1) << 3);
-                            uint32_t color = vga_palette[color_index];
+                            uint16_t color = vga_palette565[color_index];
                             *pixels++ = color;
                             *pixels++ = color;
                         }
@@ -445,7 +482,7 @@ static inline void renderer() {
                                                 | (((plane1 >> bit) & 1) << 1)
                                                 | (((plane2 >> bit) & 1) << 2)
                                                 | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette[color_index];
+                            *pixels++ = vga_palette565[color_index];
                         }
                     }
                     break;
@@ -479,7 +516,7 @@ static inline void renderer() {
                                                 | (((plane1 >> bit) & 1) << 1)
                                                 | (((plane2 >> bit) & 1) << 2)
                                                 | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette[color_index];
+                            *pixels++ = vga_palette565[color_index];
                         }
                     }
                     break;
@@ -490,14 +527,14 @@ static inline void renderer() {
                     for (int x = 640 / 8; x--;) {
                         uint8_t cga_byte = *cga_row++;
 
-                        *pixels++ = cga_palette[(cga_byte >> 7 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 6 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 5 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 4 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 3 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 2 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 1 & 1) * 15];
-                        *pixels++ = cga_palette[(cga_byte >> 0 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 6 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 5 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 4 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 3 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 2 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 1 & 1) * 15];
+                        *pixels++ = cga_palette565[(cga_byte >> 0 & 1) * 15];
                     }
 
                     break;
@@ -517,7 +554,7 @@ static inline void renderer() {
                                                 | (((plane1 >> bit) & 1) << 1)
                                                 | (((plane2 >> bit) & 1) << 2)
                                                 | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette[color_index];
+                            *pixels++ = vga_palette565[color_index];
                         }
                     }
                     break;
@@ -528,13 +565,13 @@ static inline void renderer() {
                             uint32_t ptr = x + (y >> 1) * 320;
                             ptr = (ptr >> 2) + (x & 3) * vga_plane_size;
                             ptr += vram_offset;
-                            uint32_t color = vga_palette[VIDEORAM[ptr]];
+                            uint16_t color = vga_palette565[VIDEORAM[ptr]];
                             *pixels++ = *pixels++ = color;
                         }
                     } else {
                         uint8_t *vga_row = (uint8_t *)VIDEORAM + (y >> 1) * 320;
                         for (int x = 0; x < 320; x++) {
-                            uint32_t color = vga_palette[*vga_row++];
+                            uint16_t color = vga_palette565[*vga_row++];
                             *pixels++ = *pixels++ = color;
                         }
                     }
@@ -556,7 +593,7 @@ static inline void renderer() {
 
 #pragma GCC unroll(8)
                         for (uint8_t bit = 0; bit < 8; bit++) {
-                            *pixels++ = cga_palette[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
+                            *pixels++ = cga_palette565[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
                         }
                     }
                     break;
@@ -573,7 +610,7 @@ static inline void renderer() {
 
 #pragma GCC unroll(8)
                         for (int bit = 0; bit < 8; bit++) {
-                            *pixels++ = *pixels++ = cga_palette[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
+                            *pixels++ = *pixels++ = cga_palette565[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
                         }
                     }
                     break;
@@ -591,7 +628,7 @@ static inline void renderer() {
 
 #pragma GCC unroll(8)
                         for (int bit = 0; bit < 8; bit++) {
-                            *pixels++ = *pixels++ = cga_palette[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
+                            *pixels++ = *pixels++ = cga_palette565[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
                         }
                     }
                     break;

@@ -30,6 +30,27 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 native RGB565 video buffer
+
+The current `pico_286` binary removes the 32-bit intermediate video frame from
+the active R36SX Pico-286 path:
+
+- `r36sx_linux-main.cpp` renders DOS output into a 16-bit RGB565
+  `SCREEN[640 * 480]`.
+- The renderer keeps RGB565 shadow palettes for CGA/TGA/VGA output.
+- `r36sx_minifb.c` copies RGB565 rows directly to its cached base frame.
+- When the on-screen keyboard is visible, the vertical compression blends
+  RGB565 pixels directly.
+
+This removes the previous full-frame RGB888-to-RGB565 conversion before each
+new Pico-286 frame is presented through `driver.so`.
+
+```text
+pico_286 size: 917496 bytes
+pico_286 SHA256: BED9F7092FD1E03A169EB34A40BD1964FC6F9ED403F5E1DDADF67F0E0E2D6EDB
+Defender scan: found no threats
+```
+
 ## 2026-05-29 disk menu boot order row
 
 The current `pico_286` binary adds a `BOOT ORDER` row to the disk image menu.

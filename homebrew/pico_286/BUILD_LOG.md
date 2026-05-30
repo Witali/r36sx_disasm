@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-05-30 native RGB565 video buffer
+
+Converted the R36SX Pico-286 video path from a 32-bit intermediate screen
+buffer to native RGB565.  `r36sx_linux-main.cpp` now declares `SCREEN` as a
+`uint16_t[640 * 480]`, keeps RGB565 shadow palettes for CGA/TGA/VGA renderer
+output, and writes 16-bit pixels directly.  `r36sx_minifb.c` now treats the
+MiniFB source pointer as RGB565, copies rows directly when no overlay scaling is
+needed, and blends RGB565 pixels when the on-screen keyboard compresses the DOS
+image.  This removes the per-frame RGB888-to-RGB565 framebuffer conversion from
+the active Pico-286 present path.
+
+The remaining ARGB8888-to-RGB565 match found by the scan is in the older
+Fake86 SDL shim (`homebrew/fake86/r36sx_sdl.c`).  That shim emulates SDL's
+ARGB8888 texture API and should be changed separately with its SDL
+LockTexture/UpdateTexture contract if Fake86 is revived.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_092\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 917,496 bytes
+- SHA256: `BED9F7092FD1E03A169EB34A40BD1964FC6F9ED403F5E1DDADF67F0E0E2D6EDB`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/README.md`
+  - `patches/disk_image_patch_092/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_092/MIPS_NATIVE/pico_286/README.md`
+
 ## 2026-05-29 disk menu boot order row
 
 Added a `BOOT ORDER` row to the Pico-286 disk image menu.  It displays
