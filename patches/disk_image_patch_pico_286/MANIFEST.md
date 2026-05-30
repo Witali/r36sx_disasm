@@ -137,6 +137,19 @@ pico_286 SHA256: 3FCAADC76A38CE59A854A75E0AF2D6664C04FA20CE0DA94915801CEBAFB5564
 Defender scan: found no threats
 ```
 
+## 2026-05-30 PCjs CPU test floppy
+
+Added `MIPS_NATIVE/pico_286/cpu_tests.img`, a 1.44 MB FAT12 floppy image with
+PCjs `ID.COM` and `TEST386.COM`, plus `CPUID.ASM`, `ID.ASM`, and `README.TXT`.
+Boot FreeDOS, mount this image as `B:` from the Pico-286 disk menu or set
+`fdd1=cpu_tests.img`, then run `ID` or `TEST386`.
+
+```text
+cpu_tests.img size: 1474560 bytes
+cpu_tests.img SHA256: 8005293284DC5486E1268C495356B319EEBCE4F3ECB3CD76FE09CCC5DEDCF76D
+Defender scan: found no threats
+```
+
 ## 2026-05-30 centered screenshot toast
 
 The screenshot confirmation toast now appears centered on the screen.  The

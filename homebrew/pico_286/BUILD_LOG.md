@@ -284,6 +284,54 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-30 PCjs CPU test floppy
+
+Downloaded the PCjs CPU test sources with a sparse Git checkout:
+
+```powershell
+git clone --filter=blob:none --sparse https://github.com/jeffpar/pcjs.git internet_sources\pcjs_cpu_tests
+git -C internet_sources\pcjs_cpu_tests sparse-checkout set software/pcx86/test/cpu
+```
+
+The ready DOS programs are in `software/pcx86/test/cpu/bin`:
+
+- `ID.COM`
+- `TEST386.COM`
+
+Created `homebrew/pico_286/cpu_tests.img`, a 1.44 MB FAT12 floppy image, with:
+
+- `ID.COM`
+- `TEST386.COM`
+- `CPUID.ASM`
+- `ID.ASM`
+- `README.TXT`
+
+Build command:
+
+```powershell
+python tools\create_fat12_floppy.py --output homebrew\pico_286\cpu_tests.img --label CPUTESTS --file ID.COM=internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\bin\id.com --file TEST386.COM=internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\bin\test386.com --file CPUID.ASM=internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\cpuid.asm --file ID.ASM=internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\id.asm --file README.TXT=homebrew\pico_286\dos_files\cpu_tests_readme.txt
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\bin\id.com
+.\tools\scan-download.ps1 .\internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu\bin\test386.com
+.\tools\scan-download.ps1 .\homebrew\pico_286\cpu_tests.img
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\cpu_tests.img
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\cpu_tests.img
+```
+
+Result:
+
+- Output: `homebrew/pico_286/cpu_tests.img`
+- Size: 1,474,560 bytes
+- SHA256: `8005293284DC5486E1268C495356B319EEBCE4F3ECB3CD76FE09CCC5DEDCF76D`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/cpu_tests.img`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/cpu_tests.img`
+
 ## 2026-05-30 experimental 386 protected mode core
 
 Added the first usable protected-mode layer to the R36SX Pico-286 CPU core.

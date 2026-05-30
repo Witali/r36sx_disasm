@@ -147,6 +147,10 @@ Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
 
+`cpu_tests.img` is an optional FAT12 floppy image beside the executable.  It
+contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`, then
+run `ID` or `TEST386`.
+
 The `[memory]` values are in KB.  `conventional_kb` is reported through the
 BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`
 limits XMS UMB allocations from `D000:0000` upward, and `xms_kb` limits the
