@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-30 CGA raw video memory path
+
+Sopwith still showed corrupted colored rows in the top HUD area even after the
+CGA renderer itself was fixed.  The remaining issue was lower in the memory
+backend: every write to the `0xA0000..0xBFFFF` video range was routed through
+the VGA planar `vga_mem_write()` path.  That is correct for EGA/VGA modes
+`0Dh..13h`, but CGA/text/Tandy/Hercules modes expect raw byte-addressable
+video memory at `B800:0000` or adjacent ranges.
+
+`memory.c` now routes video reads/writes through small helpers:
+
+- EGA/VGA modes `0Dh..13h` keep the existing VGA planar path;
+- CGA/text/Tandy/Hercules and other non-VGA modes store and read raw bytes from
+  the low byte of the `VIDEORAM[]` cells.
+
+This should stop CGA programs such as Sopwith from being affected by stale VGA
+sequencer/graphics-controller state.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,007,400 bytes
+- SHA256: `7E91BA0398575E9BE6B46F1C0AFC20F1F683B6FCD82FF3C113EF8C168B301709`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 Fn shortcut help overlay
 
 Added `Fn` + D-pad `Left` as an on-screen help toggle.  The overlay lists the

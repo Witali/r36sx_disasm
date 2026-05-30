@@ -14,6 +14,91 @@ uint8_t PICO286_PSRAM_ATTR HMA[HMA_END - HMA_START] = {0};
 uint8_t __attribute__((aligned (4))) SRAM[SRAM_BLOCK_SIZE] = {0};
 
 #define VIDEORAM_MASK 0xFFFF
+
+static inline uint32_t videoram_index(const uint32_t address)
+{
+    return address & VIDEORAM_MASK;
+}
+
+static inline int videoram_uses_vga_path(void)
+{
+    return ega_vga_enabled && videomode >= 0x0D && videomode <= 0x13;
+}
+
+static inline void videoram_write8_raw(const uint32_t address, const uint8_t value)
+{
+    VIDEORAM[videoram_index(address)] = value;
+}
+
+static inline uint8_t videoram_read8_raw(const uint32_t address)
+{
+    return (uint8_t)(VIDEORAM[videoram_index(address)] & 0xFFu);
+}
+
+static inline void videoram_write8(const uint32_t address, const uint8_t value)
+{
+    if (videoram_uses_vga_path()) {
+        vga_mem_write(address, value);
+        return;
+    }
+    videoram_write8_raw(address, value);
+}
+
+static inline uint8_t videoram_read8(const uint32_t address)
+{
+    if (videoram_uses_vga_path()) {
+        return vga_mem_read(address);
+    }
+    return videoram_read8_raw(address);
+}
+
+static inline void videoram_write16(const uint32_t address, const uint16_t value)
+{
+    if (videoram_uses_vga_path()) {
+        vga_mem_write16(address, value);
+        return;
+    }
+    videoram_write8_raw(address, (uint8_t)value);
+    videoram_write8_raw(address + 1u, (uint8_t)(value >> 8));
+}
+
+static inline uint16_t videoram_read16(const uint32_t address)
+{
+    if (videoram_uses_vga_path()) {
+        return vga_mem_read16(address);
+    }
+    return (uint16_t)videoram_read8_raw(address) |
+           ((uint16_t)videoram_read8_raw(address + 1u) << 8);
+}
+
+static inline void videoram_write32(const uint32_t address, const uint32_t value)
+{
+    if (videoram_uses_vga_path()) {
+        vga_mem_write(address, (uint8_t)value);
+        vga_mem_write(address + 1u, (uint8_t)(value >> 8));
+        vga_mem_write(address + 2u, (uint8_t)(value >> 16));
+        vga_mem_write(address + 3u, (uint8_t)(value >> 24));
+        return;
+    }
+    videoram_write8_raw(address, (uint8_t)value);
+    videoram_write8_raw(address + 1u, (uint8_t)(value >> 8));
+    videoram_write8_raw(address + 2u, (uint8_t)(value >> 16));
+    videoram_write8_raw(address + 3u, (uint8_t)(value >> 24));
+}
+
+static inline uint32_t videoram_read32(const uint32_t address)
+{
+    if (videoram_uses_vga_path()) {
+        return (uint32_t)vga_mem_read(address) |
+               ((uint32_t)vga_mem_read(address + 1u) << 8) |
+               ((uint32_t)vga_mem_read(address + 2u) << 16) |
+               ((uint32_t)vga_mem_read(address + 3u) << 24);
+    }
+    return (uint32_t)videoram_read8_raw(address) |
+           ((uint32_t)videoram_read8_raw(address + 1u) << 8) |
+           ((uint32_t)videoram_read8_raw(address + 2u) << 16) |
+           ((uint32_t)videoram_read8_raw(address + 3u) << 24);
+}
 read86_t read86;
 read86w_t readw86;
 read86dw_t readdw86;
@@ -27,7 +112,7 @@ void write86_ob(const uint32_t address, const uint8_t value) {
         RAM[address] = value;
     } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
         // printf("video write %x traddr %x =  %x\n", address, (address - VIDEORAM_START) & VIDEORAM_MASK, value);
-        vga_mem_write(address, value);
+        videoram_write8(address, value);
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
@@ -53,7 +138,7 @@ void writew86_ob(const uint32_t address, const uint16_t value) {
         if (address < RAM_SIZE) {
             *(uint16_t *) &RAM[address] = value;
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            vga_mem_write16(address, value);
+            videoram_write16(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writew(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -80,10 +165,7 @@ void writedw86_ob(const uint32_t address, const uint32_t value) {
         if (address < RAM_SIZE) {
             *(uint32_t *) &RAM[address] = value;
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            write86(address, (uint8_t) (value & 0xFF));
-            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
-            write86(address + 2, (uint8_t) ((value >> 16) & 0xFF));
-            write86(address + 3, (uint8_t) ((value >> 24) & 0xFF));
+            videoram_write32(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writedw(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -106,7 +188,7 @@ uint8_t read86_ob(const uint32_t address) {
         return RAM[address];
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return vga_mem_read(address);
+        return videoram_read8(address);
     }
      // if (address >= VBIOS_START && address < VBIOS_END) {
          // return VGABIOS[address - VBIOS_START];
@@ -144,7 +226,7 @@ uint16_t readw86_ob(const uint32_t address) {
         return *(uint16_t *) &RAM[address];
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return  vga_mem_read16(address);
+        return videoram_read16(address);
     }
     // if (address >= VBIOS_START && address < VBIOS_END) {
         // return *(uint16_t *) &VGABIOS[address - VBIOS_START];
@@ -222,7 +304,7 @@ void write86_mp(const uint32_t address, const uint8_t value) {
         write8psram(address, value);
     } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
         // printf("video write %x traddr %x =  %x\n", address, (address - VIDEORAM_START) & VIDEORAM_MASK, value);
-        vga_mem_write(address, value);
+        videoram_write8(address, value);
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
@@ -250,8 +332,7 @@ void writew86_mp(const uint32_t address, const uint16_t value) {
         } else if (address < VIDEORAM_START) {
             write16psram(address, value);
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            write86(address, (uint8_t) (value & 0xFF));
-            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
+            videoram_write16(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writew(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -280,10 +361,7 @@ void writedw86_mp(const uint32_t address, const uint32_t value) {
         } else if (address < VIDEORAM_START) {
             write32psram(address, value);
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            write86(address, (uint8_t) (value & 0xFF));
-            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
-            write86(address + 2, (uint8_t) ((value >> 16) & 0xFF));
-            write86(address + 3, (uint8_t) ((value >> 24) & 0xFF));
+            videoram_write32(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writedw(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -309,7 +387,7 @@ uint8_t read86_mp(const uint32_t address) {
         return read8psram(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return vga_mem_read(address);
+        return videoram_read8(address);
     }
      // if (address >= VBIOS_START && address < VBIOS_END) {
          // return VGABIOS[address - VBIOS_START];
@@ -350,7 +428,7 @@ uint16_t readw86_mp(const uint32_t address) {
         return read16psram(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return (uint16_t) read86_mp(address) | ((uint16_t) read86_mp(address + 1) << 8);
+        return videoram_read16(address);
     }
     // if (address >= VBIOS_START && address < VBIOS_END) {
         // return *(uint16_t *) &VGABIOS[address - VBIOS_START];
@@ -390,10 +468,7 @@ uint32_t readdw86_mp(const uint32_t address) {
         return read32psram(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return (uint32_t) read86_mp(address)
-               | ((uint32_t) read86_mp(address + 1) << 8)
-               | ((uint32_t) read86_mp(address + 2) << 16)
-               | ((uint32_t) read86_mp(address + 3) << 24);
+        return videoram_read32(address);
     }
     if (address >= EMS_START && address < EMS_END) {
         return ems_readdw(address - EMS_START);
@@ -424,7 +499,7 @@ void write86_sw(const uint32_t address, const uint8_t value) {
         swap_write(address, value);
     } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
         // printf("video write %x traddr %x =  %x\n", address, (address - VIDEORAM_START) & VIDEORAM_MASK, value);
-        vga_mem_write(address, value);
+        videoram_write8(address, value);
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
@@ -450,8 +525,7 @@ void writew86_sw(const uint32_t address, const uint16_t value) {
         if (address < VIDEORAM_START) {
             swap_write16(address, value);
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            write86(address, (uint8_t) (value & 0xFF));
-            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
+            videoram_write16(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writew(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -478,10 +552,7 @@ void writedw86_sw(const uint32_t address, const uint32_t value) {
         if (address < VIDEORAM_START) {
             swap_write32(address, value);
         } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-            write86(address, (uint8_t) (value & 0xFF));
-            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
-            write86(address + 2, (uint8_t) ((value >> 16) & 0xFF));
-            write86(address + 3, (uint8_t) ((value >> 24) & 0xFF));
+            videoram_write32(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writedw(address - EMS_START, value);
         } else if (address >= UMB_START && address < UMB_END) {
@@ -504,7 +575,7 @@ uint8_t read86_sw(const uint32_t address) {
         return swap_read(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return vga_mem_read(address);
+        return videoram_read8(address);
     }
      // if (address >= VBIOS_START && address < VBIOS_END) {
          // return VGABIOS[address - VBIOS_START];
@@ -542,7 +613,7 @@ uint16_t readw86_sw(const uint32_t address) {
         return swap_read16(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return (uint16_t) read86_sw(address) | ((uint16_t) read86_sw(address + 1) << 8);
+        return videoram_read16(address);
     }
     // if (address >= VBIOS_START && address < VBIOS_END) {
         // return *(uint16_t *) &VGABIOS[address - VBIOS_START];
@@ -579,10 +650,7 @@ uint32_t readdw86_sw(const uint32_t address) {
         return swap_read32(address);
     }
     if (address >= VIDEORAM_START && address < VIDEORAM_END) {
-        return (uint32_t) read86_sw(address)
-               | ((uint32_t) read86_sw(address + 1) << 8)
-               | ((uint32_t) read86_sw(address + 2) << 16)
-               | ((uint32_t) read86_sw(address + 3) << 24);
+        return videoram_read32(address);
     }
     if (address >= EMS_START && address < EMS_END) {
         return ems_readdw(address - EMS_START);

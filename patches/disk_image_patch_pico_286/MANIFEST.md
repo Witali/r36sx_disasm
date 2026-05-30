@@ -30,6 +30,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 CGA raw video memory path
+
+The Pico-286 binary was rebuilt to keep CGA/text/Tandy/Hercules video memory as
+raw byte-addressable memory instead of always passing `0xA0000..0xBFFFF` reads
+and writes through the VGA planar memory path.  EGA/VGA modes `0Dh..13h` still
+use the VGA path.
+
+This targets Sopwith's corrupted top HUD rows: mode `04h` CGA writes to
+`B800:0000` should no longer be affected by stale VGA register state.
+
+```text
+pico_286 size: 1007400 bytes
+pico_286 SHA256: 7E91BA0398575E9BE6B46F1C0AFC20F1F683B6FCD82FF3C113EF8C168B301709
+Defender scan: found no threats
+```
+
 ## 2026-05-30 Fn shortcut help overlay
 
 `Fn` + D-pad `Left` now toggles an on-screen help overlay that lists the active
