@@ -284,22 +284,11 @@ void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
         }
 
         case 3: {
-            // Mode 0: Normal write with set/reset + ALU
-            new_data = 0;
-            const uint8_t value = ror8(cpu_data, vga.data_rotate_counter) & vga.graphics_controller[8];
-
-            for (int i = 0; i < 4; i++) {
-                const uint32_t mask = 1 << i;
-
-                if ((vga.sequencer[2] & 0xf) & mask) {
-                    uint8_t set_reset = vga.graphics_controller[0] & mask ? 0xFF : 0x00;
-
-                    new_data |= value << (i * 8);
-                }
-            }
-            VIDEORAM[address] = (vga.set_reset32 & new_data) | (~new_data & vga_latch32);
+            const uint32_t selector =
+                expand_to_u32(ror8(cpu_data, vga.data_rotate_counter)) & vga.bit_mask32;
+            new_data = masked_merge_xor(vga_latch32, vga.set_reset32, selector);
+            VIDEORAM[address] = masked_merge_xor(previous_data, new_data, vga.map_mask32);
             return;
-            break;
         }
 
         default:
@@ -362,7 +351,9 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
 
         case 3: {
             // Mode 3: Transparent set/reset
-            new_data = expand_to_u32(ror8(cpu_data, vga.data_rotate_counter)) & set_reset32 | vga_latch32 & ~set_reset32;
+            const uint32_t selector =
+                expand_to_u32(ror8(cpu_data, vga.data_rotate_counter)) & vga.bit_mask32;
+            new_data = masked_merge_xor(vga_latch32, set_reset32, selector);
             *videoram_data = masked_merge_xor(*videoram_data, new_data, map_mask32);
             return;
         }
@@ -416,10 +407,9 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
         // Mode 3: transparent set/reset
         const uint32_t rot0 = expand_to_u32(ror8((uint8_t) (cpu_data_x2 & 0xFF), rotate));
         const uint32_t rot1 = expand_to_u32(ror8((uint8_t) (cpu_data_x2 >> 8), rotate));
-        const uint32_t base = latch32 & ~set_reset32;
 
-        const uint32_t new0 = (rot0 & set_reset32) | base;
-        const uint32_t new1 = (rot1 & set_reset32) | base;
+        const uint32_t new0 = masked_merge_xor(latch32, set_reset32, rot0 & bit_mask32);
+        const uint32_t new1 = masked_merge_xor(latch32, set_reset32, rot1 & bit_mask32);
 
         *p0 = masked_merge_xor(*p0, new0, map_mask32);
         *p1 = masked_merge_xor(*p1, new1, map_mask32);
