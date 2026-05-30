@@ -21,10 +21,12 @@
 #include <zlib.h>
 
 #include "MiniFB.h"
+#include "emulator/includes/font8x8.h"
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
+#include "r36sx_port/r36sx_app_stats.h"
 #include "r36sx_port/r36sx_disk_config.h"
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -149,6 +151,109 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
     return (uint16_t)(((uint16_t)(r & 0xf8u) << 8) |
                       ((uint16_t)(g & 0xfcu) << 3) |
                       ((uint16_t)b >> 3));
+}
+
+static void r36sx_mfb_fill_rect_target(uint16_t *target, int x, int y,
+                                       int w, int h, uint16_t color)
+{
+    if (!target || w <= 0 || h <= 0) {
+        return;
+    }
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x + w > g_mfb.width) {
+        w = g_mfb.width - x;
+    }
+    if (y + h > g_mfb.height) {
+        h = g_mfb.height - y;
+    }
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    for (int row = 0; row < h; row++) {
+        uint16_t *dst = target + (size_t)(y + row) * (size_t)g_mfb.width +
+                        (size_t)x;
+        for (int col = 0; col < w; col++) {
+            dst[col] = color;
+        }
+    }
+}
+
+static void r36sx_mfb_stroke_rect(uint16_t *target, int x, int y, int w,
+                                  int h, uint16_t color)
+{
+    r36sx_mfb_fill_rect_target(target, x, y, w, 1, color);
+    r36sx_mfb_fill_rect_target(target, x, y + h - 1, w, 1, color);
+    r36sx_mfb_fill_rect_target(target, x, y, 1, h, color);
+    r36sx_mfb_fill_rect_target(target, x + w - 1, y, 1, h, color);
+}
+
+static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
+                                 const char *text, uint16_t color)
+{
+    for (int i = 0; text && text[i] != '\0'; i++) {
+        unsigned char ch = (unsigned char)text[i];
+        const unsigned char *glyph = &font_8x8[(size_t)ch * 8u];
+        int char_x = x + i * 8;
+
+        for (int row = 0; row < 8; row++) {
+            int py = y + row;
+            unsigned char bits = glyph[row];
+            if (py < 0 || py >= g_mfb.height) {
+                continue;
+            }
+            for (int col = 0; col < 8; col++) {
+                int px = char_x + col;
+                if (px < 0 || px >= g_mfb.width) {
+                    continue;
+                }
+                if ((bits & (unsigned char)(0x80u >> col)) != 0) {
+                    target[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
+                        color;
+                }
+            }
+        }
+    }
+}
+
+static void r36sx_mfb_draw_stats_overlay(uint16_t *target)
+{
+    r36sx_app_stats_snapshot_t stats;
+    char line[96];
+    int text_w;
+    int box_w;
+    const int x = 8;
+    const int y = 8;
+
+    if (!target || !r36sx_app_stats_is_visible()) {
+        return;
+    }
+
+    r36sx_app_stats_snapshot(&stats);
+    snprintf(line, sizeof(line), "X86:%lu/s RD:%luKB/s WR:%luKB/s FPS:%lu",
+             (unsigned long)stats.x86_per_sec,
+             (unsigned long)stats.disk_read_kb_per_sec,
+             (unsigned long)stats.disk_write_kb_per_sec,
+             (unsigned long)stats.fps);
+    text_w = (int)strlen(line) * 8;
+    box_w = text_w + 12;
+    if (box_w > g_mfb.width - x * 2) {
+        box_w = g_mfb.width - x * 2;
+    }
+
+    r36sx_mfb_fill_rect_target(target, x, y, box_w, 18,
+                               r36sx_mfb_rgb565(5, 8, 12));
+    r36sx_mfb_stroke_rect(target, x, y, box_w, 18,
+                          r36sx_mfb_rgb565(70, 96, 112));
+    r36sx_mfb_draw_text8(target, x + 6, y + 5, line,
+                         r36sx_mfb_rgb565(236, 242, 220));
 }
 
 static void r36sx_mfb_put_be32(uint8_t *dst, uint32_t value)
@@ -625,6 +730,19 @@ static void r36sx_mfb_request_screenshot(void)
     r36sx_pico286_debug_log("minifb: Fn+Up screenshot requested");
 }
 
+static void r36sx_mfb_toggle_stats_overlay(void)
+{
+    if (!r36sx_app_stats_is_enabled()) {
+        r36sx_pico286_debug_log("minifb: Fn+Down stats overlay disabled");
+        return;
+    }
+
+    r36sx_app_stats_toggle_visible();
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("minifb: Fn+Down stats overlay %s",
+                            r36sx_app_stats_is_visible() ? "on" : "off");
+}
+
 static int r36sx_mfb_disk_led_active(uint32_t now_ms)
 {
     return (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
@@ -765,7 +883,8 @@ static int r36sx_mfb_large_overlay_active(void)
 {
     return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
-           r36sx_key_presets_is_visible(&g_mfb.key_presets);
+           r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
+           r36sx_app_stats_is_visible();
 }
 
 static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
@@ -987,6 +1106,11 @@ static int r36sx_mfb_poll_input(void)
             g_mfb.last_raw_keys = raw;
             return 0;
         }
+        if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
+            r36sx_mfb_toggle_stats_overlay();
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
         if (g_mfb.fn_down && !g_mfb.fn_chord_used &&
             g_mfb.fn_down_since_us != 0 &&
             r36sx_mfb_now_us() - g_mfb.fn_down_since_us >=
@@ -1067,6 +1191,7 @@ int mfb_open(const char *name, int width, int height, int scale)
 
     memset(&g_mfb, 0, sizeof(g_mfb));
     g_frame_generation = 0;
+    r36sx_app_stats_init();
     r36sx_screen_keyboard_init(&g_mfb.osk);
     r36sx_screen_keyboard_set_cursor_block(&g_mfb.osk, 0);
     r36sx_disk_menu_init(&g_mfb.disk_menu);
@@ -1207,11 +1332,13 @@ int mfb_update(void *buffer, int fps_limit)
         } else {
             r36sx_osk_draw();
         }
+        r36sx_mfb_draw_stats_overlay(g_mfb.frame);
         if (g_mfb.screenshot_requested) {
             r36sx_mfb_save_screenshot(g_mfb.frame);
             g_mfb.screenshot_requested = 0;
         }
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
+        r36sx_app_stats_record_frame();
     } else {
         struct r36sx_mfb_saved_rect saved_led;
         int led_saved =
@@ -1222,6 +1349,7 @@ int mfb_update(void *buffer, int fps_limit)
             g_mfb.screenshot_requested = 0;
         }
         g_mfb.disp_frame(src, g_mfb.width, g_mfb.height, g_mfb.stride);
+        r36sx_app_stats_record_frame();
         if (led_saved) {
             r36sx_mfb_restore_saved_rect(src, &saved_led);
         }

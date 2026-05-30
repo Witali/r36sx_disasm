@@ -9,6 +9,7 @@
 #include <time.h>
 
 #include "r36sx_disk_config.h"
+#include "r36sx_app_stats.h"
 #include "r36sx_pico286_compat.h"
 
 static uint32_t r36sx_host_disk_now_ms(void)
@@ -131,7 +132,11 @@ int r36sx_host_disk_read_at(FILE *file, size_t offset, void *dst,
     if (fseek(file, (long)offset, SEEK_SET) != 0) {
         return -1;
     }
-    return fread(dst, 1, bytes, file) == bytes ? 0 : -1;
+    if (fread(dst, 1, bytes, file) != bytes) {
+        return -1;
+    }
+    r36sx_app_stats_record_disk_read(bytes);
+    return 0;
 }
 
 int r36sx_host_disk_write_at(FILE *file, r36sx_host_disk_cache_t *cache,
@@ -149,6 +154,7 @@ int r36sx_host_disk_write_at(FILE *file, r36sx_host_disk_cache_t *cache,
     if (fwrite(src, 1, bytes, file) != bytes) {
         return -1;
     }
+    r36sx_app_stats_record_disk_write(bytes);
 
     cache->dirty = 1;
     cache->dirty_sectors += dirty_sectors;

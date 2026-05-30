@@ -21,9 +21,14 @@
 #include "graphics.h"
 #include "psram_spi.h"
 #include "swap.h"
+static inline void r36sx_app_stats_record_x86(uint32_t instructions)
+{
+    (void)instructions;
+}
 #else
 
 #include "r36sx_disk_config.h"
+#include "r36sx_app_stats.h"
 #include "disks-win32.c.inl"
 #include "network-redirector.c.inl"
 
@@ -1809,15 +1814,17 @@ extern volatile bool ask_to_blast;
 void __not_in_flash() exec86(uint32_t execloops) {
     static uint16_t firstip;
     static bool was_TF;
+    uint32_t loopcount = 0;
 
     //counterticks = (uint64_t) ( (double) timerfreq / (double) 65536.0);
     //tickssource();
-    for (uint32_t loopcount = 0; loopcount < execloops; loopcount++) {
+    for (loopcount = 0; loopcount < execloops; loopcount++) {
         if (unlikely(hltstate)) {
             if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
                 hltstate = 0;
                 intcall86(nextintr());
             } else {
+                r36sx_app_stats_record_x86(loopcount);
                 return;
             }
         } else if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
@@ -5216,4 +5223,5 @@ void __not_in_flash() exec86(uint32_t execloops) {
             was_TF = true;
         }
     }
+    r36sx_app_stats_record_x86(loopcount);
 }

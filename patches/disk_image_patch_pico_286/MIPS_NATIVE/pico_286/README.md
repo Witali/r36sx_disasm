@@ -21,6 +21,7 @@ This file documents the `pico_286` native executable for TinyMC.
 - Fn+Select: open the disk image menu.
 - Fn+Start: open the key preset editor.
 - Fn+D-pad Up: save a 640x480 screenshot.
+- Fn+D-pad Down: show or hide app statistics.
 - Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
@@ -82,6 +83,9 @@ boot_order=fdd0,hdd0
 [screenshot]
 screenshot_format=png
 
+[stats]
+app_stats_enabled=1
+
 [disk_cache]
 disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
@@ -112,6 +116,10 @@ compiled out with `build_pico_286.ps1 -DisableProfiling`.
 
 Set `screenshot_format=png` for compressed screenshots or
 `screenshot_format=bmp` for the old uncompressed 24-bit BMP output.
+
+Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
+It shows decoded x86 instruction loops per second, host disk image read/write
+KB/s, and presented FPS.  Set it to `0` to disable the shortcut and overlay.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,

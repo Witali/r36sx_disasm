@@ -66,6 +66,9 @@ int r36sx_pico286_profiling_enabled(void);
 // Return how often profiling summaries should be written to the log.
 uint32_t r36sx_pico286_profiling_log_ms(void);
 
+// Return non-zero when the on-screen app statistics overlay can be toggled.
+int r36sx_pico286_app_stats_enabled(void);
+
 // Return the configured screenshot file format.
 r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void);
 

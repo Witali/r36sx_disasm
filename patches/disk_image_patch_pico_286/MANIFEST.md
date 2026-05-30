@@ -30,6 +30,31 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 on-screen app statistics
+
+The current `pico_286` binary supports a compact top-left runtime statistics
+overlay.  When enabled in `pico_286.conf`, press `Fn` + D-pad `Down` to show
+or hide:
+
+- decoded x86 instruction loop count per second;
+- host disk image read KB/s;
+- host disk image write KB/s;
+- presented FPS.
+
+The config option is:
+
+```ini
+[stats]
+app_stats_enabled=1
+```
+
+Set `app_stats_enabled=0` to disable the shortcut and overlay.
+
+```text
+pico_286 size: 993864 bytes
+pico_286 SHA256: D35D17E92C3832F9EFFC88E3030E181A49F4667E6D06FD8E45FE928E6DBB1816
+```
+
 ## 2026-05-30 computed-goto opcode dispatch
 
 The current `pico_286` binary is built with `R36SX_CPU_COMPUTED_GOTO=1`.

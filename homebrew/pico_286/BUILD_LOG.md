@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-05-30 on-screen app statistics
+
+Added an optional on-screen runtime statistics overlay for Pico-286.  When
+enabled in `pico_286.conf`, `Fn` + D-pad `Down` toggles a compact top-left
+overlay with:
+
+- decoded x86 instruction loop count per second;
+- host disk image read KB/s;
+- host disk image write KB/s;
+- presented FPS.
+
+The config option is:
+
+```ini
+[stats]
+app_stats_enabled=1
+```
+
+Set `app_stats_enabled=0` to disable the feature and ignore `Fn` + D-pad
+`Down`.  The overlay uses the normal compositing path only while visible.
+
 ## 2026-05-30 Select key preset row
 
 Changed the key preset editor so the lower-left physical button slot shows the

@@ -88,6 +88,7 @@ Default input mapping:
 - Tap Fn: toggle the on-screen keyboard.
 - Hold Fn and press Select: open the disk image binding menu.
 - Hold Fn and press Start: open the key preset editor.
+- Hold Fn and press D-pad Down: show or hide the app statistics overlay.
 - Hold Fn and press X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 
@@ -179,6 +180,9 @@ boot_order=fdd0,hdd0
 [screenshot]
 screenshot_format=png
 
+[stats]
+app_stats_enabled=1
+
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
@@ -205,6 +209,10 @@ compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 `screenshot_format=png` saves compressed screenshots through zlib.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
+
+`app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a top-left overlay
+with decoded x86 instruction loops per second, host disk image read/write
+KB/s, and presented FPS.  Set it to `0` to disable the shortcut and overlay.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

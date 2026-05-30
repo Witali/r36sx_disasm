@@ -48,6 +48,7 @@ static char disk_cache_flush_sectors_text[16] = "4";
 static char disk_cache_flush_ms_text[16] = "2000";
 static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
+static char app_stats_enabled_text[8] = "1";
 static char screenshot_format_text[8] = "png";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
@@ -56,6 +57,7 @@ static uint32_t disk_cache_flush_sectors = 4u;
 static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
+static int app_stats_enabled = 1;
 static r36sx_pico286_screenshot_format_t screenshot_format =
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
@@ -453,6 +455,33 @@ static int set_screenshot_format(const char *key, const char *value,
     return 1;
 }
 
+static int set_app_stats_value(const char *key, const char *value,
+                               int line_no)
+{
+    if (key_equals(key, "app_stats_enabled") ||
+        key_equals(key, "stats_enabled") ||
+        key_equals(key, "statistics_enabled") ||
+        key_equals(key, "stats_overlay_enabled")) {
+        int enabled;
+
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        app_stats_enabled = enabled;
+        snprintf(app_stats_enabled_text, sizeof(app_stats_enabled_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: app_stats_enabled=%d",
+                                app_stats_enabled);
+        return 1;
+    }
+
+    return 0;
+}
+
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -597,6 +626,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
         return 1;
     }
     if (set_profiling_value(key, value, line_no)) {
+        return 1;
+    }
+    if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
     if (set_screenshot_format(key, value, line_no)) {
@@ -783,6 +815,10 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
     fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
 
+    fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
+    fprintf(fp, "[stats]\n");
+    fprintf(fp, "app_stats_enabled=%s\n\n", app_stats_enabled_text);
+
     fprintf(fp, "# BIOS floppy drives 00h and 01h, DOS A: and B:.\n");
     fprintf(fp, "[floppy_drives]\n");
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
@@ -905,6 +941,13 @@ uint32_t r36sx_pico286_profiling_log_ms(void)
     load_disk_config();
 
     return profiling_log_ms;
+}
+
+int r36sx_pico286_app_stats_enabled(void)
+{
+    load_disk_config();
+
+    return app_stats_enabled;
 }
 
 r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void)
