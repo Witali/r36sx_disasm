@@ -20,6 +20,7 @@ This file documents the `pico_286` native executable for TinyMC.
 - Tap Fn: show or hide the on-screen keyboard.
 - Fn+Select: open the disk image menu.
 - Fn+Start: open the key preset editor.
+- Fn+D-pad Left: show or hide the Fn shortcut help overlay.
 - Fn+D-pad Up: save a 640x480 screenshot, play a shutter click, and briefly show a preview.
 - Fn+D-pad Down: show or hide app statistics.
 - Fn+B: soft-reset the emulated PC.

@@ -87,6 +87,7 @@ struct r36sx_mfb_driver {
     uint8_t screenshot_toast_was_visible;
     uint8_t screenshot_toast_success;
     uint8_t screenshot_preview_valid;
+    uint8_t fn_help_visible;
     int base_content_h;
     int base_source_h;
     uint32_t base_generation;
@@ -263,6 +264,53 @@ static void r36sx_mfb_draw_stats_overlay(uint16_t *target)
                           r36sx_mfb_rgb565(70, 96, 112));
     r36sx_mfb_draw_text8(target, x + 6, y + 5, line,
                          r36sx_mfb_rgb565(236, 242, 220));
+}
+
+static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
+{
+    static const char *lines[] = {
+        "TAP FN: ON-SCREEN KEYBOARD",
+        "FN+LEFT: HIDE THIS HELP",
+        "FN+UP: SCREENSHOT + PREVIEW",
+        "FN+DOWN: APP STATISTICS",
+        "FN+SELECT: DISK MENU",
+        "FN+START: KEY PRESETS",
+        "FN+B: SOFT RESET PC",
+        "FN+X: EXIT TO TINYMC",
+        "HOLD FN 3S: EMERGENCY EXIT"
+    };
+    const int line_h = 14;
+    const int pad = 12;
+    int line_count = (int)R36SX_PICO286_ARRAY_COUNT(lines);
+    int box_w = 360;
+    int box_h = pad * 2 + 18 + line_count * line_h;
+    int x = (g_mfb.width - box_w) / 2;
+    int y = (g_mfb.height - box_h) / 2;
+    uint16_t bg = r36sx_mfb_rgb565(6, 10, 14);
+    uint16_t border = r36sx_mfb_rgb565(92, 132, 150);
+    uint16_t title = r36sx_mfb_rgb565(252, 232, 144);
+    uint16_t text = r36sx_mfb_rgb565(230, 238, 224);
+
+    if (!target || !g_mfb.fn_help_visible) {
+        return;
+    }
+
+    if (x < 8) {
+        x = 8;
+    }
+    if (y < 8) {
+        y = 8;
+    }
+    r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h, bg);
+    r36sx_mfb_stroke_rect(target, x, y, box_w, box_h, border);
+    r36sx_mfb_draw_text8(target, x + pad, y + pad, "FN SHORTCUTS", title);
+    r36sx_mfb_fill_rect_target(target, x + pad, y + pad + 13,
+                               box_w - pad * 2, 1, border);
+
+    for (int i = 0; i < line_count; i++) {
+        r36sx_mfb_draw_text8(target, x + pad, y + pad + 22 + i * line_h,
+                             lines[i], text);
+    }
 }
 
 static void r36sx_mfb_put_be32(uint8_t *dst, uint32_t value)
@@ -723,6 +771,9 @@ static void r36sx_osk_set_visible(int visible)
     }
     r36sx_mfb_release_all_keys();
     r36sx_screen_keyboard_set_visible(&g_mfb.osk, visible);
+    if (visible) {
+        g_mfb.fn_help_visible = 0;
+    }
     g_mfb.base_frame_valid = 0;
     g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
@@ -757,6 +808,9 @@ static void r36sx_mfb_disk_menu_set_visible(int visible)
     r36sx_osk_set_visible(0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, visible);
+    if (visible) {
+        g_mfb.fn_help_visible = 0;
+    }
     g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: disk menu %s",
@@ -796,6 +850,9 @@ static void r36sx_presets_set_visible(int visible)
     r36sx_osk_set_visible(0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, visible);
+    if (visible) {
+        g_mfb.fn_help_visible = 0;
+    }
     g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: key presets %s",
@@ -825,6 +882,7 @@ static void r36sx_mfb_request_soft_reset(void)
     r36sx_screen_keyboard_set_visible(&g_mfb.osk, 0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
+    g_mfb.fn_help_visible = 0;
     r36sx_pico286_request_soft_reset();
     g_mfb.base_frame_valid = 0;
     g_mfb.force_present = 1;
@@ -851,6 +909,14 @@ static void r36sx_mfb_toggle_stats_overlay(void)
     g_mfb.force_present = 1;
     r36sx_pico286_debug_log("minifb: Fn+Down stats overlay %s",
                             r36sx_app_stats_is_visible() ? "on" : "off");
+}
+
+static void r36sx_mfb_toggle_fn_help(void)
+{
+    g_mfb.fn_help_visible = !g_mfb.fn_help_visible;
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("minifb: Fn+Left help overlay %s",
+                            g_mfb.fn_help_visible ? "on" : "off");
 }
 
 static int r36sx_mfb_disk_led_active(uint32_t now_ms)
@@ -995,6 +1061,7 @@ static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
            r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
            r36sx_app_stats_is_visible() ||
+           g_mfb.fn_help_visible ||
            g_mfb.screenshot_requested ||
            r36sx_mfb_screenshot_toast_visible(now_ms);
 }
@@ -1220,6 +1287,11 @@ static int r36sx_mfb_poll_input(void)
         }
         if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
             r36sx_mfb_toggle_stats_overlay();
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
+        if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+            r36sx_mfb_toggle_fn_help();
             g_mfb.last_raw_keys = raw;
             return 0;
         }
@@ -1456,6 +1528,7 @@ int mfb_update(void *buffer, int fps_limit)
             r36sx_osk_draw();
         }
         r36sx_mfb_draw_stats_overlay(g_mfb.frame);
+        r36sx_mfb_draw_fn_help_overlay(g_mfb.frame);
         if (g_mfb.screenshot_requested) {
             r36sx_mfb_finish_screenshot(g_mfb.frame);
             now_ms = r36sx_mfb_now_ms32();

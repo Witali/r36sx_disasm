@@ -30,6 +30,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 Fn shortcut help overlay
+
+`Fn` + D-pad `Left` now toggles an on-screen help overlay that lists the active
+Fn shortcuts and what each one does.  The panel hides automatically before
+opening the on-screen keyboard, disk menu, key preset editor, or soft-resetting
+the emulated PC.
+
+```text
+pico_286 size: 1005252 bytes
+pico_286 SHA256: 70B2BF9661790A0D69966416C862B09D13386641B3D86441134201E737D16C12
+```
+
 ## 2026-05-30 screenshot feedback
 
 `Fn` + D-pad `Up` still saves the configured PNG/BMP screenshot, and now also

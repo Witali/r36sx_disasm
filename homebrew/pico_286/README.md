@@ -86,6 +86,9 @@ Default input mapping:
 - R: Shift.
 - L2/R2: F1/F2.
 - Tap Fn: toggle the on-screen keyboard.
+- Hold Fn and press D-pad Left: show or hide the Fn shortcut help overlay.
+- Hold Fn and press D-pad Up: save a screenshot, play a shutter click, and
+  briefly show a preview.
 - Hold Fn and press Select: open the disk image binding menu.
 - Hold Fn and press Start: open the key preset editor.
 - Hold Fn and press D-pad Down: show or hide the app statistics overlay.
@@ -211,6 +214,8 @@ compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
 `Fn` + D-pad `Up` also plays a short shutter click and shows a half-second
 confirmation overlay with a small screenshot preview.
+`Fn` + D-pad `Left` toggles an on-screen help panel listing the active Fn
+shortcuts.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a top-left overlay
 with decoded x86 instruction loops per second, host disk image read/write

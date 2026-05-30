@@ -1,5 +1,13 @@
 # pico-286 Build Log
 
+## 2026-05-30 Fn shortcut help overlay
+
+Added `Fn` + D-pad `Left` as an on-screen help toggle.  The overlay lists the
+active Fn shortcuts: keyboard toggle, help, screenshot, statistics, disk menu,
+key presets, soft reset, TinyMC exit, and long-Fn emergency exit.  Opening the
+on-screen keyboard, disk menu, key preset editor, or soft-resetting the VM hides
+the help panel so it does not stack over full-screen controls.
+
 ## 2026-05-30 screenshot feedback
 
 `Fn` + D-pad `Up` now gives immediate feedback when a screenshot is requested:

@@ -432,6 +432,8 @@ Notable patch history:
 - `disk_image_patch_104`: rebuilds Pico-286 so `Fn` + D-pad `Up` saves a
   screenshot, plays a camera-shutter click, and briefly shows a saved/failed
   message with a small preview.
+- `disk_image_patch_105`: rebuilds Pico-286 with a `Fn` + D-pad `Left` help
+  overlay listing the active Fn shortcuts.
 
 Each patch directory should contain a `MANIFEST.md` explaining what changed,
 what files to copy, and what was verified.
