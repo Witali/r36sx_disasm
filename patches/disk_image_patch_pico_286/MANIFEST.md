@@ -30,6 +30,29 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 configurable emulated memory sizes
+
+`pico_286.conf` now has a `[memory]` section:
+
+```ini
+[memory]
+conventional_kb=640
+upper_kb=176
+extended_kb=64
+xms_kb=4096
+```
+
+The values are runtime limits over the compiled-in maximum buffers.
+`conventional_kb` is reported through the BIOS Data Area, `upper_kb` limits XMS
+UMB allocations from `D000:0000` upward, `extended_kb` is returned by
+`INT 15h AH=88h`, and `xms_kb` limits the built-in XMS handler.
+
+```text
+pico_286 size: 1018680 bytes
+pico_286 SHA256: 14524A7A06ADB151CAD455BB42293D4165E6866075013B499E7FC935DB50446B
+Defender scan: found no threats
+```
+
 ## 2026-05-30 centered screenshot toast
 
 The screenshot confirmation toast now appears centered on the screen.  The

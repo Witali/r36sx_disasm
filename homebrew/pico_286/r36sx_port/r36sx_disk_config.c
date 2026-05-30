@@ -18,6 +18,14 @@
 #define R36SX_PICO286_MAX_CACHE_FLUSH_MS 60000UL
 #define R36SX_PICO286_MIN_PROFILE_LOG_MS 500UL
 #define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
+#define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
+#define R36SX_PICO286_MAX_CONVENTIONAL_KB 640UL
+#define R36SX_PICO286_MIN_UPPER_KB 0UL
+#define R36SX_PICO286_MAX_UPPER_KB 176UL
+#define R36SX_PICO286_MIN_EXTENDED_KB 0UL
+#define R36SX_PICO286_MAX_EXTENDED_KB 4096UL
+#define R36SX_PICO286_MIN_XMS_KB 0UL
+#define R36SX_PICO286_MAX_XMS_KB 4096UL
 
 typedef struct {
     uint8_t bios_drive;
@@ -50,6 +58,10 @@ static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char app_stats_enabled_text[8] = "1";
 static char screenshot_format_text[8] = "png";
+static char conventional_memory_kb_text[16] = "640";
+static char upper_memory_kb_text[16] = "176";
+static char extended_memory_kb_text[16] = "64";
+static char xms_memory_kb_text[16] = "4096";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
@@ -58,6 +70,10 @@ static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int app_stats_enabled = 1;
+static uint32_t conventional_memory_kb = 640u;
+static uint32_t upper_memory_kb = 176u;
+static uint32_t extended_memory_kb = 64u;
+static uint32_t xms_memory_kb = 4096u;
 static r36sx_pico286_screenshot_format_t screenshot_format =
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
@@ -482,6 +498,66 @@ static int set_app_stats_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_memory_value(const char *key, const char *value, int line_no)
+{
+    if (key_equals(key, "conventional_kb") ||
+        key_equals(key, "conventional_memory_kb") ||
+        key_equals(key, "conventional_ram_kb")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_CONVENTIONAL_KB,
+            R36SX_PICO286_MAX_CONVENTIONAL_KB,
+            &conventional_memory_kb,
+            conventional_memory_kb_text,
+            sizeof(conventional_memory_kb_text),
+            1UL,
+            line_no);
+    }
+
+    if (key_equals(key, "upper_kb") ||
+        key_equals(key, "upper_memory_kb") ||
+        key_equals(key, "umb_kb")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_UPPER_KB,
+            R36SX_PICO286_MAX_UPPER_KB,
+            &upper_memory_kb,
+            upper_memory_kb_text,
+            sizeof(upper_memory_kb_text),
+            1UL,
+            line_no);
+    }
+
+    if (key_equals(key, "extended_kb") ||
+        key_equals(key, "extended_memory_kb") ||
+        key_equals(key, "int15_extended_kb")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_EXTENDED_KB,
+            R36SX_PICO286_MAX_EXTENDED_KB,
+            &extended_memory_kb,
+            extended_memory_kb_text,
+            sizeof(extended_memory_kb_text),
+            1UL,
+            line_no);
+    }
+
+    if (key_equals(key, "xms_kb") ||
+        key_equals(key, "xms_memory_kb")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_XMS_KB,
+            R36SX_PICO286_MAX_XMS_KB,
+            &xms_memory_kb,
+            xms_memory_kb_text,
+            sizeof(xms_memory_kb_text),
+            1UL,
+            line_no);
+    }
+
+    return 0;
+}
+
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -629,6 +705,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
         return 1;
     }
     if (set_app_stats_value(key, value, line_no)) {
+        return 1;
+    }
+    if (set_memory_value(key, value, line_no)) {
         return 1;
     }
     if (set_screenshot_format(key, value, line_no)) {
@@ -798,6 +877,17 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
 
+    fprintf(fp, "# Emulated memory sizes in KB, capped by the compiled buffers.\n");
+    fprintf(fp, "# conventional_kb is reported through the BIOS Data Area.\n");
+    fprintf(fp, "# extended_kb is reported by INT 15h AH=88h.\n");
+    fprintf(fp, "# upper_kb limits XMS UMB allocations from D000:0000 upward.\n");
+    fprintf(fp, "# xms_kb limits the built-in XMS handler.\n");
+    fprintf(fp, "[memory]\n");
+    fprintf(fp, "conventional_kb=%s\n", conventional_memory_kb_text);
+    fprintf(fp, "upper_kb=%s\n", upper_memory_kb_text);
+    fprintf(fp, "extended_kb=%s\n", extended_memory_kb_text);
+    fprintf(fp, "xms_kb=%s\n\n", xms_memory_kb_text);
+
     fprintf(fp, "# Screenshot output format: png or bmp.\n");
     fprintf(fp, "[screenshot]\n");
     fprintf(fp, "screenshot_format=%s\n\n", screenshot_format_text);
@@ -948,6 +1038,34 @@ int r36sx_pico286_app_stats_enabled(void)
     load_disk_config();
 
     return app_stats_enabled;
+}
+
+uint32_t r36sx_pico286_conventional_memory_kb(void)
+{
+    load_disk_config();
+
+    return conventional_memory_kb;
+}
+
+uint32_t r36sx_pico286_upper_memory_kb(void)
+{
+    load_disk_config();
+
+    return upper_memory_kb;
+}
+
+uint32_t r36sx_pico286_extended_memory_kb(void)
+{
+    load_disk_config();
+
+    return extended_memory_kb;
+}
+
+uint32_t r36sx_pico286_xms_memory_kb(void)
+{
+    load_disk_config();
+
+    return xms_memory_kb;
 }
 
 r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void)

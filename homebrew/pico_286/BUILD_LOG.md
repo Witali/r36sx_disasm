@@ -1,5 +1,53 @@
 # pico-286 Build Log
 
+## 2026-05-30 configurable emulated memory sizes
+
+Added a `[memory]` section to `pico_286.conf`:
+
+```ini
+[memory]
+conventional_kb=640
+upper_kb=176
+extended_kb=64
+xms_kb=4096
+```
+
+The values are runtime limits over the compiled-in maximum buffers.  The port
+now uses them as follows:
+
+- `conventional_kb`: written to the BIOS Data Area memory-size fields;
+- `upper_kb`: limits the XMS UMB allocator from `D000:0000` upward;
+- `extended_kb`: returned by `INT 15h AH=88h`;
+- `xms_kb`: limits the built-in XMS handler's free/allocated memory reporting.
+
+XMS allocations now track requested KB per handle and fail when the configured
+XMS pool is exhausted.  XMS moves are also bounds-checked against the configured
+pool.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,018,680 bytes
+- SHA256: `14524A7A06ADB151CAD455BB42293D4165E6866075013B499E7FC935DB50446B`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 centered screenshot toast
 
 The screenshot confirmation toast is now centered on the screen instead of

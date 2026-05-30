@@ -82,6 +82,12 @@ cpu_mhz=32.768
 boot_mode=normal
 boot_order=fdd0,hdd0
 
+[memory]
+conventional_kb=640
+upper_kb=176
+extended_kb=64
+xms_kb=4096
+
 [screenshot]
 screenshot_format=png
 
@@ -111,6 +117,11 @@ hdd1_geometry=65,16,63
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
+
+The `[memory]` values are in KB.  `conventional_kb` is reported through the
+BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`
+limits XMS UMB allocations from `D000:0000` upward, and `xms_kb` limits the
+built-in XMS handler.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be

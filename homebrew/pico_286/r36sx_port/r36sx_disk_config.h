@@ -69,6 +69,18 @@ uint32_t r36sx_pico286_profiling_log_ms(void);
 // Return non-zero when the on-screen app statistics overlay can be toggled.
 int r36sx_pico286_app_stats_enabled(void);
 
+// Return conventional DOS memory reported through the BIOS Data Area.
+uint32_t r36sx_pico286_conventional_memory_kb(void);
+
+// Return upper memory available to the XMS UMB allocator.
+uint32_t r36sx_pico286_upper_memory_kb(void);
+
+// Return extended memory reported by INT 15h AH=88h.
+uint32_t r36sx_pico286_extended_memory_kb(void);
+
+// Return XMS memory exposed by the built-in XMS handler.
+uint32_t r36sx_pico286_xms_memory_kb(void);
+
 // Return the configured screenshot file format.
 r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void);
 

@@ -1,5 +1,9 @@
 #pragma GCC optimize("Ofast")
 #include "emulator.h"
+#include <string.h>
+#if !PICO_ON_DEVICE
+#include "r36sx_disk_config.h"
+#endif
 // https://www.phatcode.net/res/218/files/limems40.txt
 // https://www.phatcode.net/res/219/files/xms20.txt
 // http://www.techhelpmanual.com/944-xms_functions.html
@@ -93,26 +97,92 @@ static int umb_blocks_allocated = 0;
 
 uint32_t xms_available = XMS_MEMORY_SIZE;
 uint8_t xms_handles = 0;
+static uint16_t xms_handle_kb[XMS_HANDLES] = {0};
+static uint32_t xms_allocated_kb = 0;
 
 int a20_enabled = 0;
 
 uint8_t PICO286_PSRAM_ATTR XMS[XMS_MEMORY_SIZE] = {0};
 
-void init_umb() {
-    for (int i = 0; i < UMB_BLOCKS_COUNT; ++i) {
-        umb_blocks[i].allocated_paragraphs = 0;
+static uint32_t configured_upper_memory_kb(void)
+{
+#if PICO_ON_DEVICE
+    return (UMB_END - UMB_START) >> 10;
+#else
+    return r36sx_pico286_upper_memory_kb();
+#endif
+}
+
+static uint32_t configured_xms_memory_kb(void)
+{
+    uint32_t kb;
+
+#if PICO_ON_DEVICE
+    kb = XMS_MEMORY_SIZE >> 10;
+#else
+    kb = r36sx_pico286_xms_memory_kb();
+#endif
+    if (kb > (XMS_MEMORY_SIZE >> 10)) {
+        kb = XMS_MEMORY_SIZE >> 10;
     }
+    return kb;
+}
+
+static uint32_t xms_free_kb(void)
+{
+    uint32_t limit_kb = configured_xms_memory_kb();
+
+    return xms_allocated_kb < limit_kb ? limit_kb - xms_allocated_kb : 0;
+}
+
+static int xms_range_valid(uint32_t offset, uint32_t length)
+{
+    uint32_t limit = configured_xms_memory_kb() << 10;
+
+    return offset <= limit && length <= limit - offset;
+}
+
+static void reset_xms_allocations(void)
+{
+    memset(xms_handle_kb, 0, sizeof(xms_handle_kb));
+    xms_allocated_kb = 0;
+    xms_available = configured_xms_memory_kb() << 10;
+    xms_handles = 0;
+}
+
+void init_umb() {
+    uint32_t upper_paragraphs = configured_upper_memory_kb() * 64u;
+
+    if (upper_paragraphs > ((UMB_END - UMB_START) >> 4)) {
+        upper_paragraphs = (UMB_END - UMB_START) >> 4;
+    }
+    umb_blocks_allocated = 0;
+    for (int i = 0; i < (int)UMB_BLOCKS_COUNT; ++i) {
+        umb_blocks[i].size = 0x0080;
+        if (upper_paragraphs >= umb_blocks[i].size) {
+            umb_blocks[i].allocated_paragraphs = 0;
+            upper_paragraphs -= umb_blocks[i].size;
+        } else if (upper_paragraphs > 0) {
+            umb_blocks[i].size = (uint16_t)upper_paragraphs;
+            umb_blocks[i].allocated_paragraphs = 0;
+            upper_paragraphs = 0;
+        } else {
+            umb_blocks[i].allocated_paragraphs = -2;
+        }
+    }
+    reset_xms_allocations();
 }
 
 const umb_t *get_largest_free_umb_block(uint16_t *psz) {
     const umb_t *best = NULL;
     int best_length = 0;
     int i = 0;
-    while (i < UMB_BLOCKS_COUNT) {
+    while (i < (int)UMB_BLOCKS_COUNT) {
         if (0 == umb_blocks[i].allocated_paragraphs) {
             int j = i;
             int length = 0;
-            while (j < UMB_BLOCKS_COUNT && umb_blocks[j].allocated_paragraphs == 0) {
+            while (j < (int)UMB_BLOCKS_COUNT &&
+                   umb_blocks[j].allocated_paragraphs == 0) {
                 if (j > i) {
                     const uint16_t expected_segment = umb_blocks[j - 1].segment + umb_blocks[j - 1].size;
                     if (umb_blocks[j].segment != expected_segment)
@@ -138,14 +208,15 @@ umb_t *get_free_umb_block(const uint16_t size) {
     umb_t *best = NULL;
     int best_size = 0;
     int i = 0;
-    while (i < UMB_BLOCKS_COUNT) {
+    while (i < (int)UMB_BLOCKS_COUNT) {
         if (umb_blocks[i].allocated_paragraphs != 0) {
             i++;
             continue;
         }
         uint16_t total_size = 0;
         int j = i;
-        while (j < UMB_BLOCKS_COUNT && umb_blocks[j].allocated_paragraphs == 0) {
+        while (j < (int)UMB_BLOCKS_COUNT &&
+               umb_blocks[j].allocated_paragraphs == 0) {
             if (j > i) {
                 const uint16_t expected_segment = umb_blocks[j - 1].segment + umb_blocks[j - 1].size;
                 if (umb_blocks[j].segment != expected_segment)
@@ -270,28 +341,48 @@ uint8_t __not_in_flash() xms_handler() {
 
         case QUERY_EMB: {
             // 08h
+            uint32_t free_kb = xms_free_kb();
+
+            if (free_kb > 0xffffu) {
+                free_kb = 0xffffu;
+            }
             debug_log("[XMS] Query free\r\n");
-            CPU_AX = XMS_MEMORY_SIZE >> 10;
-            CPU_DX = XMS_HANDLES - xms_handles;
+            CPU_AX = (uint16_t)free_kb;
+            CPU_DX = (uint16_t)free_kb;
             CPU_BL = 0;
             break;
         }
         case ALLOCATE_EMB: {
             // Allocate Extended Memory Block (Function 09h):
+            uint16_t requested_kb = CPU_DX;
+            uint8_t handle = 0;
+
             debug_log("[XMS] Allocate %dKb\n", CPU_DX);
-            if (xms_handles + 1 < XMS_HANDLES) {
-                CPU_DX = ++xms_handles;
+            for (uint8_t i = 1; i < XMS_HANDLES; i++) {
+                if (xms_handle_kb[i] == 0) {
+                    handle = i;
+                    break;
+                }
+            }
+            if (requested_kb > 0 && handle && requested_kb <= xms_free_kb()) {
+                xms_handle_kb[handle] = requested_kb;
+                xms_allocated_kb += requested_kb;
+                xms_handles++;
+                CPU_DX = handle;
                 CPU_AX = 1;
                 CPU_BL = 0;
                 break;
             }
             CPU_AX = 0;
-            CPU_BL = 0xA2;
+            CPU_BL = handle ? 0xA0 : 0xA1;
             break;
         }
         case RELEASE_EMB: {
             debug_log("[XMS] Free handle %d\n", CPU_DX);
-            if (xms_handles) {
+            if (CPU_DX > 0 && CPU_DX < XMS_HANDLES &&
+                xms_handle_kb[CPU_DX] != 0) {
+                xms_allocated_kb -= xms_handle_kb[CPU_DX];
+                xms_handle_kb[CPU_DX] = 0;
                 xms_handles--;
                 CPU_AX = 1;
                 CPU_BL = 0;
@@ -314,6 +405,16 @@ uint8_t __not_in_flash() xms_handler() {
             }
 
             // TODO: Add mem<>mem and xms<>xms
+            if ((move_data.source_handle != 0 &&
+                 !xms_range_valid(move_data.source_offset,
+                                  move_data.length)) ||
+                (move_data.destination_handle != 0 &&
+                 !xms_range_valid(move_data.destination_offset,
+                                  move_data.length))) {
+                CPU_AX = 0;
+                CPU_BL = 0xA4;
+                break;
+            }
             if (!move_data.source_handle) {
                 move_data.source_offset = to_physical_offset(move_data.source_offset);
                 xms_move_to(move_data.destination_offset, move_data.source_offset, move_data.length);
@@ -339,7 +440,7 @@ uint8_t __not_in_flash() xms_handler() {
             // Request Upper Memory Block (Function 10h):
             if (CPU_DX == 0xFFFF) {
                 // Query largest available block
-                if (umb_blocks_allocated < UMB_BLOCKS_COUNT) {
+                if (umb_blocks_allocated < (int)UMB_BLOCKS_COUNT) {
                     uint16_t sz = 0;
                     const umb_t *umb_block = get_largest_free_umb_block(&sz);
                     if (umb_block != NULL) {
@@ -376,16 +477,17 @@ uint8_t __not_in_flash() xms_handler() {
             get_largest_free_umb_block(&sz);
             CPU_AX = 0x0000;
             CPU_DX = sz;
-            CPU_BL = umb_blocks_allocated >= UMB_BLOCKS_COUNT ? 0xB1 : 0xB0;
+            CPU_BL =
+                umb_blocks_allocated >= (int)UMB_BLOCKS_COUNT ? 0xB1 : 0xB0;
             break;
         }
         case RELEASE_UMB: {
             // Release Upper Memory Block (Function 11h)
             // Stub: Release Upper Memory Block
-            for (int i = 0; i < UMB_BLOCKS_COUNT; ++i)
+            for (int i = 0; i < (int)UMB_BLOCKS_COUNT; ++i)
                 if (umb_blocks[i].segment == CPU_BX && umb_blocks[i].allocated_paragraphs > 0) {
                     int par = umb_blocks[i].allocated_paragraphs;
-                    while (par > 0 && i < UMB_BLOCKS_COUNT) {
+                    while (par > 0 && i < (int)UMB_BLOCKS_COUNT) {
                         umb_blocks[i].allocated_paragraphs = 0;
                         par -= umb_blocks[i++].size;
                         umb_blocks_allocated--;

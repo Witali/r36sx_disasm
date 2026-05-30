@@ -180,6 +180,12 @@ cpu_mhz=32.768
 boot_mode=normal
 boot_order=fdd0,hdd0
 
+[memory]
+conventional_kb=640
+upper_kb=176
+extended_kb=64
+xms_kb=4096
+
 [screenshot]
 screenshot_format=png
 
@@ -205,6 +211,11 @@ hdd1_geometry=65,16,63
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
 millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
+
+The `[memory]` values are in KB and are runtime limits over the compiled-in
+maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,
+`extended_kb` is returned by `INT 15h AH=88h`, `upper_kb` limits the XMS UMB
+allocator from `D000:0000` upward, and `xms_kb` limits the built-in XMS handler.
 
 `profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
 `profiling_log_ms` controls the reporting interval.  Profiling can also be

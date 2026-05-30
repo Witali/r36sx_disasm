@@ -1129,7 +1129,7 @@ void intcall86(uint8_t intnum) {
                 }
                     return;
                 case 0x88: {
-                    CPU_AX = 64;
+                    CPU_AX = (uint16_t)r36sx_pico286_extended_memory_kb();
                     return;
                 }
             }
@@ -1162,7 +1162,18 @@ void intcall86(uint8_t intnum) {
                  * [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/PCjr/IBM%20Personal%20Computer%20PCjr%20Hardware%20Reference%20Library%20Technical%20Reference%20%281983%2d11%29%20First%20Edition%20Revised%2epdf]
                  * ROM BIOS source code page A-16 */
 
-                writew86(BIOS_TRUE_MEMORY_SIZE, 640 - 16);
+                {
+                    uint32_t conventional_kb =
+                        r36sx_pico286_conventional_memory_kb();
+                    if (conventional_kb > 640u) {
+                        conventional_kb = 640u;
+                    }
+                    writew86(BIOS_MEMORY_SIZE, (uint16_t)conventional_kb);
+                    writew86(BIOS_TRUE_MEMORY_SIZE,
+                             (uint16_t)(conventional_kb > 16u ?
+                                            conventional_kb - 16u :
+                                            conventional_kb));
+                }
 #if !PICO_ON_DEVICE
                 time_t uts = time(NULL);
                 struct tm *t = localtime(&uts);
