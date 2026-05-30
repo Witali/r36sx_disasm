@@ -141,9 +141,8 @@ static vga_cache_t vga;
 // Call whenever sequencer reg 2 or memory_mode changed
 static inline void vga_update_seq_cache(void) {
     vga.map_mask32 = expand_nibble_to_planes(vga.sequencer[2]);
-    // memory_mode in seq[4] bit2 typically is chain4
-    vga.chain4 = !!(vga.sequencer[4] & 0x04u);
-    vga_planar_mode = !(vga.sequencer[4] & 8) || !(vga.sequencer[4] & 6);
+    vga.chain4 = !!(vga.sequencer[4] & 0x08u);
+    vga_planar_mode = !vga.chain4;
 }
 
 // Call whenever GC registers that affect derived masks change

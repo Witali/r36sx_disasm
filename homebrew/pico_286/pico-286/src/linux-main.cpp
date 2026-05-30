@@ -380,12 +380,13 @@ static inline void renderer() {
                 }
                 case 0x13: {
                     if (vga_planar_mode) {
-                        for (int x = 0; x < 320; x++) {
-                            uint32_t ptr = x + (y >> 1) * 320;
-                            ptr = (ptr >> 2) + (x & 3) * vga_plane_size;
-                            ptr += vram_offset;
-                            uint32_t color = vga_palette[VIDEORAM[ptr]];
-                            *pixels++ = *pixels++ = color;
+                        uint32_t *vga_row = &VIDEORAM[vram_offset + (y >> 1) * (320 / 4)];
+                        for (int x = 0; x < 320 / 4; x++) {
+                            uint32_t four_pixels = *vga_row++;
+                            *pixels++ = *pixels++ = vga_palette[four_pixels & 0xFFu];
+                            *pixels++ = *pixels++ = vga_palette[(four_pixels >> 8) & 0xFFu];
+                            *pixels++ = *pixels++ = vga_palette[(four_pixels >> 16) & 0xFFu];
+                            *pixels++ = *pixels++ = vga_palette[(four_pixels >> 24) & 0xFFu];
                         }
                     } else {
                         uint8_t *vga_row = VIDEORAM + (y >> 1) * 320;
