@@ -1,5 +1,55 @@
 # pico-286 Build Log
 
+## 2026-05-30 80386 real-mode instruction coverage
+
+Reviewed the current 386 path and filled in the practical real-mode gaps that
+were still falling back to 16-bit execution or `INT 6`.
+
+Implemented:
+
+- 32-bit operand-size override forms for common `MOV`, ALU, immediate ALU,
+  register `INC`/`DEC`, stack `PUSH`/`POP`, shifts, `TEST`, `XCHG`, `LEA`,
+  `CBW/CWDE`, `CWD/CDQ`, `MOVSD`, `STOSD`, `LODSD`, `SCASD`, near
+  `CALL`/`JMP`/`RET`, `MUL`/`IMUL`/`DIV`/`IDIV`, and group `FF` operations;
+- 386 `0F xx` real-mode user instructions: near `Jcc`, `SETcc`, `PUSH`/`POP`
+  `FS`/`GS`, `IMUL Gv,Ev`, `MOVZX`, `MOVSX`, `BSF`, and `BSR`;
+- correct 32-bit carry/overflow flag handling for ADD/ADC/SUB/SBB/logical
+  operations.
+
+Still intentionally out of scope: full 386 protected-mode execution and
+system-control `0F xx` instructions (`LGDT`, `LIDT`, `SMSW`, `LMSW`, `MOV CRx`,
+task gates, privilege checks, descriptor cache, paging).
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1124260` bytes
+- SHA256: `C3D87363CBC3B75902E618C6D26857E76240D56C0F81D4DBFB39AC37F0567451`
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 configurable DOS host drive H:
 
 Implemented the R36SX side of Pico-286's upstream host filesystem passthrough.

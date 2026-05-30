@@ -134,9 +134,10 @@ hdd1_geometry=65,16,63
 
 `cpu_model` can be `8086`, `80286`, or `80386`.  The default is `80386`.
 Instructions above the selected model raise `INT 6`; 386-only real-mode
-features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, and
-`PUSHAD`/`POPAD` require `cpu_model=80386`.  Full protected-mode execution is
-still WIP, so keep `cpu_mode=real` for normal DOS use.
+features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, `PUSHAD`/`POPAD`,
+32-bit `MOV`/ALU/stack/shift forms, `MOVZX`/`MOVSX`, `SETcc`, near `Jcc`,
+`BSF`/`BSR`, and `IMUL` require `cpu_model=80386`.  Full protected-mode
+execution is still WIP, so keep `cpu_mode=real` for normal DOS use.
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the

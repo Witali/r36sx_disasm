@@ -30,6 +30,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 80386 real-mode instruction coverage
+
+The current `pico_286` binary expands the 80386 real-mode path:
+
+- common `66h` operand-size override forms now execute as 32-bit operations
+  for `MOV`, ALU, stack, shifts, strings, near branches, and group opcodes;
+- selected 386 `0F xx` user instructions are supported: near `Jcc`, `SETcc`,
+  `PUSH`/`POP FS/GS`, `IMUL`, `MOVZX`, `MOVSX`, `BSF`, and `BSR`;
+- 32-bit ADD/ADC/SUB/SBB flag handling was corrected.
+
+Protected-mode 386 execution is still WIP; keep `cpu_mode=real` for normal DOS
+use.
+
+pico_286 size: 1124260 bytes
+pico_286 SHA256: C3D87363CBC3B75902E618C6D26857E76240D56C0F81D4DBFB39AC37F0567451
+
 ## 2026-05-30 configurable emulated memory sizes
 
 `pico_286.conf` now has a `[memory]` section:

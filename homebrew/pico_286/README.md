@@ -232,8 +232,10 @@ hdd1_geometry=65,16,63
 model are rejected with `INT 6`; for example, `66h`/`67h` operand/address-size
 overrides and `FS`/`GS` segment forms require `cpu_model=80386`, while
 80186+ opcodes such as `PUSHA`, `ENTER`, and immediate `PUSH` are rejected in
-`cpu_model=8086`.  The 386 mode currently targets real-mode DOS programs and
-CPU probes; full protected-mode execution is still WIP.
+`cpu_model=8086`.  The 386 real-mode path supports the common 32-bit
+operand-size forms used by DOS extenders/probes (`MOV`, ALU, stack, shifts,
+`MUL`/`DIV`, `MOVZX`/`MOVSX`, `SETcc`, near `Jcc`, `BSF`/`BSR`, and `IMUL`).
+Full protected-mode execution is still WIP.
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
