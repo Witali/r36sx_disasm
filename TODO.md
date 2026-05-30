@@ -66,6 +66,11 @@
   `-O3`, LTO, and `-ffunction-sections -fdata-sections` plus linker garbage
   collection.  Measure both speed and binary size, because Zig/MIPS LTO may be
   fragile.
+- Revisit CPU-specific tuning with a compiler that supports the real device
+  core.  The current Windows Zig/Clang MIPS backend rejects `-mtune=74kc` with
+  `unknown CPU: '74kc'`; its supported MIPS CPUs include generic `mips32r2`
+  but not 74Kc.  Try SDK GCC from Linux/WSL or another MIPS GCC before adding
+  `-mtune=74kc` to build scripts.
 - Re-check `-fno-builtin-memset` and `-fno-builtin-memcpy` in
   `homebrew/pico_286/build_pico_286.ps1`.  They may block useful compiler
   lowering for the new bulk memory paths; keep them only for files that truly
