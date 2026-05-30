@@ -30,6 +30,14 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 direct-present video path
+
+The current `pico_286` binary presents normal DOS frames directly from the
+emulator `SCREEN` buffer to `driver.so`.  The separate composition buffers are
+still used for the on-screen keyboard, disk menu, and key preset editor.  The
+small red disk activity LED now saves and restores its rectangle around the
+present call, so it does not leave pixels inside the emulator framebuffer.
+
 ## 2026-05-30 runtime profiling option
 
 The current binary includes optional profiling support controlled by

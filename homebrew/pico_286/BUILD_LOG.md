@@ -1,5 +1,19 @@
 # pico-286 Build Log
 
+## 2026-05-30 direct-present video path
+
+Optimized the R36SX MiniFB present path for the normal no-menu case.
+`mfb_update()` now sends the emulator `SCREEN` buffer directly to
+`driver.so` when the on-screen keyboard, disk menu, and key preset editor are
+not visible.  This removes the extra full-frame `SCREEN` -> `base_frame` copy
+from ordinary DOS/game frames.
+
+The red disk activity LED now uses a small save/restore rectangle in direct
+mode: the LED is drawn into `SCREEN` for the `video_driver_disp_frame()` call,
+then the original pixels are restored immediately.  Full-screen overlays still
+use the separate composition buffers so the keyboard scaling and menus do not
+pollute the emulator framebuffer.
+
 ## 2026-05-30 runtime profiling option
 
 Added an optional Pico-286 profiling helper, compiled by default and controlled

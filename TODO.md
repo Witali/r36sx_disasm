@@ -39,9 +39,9 @@
   `homebrew/pico_286/r36sx_port/r36sx_cpu.c`.  The CPU now leaves `exec86()`
   while halted and wakes on the next unmasked PIC IRQ when `IF=1`; confirm DOS
   prompt/menu idle feels responsive and does not regress games.
-- Follow up on the RGB565 video present cache added in commit `32e7a3a`.
-  Test on hardware, then consider rendering directly to RGB565 for modes that
-  do not need keyboard scaling or overlays.
+- Hardware-test the direct-present Pico-286 video path.  Normal DOS frames now
+  go directly from `SCREEN` to `driver.so`, while keyboard/menu overlays still
+  use composition buffers and the disk LED uses save/restore.
 - Hardware-test `R36SX_TICKS_THREAD_SLEEP_US=1000` in
   `homebrew/pico_286/r36sx_port/r36sx_linux-main.cpp`.  This reduces the
   timer/audio thread wakeup rate from up to 4000/s to about 1000/s; confirm

@@ -10,9 +10,9 @@ integration pieces:
 
 - `r36sx_minifb.c` implements the small upstream `MiniFB` API through
   `/mnt/sdcard/cubegm/driver.so` video and joypad input.  The R36SX renderer
-  now uses a 16-bit RGB565 `SCREEN` buffer end-to-end; `mfb_update()` copies or
-  scales RGB565 rows directly instead of converting a 32-bit RGB888 frame each
-  present.
+  now uses a 16-bit RGB565 `SCREEN` buffer end-to-end.  Normal DOS frames are
+  presented directly from `SCREEN`; separate composition buffers are only used
+  for the on-screen keyboard and full-screen menus.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.
@@ -25,7 +25,9 @@ integration pieces:
   - `r36sx_disk_config.h`
   - `disks-win32.c.inl`
 - `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
-  lower-right corner when the emulator reads or writes disk image sectors.
+  lower-right corner when the emulator reads or writes disk image sectors.  In
+  direct-present mode it saves and restores the small LED rectangle instead of
+  copying the whole framebuffer.
 - `r36sx_pico286_compat.h` is forced into the build to provide POSIX prototypes
   and harmless Pico PSRAM/swap stubs for upstream branches that are parsed but
   not used by the Linux/host configuration.

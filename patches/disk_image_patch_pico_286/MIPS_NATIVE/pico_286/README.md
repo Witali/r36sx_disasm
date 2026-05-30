@@ -88,6 +88,11 @@ Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
 compiled out with `build_pico_286.ps1 -DisableProfiling`.
 
+Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
+The separate composition buffer is still used for the on-screen keyboard,
+disk menu, and key preset editor.  The small disk activity LED is drawn into
+`SCREEN` only for the present call, then its saved rectangle is restored.
+
 ## Key Preset Editor
 
 Open it with Fn+Start.

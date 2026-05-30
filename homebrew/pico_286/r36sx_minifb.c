@@ -30,6 +30,10 @@
 #define R36SX_PICO286_DISK_LED_HOLD_MS 350u
 #define R36SX_PICO286_DISK_LED_BLINK_MS 120u
 #define R36SX_PICO286_DISK_LED_RADIUS 8
+#define R36SX_PICO286_DISK_LED_OUTER_RADIUS \
+    (R36SX_PICO286_DISK_LED_RADIUS + 2)
+#define R36SX_PICO286_DISK_LED_DIAMETER \
+    (R36SX_PICO286_DISK_LED_OUTER_RADIUS * 2 + 1)
 #define R36SX_PICO286_FN_HOLD_EXIT_USEC 3000000ull
 #define R36SX_PICO286_SCREENSHOT_DIR \
     "/mnt/sdcard/MIPS_NATIVE/pico_286/screenshots"
@@ -75,7 +79,17 @@ struct r36sx_mfb_driver {
     int base_content_h;
     int base_source_h;
     uint32_t base_generation;
+    uint32_t presented_generation;
     uint32_t screenshot_counter;
+};
+
+struct r36sx_mfb_saved_rect {
+    int x;
+    int y;
+    int w;
+    int h;
+    uint16_t pixels[R36SX_PICO286_DISK_LED_DIAMETER *
+                    R36SX_PICO286_DISK_LED_DIAMETER];
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -476,26 +490,41 @@ static void r36sx_mfb_request_screenshot(void)
     r36sx_pico286_debug_log("minifb: Fn+Up screenshot requested");
 }
 
-static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
+static int r36sx_mfb_disk_led_active(uint32_t now_ms)
+{
+    return (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
+}
+
+static int r36sx_mfb_disk_led_visible(uint32_t now_ms)
+{
+    return r36sx_mfb_disk_led_active(now_ms) &&
+           ((now_ms / R36SX_PICO286_DISK_LED_BLINK_MS) & 1u) != 0u;
+}
+
+static void r36sx_mfb_disk_led_center(int *cx, int *cy)
+{
+    const int radius = R36SX_PICO286_DISK_LED_RADIUS;
+
+    *cx = g_mfb.width - radius - 12;
+    *cy = (r36sx_screen_keyboard_is_visible(&g_mfb.osk) ?
+           r36sx_osk_panel_y() : g_mfb.height) - radius - 12;
+}
+
+static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms)
 {
     int cx;
     int cy;
     const int radius = R36SX_PICO286_DISK_LED_RADIUS;
-    const int outer_radius = radius + 2;
+    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
     const uint16_t red = 0xf800u;
     const uint16_t dark_red = 0x6000u;
     const uint16_t outline = 0x0000u;
 
-    if ((int32_t)(g_disk_activity_until_ms - now_ms) <= 0) {
-        return;
-    }
-    if (((now_ms / R36SX_PICO286_DISK_LED_BLINK_MS) & 1u) == 0u) {
+    if (!target || !r36sx_mfb_disk_led_visible(now_ms)) {
         return;
     }
 
-    cx = g_mfb.width - radius - 12;
-    cy = (r36sx_screen_keyboard_is_visible(&g_mfb.osk) ?
-          r36sx_osk_panel_y() : g_mfb.height) - radius - 12;
+    r36sx_mfb_disk_led_center(&cx, &cy);
     for (int y = -outer_radius; y <= outer_radius; y++) {
         int py = cy + y;
         if (py < 0 || py >= g_mfb.height) {
@@ -508,13 +537,79 @@ static void r36sx_mfb_draw_disk_led(uint32_t now_ms)
                 continue;
             }
             if (dist2 <= radius * radius) {
-                g_mfb.frame[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
+                target[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
                     dist2 <= (radius - 3) * (radius - 3) ? red : dark_red;
             } else if (dist2 <= outer_radius * outer_radius) {
-                g_mfb.frame[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
+                target[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
                     outline;
             }
         }
+    }
+}
+
+static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
+                                         struct r36sx_mfb_saved_rect *saved)
+{
+    int cx;
+    int cy;
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
+
+    if (!target || !saved || !r36sx_mfb_disk_led_visible(now_ms)) {
+        return 0;
+    }
+
+    r36sx_mfb_disk_led_center(&cx, &cy);
+    x0 = cx - outer_radius;
+    y0 = cy - outer_radius;
+    x1 = cx + outer_radius;
+    y1 = cy + outer_radius;
+    if (x0 < 0) {
+        x0 = 0;
+    }
+    if (y0 < 0) {
+        y0 = 0;
+    }
+    if (x1 >= g_mfb.width) {
+        x1 = g_mfb.width - 1;
+    }
+    if (y1 >= g_mfb.height) {
+        y1 = g_mfb.height - 1;
+    }
+    if (x1 < x0 || y1 < y0) {
+        return 0;
+    }
+
+    saved->x = x0;
+    saved->y = y0;
+    saved->w = x1 - x0 + 1;
+    saved->h = y1 - y0 + 1;
+    for (int row = 0; row < saved->h; row++) {
+        memcpy(&saved->pixels[(size_t)row * (size_t)saved->w],
+               &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
+                       (size_t)saved->x],
+               (size_t)saved->w * sizeof(saved->pixels[0]));
+    }
+
+    r36sx_mfb_draw_disk_led_on(target, now_ms);
+    return 1;
+}
+
+static void r36sx_mfb_restore_saved_rect(
+    uint16_t *target, const struct r36sx_mfb_saved_rect *saved)
+{
+    if (!target || !saved || saved->w <= 0 || saved->h <= 0) {
+        return;
+    }
+
+    for (int row = 0; row < saved->h; row++) {
+        memcpy(&target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
+                       (size_t)saved->x],
+               &saved->pixels[(size_t)row * (size_t)saved->w],
+               (size_t)saved->w * sizeof(saved->pixels[0]));
     }
 }
 
@@ -531,17 +626,11 @@ static int r36sx_mfb_video_source_height(void)
     return source_h;
 }
 
-static int r36sx_mfb_overlay_active(uint32_t now_ms)
+static int r36sx_mfb_large_overlay_active(void)
 {
-    int disk_led_active =
-        (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
-
     return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
-           r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
-           disk_led_active ||
-           g_mfb.disk_led_was_active ||
-           g_mfb.force_present;
+           r36sx_key_presets_is_visible(&g_mfb.key_presets);
 }
 
 static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
@@ -917,7 +1006,10 @@ int mfb_update(void *buffer, int fps_limit)
     int content_h;
     int source_h;
     int source_dirty;
-    int overlay_active;
+    int source_changed;
+    int large_overlay_active;
+    int disk_led_active;
+    int need_present;
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
@@ -940,31 +1032,39 @@ int mfb_update(void *buffer, int fps_limit)
     frame_generation = r36sx_mfb_frame_generation();
     content_h = r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
     source_h = r36sx_mfb_video_source_height();
+    source_changed = frame_generation != g_mfb.presented_generation;
     source_dirty =
         !g_mfb.base_frame_valid ||
         frame_generation != g_mfb.base_generation ||
         content_h != g_mfb.base_content_h ||
         source_h != g_mfb.base_source_h;
-    overlay_active = r36sx_mfb_overlay_active(now_ms);
+    large_overlay_active = r36sx_mfb_large_overlay_active();
+    disk_led_active = r36sx_mfb_disk_led_active(now_ms);
+    need_present =
+        source_changed ||
+        large_overlay_active ||
+        disk_led_active ||
+        g_mfb.disk_led_was_active ||
+        g_mfb.force_present ||
+        g_mfb.screenshot_requested;
 
-    if (!source_dirty && !overlay_active) {
+    if (!need_present) {
         usleep(1000);
         return 0;
     }
 
-    if (source_dirty) {
-        r36sx_mfb_copy_source(src, content_h, source_h);
-        g_mfb.base_generation = frame_generation;
-        g_mfb.base_content_h = content_h;
-        g_mfb.base_source_h = source_h;
-        g_mfb.base_frame_valid = 1;
-    }
-
-    if (overlay_active) {
+    if (large_overlay_active) {
+        if (source_dirty) {
+            r36sx_mfb_copy_source(src, content_h, source_h);
+            g_mfb.base_generation = frame_generation;
+            g_mfb.base_content_h = content_h;
+            g_mfb.base_source_h = source_h;
+            g_mfb.base_frame_valid = 1;
+        }
         memcpy(g_mfb.frame, g_mfb.base_frame,
                (size_t)g_mfb.width * (size_t)g_mfb.height *
                    sizeof(g_mfb.frame[0]));
-        r36sx_mfb_draw_disk_led(now_ms);
+        r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
         if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
             r36sx_disk_menu_draw_overlay();
         } else if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
@@ -978,17 +1078,23 @@ int mfb_update(void *buffer, int fps_limit)
         }
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
     } else {
+        struct r36sx_mfb_saved_rect saved_led;
+        int led_saved =
+            r36sx_mfb_draw_disk_led_saved(src, now_ms, &saved_led);
+
         if (g_mfb.screenshot_requested) {
-            r36sx_mfb_save_screenshot(g_mfb.base_frame);
+            r36sx_mfb_save_screenshot(src);
             g_mfb.screenshot_requested = 0;
         }
-        g_mfb.disp_frame(g_mfb.base_frame, g_mfb.width, g_mfb.height,
-                         g_mfb.stride);
+        g_mfb.disp_frame(src, g_mfb.width, g_mfb.height, g_mfb.stride);
+        if (led_saved) {
+            r36sx_mfb_restore_saved_rect(src, &saved_led);
+        }
     }
 
-    g_mfb.disk_led_was_active =
-        (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
+    g_mfb.disk_led_was_active = disk_led_active;
     g_mfb.force_present = 0;
+    g_mfb.presented_generation = frame_generation;
     g_mfb.last_present_us = now;
     return 0;
 }
