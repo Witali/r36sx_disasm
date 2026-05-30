@@ -30,6 +30,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 computed-goto opcode dispatch
+
+The current `pico_286` binary is built with `R36SX_CPU_COMPUTED_GOTO=1`.
+The main `exec86()` opcode decoder uses a GNU labels-as-values dispatch table
+before the original switch body, so the normal hot path jumps directly to the
+opcode handler label.  The old switch decoder is still available by rebuilding
+with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -DisableComputedGoto
+```
+
+```text
+pico_286 size: 982416 bytes
+pico_286 SHA256: 880BF4A3BC3387A22F0D034AC644F238D540A9AE71409750D4423BC337CBE914
+```
+
 ## 2026-05-30 grouped configuration sections
 
 The current `pico_286.conf` template and the runtime config writer group every

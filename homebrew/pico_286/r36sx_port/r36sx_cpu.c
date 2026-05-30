@@ -8,6 +8,12 @@
 //#define CPU_SET_HIGH_FLAGS
 #define CPU_286_STYLE_PUSH_SP
 #define R36SX_REP_BATCH_MAX 1024u
+#ifndef R36SX_CPU_COMPUTED_GOTO
+#define R36SX_CPU_COMPUTED_GOTO 0
+#endif
+#if R36SX_CPU_COMPUTED_GOTO && !defined(__GNUC__) && !defined(__clang__)
+#error R36SX_CPU_COMPUTED_GOTO requires GNU labels-as-values support.
+#endif
 #if PICO_ON_DEVICE
 
 #include "disks-rp2350.c.inl"
@@ -1900,8 +1906,50 @@ void __not_in_flash() exec86(uint32_t execloops) {
         register uint8_t res8;
         register uint8_t oper1b;
         register uint8_t oper2b;
+#if R36SX_CPU_COMPUTED_GOTO
+        /* GNU labels-as-values remove the large opcode switch from the hot path. */
+        static void *const r36sx_opcode_dispatch[256] = {
+            &&r36sx_opcode_00, &&r36sx_opcode_01, &&r36sx_opcode_02, &&r36sx_opcode_03, &&r36sx_opcode_04, &&r36sx_opcode_05, &&r36sx_opcode_06, &&r36sx_opcode_07,
+            &&r36sx_opcode_08, &&r36sx_opcode_09, &&r36sx_opcode_0A, &&r36sx_opcode_0B, &&r36sx_opcode_0C, &&r36sx_opcode_0D, &&r36sx_opcode_0E, &&r36sx_opcode_default,
+            &&r36sx_opcode_10, &&r36sx_opcode_11, &&r36sx_opcode_12, &&r36sx_opcode_13, &&r36sx_opcode_14, &&r36sx_opcode_15, &&r36sx_opcode_16, &&r36sx_opcode_17,
+            &&r36sx_opcode_18, &&r36sx_opcode_19, &&r36sx_opcode_1A, &&r36sx_opcode_1B, &&r36sx_opcode_1C, &&r36sx_opcode_1D, &&r36sx_opcode_1E, &&r36sx_opcode_1F,
+            &&r36sx_opcode_20, &&r36sx_opcode_21, &&r36sx_opcode_22, &&r36sx_opcode_23, &&r36sx_opcode_24, &&r36sx_opcode_25, &&r36sx_opcode_default, &&r36sx_opcode_27,
+            &&r36sx_opcode_28, &&r36sx_opcode_29, &&r36sx_opcode_2A, &&r36sx_opcode_2B, &&r36sx_opcode_2C, &&r36sx_opcode_2D, &&r36sx_opcode_default, &&r36sx_opcode_2F,
+            &&r36sx_opcode_30, &&r36sx_opcode_31, &&r36sx_opcode_32, &&r36sx_opcode_33, &&r36sx_opcode_34, &&r36sx_opcode_35, &&r36sx_opcode_default, &&r36sx_opcode_37,
+            &&r36sx_opcode_38, &&r36sx_opcode_39, &&r36sx_opcode_3A, &&r36sx_opcode_3B, &&r36sx_opcode_3C, &&r36sx_opcode_3D, &&r36sx_opcode_default, &&r36sx_opcode_3F,
+            &&r36sx_opcode_40, &&r36sx_opcode_41, &&r36sx_opcode_42, &&r36sx_opcode_43, &&r36sx_opcode_44, &&r36sx_opcode_45, &&r36sx_opcode_46, &&r36sx_opcode_47,
+            &&r36sx_opcode_48, &&r36sx_opcode_49, &&r36sx_opcode_4A, &&r36sx_opcode_4B, &&r36sx_opcode_4C, &&r36sx_opcode_4D, &&r36sx_opcode_4E, &&r36sx_opcode_4F,
+            &&r36sx_opcode_50, &&r36sx_opcode_51, &&r36sx_opcode_52, &&r36sx_opcode_53, &&r36sx_opcode_54, &&r36sx_opcode_55, &&r36sx_opcode_56, &&r36sx_opcode_57,
+            &&r36sx_opcode_58, &&r36sx_opcode_59, &&r36sx_opcode_5A, &&r36sx_opcode_5B, &&r36sx_opcode_5C, &&r36sx_opcode_5D, &&r36sx_opcode_5E, &&r36sx_opcode_5F,
+            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default,
+            &&r36sx_opcode_68, &&r36sx_opcode_69, &&r36sx_opcode_6A, &&r36sx_opcode_6B, &&r36sx_opcode_6C, &&r36sx_opcode_6D, &&r36sx_opcode_6E, &&r36sx_opcode_6F,
+            &&r36sx_opcode_70, &&r36sx_opcode_71, &&r36sx_opcode_72, &&r36sx_opcode_73, &&r36sx_opcode_74, &&r36sx_opcode_75, &&r36sx_opcode_76, &&r36sx_opcode_77,
+            &&r36sx_opcode_78, &&r36sx_opcode_79, &&r36sx_opcode_7A, &&r36sx_opcode_7B, &&r36sx_opcode_7C, &&r36sx_opcode_7D, &&r36sx_opcode_7E, &&r36sx_opcode_7F,
+            &&r36sx_opcode_80, &&r36sx_opcode_81, &&r36sx_opcode_82, &&r36sx_opcode_83, &&r36sx_opcode_84, &&r36sx_opcode_85, &&r36sx_opcode_86, &&r36sx_opcode_87,
+            &&r36sx_opcode_88, &&r36sx_opcode_89, &&r36sx_opcode_8A, &&r36sx_opcode_8B, &&r36sx_opcode_8C, &&r36sx_opcode_8D, &&r36sx_opcode_8E, &&r36sx_opcode_8F,
+            &&r36sx_opcode_90, &&r36sx_opcode_91, &&r36sx_opcode_92, &&r36sx_opcode_93, &&r36sx_opcode_94, &&r36sx_opcode_95, &&r36sx_opcode_96, &&r36sx_opcode_97,
+            &&r36sx_opcode_98, &&r36sx_opcode_99, &&r36sx_opcode_9A, &&r36sx_opcode_9B, &&r36sx_opcode_9C, &&r36sx_opcode_9D, &&r36sx_opcode_9E, &&r36sx_opcode_9F,
+            &&r36sx_opcode_A0, &&r36sx_opcode_A1, &&r36sx_opcode_A2, &&r36sx_opcode_A3, &&r36sx_opcode_A4, &&r36sx_opcode_A5, &&r36sx_opcode_A6, &&r36sx_opcode_A7,
+            &&r36sx_opcode_A8, &&r36sx_opcode_A9, &&r36sx_opcode_AA, &&r36sx_opcode_AB, &&r36sx_opcode_AC, &&r36sx_opcode_AD, &&r36sx_opcode_AE, &&r36sx_opcode_AF,
+            &&r36sx_opcode_B0, &&r36sx_opcode_B1, &&r36sx_opcode_B2, &&r36sx_opcode_B3, &&r36sx_opcode_B4, &&r36sx_opcode_B5, &&r36sx_opcode_B6, &&r36sx_opcode_B7,
+            &&r36sx_opcode_B8, &&r36sx_opcode_B9, &&r36sx_opcode_BA, &&r36sx_opcode_BB, &&r36sx_opcode_BC, &&r36sx_opcode_BD, &&r36sx_opcode_BE, &&r36sx_opcode_BF,
+            &&r36sx_opcode_C0, &&r36sx_opcode_C1, &&r36sx_opcode_C2, &&r36sx_opcode_C3, &&r36sx_opcode_C4, &&r36sx_opcode_C5, &&r36sx_opcode_C6, &&r36sx_opcode_C7,
+            &&r36sx_opcode_C8, &&r36sx_opcode_C9, &&r36sx_opcode_CA, &&r36sx_opcode_CB, &&r36sx_opcode_CC, &&r36sx_opcode_CD, &&r36sx_opcode_CE, &&r36sx_opcode_CF,
+            &&r36sx_opcode_D0, &&r36sx_opcode_D1, &&r36sx_opcode_D2, &&r36sx_opcode_D3, &&r36sx_opcode_D4, &&r36sx_opcode_D5, &&r36sx_opcode_D6, &&r36sx_opcode_D7,
+            &&r36sx_opcode_D8, &&r36sx_opcode_D9, &&r36sx_opcode_DA, &&r36sx_opcode_DB, &&r36sx_opcode_DC, &&r36sx_opcode_DD, &&r36sx_opcode_DE, &&r36sx_opcode_DF,
+            &&r36sx_opcode_E0, &&r36sx_opcode_E1, &&r36sx_opcode_E2, &&r36sx_opcode_E3, &&r36sx_opcode_E4, &&r36sx_opcode_E5, &&r36sx_opcode_E6, &&r36sx_opcode_E7,
+            &&r36sx_opcode_E8, &&r36sx_opcode_E9, &&r36sx_opcode_EA, &&r36sx_opcode_EB, &&r36sx_opcode_EC, &&r36sx_opcode_ED, &&r36sx_opcode_EE, &&r36sx_opcode_EF,
+            &&r36sx_opcode_F0, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_F4, &&r36sx_opcode_F5, &&r36sx_opcode_F6, &&r36sx_opcode_F7,
+            &&r36sx_opcode_F8, &&r36sx_opcode_F9, &&r36sx_opcode_FA, &&r36sx_opcode_FB, &&r36sx_opcode_FC, &&r36sx_opcode_FD, &&r36sx_opcode_FE, &&r36sx_opcode_FF,
+        };
+        goto *r36sx_opcode_dispatch[opcode];
+#endif
         switch (opcode) {
-            case 0x0: /* 00 ADD Eb Gb */
+            case 0x0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_00: ;
+#endif
+                /* 00 ADD Eb Gb */
                 modregrm();
                 oper1b = readrm8(rm);
                 oper2b = getreg8(reg);
@@ -1909,7 +1957,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm8(rm, res8);
                 break;
 
-            case 0x1: /* 01 ADD Ev Gv */
+            case 0x1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_01: ;
+#endif
+                /* 01 ADD Ev Gv */
                 modregrm();
                 if (operandSizeOverride) {
                     register uint32_t oper1 = readrm32(rm);
@@ -1924,7 +1976,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x2: /* 02 ADD Gb Eb */
+            case 0x2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_02: ;
+#endif
+                /* 02 ADD Gb Eb */
                 modregrm();
                 oper1b = getreg8(reg);
                 oper2b = readrm8(rm);
@@ -1932,7 +1988,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 putreg8(reg, res8);
                 break;
 
-            case 0x3: {
+            case 0x3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_03: ;
+#endif
+                {
                 /* 03 ADD Gv Ev */
                 modregrm();
                 register uint32_t oper1 = getreg16(reg);
@@ -1941,7 +2001,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 putreg16(reg, res16);
                 break;
             }
-            case 0x4: /* 04 ADD CPU_AL Ib */
+            case 0x4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_04: ;
+#endif
+                /* 04 ADD CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -1949,7 +2013,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x5: {
+            case 0x5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_05: ;
+#endif
+                {
                 /* 05 ADD eAX Iv */
                 register uint32_t oper1 = CPU_AX;
                 register uint32_t oper2 = getmem16(CPU_CS, CPU_IP);
@@ -1958,15 +2026,27 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
             }
-            case 0x6: /* 06 PUSH CPU_ES */
+            case 0x6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_06: ;
+#endif
+                /* 06 PUSH CPU_ES */
                 push(CPU_ES);
                 break;
 
-            case 0x7: /* 07 POP CPU_ES */
+            case 0x7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_07: ;
+#endif
+                /* 07 POP CPU_ES */
                 CPU_ES = pop();
                 break;
 
-            case 0x8: /* 08 OR Eb Gb */
+            case 0x8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_08: ;
+#endif
+                /* 08 OR Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -1976,7 +2056,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x9: /* 09 OR Ev Gv */
+            case 0x9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_09: ;
+#endif
+                /* 09 OR Ev Gv */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -1986,7 +2070,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0xA: /* 0A OR Gb Eb */
+            case 0xA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0A: ;
+#endif
+                /* 0A OR Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -1996,7 +2084,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0xB: /* 0B OR Gv Ev */
+            case 0xB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0B: ;
+#endif
+                /* 0B OR Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2009,7 +2101,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 putreg16(reg, res16);
                 break;
 
-            case 0xC: /* 0C OR CPU_AL Ib */
+            case 0xC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0C: ;
+#endif
+                /* 0C OR CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2017,7 +2113,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0xD: /* 0D OR eAX Iv */
+            case 0xD:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0D: ;
+#endif
+                /* 0D OR eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2025,22 +2125,35 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0xE: /* 0E PUSH CPU_CS */
+            case 0xE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0E: ;
+#endif
+                /* 0E PUSH CPU_CS */
                 push(CPU_CS);
                 break;
 
 #ifdef CPU_8086 //only the 8086/8088 does this.
-            case 0xF: //0F POP CS
+            case 0xF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_0F: ;
+#endif
+                //0F POP CS
                 CPU_CS = pop();
                 break;
 #else
                 /*
-                            case 0xF: // 286 protected mode
+                            case 0xF:
+                                // 286 protected mode
                             break;
                 */
 #endif
 
-            case 0x10: /* 10 ADC Eb Gb */
+            case 0x10:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_10: ;
+#endif
+                /* 10 ADC Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -2049,7 +2162,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm8(rm, res8);
                 break;
 
-            case 0x11: /* 11 ADC Ev Gv */
+            case 0x11:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_11: ;
+#endif
+                /* 11 ADC Ev Gv */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -2058,7 +2175,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm16(rm, res16);
                 break;
 
-            case 0x12: /* 12 ADC Gb Eb */
+            case 0x12:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_12: ;
+#endif
+                /* 12 ADC Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2067,7 +2188,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 putreg8(reg, res8);
                 break;
 
-            case 0x13: /* 13 ADC Gv Ev */
+            case 0x13:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_13: ;
+#endif
+                /* 13 ADC Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2077,7 +2202,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x14: /* 14 ADC CPU_AL Ib */
+            case 0x14:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_14: ;
+#endif
+                /* 14 ADC CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2085,7 +2214,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x15: /* 15 ADC eAX Iv */
+            case 0x15:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_15: ;
+#endif
+                /* 15 ADC eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2093,15 +2226,27 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x16: /* 16 PUSH CPU_SS */
+            case 0x16:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_16: ;
+#endif
+                /* 16 PUSH CPU_SS */
                 push(CPU_SS);
                 break;
 
-            case 0x17: /* 17 POP CPU_SS */
+            case 0x17:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_17: ;
+#endif
+                /* 17 POP CPU_SS */
                 CPU_SS = pop();
                 break;
 
-            case 0x18: /* 18 SBB Eb Gb */
+            case 0x18:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_18: ;
+#endif
+                /* 18 SBB Eb Gb */
                 modregrm();
                 oper1b = readrm8(rm);
                 oper2b = getreg8(reg);
@@ -2109,7 +2254,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm8(rm, res8);
                 break;
 
-            case 0x19: /* 19 SBB Ev Gv */
+            case 0x19:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_19: ;
+#endif
+                /* 19 SBB Ev Gv */
                 modregrm();
                 oper1 = readrm16(rm);
                 oper2 = getreg16(reg);
@@ -2117,7 +2266,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm16(rm, res16);
                 break;
 
-            case 0x1A: /* 1A SBB Gb Eb */
+            case 0x1A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1A: ;
+#endif
+                /* 1A SBB Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2127,7 +2280,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x1B: /* 1B SBB Gv Ev */
+            case 0x1B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1B: ;
+#endif
+                /* 1B SBB Gv Ev */
                 modregrm();
                 oper1 = getreg16(reg);
                 oper2 = readrm16(rm);
@@ -2135,7 +2292,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 putreg16(reg, res16);
                 break;
 
-            case 0x1C: /* 1C SBB CPU_AL Ib */
+            case 0x1C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1C: ;
+#endif
+                /* 1C SBB CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2143,7 +2304,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x1D: /* 1D SBB eAX Iv */
+            case 0x1D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1D: ;
+#endif
+                /* 1D SBB eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2151,15 +2316,27 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x1E: /* 1E PUSH CPU_DS */
+            case 0x1E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1E: ;
+#endif
+                /* 1E PUSH CPU_DS */
                 push(CPU_DS);
                 break;
 
-            case 0x1F: /* 1F POP CPU_DS */
+            case 0x1F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_1F: ;
+#endif
+                /* 1F POP CPU_DS */
                 CPU_DS = pop();
                 break;
 
-            case 0x20: /* 20 AND Eb Gb */
+            case 0x20:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_20: ;
+#endif
+                /* 20 AND Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -2168,7 +2345,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm8(rm, res8);
                 break;
 
-            case 0x21: /* 21 AND Ev Gv */
+            case 0x21:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_21: ;
+#endif
+                /* 21 AND Ev Gv */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -2178,7 +2359,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x22: /* 22 AND Gb Eb */
+            case 0x22:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_22: ;
+#endif
+                /* 22 AND Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2188,7 +2373,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x23: /* 23 AND Gv Ev */
+            case 0x23:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_23: ;
+#endif
+                /* 23 AND Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2198,7 +2387,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x24: /* 24 AND CPU_AL Ib */
+            case 0x24:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_24: ;
+#endif
+                /* 24 AND CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2206,7 +2399,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x25: /* 25 AND eAX Iv */
+            case 0x25:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_25: ;
+#endif
+                /* 25 AND eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2214,7 +2411,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x27: /* 27 DAA */
+            case 0x27:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_27: ;
+#endif
+                /* 27 DAA */
             {
                 uint8_t old_al;
                 old_al = CPU_AL;
@@ -2238,7 +2439,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
             }
 
-            case 0x28: /* 28 SUB Eb Gb */
+            case 0x28:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_28: ;
+#endif
+                /* 28 SUB Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -2248,7 +2453,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x29: {
+            case 0x29:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_29: ;
+#endif
+                {
                 /* 29 SUB Ev Gv */
                 modregrm();
                 register uint32_t oper1 = readrm16(rm);
@@ -2261,7 +2470,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm16(rm, (uint16_t) dst);
                 break;
             }
-            case 0x2A: /* 2A SUB Gb Eb */
+            case 0x2A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_2A: ;
+#endif
+                /* 2A SUB Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2271,7 +2484,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x2B: /* 2B SUB Gv Ev */
+            case 0x2B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_2B: ;
+#endif
+                /* 2B SUB Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2281,7 +2498,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x2C: /* 2C SUB CPU_AL Ib */
+            case 0x2C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_2C: ;
+#endif
+                /* 2C SUB CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2289,7 +2510,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x2D: /* 2D SUB eAX Iv */
+            case 0x2D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_2D: ;
+#endif
+                /* 2D SUB eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2297,7 +2522,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x2F: /* 2F DAS */
+            case 0x2F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_2F: ;
+#endif
+                /* 2F DAS */
             {
                 uint8_t old_al;
                 old_al = CPU_AL;
@@ -2321,7 +2550,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
             }
 
-            case 0x30: /* 30 XOR Eb Gb */
+            case 0x30:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_30: ;
+#endif
+                /* 30 XOR Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -2331,7 +2564,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x31: /* 31 XOR Ev Gv */
+            case 0x31:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_31: ;
+#endif
+                /* 31 XOR Ev Gv */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -2341,7 +2578,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x32: /* 32 XOR Gb Eb */
+            case 0x32:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_32: ;
+#endif
+                /* 32 XOR Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2351,7 +2592,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x33: /* 33 XOR Gv Ev */
+            case 0x33:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_33: ;
+#endif
+                /* 33 XOR Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2361,7 +2606,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x34: /* 34 XOR CPU_AL Ib */
+            case 0x34:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_34: ;
+#endif
+                /* 34 XOR CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2369,7 +2618,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = res8;
                 break;
 
-            case 0x35: /* 35 XOR eAX Iv */
+            case 0x35:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_35: ;
+#endif
+                /* 35 XOR eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2377,7 +2630,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x37: /* 37 AAA ASCII */
+            case 0x37:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_37: ;
+#endif
+                /* 37 AAA ASCII */
                 if (((CPU_AL & 0xF) > 9) || (af == 1)) {
                     CPU_AX = CPU_AX + 0x106;
                     x86_flags.value |= FLAG_CF_AF_MASK;
@@ -2388,7 +2645,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = CPU_AL & 0xF;
                 break;
 
-            case 0x38: /* 38 CMP Eb Gb */
+            case 0x38:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_38: ;
+#endif
+                /* 38 CMP Eb Gb */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -2397,7 +2658,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x39: /* 39 CMP Ev Gv */
+            case 0x39:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_39: ;
+#endif
+                /* 39 CMP Ev Gv */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -2406,7 +2671,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x3A: /* 3A CMP Gb Eb */
+            case 0x3A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_3A: ;
+#endif
+                /* 3A CMP Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -2415,7 +2684,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x3B: /* 3B CMP Gv Ev */
+            case 0x3B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_3B: ;
+#endif
+                /* 3B CMP Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -2424,7 +2697,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x3C: /* 3C CMP CPU_AL Ib */
+            case 0x3C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_3C: ;
+#endif
+                /* 3C CMP CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -2432,7 +2709,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x3D: /* 3D CMP eAX Iv */
+            case 0x3D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_3D: ;
+#endif
+                /* 3D CMP eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -2440,7 +2721,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x3F: /* 3F AAS ASCII */
+            case 0x3F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_3F: ;
+#endif
+                /* 3F AAS ASCII */
                 if (((CPU_AL & 0xF) > 9) || (af == 1)) {
                     CPU_AX = CPU_AX - 6;
                     CPU_AH = CPU_AH - 1;
@@ -2452,7 +2737,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AL = CPU_AL & 0xF;
                 break;
 
-            case 0x40: {
+            case 0x40:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_40: ;
+#endif
+                {
                 /* 40 INC eAX */
                 register uint32_t oper1 = CPU_AX;
                 register uint32_t dst = oper1 + 1;
@@ -2462,7 +2751,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = (uint16_t) dst;
                 break;
             }
-            case 0x41: {
+            case 0x41:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_41: ;
+#endif
+                {
                 /* 41 INC eCX */
                 register uint32_t oper1 = CPU_CX;
                 register uint32_t dst = oper1 + 1;
@@ -2472,7 +2765,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_CX = (uint16_t) dst;
                 break;
             }
-            case 0x42: {
+            case 0x42:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_42: ;
+#endif
+                {
                 /* 42 INC eDX */
                 register uint32_t oper1 = CPU_DX;
                 register uint32_t dst = oper1 + 1;
@@ -2482,7 +2779,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DX = (uint16_t) dst;
                 break;
             }
-            case 0x43: {
+            case 0x43:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_43: ;
+#endif
+                {
                 /* 43 INC eBX */
                 register uint32_t oper1 = CPU_BX;
                 register uint32_t dst = oper1 + 1;
@@ -2492,7 +2793,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_BX = (uint16_t) dst;
                 break;
             }
-            case 0x44: {
+            case 0x44:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_44: ;
+#endif
+                {
                 /* 44 INC eSP */
                 register uint32_t oper1 = CPU_SP;
                 register uint32_t dst = oper1 + 1;
@@ -2502,7 +2807,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_SP = (uint16_t) dst;
                 break;
             }
-            case 0x45: {
+            case 0x45:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_45: ;
+#endif
+                {
                 /* 45 INC eBP */
                 register uint32_t oper1 = CPU_BP;
                 register uint32_t dst = oper1 + 1;
@@ -2512,7 +2821,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_BP = (uint16_t) dst;
                 break;
             }
-            case 0x46: {
+            case 0x46:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_46: ;
+#endif
+                {
                 /* 46 INC eSI */
                 register uint32_t oper1 = CPU_SI;
                 register uint32_t dst = oper1 + 1;
@@ -2522,7 +2835,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_SI = (uint16_t) dst;
                 break;
             }
-            case 0x47: {
+            case 0x47:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_47: ;
+#endif
+                {
                 /* 47 INC eDI */
                 register uint32_t oper1 = CPU_DI;
                 register uint32_t dst = oper1 + 1;
@@ -2532,7 +2849,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DI = (uint16_t) dst;
                 break;
             }
-            case 0x48: /* 48 DEC eAX */
+            case 0x48:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_48: ;
+#endif
+                /* 48 DEC eAX */
                 oldcf = cf;
                 oper1 = CPU_AX;
                 oper2 = 1;
@@ -2541,7 +2862,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = res16;
                 break;
 
-            case 0x49: /* 49 DEC eCX */
+            case 0x49:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_49: ;
+#endif
+                /* 49 DEC eCX */
                 oldcf = cf;
                 oper1 = CPU_CX;
                 oper2 = 1;
@@ -2550,7 +2875,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_CX = res16;
                 break;
 
-            case 0x4A: /* 4A DEC eDX */
+            case 0x4A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4A: ;
+#endif
+                /* 4A DEC eDX */
                 oldcf = cf;
                 oper1 = CPU_DX;
                 oper2 = 1;
@@ -2559,7 +2888,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DX = res16;
                 break;
 
-            case 0x4B: /* 4B DEC eBX */
+            case 0x4B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4B: ;
+#endif
+                /* 4B DEC eBX */
                 oldcf = cf;
                 oper1 = CPU_BX;
                 oper2 = 1;
@@ -2568,7 +2901,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_BX = res16;
                 break;
 
-            case 0x4C: /* 4C DEC eSP */
+            case 0x4C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4C: ;
+#endif
+                /* 4C DEC eSP */
                 oldcf = cf;
                 oper1 = CPU_SP;
                 oper2 = 1;
@@ -2577,7 +2914,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_SP = res16;
                 break;
 
-            case 0x4D: /* 4D DEC eBP */
+            case 0x4D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4D: ;
+#endif
+                /* 4D DEC eBP */
                 oldcf = cf;
                 oper1 = CPU_BP;
                 oper2 = 1;
@@ -2586,7 +2927,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_BP = res16;
                 break;
 
-            case 0x4E: /* 4E DEC eSI */
+            case 0x4E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4E: ;
+#endif
+                /* 4E DEC eSI */
                 oldcf = cf;
                 oper1 = CPU_SI;
                 oper2 = 1;
@@ -2595,7 +2940,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_SI = res16;
                 break;
 
-            case 0x4F: /* 4F DEC eDI */
+            case 0x4F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_4F: ;
+#endif
+                /* 4F DEC eDI */
                 oldcf = cf;
                 oper1 = CPU_DI;
                 oper2 = 1;
@@ -2604,23 +2953,43 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DI = res16;
                 break;
 
-            case 0x50: /* 50 PUSH eAX */
+            case 0x50:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_50: ;
+#endif
+                /* 50 PUSH eAX */
                 push(CPU_AX);
                 break;
 
-            case 0x51: /* 51 PUSH eCX */
+            case 0x51:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_51: ;
+#endif
+                /* 51 PUSH eCX */
                 push(CPU_CX);
                 break;
 
-            case 0x52: /* 52 PUSH eDX */
+            case 0x52:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_52: ;
+#endif
+                /* 52 PUSH eDX */
                 push(CPU_DX);
                 break;
 
-            case 0x53: /* 53 PUSH eBX */
+            case 0x53:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_53: ;
+#endif
+                /* 53 PUSH eBX */
                 push(CPU_BX);
                 break;
 
-            case 0x54: /* 54 PUSH eSP */
+            case 0x54:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_54: ;
+#endif
+                /* 54 PUSH eSP */
 #ifdef CPU_286_STYLE_PUSH_SP
                 push(CPU_SP);
 #else
@@ -2628,52 +2997,100 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 break;
 
-            case 0x55: /* 55 PUSH eBP */
+            case 0x55:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_55: ;
+#endif
+                /* 55 PUSH eBP */
                 push(CPU_BP);
                 break;
 
-            case 0x56: /* 56 PUSH eSI */
+            case 0x56:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_56: ;
+#endif
+                /* 56 PUSH eSI */
                 push(CPU_SI);
                 break;
 
-            case 0x57: /* 57 PUSH eDI */
+            case 0x57:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_57: ;
+#endif
+                /* 57 PUSH eDI */
                 push(CPU_DI);
                 break;
 
-            case 0x58: /* 58 POP eAX */
+            case 0x58:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_58: ;
+#endif
+                /* 58 POP eAX */
                 CPU_AX = pop();
                 break;
 
-            case 0x59: /* 59 POP eCX */
+            case 0x59:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_59: ;
+#endif
+                /* 59 POP eCX */
                 CPU_CX = pop();
                 break;
 
-            case 0x5A: /* 5A POP eDX */
+            case 0x5A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5A: ;
+#endif
+                /* 5A POP eDX */
                 CPU_DX = pop();
                 break;
 
-            case 0x5B: /* 5B POP eBX */
+            case 0x5B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5B: ;
+#endif
+                /* 5B POP eBX */
                 CPU_BX = pop();
                 break;
 
-            case 0x5C: /* 5C POP eSP */
+            case 0x5C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5C: ;
+#endif
+                /* 5C POP eSP */
                 CPU_SP = pop();
                 break;
 
-            case 0x5D: /* 5D POP eBP */
+            case 0x5D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5D: ;
+#endif
+                /* 5D POP eBP */
                 CPU_BP = pop();
                 break;
 
-            case 0x5E: /* 5E POP eSI */
+            case 0x5E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5E: ;
+#endif
+                /* 5E POP eSI */
                 CPU_SI = pop();
                 break;
 
-            case 0x5F: /* 5F POP eDI */
+            case 0x5F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_5F: ;
+#endif
+                /* 5F POP eDI */
                 CPU_DI = pop();
                 break;
 
 #ifndef CPU_8086
-            case 0x60: /* 60 PUSHA (80186+) */
+            case 0x60:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_60: ;
+#endif
+                /* 60 PUSHA (80186+) */
                 oldsp = CPU_SP;
                 push(CPU_AX);
                 push(CPU_CX);
@@ -2685,7 +3102,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 push(CPU_DI);
                 break;
 
-            case 0x61: /* 61 POPA (80186+) */
+            case 0x61:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_61: ;
+#endif
+                /* 61 POPA (80186+) */
                 CPU_DI = pop();
                 CPU_SI = pop();
                 CPU_BP = pop();
@@ -2696,7 +3117,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_AX = pop();
                 break;
 
-            case 0x62: /* 62 BOUND Gv, Ev (80186+) */
+            case 0x62:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_62: ;
+#endif
+                /* 62 BOUND Gv, Ev (80186+) */
                 modregrm();
 
                 getea(rm);
@@ -2718,20 +3143,36 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 #if CPU_386_EXTENDED_OPS
-            case 0x66: /* Operand-Size Override (???????? ?????? ?????????: 16 ? 32 ???) */
+            case 0x66:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_66: ;
+#endif
+                /* Operand-Size Override (???????? ?????? ?????????: 16 ? 32 ???) */
                 operandSizeOverride = true;
                 break;
-            case 0x67: /* Address-Size Override (???????? ?????? ??????: 16 ? 32 ???) */
+            case 0x67:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_67: ;
+#endif
+                /* Address-Size Override (???????? ?????? ??????: 16 ? 32 ???) */
                 addressSizeOverride = true;
                 break;
 #endif
-            case 0x68: /* 68 PUSH Iv (80186+) */
+            case 0x68:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_68: ;
+#endif
+                /* 68 PUSH Iv (80186+) */
                 push(getmem16(CPU_CS, CPU_IP)
                 );
                 StepIP(2);
                 break;
 
-            case 0x69: {
+            case 0x69:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_69: ;
+#endif
+                {
                 /* 69 IMUL Gv Ev Iv (80186+) */
                 modregrm();
                 register int32_t temp1 = (int32_t)(int16_t)readrm16(rm);
@@ -2746,12 +3187,20 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
             }
-            case 0x6A: /* 6A PUSH Ib (80186+) */
+            case 0x6A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6A: ;
+#endif
+                /* 6A PUSH Ib (80186+) */
                 push((uint16_t) signext(getmem8(CPU_CS, CPU_IP)));
                 StepIP(1);
                 break;
 
-            case 0x6B: {
+            case 0x6B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6B: ;
+#endif
+                {
                 /* 6B IMUL Gv Eb Ib (80186+) */
                 modregrm();
                 register int32_t temp1 = (int32_t)(int16_t)readrm16(rm);
@@ -2766,7 +3215,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
             }
-            case 0x6C: /* 6E INSB */
+            case 0x6C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6C: ;
+#endif
+                /* 6E INSB */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -2792,7 +3245,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0x6D: /* 6F INSW */
+            case 0x6D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6D: ;
+#endif
+                /* 6F INSW */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -2818,7 +3275,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0x6E: /* 6E OUTSB */
+            case 0x6E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6E: ;
+#endif
+                /* 6E OUTSB */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -2844,7 +3305,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0x6F: /* 6F OUTSW */
+            case 0x6F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_6F: ;
+#endif
+                /* 6F OUTSW */
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
@@ -2871,7 +3336,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
 #endif
 
-            case 0x70: /* 70 JO Jb */
+            case 0x70:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_70: ;
+#endif
+                /* 70 JO Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (of) {
@@ -2879,7 +3348,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x71: /* 71 JNO Jb */
+            case 0x71:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_71: ;
+#endif
+                /* 71 JNO Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!of) {
@@ -2887,7 +3360,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x72: /* 72 JB Jb */
+            case 0x72:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_72: ;
+#endif
+                /* 72 JB Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf) {
@@ -2895,7 +3372,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x73: /* 73 JNB Jb */
+            case 0x73:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_73: ;
+#endif
+                /* 73 JNB Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf) {
@@ -2903,7 +3384,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x74: /* 74 JZ Jb */
+            case 0x74:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_74: ;
+#endif
+                /* 74 JZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (zf) {
@@ -2911,7 +3396,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x75: /* 75 JNZ Jb */
+            case 0x75:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_75: ;
+#endif
+                /* 75 JNZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!zf) {
@@ -2919,7 +3408,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x76: /* 76 JBE Jb */
+            case 0x76:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_76: ;
+#endif
+                /* 76 JBE Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf || zf) {
@@ -2927,7 +3420,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x77: /* 77 JA Jb */
+            case 0x77:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_77: ;
+#endif
+                /* 77 JA Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf && !zf) {
@@ -2935,7 +3432,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x78: /* 78 JS Jb */
+            case 0x78:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_78: ;
+#endif
+                /* 78 JS Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf) {
@@ -2943,7 +3444,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x79: /* 79 JNS Jb */
+            case 0x79:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_79: ;
+#endif
+                /* 79 JNS Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!sf) {
@@ -2951,7 +3456,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7A: /* 7A JPE Jb */
+            case 0x7A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7A: ;
+#endif
+                /* 7A JPE Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (pf) {
@@ -2959,7 +3468,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7B: /* 7B JPO Jb */
+            case 0x7B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7B: ;
+#endif
+                /* 7B JPO Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!pf) {
@@ -2967,7 +3480,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7C: /* 7C JL Jb */
+            case 0x7C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7C: ;
+#endif
+                /* 7C JL Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf != of) {
@@ -2975,7 +3492,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7D: /* 7D JGE Jb */
+            case 0x7D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7D: ;
+#endif
+                /* 7D JGE Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf == of) {
@@ -2983,7 +3504,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7E: /* 7E JLE Jb */
+            case 0x7E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7E: ;
+#endif
+                /* 7E JLE Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if ((sf != of) || zf) {
@@ -2991,7 +3516,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x7F: /* 7F JG Jb */
+            case 0x7F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_7F: ;
+#endif
+                /* 7F JG Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!
@@ -3002,7 +3531,14 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
 
             case 0x80:
-            case 0x82: /* 80/82 GRP1 Eb Ib */
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_80: ;
+#endif
+            case 0x82:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_82: ;
+#endif
+                /* 80/82 GRP1 Eb Ib */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -3044,8 +3580,16 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x81: /* 81 GRP1 Ev Iv */
-            case 0x83: /* 83 GRP1 Ev Ib */
+            case 0x81:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_81: ;
+#endif
+                /* 81 GRP1 Ev Iv */
+            case 0x83:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_83: ;
+#endif
+                /* 83 GRP1 Ev Ib */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -3093,7 +3637,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x84: /* 84 TEST Gb Eb */
+            case 0x84:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_84: ;
+#endif
+                /* 84 TEST Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -3102,7 +3650,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                           & oper2b);
                 break;
 
-            case 0x85: /* 85 TEST Gv Ev */
+            case 0x85:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_85: ;
+#endif
+                /* 85 TEST Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -3111,7 +3663,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                            & oper2);
                 break;
 
-            case 0x86: /* 86 XCHG Gb Eb */
+            case 0x86:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_86: ;
+#endif
+                /* 86 XCHG Gb Eb */
                 modregrm();
 
                 oper1b = getreg8(reg);
@@ -3121,7 +3677,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x87: /* 87 XCHG Gv Ev */
+            case 0x87:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_87: ;
+#endif
+                /* 87 XCHG Gv Ev */
                 modregrm();
 
                 oper1 = getreg16(reg);
@@ -3131,42 +3691,66 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x88: /* 88 MOV Eb Gb */
+            case 0x88:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_88: ;
+#endif
+                /* 88 MOV Eb Gb */
                 modregrm();
 
                 writerm8(rm, getreg8(reg)
                 );
                 break;
 
-            case 0x89: /* 89 MOV Ev Gv */
+            case 0x89:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_89: ;
+#endif
+                /* 89 MOV Ev Gv */
                 modregrm();
 
                 writerm16(rm, getreg16(reg)
                 );
                 break;
 
-            case 0x8A: /* 8A MOV Gb Eb */
+            case 0x8A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8A: ;
+#endif
+                /* 8A MOV Gb Eb */
                 modregrm();
 
                 putreg8(reg, readrm8(rm)
                 );
                 break;
 
-            case 0x8B: /* 8B MOV Gv Ev */
+            case 0x8B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8B: ;
+#endif
+                /* 8B MOV Gv Ev */
                 modregrm();
 
                 putreg16(reg, readrm16(rm)
                 );
                 break;
 
-            case 0x8C: /* 8C MOV Ew Sw */
+            case 0x8C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8C: ;
+#endif
+                /* 8C MOV Ew Sw */
                 modregrm();
 
                 writerm16(rm, getsegreg(reg)
                 );
                 break;
 
-            case 0x8D: /* 8D LEA Gv M */
+            case 0x8D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8D: ;
+#endif
+                /* 8D LEA Gv M */
                 modregrm();
 
                 getea(rm);
@@ -3176,66 +3760,110 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0x8E: /* 8E MOV Sw Ew */
+            case 0x8E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8E: ;
+#endif
+                /* 8E MOV Sw Ew */
                 modregrm();
 
                 putsegreg(reg, readrm16(rm)
                 );
                 break;
 
-            case 0x8F: /* 8F POP Ev */
+            case 0x8F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_8F: ;
+#endif
+                /* 8F POP Ev */
                 modregrm();
 
                 writerm16(rm, pop()
                 );
                 break;
 
-            case 0x90: /* 90 NOP */
+            case 0x90:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_90: ;
+#endif
+                /* 90 NOP */
                 break;
 
-            case 0x91: /* 91 XCHG eCX eAX */
+            case 0x91:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_91: ;
+#endif
+                /* 91 XCHG eCX eAX */
                 oper1 = CPU_CX;
                 CPU_CX = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x92: /* 92 XCHG eDX eAX */
+            case 0x92:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_92: ;
+#endif
+                /* 92 XCHG eDX eAX */
                 oper1 = CPU_DX;
                 CPU_DX = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x93: /* 93 XCHG eBX eAX */
+            case 0x93:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_93: ;
+#endif
+                /* 93 XCHG eBX eAX */
                 oper1 = CPU_BX;
                 CPU_BX = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x94: /* 94 XCHG eSP eAX */
+            case 0x94:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_94: ;
+#endif
+                /* 94 XCHG eSP eAX */
                 oper1 = CPU_SP;
                 CPU_SP = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x95: /* 95 XCHG eBP eAX */
+            case 0x95:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_95: ;
+#endif
+                /* 95 XCHG eBP eAX */
                 oper1 = CPU_BP;
                 CPU_BP = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x96: /* 96 XCHG eSI eAX */
+            case 0x96:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_96: ;
+#endif
+                /* 96 XCHG eSI eAX */
                 oper1 = CPU_SI;
                 CPU_SI = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x97: /* 97 XCHG eDI eAX */
+            case 0x97:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_97: ;
+#endif
+                /* 97 XCHG eDI eAX */
                 oper1 = CPU_DI;
                 CPU_DI = CPU_AX;
                 CPU_AX = oper1;
                 break;
 
-            case 0x98: /* 98 CBW */
+            case 0x98:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_98: ;
+#endif
+                /* 98 CBW */
                 if ((CPU_AL & 0x80) == 0x80) {
                     CPU_AH = 0xFF;
                 } else {
@@ -3243,7 +3871,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x99: /* 99 CWD */
+            case 0x99:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_99: ;
+#endif
+                /* 99 CWD */
                 if ((CPU_AH & 0x80) == 0x80) {
                     CPU_DX = 0xFFFF;
                 } else {
@@ -3251,7 +3883,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0x9A: /* 9A CALL Ap */
+            case 0x9A:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9A: ;
+#endif
+                /* 9A CALL Ap */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
@@ -3262,15 +3898,27 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_CS = oper2;
                 break;
 
-            case 0x9B: /* 9B WAIT */
+            case 0x9B:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9B: ;
+#endif
+                /* 9B WAIT */
                 /// TODO:
                 break;
 
-            case 0x9C: /* 9C PUSHF */
+            case 0x9C:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9C: ;
+#endif
+                /* 9C PUSHF */
                 push(makeflagsword());
                 break;
 
-            case 0x9D: /* 9D POPF */
+            case 0x9D:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9D: ;
+#endif
+                /* 9D POPF */
 #ifdef CPU_SET_HIGH_FLAGS
                 decodeflagsword(pop() | 0xF800);
 #else
@@ -3278,36 +3926,64 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 break;
 
-            case 0x9E: /* 9E SAHF */
+            case 0x9E:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9E: ;
+#endif
+                /* 9E SAHF */
                 decodeflagsword((makeflagsword() & 0xFF00) | CPU_AH);
                 break;
 
-            case 0x9F: /* 9F LAHF */
+            case 0x9F:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_9F: ;
+#endif
+                /* 9F LAHF */
                 CPU_AH = makeflagsword() & 0xFF;
                 break;
 
-            case 0xA0: /* A0 MOV CPU_AL Ob */
+            case 0xA0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A0: ;
+#endif
+                /* A0 MOV CPU_AL Ob */
                 CPU_AL = getmem8(useseg, getmem16(CPU_CS, CPU_IP));
                 StepIP(2);
                 break;
 
-            case 0xA1: /* A1 MOV eAX Ov */
+            case 0xA1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A1: ;
+#endif
+                /* A1 MOV eAX Ov */
                 oper1 = getmem16(useseg, getmem16(CPU_CS, CPU_IP));
                 StepIP(2);
                 CPU_AX = oper1;
                 break;
 
-            case 0xA2: /* A2 MOV Ob CPU_AL */
+            case 0xA2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A2: ;
+#endif
+                /* A2 MOV Ob CPU_AL */
                 putmem8(useseg, getmem16(CPU_CS, CPU_IP), CPU_AL);
                 StepIP(2);
                 break;
 
-            case 0xA3: /* A3 MOV Ov eAX */
+            case 0xA3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A3: ;
+#endif
+                /* A3 MOV Ov eAX */
                 putmem16(useseg, getmem16(CPU_CS, CPU_IP), CPU_AX);
                 StepIP(2);
                 break;
 
-            case 0xA4: /* A4 MOVSB */
+            case 0xA4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A4: ;
+#endif
+                /* A4 MOVSB */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3333,7 +4009,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 loopcount++;
                 break;
 
-            case 0xA5: /* A5 MOVSW */
+            case 0xA5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A5: ;
+#endif
+                /* A5 MOVSW */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3359,7 +4039,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 loopcount++;
                 break;
 
-            case 0xA6: /* A6 CMPSB */
+            case 0xA6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A6: ;
+#endif
+                /* A6 CMPSB */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3396,7 +4080,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xA7: /* A7 CMPSW */
+            case 0xA7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A7: ;
+#endif
+                /* A7 CMPSW */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3435,7 +4123,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xA8: /* A8 TEST CPU_AL Ib */
+            case 0xA8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A8: ;
+#endif
+                /* A8 TEST CPU_AL Ib */
                 oper1b = CPU_AL;
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
@@ -3443,7 +4135,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                           & oper2b);
                 break;
 
-            case 0xA9: /* A9 TEST eAX Iv */
+            case 0xA9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_A9: ;
+#endif
+                /* A9 TEST eAX Iv */
                 oper1 = CPU_AX;
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
@@ -3451,7 +4147,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                            & oper2);
                 break;
 
-            case 0xAA: /* AA STOSB */
+            case 0xAA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AA: ;
+#endif
+                /* AA STOSB */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3477,7 +4177,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 loopcount++;
                 break;
 
-            case 0xAB: /* AB STOSW */
+            case 0xAB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AB: ;
+#endif
+                /* AB STOSW */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3503,7 +4207,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 loopcount++;
                 break;
 
-            case 0xAC: /* AC LODSB */
+            case 0xAC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AC: ;
+#endif
+                /* AC LODSB */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3529,7 +4237,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xAD: /* AD LODSW */
+            case 0xAD:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AD: ;
+#endif
+                /* AD LODSW */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3556,7 +4268,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xAE: /* AE SCASB */
+            case 0xAE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AE: ;
+#endif
+                /* AE SCASB */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3591,7 +4307,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xAF: /* AF SCASW */
+            case 0xAF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_AF: ;
+#endif
+                /* AF SCASW */
                 if (
                     reptype && (CPU_CX
                                 == 0)) {
@@ -3627,91 +4347,159 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_IP = firstip;
                 break;
 
-            case 0xB0: /* B0 MOV CPU_AL Ib */
+            case 0xB0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B0: ;
+#endif
+                /* B0 MOV CPU_AL Ib */
                 CPU_AL = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB1: /* B1 MOV CPU_CL Ib */
+            case 0xB1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B1: ;
+#endif
+                /* B1 MOV CPU_CL Ib */
                 CPU_CL = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB2: /* B2 MOV CPU_DL Ib */
+            case 0xB2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B2: ;
+#endif
+                /* B2 MOV CPU_DL Ib */
                 CPU_DL = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB3: /* B3 MOV CPU_BL Ib */
+            case 0xB3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B3: ;
+#endif
+                /* B3 MOV CPU_BL Ib */
                 CPU_BL = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB4: /* B4 MOV CPU_AH Ib */
+            case 0xB4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B4: ;
+#endif
+                /* B4 MOV CPU_AH Ib */
                 CPU_AH = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB5: /* B5 MOV CPU_CH Ib */
+            case 0xB5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B5: ;
+#endif
+                /* B5 MOV CPU_CH Ib */
                 CPU_CH = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB6: /* B6 MOV CPU_DH Ib */
+            case 0xB6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B6: ;
+#endif
+                /* B6 MOV CPU_DH Ib */
                 CPU_DH = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB7: /* B7 MOV CPU_BH Ib */
+            case 0xB7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B7: ;
+#endif
+                /* B7 MOV CPU_BH Ib */
                 CPU_BH = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 break;
 
-            case 0xB8: /* B8 MOV eAX Iv */
+            case 0xB8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B8: ;
+#endif
+                /* B8 MOV eAX Iv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 CPU_AX = oper1;
                 break;
 
-            case 0xB9: /* B9 MOV eCX Iv */
+            case 0xB9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_B9: ;
+#endif
+                /* B9 MOV eCX Iv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 CPU_CX = oper1;
                 break;
 
-            case 0xBA: /* BA MOV eDX Iv */
+            case 0xBA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BA: ;
+#endif
+                /* BA MOV eDX Iv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 CPU_DX = oper1;
                 break;
 
-            case 0xBB: /* BB MOV eBX Iv */
+            case 0xBB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BB: ;
+#endif
+                /* BB MOV eBX Iv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 CPU_BX = oper1;
                 break;
 
-            case 0xBC: /* BC MOV eSP Iv */
+            case 0xBC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BC: ;
+#endif
+                /* BC MOV eSP Iv */
                 CPU_SP = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 break;
 
-            case 0xBD: /* BD MOV eBP Iv */
+            case 0xBD:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BD: ;
+#endif
+                /* BD MOV eBP Iv */
                 CPU_BP = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 break;
 
-            case 0xBE: /* BE MOV eSI Iv */
+            case 0xBE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BE: ;
+#endif
+                /* BE MOV eSI Iv */
                 CPU_SI = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 break;
 
-            case 0xBF: /* BF MOV eDI Iv */
+            case 0xBF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_BF: ;
+#endif
+                /* BF MOV eDI Iv */
                 CPU_DI = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 break;
 
-            case 0xC0: /* C0 GRP2 byte imm8 (80186+) */
+            case 0xC0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C0: ;
+#endif
+                /* C0 GRP2 byte imm8 (80186+) */
                 modregrm();
 
                 oper1b = readrm8(rm);
@@ -3720,7 +4508,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 writerm8(rm, op_grp2_8(oper2b, oper1b));
                 break;
 
-            case 0xC1: /* C1 GRP2 word imm8 (80186+) */
+            case 0xC1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C1: ;
+#endif
+                /* C1 GRP2 word imm8 (80186+) */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -3730,17 +4522,29 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0xC2: /* C2 RET Iw */
+            case 0xC2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C2: ;
+#endif
+                /* C2 RET Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 CPU_IP = pop();
                 CPU_SP = CPU_SP + oper1;
                 break;
 
-            case 0xC3: /* C3 RET */
+            case 0xC3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C3: ;
+#endif
+                /* C3 RET */
                 CPU_IP = pop();
                 break;
 
-            case 0xC4: /* C4 LES Gv Mp */
+            case 0xC4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C4: ;
+#endif
+                /* C4 LES Gv Mp */
                 modregrm();
 
                 getea(rm);
@@ -3748,7 +4552,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_ES = read86(ea + 2) + read86(ea + 3) * 256;
                 break;
 
-            case 0xC5: /* C5 LDS Gv Mp */
+            case 0xC5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C5: ;
+#endif
+                /* C5 LDS Gv Mp */
                 modregrm();
 
                 getea(rm);
@@ -3756,7 +4564,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DS = read86(ea + 2) + read86(ea + 3) * 256;
                 break;
 
-            case 0xC6: /* C6 MOV Eb Ib */
+            case 0xC6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C6: ;
+#endif
+                /* C6 MOV Eb Ib */
                 modregrm();
 
                 writerm8(rm, getmem8(CPU_CS, CPU_IP)
@@ -3764,7 +4576,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(1);
                 break;
 
-            case 0xC7: /* C7 MOV Ev Iv */
+            case 0xC7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C7: ;
+#endif
+                /* C7 MOV Ev Iv */
                 modregrm();
 
                 writerm16(rm, getmem16(CPU_CS, CPU_IP)
@@ -3772,7 +4588,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(2);
                 break;
 
-            case 0xC8: /* C8 ENTER (80186+) */
+            case 0xC8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C8: ;
+#endif
+                /* C8 ENTER (80186+) */
                 stacksize = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 nestlev = getmem8(CPU_CS, CPU_IP);
@@ -3796,40 +4616,68 @@ void __not_in_flash() exec86(uint32_t execloops) {
 
                 break;
 
-            case 0xC9: /* C9 LEAVE (80186+) */
+            case 0xC9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_C9: ;
+#endif
+                /* C9 LEAVE (80186+) */
                 CPU_SP = CPU_BP;
                 CPU_BP = pop();
                 break;
 
-            case 0xCA: /* CA RETF Iw */
+            case 0xCA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CA: ;
+#endif
+                /* CA RETF Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 CPU_IP = pop();
                 CPU_CS = pop();
                 CPU_SP = CPU_SP + oper1;
                 break;
 
-            case 0xCB: /* CB RETF */
+            case 0xCB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CB: ;
+#endif
+                /* CB RETF */
                 CPU_IP = pop();
                 CPU_CS = pop();
                 break;
 
-            case 0xCC: /* CC INT 3 */
+            case 0xCC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CC: ;
+#endif
+                /* CC INT 3 */
                 intcall86(3);
                 break;
 
-            case 0xCD: /* CD INT Ib */
+            case 0xCD:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CD: ;
+#endif
+                /* CD INT Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 intcall86(oper1b);
                 break;
 
-            case 0xCE: /* CE INTO */
+            case 0xCE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CE: ;
+#endif
+                /* CE INTO */
                 if (of) {
                     intcall86(4);
                 }
                 break;
 
-            case 0xCF: /* CF IRET */
+            case 0xCF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_CF: ;
+#endif
+                /* CF IRET */
                 CPU_IP = pop();
                 CPU_CS = pop();
 #ifdef CPU_SET_HIGH_FLAGS
@@ -3844,28 +4692,44 @@ void __not_in_flash() exec86(uint32_t execloops) {
                  */
                 break;
 
-            case 0xD0: /* D0 GRP2 Eb 1 */
+            case 0xD0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D0: ;
+#endif
+                /* D0 GRP2 Eb 1 */
                 modregrm();
 
                 oper1b = readrm8(rm);
                 writerm8(rm, op_grp2_8(1, oper1b));
                 break;
 
-            case 0xD1: /* D1 GRP2 Ev 1 */
+            case 0xD1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D1: ;
+#endif
+                /* D1 GRP2 Ev 1 */
                 modregrm();
 
                 oper1 = readrm16(rm);
                 writerm16(rm, op_grp2_16(1));
                 break;
 
-            case 0xD2: /* D2 GRP2 Eb CPU_CL */
+            case 0xD2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D2: ;
+#endif
+                /* D2 GRP2 Eb CPU_CL */
                 modregrm();
 
                 oper1b = readrm8(rm);
                 writerm8(rm, op_grp2_8(CPU_CL, oper1b));
                 break;
 
-            case 0xD3: /* D3 GRP2 Ev CPU_CL */
+            case 0xD3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D3: ;
+#endif
+                /* D3 GRP2 Ev CPU_CL */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -3873,7 +4737,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 );
                 break;
 
-            case 0xD4: /* D4 AAM I0 */
+            case 0xD4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D4: ;
+#endif
+                /* D4 AAM I0 */
                 oper1 = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 if (!oper1) {
@@ -3886,7 +4754,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 flag_szp16(CPU_AX);
                 break;
 
-            case 0xD5: /* D5 AAD I0 */
+            case 0xD5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D5: ;
+#endif
+                /* D5 AAD I0 */
                 oper1 = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 CPU_AL = (CPU_AH * oper1 + CPU_AL) & 255;
@@ -3896,28 +4768,65 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 sf = 0;
                 break;
 
-            case 0xD6: /* D6 XLAT on V20/V30, SALC on 8086/8088 */
+            case 0xD6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D6: ;
+#endif
+                /* D6 XLAT on V20/V30, SALC on 8086/8088 */
 #ifndef CPU_NO_SALC
                 CPU_AL = CPU_FL_CF ? 0xFF : 0x00;
                 break;
 #endif
 
-            case 0xD7: /* D7 XLAT */
+            case 0xD7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D7: ;
+#endif
+                /* D7 XLAT */
                 CPU_AL = read86(useseg * 16 + (CPU_BX) + CPU_AL);
                 break;
 
             case 0xD8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D8: ;
+#endif
             case 0xD9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_D9: ;
+#endif
             case 0xDA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DA: ;
+#endif
             case 0xDB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DB: ;
+#endif
             case 0xDC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DC: ;
+#endif
             case 0xDE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DE: ;
+#endif
             case 0xDD:
-            case 0xDF: /* escape to x87 FPU */
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DD: ;
+#endif
+            case 0xDF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_DF: ;
+#endif
+                /* escape to x87 FPU */
                 OpFpu(opcode);
                 break;
 
-            case 0xE0: /* E0 LOOPNZ Jb */
+            case 0xE0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E0: ;
+#endif
+                /* E0 LOOPNZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
@@ -3926,7 +4835,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xE1: /* E1 LOOPZ Jb */
+            case 0xE1:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E1: ;
+#endif
+                /* E1 LOOPZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
@@ -3935,7 +4848,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xE2: /* E2 LOOP Jb */
+            case 0xE2:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E2: ;
+#endif
+                /* E2 LOOP Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
@@ -3944,7 +4861,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xE3: /* E3 JCXZ Jb */
+            case 0xE3:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E3: ;
+#endif
+                /* E3 JCXZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!CPU_CX) {
@@ -3952,46 +4873,74 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xE4: /* E4 IN CPU_AL Ib */
+            case 0xE4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E4: ;
+#endif
+                /* E4 IN CPU_AL Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 CPU_AL = (uint8_t) portin(oper1b);
                 break;
 
-            case 0xE5: /* E5 IN eAX Ib */
+            case 0xE5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E5: ;
+#endif
+                /* E5 IN eAX Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 CPU_AX = portin16(oper1b);
                 break;
 
-            case 0xE6: /* E6 OUT Ib CPU_AL */
+            case 0xE6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E6: ;
+#endif
+                /* E6 OUT Ib CPU_AL */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 portout(oper1b, CPU_AL
                 );
                 break;
 
-            case 0xE7: /* E7 OUT Ib eAX */
+            case 0xE7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E7: ;
+#endif
+                /* E7 OUT Ib eAX */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 portout16(oper1b, CPU_AX
                 );
                 break;
 
-            case 0xE8: /* E8 CALL Jv */
+            case 0xE8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E8: ;
+#endif
+                /* E8 CALL Jv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 push(CPU_IP);
                 CPU_IP = CPU_IP + oper1;
                 break;
 
-            case 0xE9: /* E9 JMP Jv */
+            case 0xE9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_E9: ;
+#endif
+                /* E9 JMP Jv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 CPU_IP = CPU_IP + oper1;
                 break;
 
-            case 0xEA: /* EA JMP Ap */
+            case 0xEA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_EA: ;
+#endif
+                /* EA JMP Ap */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
@@ -3999,41 +4948,73 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_CS = oper2;
                 break;
 
-            case 0xEB: /* EB JMP Jb */
+            case 0xEB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_EB: ;
+#endif
+                /* EB JMP Jb */
                 oper1 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 CPU_IP = CPU_IP + oper1;
                 break;
 
-            case 0xEC: /* EC IN CPU_AL regdx */
+            case 0xEC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_EC: ;
+#endif
+                /* EC IN CPU_AL regdx */
                 oper1 = CPU_DX;
                 CPU_AL = (uint8_t) portin(oper1);
                 break;
 
-            case 0xED: /* ED IN eAX regdx */
+            case 0xED:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_ED: ;
+#endif
+                /* ED IN eAX regdx */
                 oper1 = CPU_DX;
                 CPU_AX = portin16(oper1);
                 break;
 
-            case 0xEE: /* EE OUT regdx CPU_AL */
+            case 0xEE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_EE: ;
+#endif
+                /* EE OUT regdx CPU_AL */
                 oper1 = CPU_DX;
                 portout(oper1, CPU_AL
                 );
                 break;
 
-            case 0xEF: /* EF OUT regdx eAX */
+            case 0xEF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_EF: ;
+#endif
+                /* EF OUT regdx eAX */
                 oper1 = CPU_DX;
                 portout16(oper1, CPU_AX);
                 break;
 
-            case 0xF0: /* F0 LOCK */
+            case 0xF0:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F0: ;
+#endif
+                /* F0 LOCK */
                 break;
 
-            case 0xF4: /* F4 HLT */
+            case 0xF4:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F4: ;
+#endif
+                /* F4 HLT */
                 hltstate = 1;
                 return;
 
-            case 0xF5: /* F5 CMC */
+            case 0xF5:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F5: ;
+#endif
+                /* F5 CMC */
                 if (!cf) {
                     cf = 1;
                 } else {
@@ -4041,7 +5022,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xF6: /* F6 GRP3a Eb */
+            case 0xF6:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F6: ;
+#endif
+                /* F6 GRP3a Eb */
                 modregrm();
                 oper1b = readrm8(rm);
                 oper1 = signext(oper1b);
@@ -4116,7 +5101,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xF7: /* F7 GRP3b Ev */
+            case 0xF7:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F7: ;
+#endif
+                /* F7 GRP3b Ev */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -4127,31 +5116,59 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xF8: /* F8 CLC */
+            case 0xF8:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F8: ;
+#endif
+                /* F8 CLC */
                 cf = 0;
                 break;
 
-            case 0xF9: /* F9 STC */
+            case 0xF9:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_F9: ;
+#endif
+                /* F9 STC */
                 cf = 1;
                 break;
 
-            case 0xFA: /* FA CLI */
+            case 0xFA:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FA: ;
+#endif
+                /* FA CLI */
                 ifl = 0;
                 break;
 
-            case 0xFB: /* FB STI */
+            case 0xFB:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FB: ;
+#endif
+                /* FB STI */
                 ifl = 1;
                 break;
 
-            case 0xFC: /* FC CLD */
+            case 0xFC:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FC: ;
+#endif
+                /* FC CLD */
                 df = 0;
                 break;
 
-            case 0xFD: /* FD STD */
+            case 0xFD:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FD: ;
+#endif
+                /* FD STD */
                 df = 1;
                 break;
 
-            case 0xFE: /* FE GRP4 Eb */
+            case 0xFE:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FE: ;
+#endif
+                /* FE GRP4 Eb */
                 modregrm();
                 oper1b = readrm8(rm);
                 oper2b = 1;
@@ -4169,7 +5186,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 break;
 
-            case 0xFF: /* FF GRP5 Ev */
+            case 0xFF:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_FF: ;
+#endif
+                /* FF GRP5 Ev */
                 modregrm();
 
                 oper1 = readrm16(rm);
@@ -4177,6 +5198,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 break;
 
             default:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_default: ;
+#endif
 #ifdef CPU_ALLOW_ILLEGAL_OP_EXCEPTION
                 intcall86(6); /* trip invalid opcode exception. this occurs on the 80186+, 8086/8088 CPUs treat them as NOPs. */
                 /* technically they aren't exactly like NOPs in most cases, but for our pursoses, that's accurate enough. */

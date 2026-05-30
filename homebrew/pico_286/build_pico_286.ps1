@@ -1,6 +1,7 @@
 param(
     [switch]$DebugLog,
     [switch]$DisableProfiling,
+    [switch]$DisableComputedGoto,
     [switch]$TryStrip
 )
 
@@ -30,6 +31,7 @@ $CrtEnd = Join-Path $GccLib "crtend.o"
 $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
 $DebugValue = if ($DebugLog) { "1" } else { "0" }
 $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
+$ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -78,6 +80,7 @@ $CommonArgs = @(
     "-DPICO_RP2350=0",
     "-DDEBUG=$DebugValue",
     "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
+    "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",

@@ -1,5 +1,27 @@
 # pico-286 Build Log
 
+## 2026-05-30 computed-goto opcode dispatch
+
+Added an optional GNU labels-as-values dispatch table to the main `exec86()`
+opcode decoder in `r36sx_cpu.c`.  The existing `switch (opcode)` body remains
+as the fallback implementation, but the normal R36SX build now jumps directly
+to the opcode handler label through a 256-entry table before the switch.
+
+This removes one large switch dispatch from the hot path without rewriting the
+individual opcode handlers.  Prefix opcodes that are handled before the main
+decoder, and unavailable 286/386 opcodes in this build, still route to the
+default handler.
+
+Build options:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+.\homebrew\pico_286\build_pico_286.ps1 -DisableComputedGoto
+```
+
+Both commands were tested.  The first command is the optimized default build;
+the second keeps the old switch-based decoder for comparison or fallback.
+
 ## 2026-05-30 grouped configuration sections
 
 Grouped all `pico_286.conf` options under INI section headers.  The parser

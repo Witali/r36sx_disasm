@@ -57,7 +57,10 @@ directory is only for compiler output:
   the R36SX disk config loaded by `r36sx_disk_config.c`.  It also adds missing
   text-mode BIOS `INT 10h` services used by BIOS/DOS boot screens: cursor
   shape/position, scroll/clear window, read/write character and attribute,
-  teletype output, mode query, active page selection, and write string.
+  teletype output, mode query, active page selection, and write string.  The
+  main `exec86()` opcode decoder can use a GNU labels-as-values dispatch table
+  to jump directly to opcode handlers; the old `switch` decoder remains
+  available through the build option below.
 - `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
   `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
   `81h`.  The same config also controls the optional on-screen keyboard cursor
@@ -263,6 +266,13 @@ diagnostics, pass `-DebugLog`:
 
 ```powershell
 .\homebrew\pico_286\build_pico_286.ps1 -DebugLog
+```
+
+The normal build enables the computed-goto opcode dispatch table.  To compare
+against the old switch-based decoder, pass `-DisableComputedGoto`:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -DisableComputedGoto
 ```
 
 With `-DebugLog`, the device writes:

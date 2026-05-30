@@ -118,6 +118,10 @@ The separate composition buffer is still used for the on-screen keyboard,
 disk menu, and key preset editor.  The small disk activity LED is drawn into
 `SCREEN` only for the present call, then its saved rectangle is restored.
 
+This build also enables the computed-goto CPU opcode dispatcher, so the main
+`exec86()` loop jumps directly to opcode handlers instead of entering the large
+switch decoder on every instruction.
+
 ## Key Preset Editor
 
 Open it with Fn+Start.
