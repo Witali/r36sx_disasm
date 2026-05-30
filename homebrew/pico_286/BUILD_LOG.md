@@ -1,5 +1,57 @@
 # pico-286 Build Log
 
+## 2026-05-30 VGA register and memory model fixes
+
+Applied the first pass of VGA model fixes from the register/memory audit.
+
+Source changes were intentionally split into separate commits:
+
+- `Route VGA register reads`: routed sequencer/graphics/attribute/DAC reads
+  through `vga_portin()` and reset the Attribute Controller flip-flop when
+  reading `0x3DA`.
+- `Track VGA attribute registers`: stored Attribute Controller registers,
+  used a 5-bit Attribute Controller index, and added minimal DAC mask and
+  Misc Output register readback.
+- `Fix VGA write mode 3 masking`: made write mode 3 use
+  `(rotated_cpu_byte & bit_mask)` as the selector and Set/Reset as the source.
+- `Respect VGA memory map selection`: honored Graphics Controller register 6
+  memory map selection for `A000`, `B000`, and `B800` VGA windows.
+- `Fix VGA chain4 mode 13 rendering`: corrected Sequencer Memory Mode chain-4
+  bit handling and made unchained Mode 13h read the same packed plane-byte
+  layout that the write path stores.
+- `Apply VGA start address in graphics renderer`: made EGA/VGA graphics
+  renderers apply CRTC Start Address (`vram_offset`) and wrap indexes inside
+  the 64 KiB logical VRAM window.
+
+The remaining larger VGA items are still intentionally deferred: full CRTC
+Offset/stride timing semantics and VGA text font plane 2 rendering need a
+separate, narrower test case because they can change many text and graphics
+modes at once.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,085,216 bytes
+- SHA256: `4DF6DF0894F39D2310F66E3819DACB2DC6C9C88004B6C1AAA4A69D1757022CE2`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 3DBENCH VGA Mode 13h rendering fix
 
 Investigated `C:\Temp\3DBENCH.EXE` with Ghidra 12.0.4.  The DOS EXE is
