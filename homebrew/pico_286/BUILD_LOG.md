@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-30 lower-right statistics table
+
+Changed the `Fn` + D-pad `Down` statistics overlay from a single top-left text
+line to a compact two-column table anchored in the lower-right corner directly
+above the disk activity LED.  Metric names now stay in one column and values in
+the next column:
+
+```text
+X86    123456/s
+READ   0K/s
+WRITE  0K/s
+FPS    60
+```
+
+The shared MiniFB 8x8 text helper now reads `font_8x8` with the same
+least-significant-bit-left convention as the DOS text renderer, fixing the
+per-character horizontal mirroring that was visible in the stats line.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,009,372 bytes
+- SHA256: `ED98F6095FD5858A155A5AAA3131FB76D8FAC32D15327FB47E7CEEE38350CFDC`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 CGA raw video memory path
 
 Sopwith still showed corrupted colored rows in the top HUD area even after the

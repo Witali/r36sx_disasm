@@ -224,7 +224,7 @@ static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
                 if (px < 0 || px >= g_mfb.width) {
                     continue;
                 }
-                if ((bits & (unsigned char)(0x80u >> col)) != 0) {
+                if ((bits & (unsigned char)(1u << col)) != 0) {
                     target[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
                         color;
                 }
@@ -233,37 +233,77 @@ static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
     }
 }
 
+static void r36sx_mfb_disk_led_center(int *cx, int *cy);
+
 static void r36sx_mfb_draw_stats_overlay(uint16_t *target)
 {
     r36sx_app_stats_snapshot_t stats;
-    char line[96];
-    int text_w;
+    const char *labels[] = {
+        "X86",
+        "READ",
+        "WRITE",
+        "FPS"
+    };
+    char values[4][16];
+    int label_w = 5 * 8;
+    int value_w = 0;
     int box_w;
-    const int x = 8;
-    const int y = 8;
+    int box_h;
+    int x;
+    int y;
+    int led_cx;
+    int led_cy;
+    const int pad = 5;
+    const int gap = 8;
+    const int row_h = 10;
+    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
 
     if (!target || !r36sx_app_stats_is_visible()) {
         return;
     }
 
     r36sx_app_stats_snapshot(&stats);
-    snprintf(line, sizeof(line), "X86:%lu/s RD:%luKB/s WR:%luKB/s FPS:%lu",
-             (unsigned long)stats.x86_per_sec,
-             (unsigned long)stats.disk_read_kb_per_sec,
-             (unsigned long)stats.disk_write_kb_per_sec,
+    snprintf(values[0], sizeof(values[0]), "%lu/s",
+             (unsigned long)stats.x86_per_sec);
+    snprintf(values[1], sizeof(values[1]), "%luK/s",
+             (unsigned long)stats.disk_read_kb_per_sec);
+    snprintf(values[2], sizeof(values[2]), "%luK/s",
+             (unsigned long)stats.disk_write_kb_per_sec);
+    snprintf(values[3], sizeof(values[3]), "%lu",
              (unsigned long)stats.fps);
-    text_w = (int)strlen(line) * 8;
-    box_w = text_w + 12;
-    if (box_w > g_mfb.width - x * 2) {
-        box_w = g_mfb.width - x * 2;
+    for (int i = 0; i < 4; i++) {
+        int w = (int)strlen(values[i]) * 8;
+        if (w > value_w) {
+            value_w = w;
+        }
     }
 
-    r36sx_mfb_fill_rect_target(target, x, y, box_w, 18,
+    box_w = pad * 2 + label_w + gap + value_w;
+    box_h = pad * 2 + 4 * row_h - 2;
+    r36sx_mfb_disk_led_center(&led_cx, &led_cy);
+    x = led_cx + outer_radius - box_w;
+    y = led_cy - outer_radius - 4 - box_h;
+    if (x < 0) {
+        x = 0;
+    }
+    if (x + box_w > g_mfb.width) {
+        x = g_mfb.width - box_w;
+    }
+    if (y < 0) {
+        y = 0;
+    }
+
+    r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h,
                                r36sx_mfb_rgb565(5, 8, 12));
-    r36sx_mfb_stroke_rect(target, x, y, box_w, 18,
+    r36sx_mfb_stroke_rect(target, x, y, box_w, box_h,
                           r36sx_mfb_rgb565(70, 96, 112));
-    r36sx_mfb_draw_text8(target, x + 6, y + 5, line,
-                         r36sx_mfb_rgb565(236, 242, 220));
+    for (int i = 0; i < 4; i++) {
+        int row_y = y + pad + i * row_h;
+        r36sx_mfb_draw_text8(target, x + pad, row_y, labels[i],
+                             r36sx_mfb_rgb565(176, 202, 214));
+        r36sx_mfb_draw_text8(target, x + pad + label_w + gap, row_y,
+                             values[i], r36sx_mfb_rgb565(236, 242, 220));
+    }
 }
 
 static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)

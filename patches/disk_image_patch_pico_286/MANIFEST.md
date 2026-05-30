@@ -30,6 +30,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 lower-right statistics table
+
+The `Fn` + D-pad `Down` statistics overlay now draws a compact lower-right
+two-column table directly above the disk LED instead of a single top-left line.
+The MiniFB 8x8 text helper also uses the same bit direction as the DOS text
+renderer, fixing mirrored characters in the statistics overlay.
+
+```text
+pico_286 size: 1009372 bytes
+pico_286 SHA256: ED98F6095FD5858A155A5AAA3131FB76D8FAC32D15327FB47E7CEEE38350CFDC
+Defender scan: found no threats
+```
+
 ## 2026-05-30 CGA raw video memory path
 
 The Pico-286 binary was rebuilt to keep CGA/text/Tandy/Hercules video memory as
