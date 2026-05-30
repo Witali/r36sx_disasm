@@ -4,6 +4,8 @@ This file documents the `pico_286` native executable for TinyMC.
 
 ## Main DOS Controls
 
+The default key preset maps physical buttons like this:
+
 - D-pad: PC cursor keys.
 - A or Start: Enter.
 - B: Escape.
@@ -14,6 +16,9 @@ This file documents the `pico_286` native executable for TinyMC.
 - R: Shift.
 - L2: F1.
 - R2: F2.
+
+These mappings can be changed in the key preset editor.  There is no
+Select+Start exit shortcut; use Fn+X or the long Fn hold described below.
 
 ## Fn Shortcuts
 
@@ -26,6 +31,9 @@ This file documents the `pico_286` native executable for TinyMC.
 - Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
+
+The active Fn shortcuts are exactly the ones listed above.  Fn+A, Fn+Y,
+Fn+D-pad Right, Fn+L, Fn+L2, Fn+R, and Fn+R2 currently have no action.
 
 Screenshots are written to `MIPS_NATIVE/pico_286/screenshots` as
 `pico_286_YYYYMMDD_HHMMSS_NNN.png` or
@@ -59,12 +67,13 @@ text mode uses its 400 drawn rows rather than the full 480-pixel framebuffer.
 Open it with Fn+Select.
 
 - D-pad Up/Down: select a row.
-- Left/Right: change the selected disk image.
-- A or Y: accept/change the selected row.
+- Left/Right: change the selected disk image or boot order.
+- A or Y on a drive row: select the next disk image.
+- A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
+- A or Y on `SAVE/APPLY`: write current bindings to `pico_286.conf` and apply them.
+- A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
+- A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
-- `BOOT ORDER`: choose `A,C` or `C,A`.
-- `SAVE/APPLY`: write current bindings to `pico_286.conf` and apply them.
-- `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 
 The menu searches for `.img` files next to `pico_286.conf`.
 
@@ -150,11 +159,14 @@ Open it with Fn+Start.
 
 - D-pad: select rows.
 - Left/Right: change preset or column.
-- A or Y: activate the selected row, accept OK, or accept the highlighted
-  on-screen key in picker mode.
-- B or X: cancel the editor without saving when no picker keyboard is open.
-- In picker mode, B enters Backspace and X enters Escape.
-- `RENAME`: edit the preset name with the on-screen keyboard.
+- A or Y on `PRESET`: select the next preset.
+- A or Y on `RENAME`: edit the preset name with the on-screen keyboard.
+- A or Y on `ADD NEW`: create a new preset by copying the current one.
+- A or Y on a button row: open the key picker for that physical button.
+- A or Y in key picker mode: assign the highlighted on-screen key.
+- B in key picker mode: assign Backspace.
+- X in key picker mode: assign Escape.
+- B or X outside picker mode: cancel the editor without saving.
 - `OK`: save all draft changes to `keypresets.conf`.
 - `CANCEL`: close without saving.
 
