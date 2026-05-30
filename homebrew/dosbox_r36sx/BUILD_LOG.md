@@ -193,6 +193,45 @@ Result:
 - Microsoft Defender scans of both the build output and overlay copy reported
   no threats.
 
+Device test feedback after direct-present build:
+
+- the device now shows a blinking cursor, confirming that `driver.so`
+  presentation is active;
+- no shell text is visible yet, so the next likely issue is 8bpp/palette output
+  or a render/update path that only makes the VGA cursor visible.
+
+RGB-output/diagnostic rebuild:
+
+```powershell
+.\homebrew\dosbox_r36sx\build_dosbox_r36sx.ps1
+.\tools\scan-download.ps1 .\homebrew\dosbox_r36sx\dosbox_r36sx
+Copy-Item -Force homebrew\dosbox_r36sx\dosbox_r36sx patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+.\tools\scan-download.ps1 .\patches\disk_image_patch_dosbox_r36sx\MIPS_NATIVE\dosbox_r36sx\dosbox_r36sx
+tools\mips_gcc_windows\g++-mipsel-none-elf-10.3.0\bin\mipsel-none-elf-readelf.exe -d homebrew\dosbox_r36sx\dosbox_r36sx
+```
+
+Changes:
+
+- `GFX_GetBestMode()` now strips `GFX_CAN_8` / `GFX_LOVE_8` for this R36SX
+  build so text mode should render through RGB scaler output instead of an
+  8bpp paletted SDL surface;
+- `R36SX_PresentSurface()` logs the first 30 present calls to
+  `dosbox.stderr.log`: source surface size, bpp, pitch, clip rectangle,
+  non-black pixel count, and bounding box;
+- `dosbox.conf` autoexec now prints an explicit `R36SX DOSBox direct video
+  test` line and `ver` before `dir`.
+
+Result:
+
+- output size: `8032184` bytes;
+- SHA256:
+  `A94F7C4BFA20C6B38FF218FE799FAEA371251301BF3A8D354BF09514E1228B7D`;
+- dynamic dependencies unchanged:
+  `libSDL-1.2.so.0`, `libpthread.so.0`, `libdl.so.2`, `libm.so.6`,
+  `libstdc++.so.6`, `libgcc_s.so.1`, `libc.so.6`;
+- Microsoft Defender scans of both the build output and overlay copy reported
+  no threats.
+
 Device test feedback:
 
 - the baseline SDL build reached execution but showed a black screen;

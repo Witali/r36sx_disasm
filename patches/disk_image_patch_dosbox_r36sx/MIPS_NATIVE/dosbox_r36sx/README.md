@@ -12,10 +12,14 @@ This build is an early baseline:
 - official DOSBox 0.74-3 source;
 - MIPS little-endian Linux executable;
 - SDL 1.2 frontend from the firmware;
+- forced RGB SDL output for the R36SX video mirror, avoiding the 8bpp palette
+  path that can leave only the VGA cursor visible;
 - direct R36SX display mirror: each DOSBox frame is converted to 640x480 RGB565
   and sent to `/mnt/sdcard/cubegm/driver.so` with `video_driver_disp_frame()`;
 - wrapper main sets `LD_LIBRARY_PATH`, changes into this directory, loads
   `dosbox.conf`, and writes `dosbox.stdout.log` / `dosbox.stderr.log`;
+- `dosbox.stderr.log` includes the first 30 frame-present summaries for
+  display debugging;
 - no R36SX on-screen keyboard yet;
 - no R36SX disk/key preset menus yet;
 - conservative `dosbox.conf` with a small mounted `drive_c` folder.

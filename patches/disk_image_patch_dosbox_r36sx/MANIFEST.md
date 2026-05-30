@@ -18,6 +18,10 @@ R36SX/SF3000 MIPS Linux firmware. It links against the firmware SDL 1.2
 runtime, but also mirrors every DOSBox `GFX_EndUpdate()` surface to
 `/mnt/sdcard/cubegm/driver.so` as a 640x480 RGB565 framebuffer.
 
+This revision forces RGB SDL output instead of 8bpp paletted output for the
+mirrored video path, and logs the first 30 frame presents to
+`dosbox.stderr.log`.
+
 It does not yet contain the Pico-286 style R36SX menu overlays or on-screen
 keyboard.
 
@@ -38,7 +42,7 @@ These libraries are present in the inspected firmware image.
 Current binary:
 
 ```text
-size:   8031028 bytes
-sha256: E43BC187D7373D117080675A35FDC5ED5B4829B22DF0EE8973DEFE12113B8FBF
+size:   8032184 bytes
+sha256: A94F7C4BFA20C6B38FF218FE799FAEA371251301BF3A8D354BF09514E1228B7D
 scan:   Microsoft Defender found no threats
 ```

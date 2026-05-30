@@ -39,6 +39,12 @@ as a 640x480 RGB565 frame. This is the same final presentation route used by
 Pico-286 and the native apps, and avoids relying on the firmware SDL video
 backend to make the frame visible.
 
+The R36SX build also forces DOSBox away from 8bpp paletted SDL output and into
+RGB output before the `driver.so` mirror. On the device, the palette path can
+show only the blinking VGA cursor while normal shell text stays invisible. The
+first 30 mirrored frames are summarized in `dosbox.stderr.log` with surface
+size, bpp, non-black pixel count, and bounding box.
+
 Next steps are:
 
 - route input through the same raw `cube_ioctl()`/joy shared-memory path used by

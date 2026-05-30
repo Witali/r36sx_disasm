@@ -244,6 +244,7 @@ struct R36SX_DriverVideo {
 	r36sx_video_driver_disp_frame_fn disp_frame;
 	r36sx_video_driver_deinit_fn deinit;
 	uint16_t *frame;
+	unsigned int present_count;
 	bool active;
 	bool tried;
 };
@@ -375,6 +376,11 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 		return;
 
 	bool locked=false;
+	unsigned int nonblack=0;
+	int minx=R36SX_SCREEN_WIDTH;
+	int miny=R36SX_SCREEN_HEIGHT;
+	int maxx=-1;
+	int maxy=-1;
 	if (SDL_MUSTLOCK(surface)) {
 		if (SDL_LockSurface(surface) != 0)
 			return;
@@ -391,12 +397,40 @@ static void R36SX_PresentSurface(SDL_Surface *surface) {
 			uint8_t r,g,b;
 			uint32_t pixel=R36SX_ReadSurfacePixel(surface,sx,sy);
 			SDL_GetRGB(pixel,surface->format,&r,&g,&b);
-			dst[x]=R36SX_RGB888ToRGB565(r,g,b);
+			uint16_t out=R36SX_RGB888ToRGB565(r,g,b);
+			dst[x]=out;
+			if (out != 0) {
+				nonblack++;
+				if (x < minx) minx=x;
+				if (y < miny) miny=y;
+				if (x > maxx) maxx=x;
+				if (y > maxy) maxy=y;
+			}
 		}
 	}
 
 	if (locked)
 		SDL_UnlockSurface(surface);
+
+	if (r36sx_video.present_count < 30) {
+		fprintf(stderr,
+		        "r36sx_video: present #%u surface=%dx%d bpp=%d pitch=%d clip=%d,%d %dx%d nonblack=%u bbox=%d,%d..%d,%d\n",
+		        r36sx_video.present_count,
+		        surface->w,
+		        surface->h,
+		        surface->format ? surface->format->BitsPerPixel : 0,
+		        surface->pitch,
+		        sdl.clip.x,
+		        sdl.clip.y,
+		        sdl.clip.w,
+		        sdl.clip.h,
+		        nonblack,
+		        minx,
+		        miny,
+		        maxx,
+		        maxy);
+	}
+	r36sx_video.present_count++;
 
 	r36sx_video.disp_frame(r36sx_video.frame,
 	                       R36SX_SCREEN_WIDTH,
@@ -555,6 +589,15 @@ Bitu GFX_GetBestMode(Bitu flags) {
 	switch (sdl.desktop.want_type) {
 	case SCREEN_SURFACE:
 check_surface:
+		/* The R36SX path mirrors the SDL surface into driver.so as RGB565.
+		 * Avoid 8bpp paletted SDL surfaces: the firmware SDL palette path can
+		 * make DOS text invisible while the hardware cursor still blinks. */
+		flags &= ~(GFX_CAN_8|GFX_LOVE_8);
+		if ((flags & (GFX_LOVE_15|GFX_LOVE_16|GFX_LOVE_32)) == 0) {
+			if (flags & GFX_CAN_16) flags |= GFX_LOVE_16;
+			else if (flags & GFX_CAN_32) flags |= GFX_LOVE_32;
+			else if (flags & GFX_CAN_15) flags |= GFX_LOVE_15;
+		}
 		flags &= ~GFX_LOVE_8;		//Disable love for 8bpp modes
 		/* Check if we can satisfy the depth it loves */
 		if (flags & GFX_LOVE_8) testbpp=8;
