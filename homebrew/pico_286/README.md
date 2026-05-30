@@ -23,6 +23,7 @@ integration pieces:
   - `r36sx_ports.c`
   - `r36sx_disk_config.c`
   - `r36sx_disk_config.h`
+  - `network-redirector.c.inl`
   - `disks-win32.c.inl`
 - `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
   lower-right corner when the emulator reads or writes disk image sectors.  In
@@ -66,6 +67,9 @@ directory is only for compiler output:
   `81h`.  The same config also controls the optional on-screen keyboard cursor
   block.  If the file is absent, it falls back to the legacy internal disk
   names `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
+- `network-redirector.c.inl` overrides the upstream host filesystem redirector
+  so DOS drive `H:` maps to the configured `host_drive_path` instead of the
+  upstream Linux default `/tmp`.
 - `EXE_README.md` is the short user-facing control guide copied next to the
   `pico_286` executable on the SD-card filesystem.
 - `disks-win32.c.inl` is copied into `obj/` and patched so sector reads and
@@ -205,6 +209,9 @@ screenshot_format=png
 [stats]
 app_stats_enabled=1
 
+[host_drive]
+host_drive_path=host
+
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
@@ -254,6 +261,13 @@ two-column overlay above the disk LED.  It shows decoded x86 instruction loops
 in K/s, host disk image read/write KB/s, and presented FPS.  Set it to `0` to
 disable the shortcut and overlay.
 
+`host_drive_path` is the R36SX host directory exposed to DOS as network drive
+`H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are
+resolved next to `pico_286.conf`, so the default `host` means
+`MIPS_NATIVE/pico_286/host` on the SD card.  DOS still needs to run
+`MAPDRIVE.COM` once after boot, and `CONFIG.SYS` must contain `LASTDRIVE=H` or
+higher so DOS allocates a CDS entry for drive `H:`.
+
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,
 which lets the embedded Turbo XT BIOS stop at its boot prompt.  The ROM does
@@ -269,8 +283,7 @@ directory unless absolute paths are used.  Leaving a value empty disables that
 drive.  If `pico_286.conf` is missing, the same four default filenames are
 used from the legacy internal fallback (`fdd0.img`, `fdd1.img`, `hdd.img`,
 `hdd2.img`).  Additional FreeDOS package images can be placed in the same
-directory and selected through the disk image menu.  The upstream network
-redirector still maps DOS drive H: to `/tmp/`.
+directory and selected through the disk image menu.
 
 `hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
 `cylinders,heads,sectors` order.  The current bundled hard disk images are

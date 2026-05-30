@@ -43,6 +43,12 @@ void r36sx_pico286_set_disk_value(uint8_t bios_drive, const char *value);
 // Return the directory that contains pico_286.conf, or an empty string.
 const char *r36sx_pico286_config_dir(void);
 
+// Return the host filesystem directory exposed through DOS network drive H:.
+const char *r36sx_pico286_host_drive_path(void);
+
+// Return the configured host drive value as written to pico_286.conf.
+const char *r36sx_pico286_host_drive_value(void);
+
 // Write the current Pico-286 configuration back to pico_286.conf.
 int r36sx_pico286_save_config(void);
 

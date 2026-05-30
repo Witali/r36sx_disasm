@@ -30,6 +30,7 @@ static inline void r36sx_app_stats_record_x86(uint32_t instructions)
 #include "r36sx_disk_config.h"
 #include "r36sx_app_stats.h"
 #include "disks-win32.c.inl"
+#define R36SX_PICO286_HOST_DRIVE_CONFIG 1
 #include "network-redirector.c.inl"
 
 #endif

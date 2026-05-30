@@ -109,6 +109,9 @@ screenshot_format=png
 [stats]
 app_stats_enabled=1
 
+[host_drive]
+host_drive_path=host
+
 [disk_cache]
 disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
@@ -155,6 +158,11 @@ Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
 instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
 Set it to `0` to disable the shortcut and overlay.
+
+Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
+Relative paths are resolved next to `pico_286.conf`; the default `host` maps
+to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
+after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,

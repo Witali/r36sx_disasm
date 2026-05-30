@@ -19,6 +19,8 @@ The default key preset maps physical buttons like this:
 
 These mappings can be changed in the key preset editor.  There is no
 Select+Start exit shortcut; use Fn+X or the long Fn hold described below.
+Held mapped keys auto-repeat after a short delay, except modifier keys such as
+Shift, Ctrl, and Alt.
 
 ## Fn Shortcuts
 
@@ -46,12 +48,14 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 - D-pad: move between keys.
 - Hold D-pad: repeat movement after a short delay.
+- L or R: switch between the normal keyboard and symbol keyboard.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.
 - Y: Enter.
 - Select: close the keyboard.
 
+Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
 DOS keyboard does not show the right-side cursor-key block; that block is only
 shown by the key picker inside the preset editor.  The keyboard panel is drawn
@@ -85,6 +89,8 @@ stdio buffer controlled by:
 
 ```text
 [cpu]
+cpu_model=80386
+cpu_mode=real
 cpu_mhz=32.768
 
 [boot]
@@ -102,6 +108,9 @@ screenshot_format=png
 
 [stats]
 app_stats_enabled=1
+
+[host_drive]
+host_drive_path=host
 
 [disk_cache]
 disk_cache_buffer_kb=64
@@ -123,6 +132,12 @@ hdd1=hdd2.img
 hdd1_geometry=65,16,63
 ```
 
+`cpu_model` can be `8086`, `80286`, or `80386`.  The default is `80386`.
+Instructions above the selected model raise `INT 6`; 386-only real-mode
+features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, and
+`PUSHAD`/`POPAD` require `cpu_model=80386`.  Full protected-mode execution is
+still WIP, so keep `cpu_mode=real` for normal DOS use.
+
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
@@ -143,6 +158,11 @@ Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
 instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
 Set it to `0` to disable the shortcut and overlay.
+
+Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
+Relative paths are resolved next to `pico_286.conf`; the default `host` maps
+to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
+after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,

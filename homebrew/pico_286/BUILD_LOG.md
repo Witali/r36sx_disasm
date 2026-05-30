@@ -1,5 +1,49 @@
 # pico-286 Build Log
 
+## 2026-05-30 configurable DOS host drive H:
+
+Implemented the R36SX side of Pico-286's upstream host filesystem passthrough.
+The bundled network redirector still uses the DOS `INT 2Fh/11h` interface, but
+its host base directory is now read from `pico_286.conf` instead of the
+upstream Linux default `/tmp`.
+
+New config section:
+
+```ini
+[host_drive]
+host_drive_path=host
+```
+
+Relative paths are resolved next to `pico_286.conf`, so the default maps DOS
+drive `H:` to `MIPS_NATIVE/pico_286/host` on the SD card.  The directory is
+created on startup when possible.  DOS still has to run upstream
+`MAPDRIVE.COM` after boot to mark `H:` as a network drive, and `CONFIG.SYS`
+must set `LASTDRIVE=H` or higher.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,091,492 bytes
+- SHA256: `43CBA5D04F6F62037B922EADA6E56D93B3724C2C4C406785A925B395D3941A11`
+- Defender scan: found no threats in all three updated copies
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 default 80386 compatibility mode
 
 The R36SX Pico-286 port now defaults to `cpu_model=80386` when no config file

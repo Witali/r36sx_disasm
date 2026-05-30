@@ -1,9 +1,11 @@
 #include "r36sx_disk_config.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define R36SX_PICO286_CONFIG_PATH "pico_286.conf"
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
@@ -52,6 +54,8 @@ static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
 static char boot_mode_text[32] = "normal";
 static char boot_order_text[64] = "fdd0,hdd0";
+static char host_drive_value[R36SX_PICO286_MAX_DISK_PATH] = "host";
+static char host_drive_path[R36SX_PICO286_MAX_DISK_PATH] = "host";
 static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
 static char disk_cache_buffer_kb_text[16] = "64";
 static char disk_cache_flush_sectors_text[16] = "4";
@@ -205,6 +209,21 @@ static int is_absolute_path(const char *path)
            (isalpha((unsigned char)path[0]) && path[1] == ':');
 }
 
+static void resolve_config_relative_path(char *dest, size_t dest_size,
+                                         const char *value)
+{
+    if (!dest || dest_size == 0) {
+        return;
+    }
+
+    if (!value || value[0] == '\0' || is_absolute_path(value) ||
+        disk_config_dir[0] == '\0') {
+        snprintf(dest, dest_size, "%s", value ? value : "");
+    } else {
+        snprintf(dest, dest_size, "%s/%s", disk_config_dir, value);
+    }
+}
+
 static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
                                  const char *value)
 {
@@ -213,14 +232,31 @@ static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
     }
 
     snprintf(entry->value, sizeof(entry->value), "%s", value ? value : "");
-    if (entry->value[0] == '\0' || is_absolute_path(entry->value) ||
-        disk_config_dir[0] == '\0') {
-        snprintf(entry->path, sizeof(entry->path), "%s", entry->value);
-    } else {
-        snprintf(entry->path, sizeof(entry->path), "%s/%s", disk_config_dir,
-                 entry->value);
-    }
+    resolve_config_relative_path(entry->path, sizeof(entry->path),
+                                 entry->value);
     entry->configured = 1;
+}
+
+static void set_host_drive_value(const char *value)
+{
+    snprintf(host_drive_value, sizeof(host_drive_value), "%s",
+             value ? value : "");
+    resolve_config_relative_path(host_drive_path, sizeof(host_drive_path),
+                                 host_drive_value);
+}
+
+static void ensure_host_drive_dir(void)
+{
+    if (host_drive_path[0] == '\0') {
+        return;
+    }
+
+    if (mkdir(host_drive_path, 0777) == 0 || errno == EEXIST) {
+        return;
+    }
+
+    r36sx_pico286_debug_log("diskcfg: host drive mkdir failed path='%s' errno=%d",
+                            host_drive_path, errno);
 }
 
 static void set_config_dir(const char *config_path)
@@ -248,6 +284,7 @@ static void set_config_dir(const char *config_path)
     for (size_t i = 0; i < sizeof(disk_entries) / sizeof(disk_entries[0]); i++) {
         set_disk_entry_value(&disk_entries[i], disk_entries[i].value);
     }
+    set_host_drive_value(host_drive_value);
 }
 
 static int set_cpu_mhz(const char *value, int line_no)
@@ -774,6 +811,17 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
     }
+    if (key_equals(key, "host_drive_path") ||
+        key_equals(key, "host_path") ||
+        key_equals(key, "host_dir") ||
+        key_equals(key, "shared_dir") ||
+        key_equals(key, "drive_h") ||
+        key_equals(key, "drive_h_path")) {
+        set_host_drive_value(value);
+        r36sx_pico286_debug_log("diskcfg: host_drive_path='%s'",
+                                host_drive_path);
+        return 1;
+    }
     if (set_disk_cache_value(key, value, line_no)) {
         return 1;
     }
@@ -839,6 +887,7 @@ static void load_disk_config(void)
     if (!fp) {
         r36sx_pico286_debug_log("diskcfg: %s not found; using built-in defaults",
                                 R36SX_PICO286_CONFIG_PATH);
+        ensure_host_drive_dir();
         return;
     }
 
@@ -870,6 +919,7 @@ static void load_disk_config(void)
     }
 
     fclose(fp);
+    ensure_host_drive_dir();
 }
 
 const char *r36sx_pico286_disk_path(uint8_t bios_drive, const char *fallback_path)
@@ -926,6 +976,20 @@ const char *r36sx_pico286_config_dir(void)
     load_disk_config();
 
     return disk_config_dir;
+}
+
+const char *r36sx_pico286_host_drive_path(void)
+{
+    load_disk_config();
+
+    return host_drive_path;
+}
+
+const char *r36sx_pico286_host_drive_value(void)
+{
+    load_disk_config();
+
+    return host_drive_value;
 }
 
 int r36sx_pico286_save_config(void)
@@ -992,6 +1056,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
     fprintf(fp, "[stats]\n");
     fprintf(fp, "app_stats_enabled=%s\n\n", app_stats_enabled_text);
+
+    fprintf(fp, "# Host filesystem directory exposed to DOS as network drive H:.\n");
+    fprintf(fp, "# Relative paths are resolved next to pico_286.conf.\n");
+    fprintf(fp, "# DOS must run MAPDRIVE.COM after boot; CONFIG.SYS needs LASTDRIVE=H or higher.\n");
+    fprintf(fp, "[host_drive]\n");
+    fprintf(fp, "host_drive_path=%s\n\n", host_drive_value);
 
     fprintf(fp, "# BIOS floppy drives 00h and 01h, DOS A: and B:.\n");
     fprintf(fp, "[floppy_drives]\n");
