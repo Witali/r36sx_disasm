@@ -1928,7 +1928,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
         /* GNU labels-as-values remove the large opcode switch from the hot path. */
         static void *const r36sx_opcode_dispatch[256] = {
             &&r36sx_opcode_00, &&r36sx_opcode_01, &&r36sx_opcode_02, &&r36sx_opcode_03, &&r36sx_opcode_04, &&r36sx_opcode_05, &&r36sx_opcode_06, &&r36sx_opcode_07,
-            &&r36sx_opcode_08, &&r36sx_opcode_09, &&r36sx_opcode_0A, &&r36sx_opcode_0B, &&r36sx_opcode_0C, &&r36sx_opcode_0D, &&r36sx_opcode_0E, &&r36sx_opcode_default,
+            &&r36sx_opcode_08, &&r36sx_opcode_09, &&r36sx_opcode_0A, &&r36sx_opcode_0B, &&r36sx_opcode_0C, &&r36sx_opcode_0D, &&r36sx_opcode_0E, &&r36sx_opcode_0F,
             &&r36sx_opcode_10, &&r36sx_opcode_11, &&r36sx_opcode_12, &&r36sx_opcode_13, &&r36sx_opcode_14, &&r36sx_opcode_15, &&r36sx_opcode_16, &&r36sx_opcode_17,
             &&r36sx_opcode_18, &&r36sx_opcode_19, &&r36sx_opcode_1A, &&r36sx_opcode_1B, &&r36sx_opcode_1C, &&r36sx_opcode_1D, &&r36sx_opcode_1E, &&r36sx_opcode_1F,
             &&r36sx_opcode_20, &&r36sx_opcode_21, &&r36sx_opcode_22, &&r36sx_opcode_23, &&r36sx_opcode_24, &&r36sx_opcode_25, &&r36sx_opcode_default, &&r36sx_opcode_27,
@@ -2151,21 +2151,19 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 push(CPU_CS);
                 break;
 
-#ifdef CPU_8086 //only the 8086/8088 does this.
             case 0xF:
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_0F: ;
 #endif
+#ifdef CPU_8086 //only the 8086/8088 does this.
                 //0F POP CS
                 CPU_CS = pop();
-                break;
 #else
-                /*
-                            case 0xF:
-                                // 286 protected mode
-                            break;
-                */
+                /* 286+: 0F is not CPUID yet; report invalid opcode for CPU probes. */
+                CPU_IP = firstip;
+                intcall86(6);
 #endif
+                break;
 
             case 0x10:
 #if R36SX_CPU_COMPUTED_GOTO

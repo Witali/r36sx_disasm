@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-30 opcode 0F invalid-opcode handling
+
+CPUID is intentionally not implemented for the emulated 286-class CPU.  The
+bug was that opcode `0F` was routed to a no-op default path, so a CPU probe
+executing `0F A2` did not get the expected invalid-opcode exception and then
+mis-decoded `A2` as a standalone instruction.
+
+The CPU core now routes opcode `0F` to a real handler in both switch and
+computed-goto dispatch.  In non-8086 builds it restores `IP` to the faulting
+opcode and raises `INT 6`, matching the behavior CPU detector programs expect
+when probing for unsupported CPUID/386+ instructions.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,019,272 bytes
+- SHA256: `04F7A40008CC059DFD9EA3FA7378F362480CF70A754CBDC883188225CEA70B39`
+- Defender scan: found no threats in the updated deployed copies
+- `homebrew/pico_286/pico_286` has the same SHA256 as the scanned deployed
+  copies
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 configurable emulated memory sizes
 
 Added a `[memory]` section to `pico_286.conf`:
