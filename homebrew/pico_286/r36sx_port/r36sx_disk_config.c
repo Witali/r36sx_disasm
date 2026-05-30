@@ -47,7 +47,7 @@ static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
 static char disk_config_path[R36SX_PICO286_MAX_DISK_PATH] =
     R36SX_PICO286_CONFIG_PATH;
-static char cpu_model_text[16] = "80286";
+static char cpu_model_text[16] = "80386";
 static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
 static char boot_mode_text[32] = "normal";
@@ -65,7 +65,7 @@ static char upper_memory_kb_text[16] = "176";
 static char extended_memory_kb_text[16] = "64";
 static char xms_memory_kb_text[16] = "4096";
 static uint32_t cpu_exec_loops = 0;
-static r36sx_pico286_cpu_model_t cpu_model = R36SX_PICO286_CPU_80286;
+static r36sx_pico286_cpu_model_t cpu_model = R36SX_PICO286_CPU_80386;
 static r36sx_pico286_cpu_mode_t cpu_mode = R36SX_PICO286_CPU_MODE_REAL;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
@@ -945,6 +945,8 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
 
     fprintf(fp, "# CPU compatibility model: 8086, 80286, or 80386.\n");
+    fprintf(fp, "# Higher-generation instructions are accepted only when the selected\n");
+    fprintf(fp, "# model supports them; unsupported opcodes raise INT 6.\n");
     fprintf(fp, "# cpu_mode=real is the normal PC boot mode. cpu_mode=protected is\n");
     fprintf(fp, "# parsed for experiments; full protected-mode execution is still WIP.\n");
     fprintf(fp, "# CPU speed knob maps to exec86 loops per host scheduler slice.\n");

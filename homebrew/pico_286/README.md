@@ -185,6 +185,8 @@ devices:
 
 ```ini
 [cpu]
+cpu_model=80386
+cpu_mode=real
 cpu_mhz=32.768
 
 [boot]
@@ -217,6 +219,14 @@ hdd0_geometry=65,16,63
 hdd1=hdd2.img
 hdd1_geometry=65,16,63
 ```
+
+`cpu_model` selects the emulated instruction compatibility level: `8086`,
+`80286`, or `80386`.  The default is `80386`.  Instructions above the selected
+model are rejected with `INT 6`; for example, `66h`/`67h` operand/address-size
+overrides and `FS`/`GS` segment forms require `cpu_model=80386`, while
+80186+ opcodes such as `PUSHA`, `ENTER`, and immediate `PUSH` are rejected in
+`cpu_model=8086`.  The 386 mode currently targets real-mode DOS programs and
+CPU probes; full protected-mode execution is still WIP.
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per

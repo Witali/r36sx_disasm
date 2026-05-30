@@ -662,6 +662,17 @@ static INLINE uint16_t pop() {
     return tempval;
 }
 
+static INLINE void push32(uint32_t pushval) {
+    CPU_SP = CPU_SP - 4;
+    putmem32(CPU_SS, CPU_SP, pushval);
+}
+
+static INLINE uint32_t pop32(void) {
+    uint32_t tempval = getmem32(CPU_SS, CPU_SP);
+    CPU_SP = CPU_SP + 4;
+    return tempval;
+}
+
 static INLINE uint32_t readrm32(uint8_t rmval) {
     if (mode < 3) {
         getea(rmval);
@@ -715,7 +726,7 @@ static INLINE void writerm8(uint8_t rmval, uint8_t value) {
 
 static INLINE uint16_t makeflagsword(void) {
 #if CPU_386_EXTENDED_OPS
-    return 2 | x86_flags.value;
+    return (uint16_t)(2u | x86_flags.value);
 #else
     return 2 | (x86_flags.value & 0b111111010101);
 #endif
@@ -723,6 +734,15 @@ static INLINE uint16_t makeflagsword(void) {
 
 static INLINE void decodeflagsword(uint16_t x) {
     x86_flags.value = x;
+}
+
+static INLINE uint32_t makeflagsdword(void) {
+    /* 80386 EFLAGS: expose 386-era status/control bits, but not 486+ AC or CPUID ID. */
+    return 2u | (x86_flags.value & 0x00037FD7u);
+}
+
+static INLINE void decodeflagsdword(uint32_t x) {
+    x86_flags.value = 2u | (x & 0x00037FD7u);
 }
 
 #define R36SX_BIOS_TEXT_BASE 0x8000u
@@ -3301,6 +3321,18 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
+                if (operandSizeOverride) {
+                    uint32_t oldesp = CPU_ESP;
+                    push32(CPU_EAX);
+                    push32(CPU_ECX);
+                    push32(CPU_EDX);
+                    push32(CPU_EBX);
+                    push32(oldesp);
+                    push32(CPU_EBP);
+                    push32(CPU_ESI);
+                    push32(CPU_EDI);
+                    break;
+                }
                 oldsp = CPU_SP;
                 push(CPU_AX);
                 push(CPU_CX);
@@ -3319,6 +3351,17 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* 61 POPA (80186+) */
                 if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
                     r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
+                if (operandSizeOverride) {
+                    CPU_EDI = pop32();
+                    CPU_ESI = pop32();
+                    CPU_EBP = pop32();
+                    CPU_SP += 4;
+                    CPU_EBX = pop32();
+                    CPU_EDX = pop32();
+                    CPU_ECX = pop32();
+                    CPU_EAX = pop32();
                     break;
                 }
                 CPU_DI = pop();
@@ -4172,6 +4215,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_9C: ;
 #endif
                 /* 9C PUSHF */
+                if (operandSizeOverride) {
+                    push32(makeflagsdword());
+                    break;
+                }
                 push(makeflagsword());
                 break;
 
@@ -4180,6 +4227,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_9D: ;
 #endif
                 /* 9D POPF */
+                if (operandSizeOverride) {
+                    decodeflagsdword(pop32());
+                    break;
+                }
 #ifdef CPU_SET_HIGH_FLAGS
                 decodeflagsword(pop() | 0xF800);
 #else

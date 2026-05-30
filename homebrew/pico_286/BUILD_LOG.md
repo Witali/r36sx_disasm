@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-30 default 80386 compatibility mode
+
+The R36SX Pico-286 port now defaults to `cpu_model=80386` when no config file
+or `cpu_model` key is present.  The shipped configs in `homebrew`, `disk_image`,
+and `patches/disk_image_patch_pico_286` also set:
+
+```ini
+[cpu]
+cpu_model=80386
+cpu_mode=real
+```
+
+The config parser still accepts `8086`, `80286`, and `80386`.  The CPU decoder
+uses that model to reject higher-generation instructions with `INT 6`: 80186+
+opcodes remain blocked in `8086`, and 386-only prefixes/segment forms remain
+blocked unless `80386` is selected.  The 386 real-mode path now also handles
+operand-size overridden `PUSHFD`/`POPFD` and `PUSHAD`/`POPAD`, which are common
+in DOS CPU detection code.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1
+```
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,088,212 bytes
+- SHA256: `D95AE71E8C14DE73AFA18D2FD0C684FFCB374916E73EC3B93F911C22F1E04F49`
+- Defender scan: found no threats in all three updated copies
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 VGA register and memory model fixes
 
 Applied the first pass of VGA model fixes from the register/memory audit.
