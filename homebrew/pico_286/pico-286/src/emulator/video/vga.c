@@ -12,6 +12,7 @@ static uint8_t sequencer_register = 0;
 static uint8_t graphics_control_register = 0;
 
 static uint8_t color_index = 0, read_color_index = 0, vga_register;
+static uint8_t attribute_data_mode = 0;
 uint32_t vga_plane_offset = 0;
 uint8_t vga_planar_mode = 0;
 
@@ -488,8 +489,12 @@ void vga_init(void) {
     vga_update_gc_cache();
     vga_latch32 = 0;
     sequencer_register = graphics_control_register = 0;
+    attribute_data_mode = 0;
 }
 
+void vga_attribute_reset_flipflop(void) {
+    attribute_data_mode = 0;
+}
 
 void vga_portout(uint16_t portnum, uint16_t value) {
     //    http://www.techhelpmanual.com/900-video_graphics_array_i_o_ports.html
@@ -499,9 +504,7 @@ void vga_portout(uint16_t portnum, uint16_t value) {
     switch (portnum) {
         /* Attribute Address Register */
         case 0x3C0: {
-            static uint8_t data_mode = 0; // 0 -- address, 1 -- data
-
-            if (data_mode) {
+            if (attribute_data_mode) {
                 // Palette registers
                 if (vga_register <= 0x0f) {
                     const uint8_t r = (((value >> 2) & 1) << 1) + ((value >> 5) & 1);
@@ -521,7 +524,7 @@ void vga_portout(uint16_t portnum, uint16_t value) {
                 vga_register = value & 0b1111;
             }
 
-            data_mode ^= 1;
+            attribute_data_mode ^= 1;
             break;
         }
         // http://www.osdever.net/FreeVGA/vga/seqreg.htm
