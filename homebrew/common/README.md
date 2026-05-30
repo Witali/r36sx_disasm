@@ -61,6 +61,7 @@ Current physical button bindings while the keyboard is visible:
 
 - D-pad moves the highlighted key.
 - Holding a D-pad direction repeats movement after a short delay.
+- L or R switches between the normal layout and the symbol layout.
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Y sends Enter immediately.

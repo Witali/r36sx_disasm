@@ -105,6 +105,83 @@ static const struct r36sx_osk_key g_osk_row4[] = {
     { "CLOSE", 0, R36SX_OSK_FLAG_CLOSE }
 };
 
+static const struct r36sx_osk_key g_osk_symbol_row0[] = {
+    { "ESC", R36SX_SCREEN_KEY_ESCAPE, 0 },
+    { "!", '1', R36SX_OSK_FLAG_SHIFTED },
+    { "@", '2', R36SX_OSK_FLAG_SHIFTED },
+    { "#", '3', R36SX_OSK_FLAG_SHIFTED },
+    { "$", '4', R36SX_OSK_FLAG_SHIFTED },
+    { "%", '5', R36SX_OSK_FLAG_SHIFTED },
+    { "^", '6', R36SX_OSK_FLAG_SHIFTED },
+    { "&", '7', R36SX_OSK_FLAG_SHIFTED },
+    { "*", '8', R36SX_OSK_FLAG_SHIFTED },
+    { "(", '9', R36SX_OSK_FLAG_SHIFTED },
+    { ")", '0', R36SX_OSK_FLAG_SHIFTED },
+    { "_", R36SX_SCREEN_KEY_OEM_MINUS, R36SX_OSK_FLAG_SHIFTED },
+    { "BS", R36SX_SCREEN_KEY_BACK, 0 }
+};
+
+static const struct r36sx_osk_key g_osk_symbol_row1[] = {
+    { "TAB", R36SX_SCREEN_KEY_TAB, 0 },
+    { "~", R36SX_SCREEN_KEY_OEM_3, R36SX_OSK_FLAG_SHIFTED },
+    { "`", R36SX_SCREEN_KEY_OEM_3, 0 },
+    { "[", R36SX_SCREEN_KEY_OEM_4, 0 },
+    { "]", R36SX_SCREEN_KEY_OEM_6, 0 },
+    { "{", R36SX_SCREEN_KEY_OEM_4, R36SX_OSK_FLAG_SHIFTED },
+    { "}", R36SX_SCREEN_KEY_OEM_6, R36SX_OSK_FLAG_SHIFTED },
+    { "+", R36SX_SCREEN_KEY_OEM_PLUS, R36SX_OSK_FLAG_SHIFTED },
+    { "=", R36SX_SCREEN_KEY_OEM_PLUS, 0 },
+    { "|", R36SX_SCREEN_KEY_OEM_5, R36SX_OSK_FLAG_SHIFTED },
+    { "\\", R36SX_SCREEN_KEY_OEM_5, 0 },
+    { "?", R36SX_SCREEN_KEY_OEM_2, R36SX_OSK_FLAG_SHIFTED },
+    { "/", R36SX_SCREEN_KEY_OEM_2, 0 }
+};
+
+static const struct r36sx_osk_key g_osk_symbol_row2[] = {
+    { "CTRL", R36SX_SCREEN_KEY_CONTROL, R36SX_OSK_FLAG_CTRL_MOD },
+    { "<", R36SX_SCREEN_KEY_OEM_COMMA, R36SX_OSK_FLAG_SHIFTED },
+    { ">", R36SX_SCREEN_KEY_OEM_PERIOD, R36SX_OSK_FLAG_SHIFTED },
+    { ",", R36SX_SCREEN_KEY_OEM_COMMA, 0 },
+    { ".", R36SX_SCREEN_KEY_OEM_PERIOD, 0 },
+    { ";", R36SX_SCREEN_KEY_OEM_1, 0 },
+    { ":", R36SX_SCREEN_KEY_OEM_1, R36SX_OSK_FLAG_SHIFTED },
+    { "'", R36SX_SCREEN_KEY_OEM_7, 0 },
+    { "\"", R36SX_SCREEN_KEY_OEM_7, R36SX_OSK_FLAG_SHIFTED },
+    { "-", R36SX_SCREEN_KEY_OEM_MINUS, 0 },
+    { "ENT", R36SX_SCREEN_KEY_RETURN, 0 }
+};
+
+static const struct r36sx_osk_key g_osk_symbol_row3[] = {
+    { "SHF", R36SX_SCREEN_KEY_SHIFT, R36SX_OSK_FLAG_SHIFT_MOD },
+    { "#", '3', R36SX_OSK_FLAG_SHIFTED },
+    { "$", '4', R36SX_OSK_FLAG_SHIFTED },
+    { "%", '5', R36SX_OSK_FLAG_SHIFTED },
+    { "^", '6', R36SX_OSK_FLAG_SHIFTED },
+    { "&", '7', R36SX_OSK_FLAG_SHIFTED },
+    { "*", '8', R36SX_OSK_FLAG_SHIFTED },
+    { "<", R36SX_SCREEN_KEY_OEM_COMMA, R36SX_OSK_FLAG_SHIFTED },
+    { ">", R36SX_SCREEN_KEY_OEM_PERIOD, R36SX_OSK_FLAG_SHIFTED },
+    { "~", R36SX_SCREEN_KEY_OEM_3, R36SX_OSK_FLAG_SHIFTED },
+    { "`", R36SX_SCREEN_KEY_OEM_3, 0 },
+    { "SPC", R36SX_SCREEN_KEY_SPACE, 0 }
+};
+
+static const struct r36sx_osk_key g_osk_symbol_row4[] = {
+    { "F1", R36SX_SCREEN_KEY_F1 + 0, 0 },
+    { "F2", R36SX_SCREEN_KEY_F1 + 1, 0 },
+    { "F3", R36SX_SCREEN_KEY_F1 + 2, 0 },
+    { "F4", R36SX_SCREEN_KEY_F1 + 3, 0 },
+    { "F5", R36SX_SCREEN_KEY_F1 + 4, 0 },
+    { "F6", R36SX_SCREEN_KEY_F1 + 5, 0 },
+    { "F7", R36SX_SCREEN_KEY_F1 + 6, 0 },
+    { "F8", R36SX_SCREEN_KEY_F1 + 7, 0 },
+    { "F9", R36SX_SCREEN_KEY_F1 + 8, 0 },
+    { "F10", R36SX_SCREEN_KEY_F1 + 9, 0 },
+    { "ALT", R36SX_SCREEN_KEY_MENU, R36SX_OSK_FLAG_ALT_MOD },
+    { "DEL", R36SX_SCREEN_KEY_DELETE, 0 },
+    { "CLOSE", 0, R36SX_OSK_FLAG_CLOSE }
+};
+
 static const struct r36sx_osk_key g_osk_cursor_keys[] = {
     { R36SX_OSK_LABEL_UP, R36SX_SCREEN_KEY_UP, 0 },
     { R36SX_OSK_LABEL_LEFT, R36SX_SCREEN_KEY_LEFT, 0 },
@@ -122,6 +199,11 @@ static const struct r36sx_osk_key *const g_osk_rows[] = {
     g_osk_row0, g_osk_row1, g_osk_row2, g_osk_row3, g_osk_row4
 };
 
+static const struct r36sx_osk_key *const g_osk_symbol_rows[] = {
+    g_osk_symbol_row0, g_osk_symbol_row1, g_osk_symbol_row2,
+    g_osk_symbol_row3, g_osk_symbol_row4
+};
+
 static const uint8_t g_osk_row_counts[] = {
     R36SX_OSK_ARRAY_COUNT(g_osk_row0),
     R36SX_OSK_ARRAY_COUNT(g_osk_row1),
@@ -129,6 +211,27 @@ static const uint8_t g_osk_row_counts[] = {
     R36SX_OSK_ARRAY_COUNT(g_osk_row3),
     R36SX_OSK_ARRAY_COUNT(g_osk_row4)
 };
+
+static const uint8_t g_osk_symbol_row_counts[] = {
+    R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row0),
+    R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row1),
+    R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row2),
+    R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row3),
+    R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row4)
+};
+
+static const uint8_t *active_row_counts(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->symbol_mode ? g_osk_symbol_row_counts :
+        g_osk_row_counts;
+}
+
+static const struct r36sx_osk_key *const *active_rows(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->symbol_mode ? g_osk_symbol_rows : g_osk_rows;
+}
 
 static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -426,6 +529,7 @@ static void enter_cursor_block(struct r36sx_screen_keyboard *keyboard)
 
 static void leave_cursor_block(struct r36sx_screen_keyboard *keyboard)
 {
+    const uint8_t *counts = active_row_counts(keyboard);
     int row = R36SX_OSK_CURSOR_BLOCK_Y_ROW + (int)keyboard->row;
     int row_count = (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows);
 
@@ -434,7 +538,7 @@ static void leave_cursor_block(struct r36sx_screen_keyboard *keyboard)
     }
     keyboard->zone = R36SX_OSK_ZONE_MAIN;
     keyboard->row = (uint8_t)row;
-    keyboard->col = (uint8_t)(g_osk_row_counts[row] - 1);
+    keyboard->col = (uint8_t)(counts[row] - 1);
 }
 
 static void move_cursor_selection(struct r36sx_screen_keyboard *keyboard,
@@ -476,6 +580,7 @@ static void move_cursor_selection(struct r36sx_screen_keyboard *keyboard,
 static void move_main_selection(struct r36sx_screen_keyboard *keyboard, int dx,
                                 int dy)
 {
+    const uint8_t *counts = active_row_counts(keyboard);
     int row_count = (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows);
     int row = (int)keyboard->row + dy;
     int col = (int)keyboard->col + dx;
@@ -487,12 +592,12 @@ static void move_main_selection(struct r36sx_screen_keyboard *keyboard, int dx,
     }
 
     if (dy != 0) {
-        int max_col = (int)g_osk_row_counts[row] - 1;
+        int max_col = (int)counts[row] - 1;
         if (col > max_col) {
             col = max_col;
         }
     } else {
-        int count = (int)g_osk_row_counts[row];
+        int count = (int)counts[row];
         if (dx > 0 && keyboard->cursor_block && col >= count) {
             keyboard->row = (uint8_t)row;
             enter_cursor_block(keyboard);
@@ -674,6 +779,9 @@ static void handle_navigation(struct r36sx_screen_keyboard *keyboard,
 static const struct r36sx_osk_key *current_key(
     struct r36sx_screen_keyboard *keyboard)
 {
+    const struct r36sx_osk_key *const *rows = active_rows(keyboard);
+    const uint8_t *counts = active_row_counts(keyboard);
+
     normalize_cursor_selection(keyboard);
     if (keyboard->zone == R36SX_OSK_ZONE_CURSOR) {
         const struct r36sx_osk_key *key =
@@ -688,10 +796,10 @@ static const struct r36sx_osk_key *current_key(
     if (keyboard->row >= R36SX_OSK_ARRAY_COUNT(g_osk_rows)) {
         keyboard->row = 0;
     }
-    if (keyboard->col >= g_osk_row_counts[keyboard->row]) {
+    if (keyboard->col >= counts[keyboard->row]) {
         keyboard->col = 0;
     }
-    return &g_osk_rows[keyboard->row][keyboard->col];
+    return &rows[keyboard->row][keyboard->col];
 }
 
 static void update_press_animation(struct r36sx_screen_keyboard *keyboard,
@@ -730,9 +838,12 @@ static void start_keycode_press_animation(
     uint16_t keycode,
     uint32_t buttons)
 {
+    const struct r36sx_osk_key *const *rows = active_rows(keyboard);
+    const uint8_t *counts = active_row_counts(keyboard);
+
     for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
-        for (size_t col = 0; col < g_osk_row_counts[row]; col++) {
-            if (keycode_matches(g_osk_rows[row][col].keycode, keycode)) {
+        for (size_t col = 0; col < counts[row]; col++) {
+            if (keycode_matches(rows[row][col].keycode, keycode)) {
                 keyboard->press_zone = R36SX_OSK_ZONE_MAIN;
                 keyboard->press_row = (uint8_t)row;
                 keyboard->press_col = (uint8_t)col;
@@ -872,6 +983,7 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->shift = 0;
     keyboard->ctrl = 0;
     keyboard->alt = 0;
+    keyboard->symbol_mode = 0;
     keyboard->cursor_block = 0;
     keyboard->press_zone = R36SX_OSK_ZONE_MAIN;
     keyboard->press_row = 0;
@@ -883,6 +995,26 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->key_repeat_keycode = 0;
     keyboard->key_repeat_force_shift = 0;
     keyboard->key_repeat_next_us = 0;
+}
+
+static void toggle_symbol_mode(struct r36sx_screen_keyboard *keyboard)
+{
+    const uint8_t *counts;
+
+    if (!keyboard) {
+        return;
+    }
+    keyboard->symbol_mode ^= 1u;
+    keyboard->press_buttons = 0;
+    reset_nav_repeat(keyboard);
+    reset_key_repeat(keyboard);
+    if (keyboard->zone == R36SX_OSK_ZONE_MAIN &&
+        keyboard->row < R36SX_OSK_ARRAY_COUNT(g_osk_rows)) {
+        counts = active_row_counts(keyboard);
+        if (keyboard->col >= counts[keyboard->row]) {
+            keyboard->col = (uint8_t)(counts[keyboard->row] - 1);
+        }
+    }
 }
 
 int r36sx_screen_keyboard_is_visible(
@@ -902,6 +1034,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->shift = 0;
         keyboard->ctrl = 0;
         keyboard->alt = 0;
+        keyboard->symbol_mode = 0;
         keyboard->press_buttons = 0;
         reset_nav_repeat(keyboard);
         reset_key_repeat(keyboard);
@@ -973,6 +1106,9 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         return 0;
     }
     update_press_animation(keyboard, held);
+    if ((pressed & (R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R)) != 0) {
+        toggle_symbol_mode(keyboard);
+    }
     nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
     handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
@@ -1023,6 +1159,9 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
         return 0;
     }
     update_press_animation(keyboard, held);
+    if ((pressed & (R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R)) != 0) {
+        toggle_symbol_mode(keyboard);
+    }
     nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
     handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
@@ -1065,6 +1204,8 @@ void r36sx_screen_keyboard_draw(
     int height,
     int stride_pixels)
 {
+    const struct r36sx_osk_key *const *rows = active_rows(keyboard);
+    const uint8_t *counts = active_row_counts(keyboard);
     const int rows_h =
         (int)R36SX_OSK_ARRAY_COUNT(g_osk_rows) * R36SX_OSK_KEY_H +
         ((int)R36SX_OSK_ARRAY_COUNT(g_osk_rows) - 1) *
@@ -1099,18 +1240,20 @@ void r36sx_screen_keyboard_draw(
     fill_rect(frame, width, height, stride_pixels, panel_x + 1, panel_y + 1,
               panel_w - 2, R36SX_OSK_HEADER_H, header);
     draw_text(frame, width, height, stride_pixels, panel_x + 6, panel_y + 5,
-              "FN KBD  D-PAD MOVE  A/START TYPE  B BS  X ESC  Y ENT", text,
+              keyboard->symbol_mode ?
+              "FN KBD  L/R ABC  A/START TYPE  B BS  X ESC  Y ENT" :
+              "FN KBD  L/R SYM  A/START TYPE  B BS  X ESC  Y ENT", text,
               R36SX_OSK_TEXT_SCALE);
 
     for (size_t row = 0; row < R36SX_OSK_ARRAY_COUNT(g_osk_rows); row++) {
-        int count = g_osk_row_counts[row];
+        int count = counts[row];
         int row_w = count * main_key_w +
                     (count - 1) * R36SX_OSK_KEY_GAP;
         int x = content_x + (main_w - row_w) / 2;
         int y = keys_y +
                 (int)row * (R36SX_OSK_KEY_H + R36SX_OSK_KEY_GAP);
         for (int col = 0; col < count; col++) {
-            draw_key(keyboard, &g_osk_rows[row][col], frame, width, height,
+            draw_key(keyboard, &rows[row][col], frame, width, height,
                      stride_pixels, x, y, main_key_w,
                      keyboard->zone == R36SX_OSK_ZONE_MAIN &&
                      row == keyboard->row && col == keyboard->col,

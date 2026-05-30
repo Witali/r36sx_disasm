@@ -115,7 +115,10 @@ static const struct r36sx_key_choice g_choices[] = {
     { "COMMA", R36SX_SCREEN_KEY_OEM_COMMA },
     { "PERIOD", R36SX_SCREEN_KEY_OEM_PERIOD },
     { "SLASH", R36SX_SCREEN_KEY_OEM_2 },
+    { "GRAVE", R36SX_SCREEN_KEY_OEM_3 },
+    { "LBRACKET", R36SX_SCREEN_KEY_OEM_4 },
     { "BACKSLASH", R36SX_SCREEN_KEY_OEM_5 },
+    { "RBRACKET", R36SX_SCREEN_KEY_OEM_6 },
     { "QUOTE", R36SX_SCREEN_KEY_OEM_7 },
     { "COLON", R36SX_SCREEN_KEY_OEM_1 },
 };
@@ -862,7 +865,10 @@ static char name_char_for_keycode(uint16_t keycode)
     case R36SX_SCREEN_KEY_OEM_COMMA: return ',';
     case R36SX_SCREEN_KEY_OEM_PERIOD: return '.';
     case R36SX_SCREEN_KEY_OEM_2: return '/';
+    case R36SX_SCREEN_KEY_OEM_3: return '`';
+    case R36SX_SCREEN_KEY_OEM_4: return '[';
     case R36SX_SCREEN_KEY_OEM_5: return '\\';
+    case R36SX_SCREEN_KEY_OEM_6: return ']';
     case R36SX_SCREEN_KEY_OEM_7: return '\'';
     case R36SX_SCREEN_KEY_OEM_1: return ':';
     default: return '\0';

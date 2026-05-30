@@ -34,7 +34,10 @@ enum {
     R36SX_SCREEN_KEY_OEM_MINUS = 189,
     R36SX_SCREEN_KEY_OEM_PERIOD = 190,
     R36SX_SCREEN_KEY_OEM_2 = 191,
+    R36SX_SCREEN_KEY_OEM_3 = 192,
+    R36SX_SCREEN_KEY_OEM_4 = 219,
     R36SX_SCREEN_KEY_OEM_5 = 220,
+    R36SX_SCREEN_KEY_OEM_6 = 221,
     R36SX_SCREEN_KEY_OEM_7 = 222
 };
 
@@ -46,6 +49,7 @@ struct r36sx_screen_keyboard {
     uint8_t shift;
     uint8_t ctrl;
     uint8_t alt;
+    uint8_t symbol_mode;
     uint8_t cursor_block;
     uint8_t press_zone;
     uint8_t press_row;

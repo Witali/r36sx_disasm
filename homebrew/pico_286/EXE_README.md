@@ -48,6 +48,7 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 - D-pad: move between keys.
 - Hold D-pad: repeat movement after a short delay.
+- L or R: switch between the normal keyboard and symbol keyboard.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.

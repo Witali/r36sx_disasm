@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-30 on-screen keyboard symbol layout
+
+Added a second on-screen keyboard layout for DOS symbols and punctuation.
+
+- `L` or `R` toggles between the normal keyboard and the symbol keyboard while
+  the on-screen keyboard is visible.
+- The symbol layout includes shifted DOS/US-keyboard characters such as `!`,
+  `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `_`, `<`, `>`, `?`, `|`, and
+  `~`.
+- Added missing keycode/scancode support for the backtick/tilde key and the
+  bracket keys (`[`, `]`, `{`, `}`).
+- The key preset picker can also switch layouts with `L` or `R`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,062,020 bytes
+- SHA256: `B85E15CF6EABF28C44E92F0563443627BBB92407B21B25DF4E37C35C5CCCFF80`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 emulator key auto-repeat
 
 Added typematic-style auto-repeat for keys that are sent into the emulated PC:

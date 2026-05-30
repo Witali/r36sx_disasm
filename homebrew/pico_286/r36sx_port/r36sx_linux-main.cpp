@@ -778,8 +778,14 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // .
         case 191: scancode = 0x35;
             break; // / / ?
+        case 192: scancode = 0x29;
+            break; // ` / ~
+        case 219: scancode = 0x1A;
+            break; // [ / {
         case 220: scancode = 0x2B;
             break; // backslash / |
+        case 221: scancode = 0x1B;
+            break; // ] / }
         case 222: scancode = 0x28;
             break; // apostrophe / quote
         default: scancode = 0;
