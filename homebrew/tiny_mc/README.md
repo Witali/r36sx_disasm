@@ -16,8 +16,8 @@ MC is installed as `MIPS_NATIVE/tiny_mc/tiny_mc` and receives
 - Y: view the selected regular file as text, regardless of extension.
 - A or Start: enter a directory, view a configured text file, or run the
   selected executable.
-- In the text viewer, Up/Down scroll, Select pages up, A/Start pages down,
-  and Left/B returns to the file list.
+- In the text viewer, Up/Down scroll, Select switches text/hex dump view,
+  A/Start pages down, and Left/B returns to the file list.
 - Fn: close Tiny MC and `execl()` the stock `/mnt/sdcard/cubegm/icube`
   supervisor directly.
 
@@ -109,7 +109,9 @@ extensions opened by the built-in text viewer.
 Files matching `text_extensions` are shown as `[TXT]` in the list. Press
 `A`/`Start` to open those files automatically, or press `Y` on any regular
 file to force-open it as text. In the viewer, `Up`/`Down` scroll, `Select`
-pages up, `A`/`Start` pages down, and `Left`/`B` returns to the file list.
+switches between text and hex dump view, `A`/`Start` pages down, and `Left`/`B`
+returns to the file list. The hex dump shows 16 bytes per row with an ASCII
+column.
 
 ## Input model
 

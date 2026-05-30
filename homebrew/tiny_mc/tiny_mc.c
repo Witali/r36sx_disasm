@@ -330,15 +330,25 @@ struct app_config {
     int list_row_h;
 };
 
+enum {
+    TEXT_VIEWER_MODE_TEXT = 0,
+    TEXT_VIEWER_MODE_HEX = 1,
+    TEXT_VIEWER_HEX_BYTES_PER_ROW = 16
+};
+
 struct text_viewer_state {
     int active;
     char path[PATH_MAX];
     char title[MAX_NAME];
+    unsigned char *raw_buffer;
     char *buffer;
     char **lines;
     size_t byte_count;
     int line_count;
     int scroll;
+    int text_scroll;
+    int hex_scroll;
+    int mode;
     int truncated;
 };
 
@@ -2189,6 +2199,7 @@ static void text_viewer_release(void)
 {
     free(g_viewer.lines);
     free(g_viewer.buffer);
+    free(g_viewer.raw_buffer);
     memset(&g_viewer, 0, sizeof(g_viewer));
 }
 
@@ -2204,7 +2215,11 @@ static void text_viewer_close(void)
 static void text_viewer_clamp_scroll(void)
 {
     int rows = text_viewer_visible_rows();
-    int max_scroll = g_viewer.line_count - rows;
+    int total_rows = g_viewer.mode == TEXT_VIEWER_MODE_HEX ?
+        (int)((g_viewer.byte_count + TEXT_VIEWER_HEX_BYTES_PER_ROW - 1) /
+              TEXT_VIEWER_HEX_BYTES_PER_ROW) :
+        g_viewer.line_count;
+    int max_scroll = total_rows - rows;
 
     if (max_scroll < 0) {
         max_scroll = 0;
@@ -2215,6 +2230,11 @@ static void text_viewer_clamp_scroll(void)
     if (g_viewer.scroll > max_scroll) {
         g_viewer.scroll = max_scroll;
     }
+    if (g_viewer.mode == TEXT_VIEWER_MODE_HEX) {
+        g_viewer.hex_scroll = g_viewer.scroll;
+    } else {
+        g_viewer.text_scroll = g_viewer.scroll;
+    }
 }
 
 static int text_viewer_open(const char *path, const char *title)
@@ -2223,6 +2243,7 @@ static int text_viewer_open(const char *path, const char *title)
     struct stat st;
     size_t wanted = TEXT_VIEWER_MAX_BYTES;
     size_t total = 0;
+    unsigned char *raw_buffer;
     char *buffer;
     char **lines;
 
@@ -2240,26 +2261,26 @@ static int text_viewer_open(const char *path, const char *title)
         wanted = (size_t)st.st_size;
     }
 
-    buffer = (char *)malloc(wanted + 1);
+    raw_buffer = (unsigned char *)malloc(wanted + 1);
     lines = (char **)malloc(sizeof(char *) * TEXT_VIEWER_MAX_LINES);
-    if (!buffer || !lines) {
+    if (!raw_buffer || !lines) {
         close(fd);
         free(lines);
-        free(buffer);
+        free(raw_buffer);
         snprintf(g_status, sizeof(g_status), "Not enough memory for text viewer");
         log_msg("text viewer malloc failed for %s", path);
         return -1;
     }
 
     while (total < wanted) {
-        ssize_t rc = read(fd, buffer + total, wanted - total);
+        ssize_t rc = read(fd, raw_buffer + total, wanted - total);
         if (rc < 0) {
             if (errno == EINTR) {
                 continue;
             }
             close(fd);
             free(lines);
-            free(buffer);
+            free(raw_buffer);
             snprintf(g_status, sizeof(g_status), "Read failed: %s", strerror(errno));
             log_msg("text viewer read failed: %s: %s", path, strerror(errno));
             return -1;
@@ -2270,6 +2291,17 @@ static int text_viewer_open(const char *path, const char *title)
         total += (size_t)rc;
     }
     close(fd);
+    raw_buffer[total] = '\0';
+
+    buffer = (char *)malloc(total + 1);
+    if (!buffer) {
+        free(lines);
+        free(raw_buffer);
+        snprintf(g_status, sizeof(g_status), "Not enough memory for text viewer");
+        log_msg("text viewer text buffer malloc failed for %s", path);
+        return -1;
+    }
+    memcpy(buffer, raw_buffer, total);
     buffer[total] = '\0';
 
     int line_count = 0;
@@ -2293,11 +2325,15 @@ static int text_viewer_open(const char *path, const char *title)
     }
 
     g_viewer.active = 1;
+    g_viewer.raw_buffer = raw_buffer;
     g_viewer.buffer = buffer;
     g_viewer.lines = lines;
     g_viewer.byte_count = total;
     g_viewer.line_count = line_count;
     g_viewer.scroll = 0;
+    g_viewer.text_scroll = 0;
+    g_viewer.hex_scroll = 0;
+    g_viewer.mode = TEXT_VIEWER_MODE_TEXT;
     g_viewer.truncated =
         total == TEXT_VIEWER_MAX_BYTES ||
         (line_count >= TEXT_VIEWER_MAX_LINES && total > 0);
@@ -2308,6 +2344,54 @@ static int text_viewer_open(const char *path, const char *title)
     log_msg("text viewer open: path=%s bytes=%lu lines=%d truncated=%d",
             path, (unsigned long)total, line_count, g_viewer.truncated);
     return 0;
+}
+
+static void text_viewer_toggle_mode(void)
+{
+    if (g_viewer.mode == TEXT_VIEWER_MODE_HEX) {
+        g_viewer.hex_scroll = g_viewer.scroll;
+        g_viewer.mode = TEXT_VIEWER_MODE_TEXT;
+        g_viewer.scroll = g_viewer.text_scroll;
+        snprintf(g_status, sizeof(g_status), "Text view");
+    } else {
+        g_viewer.text_scroll = g_viewer.scroll;
+        g_viewer.mode = TEXT_VIEWER_MODE_HEX;
+        g_viewer.scroll = g_viewer.hex_scroll;
+        snprintf(g_status, sizeof(g_status), "Hex dump view");
+    }
+    text_viewer_clamp_scroll();
+    log_msg("text viewer mode=%s scroll=%d",
+            g_viewer.mode == TEXT_VIEWER_MODE_HEX ? "hex" : "text",
+            g_viewer.scroll);
+}
+
+static void format_hex_dump_row(char *out, size_t out_size, size_t offset)
+{
+    char hex[TEXT_VIEWER_HEX_BYTES_PER_ROW * 3 + 3];
+    char ascii[TEXT_VIEWER_HEX_BYTES_PER_ROW + 1];
+    size_t pos = 0;
+
+    for (int i = 0; i < TEXT_VIEWER_HEX_BYTES_PER_ROW; i++) {
+        size_t idx = offset + (size_t)i;
+        if (idx < g_viewer.byte_count) {
+            unsigned char b = g_viewer.raw_buffer[idx];
+            pos += (size_t)snprintf(hex + pos, sizeof(hex) - pos,
+                                    "%02X%s", b,
+                                    i == 7 ? "  " : " ");
+            ascii[i] = (b >= 32 && b < 127) ? (char)b : '.';
+        } else {
+            pos += (size_t)snprintf(hex + pos, sizeof(hex) - pos,
+                                    "  %s", i == 7 ? "  " : " ");
+            ascii[i] = ' ';
+        }
+        if (pos >= sizeof(hex)) {
+            pos = sizeof(hex) - 1;
+        }
+    }
+    hex[sizeof(hex) - 1] = '\0';
+    ascii[TEXT_VIEWER_HEX_BYTES_PER_ROW] = '\0';
+    snprintf(out, out_size, "%06lX  %s |%s|",
+             (unsigned long)offset, hex, ascii);
 }
 
 static void draw_text_viewer_ui(void)
@@ -2322,6 +2406,10 @@ static void draw_text_viewer_ui(void)
     int top = HEADER_H + LIST_TOP_OFFSET;
     int row_h = text_viewer_row_h();
     int rows = text_viewer_visible_rows();
+    int total_rows = g_viewer.mode == TEXT_VIEWER_MODE_HEX ?
+        (int)((g_viewer.byte_count + TEXT_VIEWER_HEX_BYTES_PER_ROW - 1) /
+              TEXT_VIEWER_HEX_BYTES_PER_ROW) :
+        g_viewer.line_count;
     char header[360];
     char footer[192];
 
@@ -2332,12 +2420,26 @@ static void draw_text_viewer_ui(void)
     fill_rect(0, g_fb.height - FOOTER_H, g_fb.width, FOOTER_H, band);
     fill_rect(0, g_fb.height - FOOTER_H, g_fb.width, 3, hi);
 
-    snprintf(header, sizeof(header), "VIEW %s", g_viewer.title);
+    snprintf(header, sizeof(header), "VIEW %s %s",
+             g_viewer.mode == TEXT_VIEWER_MODE_HEX ? "HEX" : "TEXT",
+             g_viewer.title);
     draw_text(12, 12, header, rgb565(250, 250, 245), 2, g_fb.width - 24);
     draw_text(12, HEADER_H + 4, g_viewer.path, muted, 1, g_fb.width - 24);
 
-    if (g_viewer.line_count == 0) {
-        draw_text(12, top, "[EMPTY TEXT FILE]", muted, 1, g_fb.width - 24);
+    if (total_rows == 0) {
+        draw_text(12, top, "[EMPTY FILE]", muted, 1, g_fb.width - 24);
+    } else if (g_viewer.mode == TEXT_VIEWER_MODE_HEX) {
+        for (int row = 0; row < rows; row++) {
+            int idx = g_viewer.scroll + row;
+            char line[96];
+            if (idx >= total_rows) {
+                break;
+            }
+            format_hex_dump_row(line, sizeof(line),
+                                (size_t)idx * TEXT_VIEWER_HEX_BYTES_PER_ROW);
+            draw_text(12, top + row * row_h, line, text, 1,
+                      g_fb.width - 36);
+        }
     } else {
         for (int row = 0; row < rows; row++) {
             int idx = g_viewer.scroll + row;
@@ -2349,16 +2451,23 @@ static void draw_text_viewer_ui(void)
         }
     }
 
-    draw_scrollbar_for(top, rows, g_viewer.line_count, g_viewer.scroll, row_h);
+    draw_scrollbar_for(top, rows, total_rows, g_viewer.scroll, row_h);
 
     snprintf(footer, sizeof(footer),
-             "UP/DOWN SCROLL  SELECT PGUP  A/START PGDN  LEFT/B BACK");
+             "UP/DOWN SCROLL  SELECT TEXT/HEX  A/START PGDN  LEFT/B BACK");
     draw_text(12, g_fb.height - FOOTER_H + 8, footer,
               rgb565(230, 240, 220), 1, g_fb.width - 24);
-    snprintf(footer, sizeof(footer), "Line %d/%d%s",
-             g_viewer.line_count > 0 ? g_viewer.scroll + 1 : 0,
-             g_viewer.line_count,
-             g_viewer.truncated ? "  TRUNCATED" : "");
+    if (g_viewer.mode == TEXT_VIEWER_MODE_HEX) {
+        size_t offset = (size_t)g_viewer.scroll * TEXT_VIEWER_HEX_BYTES_PER_ROW;
+        snprintf(footer, sizeof(footer), "Offset %06lX/%06lX%s",
+                 (unsigned long)offset, (unsigned long)g_viewer.byte_count,
+                 g_viewer.truncated ? "  TRUNCATED" : "");
+    } else {
+        snprintf(footer, sizeof(footer), "Line %d/%d%s",
+                 g_viewer.line_count > 0 ? g_viewer.scroll + 1 : 0,
+                 g_viewer.line_count,
+                 g_viewer.truncated ? "  TRUNCATED" : "");
+    }
     draw_text(12, g_fb.height - 17, footer,
               rgb565(220, 210, 180), 1, g_fb.width - 24);
 
@@ -2678,7 +2787,7 @@ static void handle_text_viewer_buttons(uint32_t buttons, uint32_t changed,
     }
 
     if ((changed & BTN_SELECT_BIT) != 0) {
-        g_viewer.scroll -= page;
+        text_viewer_toggle_mode();
         g_repeat_buttons = 0;
     } else if ((changed & (BTN_RIGHT_BIT | BTN_A_BIT | BTN_START_BIT)) != 0) {
         g_viewer.scroll += page;
