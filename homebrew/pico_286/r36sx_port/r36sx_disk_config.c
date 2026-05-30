@@ -959,10 +959,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
 
     fprintf(fp, "# Emulated memory sizes in KB, capped by the compiled buffers.\n");
-    fprintf(fp, "# conventional_kb is reported through the BIOS Data Area.\n");
-    fprintf(fp, "# extended_kb is reported by INT 15h AH=88h.\n");
-    fprintf(fp, "# upper_kb limits XMS UMB allocations from D000:0000 upward.\n");
-    fprintf(fp, "# xms_kb limits the built-in XMS handler.\n");
+    fprintf(fp, "# Allowed ranges:\n");
+    fprintf(fp, "# conventional_kb: 64..640, reported through the BIOS Data Area.\n");
+    fprintf(fp, "# upper_kb: 0..176, limits XMS UMB allocations from D000:0000 upward.\n");
+    fprintf(fp, "# extended_kb: 0..4096, reported by INT 15h AH=88h.\n");
+    fprintf(fp, "# xms_kb: 0..4096, limits the built-in XMS handler.\n");
     fprintf(fp, "[memory]\n");
     fprintf(fp, "conventional_kb=%s\n", conventional_memory_kb_text);
     fprintf(fp, "upper_kb=%s\n", upper_memory_kb_text);
