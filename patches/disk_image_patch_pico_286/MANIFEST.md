@@ -30,6 +30,17 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 centered screenshot toast
+
+The screenshot confirmation toast now appears centered on the screen.  The
+small screenshot preview remains inside the toast box below the status message.
+
+```text
+pico_286 size: 1009420 bytes
+pico_286 SHA256: 8738F3780244DAD130E7DAF70EA010AD6C10E9255FD49168CDD7D6330BB585B0
+Defender scan: found no threats
+```
+
 ## 2026-05-30 statistics x86 rate in K/s
 
 The `X86` row in the on-screen statistics table now displays thousands of

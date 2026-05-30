@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-05-30 centered screenshot toast
+
+The screenshot confirmation toast is now centered on the screen instead of
+being anchored in the upper-right corner.  The preview remains in the same
+toast box below the `SCREENSHOT SAVED` / `SCREENSHOT FAILED` message.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,009,420 bytes
+- SHA256: `8738F3780244DAD130E7DAF70EA010AD6C10E9255FD49168CDD7D6330BB585B0`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 statistics x86 rate in K/s
 
 The `X86` row in the on-screen statistics table now displays thousands of

@@ -689,13 +689,12 @@ static void r36sx_mfb_draw_screenshot_toast(uint16_t *target,
                                             uint32_t now_ms)
 {
     const char *message;
-    const int margin = 10;
     const int preview_pad = 6;
     const int text_h = 18;
     int box_w = R36SX_PICO286_SCREENSHOT_PREVIEW_W + preview_pad * 2;
     int box_h = text_h + R36SX_PICO286_SCREENSHOT_PREVIEW_H + preview_pad;
-    int x = g_mfb.width - box_w - margin;
-    int y = margin;
+    int x = (g_mfb.width - box_w) / 2;
+    int y = (g_mfb.height - box_h) / 2;
     int preview_x;
     int preview_y;
 
@@ -703,8 +702,11 @@ static void r36sx_mfb_draw_screenshot_toast(uint16_t *target,
         return;
     }
 
-    if (x < margin) {
-        x = margin;
+    if (x < 0) {
+        x = 0;
+    }
+    if (y < 0) {
+        y = 0;
     }
     message = g_mfb.screenshot_toast_success ?
               "SCREENSHOT SAVED" : "SCREENSHOT FAILED";
