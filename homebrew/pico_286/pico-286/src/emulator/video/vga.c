@@ -188,7 +188,7 @@ uint16_t __not_in_flash() vga_mem_read16(uint32_t address) {
 
     // Load two DWORDs from VRAM
     const uint32_t plane_lo = VIDEORAM[address];
-    const uint32_t plane_hi = VIDEORAM[address + 1];
+    const uint32_t plane_hi = VIDEORAM[(address + 1u) & 0xFFFFu];
 
     // VGA latches the last value read
     vga_latch32 = plane_hi;
@@ -375,8 +375,9 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
     const uint8_t logic = vga.logical_operation;
     const uint8_t wmode = vga.write_mode;
 
-    uint32_t *p0 = &VIDEORAM[address & 0xFFFFu];
-    uint32_t *p1 = p0 + 1;
+    const uint32_t index0 = address & 0xFFFFu;
+    uint32_t *p0 = &VIDEORAM[index0];
+    uint32_t *p1 = &VIDEORAM[(index0 + 1u) & 0xFFFFu];
 
     if (wmode == 1) {
         // Mode 1: latch -> enabled planes

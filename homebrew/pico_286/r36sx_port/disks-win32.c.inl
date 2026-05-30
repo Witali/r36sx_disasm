@@ -21,12 +21,17 @@ struct struct_drive {
     uint8_t readonly;
 } disk[4];
 
+static inline int normalize_disk_number(uint8_t *drivenum) {
+    if (*drivenum & 0x80) *drivenum -= 126;
+    return *drivenum < 4;
+}
+
 static inline void update_bios_disk_counts(void) {
     RAM[0x475] = (uint8_t)hdcount;  // BIOS Data Area: fixed disk count.
 }
 
 static inline void ejectdisk(uint8_t drivenum) {
-    if (drivenum & 0x80) drivenum -= 126;
+    if (!normalize_disk_number(&drivenum)) return;
 
     if (disk[drivenum].inserted) {
         r36sx_host_disk_close(&disk[drivenum].diskfile,
@@ -43,7 +48,10 @@ static inline void ejectdisk(uint8_t drivenum) {
 
 uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     uint8_t bios_drive = drivenum;
-    if (drivenum & 0x80) drivenum -= 126;  // Normalize hard drive numbers
+    if (!normalize_disk_number(&drivenum)) {
+        printf("DISK: ERROR: unsupported drive %02Xh\n", bios_drive);
+        return 0;
+    }
 
     r36sx_host_disk_cache_t cache;
     size_t size = 0;

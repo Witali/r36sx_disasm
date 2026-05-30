@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-30 memory bounds hardening
+
+Audited emulator memory access paths and fixed host-array boundary hazards:
+
+- RAM/UMB/HMA/BIOS fast word and dword paths now use direct casts only when
+  the whole access fits in the target region; boundary-crossing accesses fall
+  back to byte reads/writes.
+- A20-disabled high addresses wrap with a 20-bit mask instead of recursive
+  subtract-and-retry.
+- EMS page selectors are constrained to the configured EMS size, and EMS
+  word/dword accesses are assembled from bounded byte operations.
+- VGA planar 16-bit reads/writes wrap `0xffff + 1` inside the 64 KiB VGA
+  window instead of taking `VIDEORAM[0x10000]`.
+- Disk insertion/ejection rejects unsupported drive indices before indexing
+  `disk[4]`.
+- DOS network redirector SDA/SFT/DTA pointers are range-checked before direct
+  `RAM[]` access.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,079,216 bytes
+- SHA256: `89390CE019A88F8366E727D9FD18A151A4F182245BCA6D88195CB431B7ABA263`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 on-screen keyboard symbol layout
 
 Added a second on-screen keyboard layout for DOS symbols and punctuation.

@@ -30,6 +30,11 @@ FILE *open_files[MAX_FILES] = {0};
 // Current working directory for the remote drive (relative to HOST_BASE_DIR)
 char current_remote_dir[256] = "";
 
+static inline bool guest_ram_range_ok(uint32_t address, size_t bytes) {
+    return bytes == 0 ? address <= RAM_SIZE :
+           address < RAM_SIZE && bytes <= (size_t)(RAM_SIZE - address);
+}
+
 // Helper function to get a free file handle
 static inline int8_t get_free_handle() {
     for (int i = 0; i < MAX_FILES; i++) {
@@ -42,6 +47,15 @@ static inline int8_t get_free_handle() {
 
 // Helper to get full path from guest path
 static void get_full_path(char *dest, const char *guest_path) {
+    char guest_path_copy[128];
+    size_t copy_len = 0;
+    while (copy_len + 1 < sizeof(guest_path_copy) && guest_path[copy_len]) {
+        guest_path_copy[copy_len] = guest_path[copy_len];
+        copy_len++;
+    }
+    guest_path_copy[copy_len] = '\0';
+    guest_path = guest_path_copy;
+
     if (guest_path[1] == ':') {
         // Absolute path with drive letter (e.g., "H:\file.txt" or "H:\TOOLS\file.txt")
         const char *path_part = guest_path + 2; // Skip "H:"
@@ -49,21 +63,22 @@ static void get_full_path(char *dest, const char *guest_path) {
             path_part++; // Skip leading backslash, so "\TOOLS\file.txt" becomes "TOOLS\file.txt"
         }
         if (strlen(path_part) > 0) {
-            sprintf(dest, HOST_BASE_DIR "\\%s", path_part);
+            snprintf(dest, 256, HOST_BASE_DIR "\\%s", path_part);
         } else {
-            sprintf(dest, HOST_BASE_DIR);
+            snprintf(dest, 256, "%s", HOST_BASE_DIR);
         }
     } else if (guest_path[0] == '\\') {
         // Root-relative path (e.g., "\subdir\file.txt")
-        sprintf(dest, HOST_BASE_DIR "%s", guest_path);
+        snprintf(dest, 256, HOST_BASE_DIR "%s", guest_path);
     } else {
         // Relative path (e.g., "file.txt" or "subdir\file.txt")
         if (strlen(current_remote_dir) > 0) {
-            sprintf(dest, HOST_BASE_DIR "\\%s\\%s", current_remote_dir, guest_path);
+            snprintf(dest, 256, HOST_BASE_DIR "\\%s\\%s", current_remote_dir, guest_path);
         } else {
-            sprintf(dest, HOST_BASE_DIR "\\%s", guest_path);
+            snprintf(dest, 256, HOST_BASE_DIR "\\%s", guest_path);
         }
     }
+    dest[255] = '\0';
 #ifndef WIN32
     for (char *p = dest; *p; p++) {
         if (*p == '\\') {
@@ -154,6 +169,65 @@ typedef struct __attribute__((packed)) {
 } sftstruct;
 
 #define FIRST_FILENAME_OFFSET 0x9e
+#define SDA_MIN_SAFE_SIZE 0x300u
+
+static uint32_t sda_addr = 0;
+
+static inline sftstruct *guest_sft_ptr(void) {
+    const uint32_t address = ((uint32_t) CPU_ES << 4) + CPU_DI;
+    return guest_ram_range_ok(address, sizeof(sftstruct)) ?
+           (sftstruct *) &RAM[address] : NULL;
+}
+
+static inline bool guest_read_u16_ram(uint32_t address, uint16_t *value) {
+    if (!guest_ram_range_ok(address, 2u)) {
+        *value = 0;
+        return false;
+    }
+    *value = (uint16_t)RAM[address] | ((uint16_t)RAM[address + 1u] << 8);
+    return true;
+}
+
+static inline bool guest_dta_address(uint32_t *address) {
+    uint16_t dta_off = 0;
+    uint16_t dta_seg = 0;
+    if (!guest_read_u16_ram(sda_addr + 12u, &dta_off) ||
+        !guest_read_u16_ram(sda_addr + 14u, &dta_seg)) {
+        *address = 0;
+        return false;
+    }
+    *address = ((uint32_t)dta_seg << 4) + dta_off;
+    return true;
+}
+
+static inline const char *guest_sda_string(uint32_t offset,
+                                           char *buffer,
+                                           size_t buffer_size) {
+    uint32_t address = sda_addr + offset;
+    size_t copy_len = 0;
+
+    if (buffer_size == 0) {
+        return "";
+    }
+    if (offset >= SDA_MIN_SAFE_SIZE || address < sda_addr ||
+        !guest_ram_range_ok(address, 1u)) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+
+    while (copy_len + 1 < buffer_size && address + copy_len < RAM_SIZE &&
+           RAM[address + copy_len]) {
+        buffer[copy_len] = (char)RAM[address + copy_len];
+        copy_len++;
+    }
+    buffer[copy_len] = '\0';
+    return buffer;
+}
+
+static inline void guest_memory_error(void) {
+    CPU_AX = 8;
+    CPU_FL_CF = 1;
+}
 
 static inline bool redirector_handler() {
     char path[256];
@@ -170,9 +244,14 @@ static inline bool redirector_handler() {
  * Extended open mode          2E1h    Not supported
  */
 
-    static uint32_t sda_addr = 0;
     static sdbstruct *dta_ptr;
     static intptr_t handle = -1;
+
+    if (CPU_AX != 0x1100 &&
+        (!sda_addr || !guest_ram_range_ok(sda_addr, SDA_MIN_SAFE_SIZE))) {
+        guest_memory_error();
+        return true;
+    }
 
     switch (CPU_AX) {
         // Check if network redirector is installed
@@ -187,7 +266,9 @@ static inline bool redirector_handler() {
 
         // Remove Remote Directory
         case 0x1101: {
-            get_full_path(path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            char guest_path[128];
+            get_full_path(path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
             debug_log("Removing directory %s\n", path);
 
             const int result = rmdir(path); // TODO recursive remove
@@ -203,7 +284,9 @@ static inline bool redirector_handler() {
 
         // Create Remote Directory
         case 0x1103: {
-            get_full_path(path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            char guest_path[128];
+            get_full_path(path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
             debug_log("Creating directory %s\n", path);
             const int result = mkdir(path, 0777);
             if (result == 0) {
@@ -218,7 +301,9 @@ static inline bool redirector_handler() {
 
         // Change Remote Directory
         case 0x1105: {
-            const char *dos_path = &RAM[sda_addr + FIRST_FILENAME_OFFSET];
+            char dos_path_buf[128];
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
             debug_log("Change directory to: '%s'\n", dos_path);
 
             // Handle different path formats
@@ -227,11 +312,12 @@ static inline bool redirector_handler() {
                 strcpy(current_remote_dir, "");
             } else if (dos_path[0] == '\\') {
                 // Absolute path from root, remove leading backslash
-                strcpy(current_remote_dir, dos_path + 1);
+                snprintf(current_remote_dir, sizeof(current_remote_dir), "%s", dos_path + 1);
             } else {
                 // Relative path
-                strcpy(current_remote_dir, dos_path);
+                snprintf(current_remote_dir, sizeof(current_remote_dir), "%s", dos_path);
             }
+            current_remote_dir[sizeof(current_remote_dir) - 1] = '\0';
 
             debug_log("Current remote dir set to: '%s'\n", current_remote_dir);
             CPU_AX = 0;
@@ -243,7 +329,11 @@ static inline bool redirector_handler() {
         case 0x1107:
         // Close Remote File
         case 0x1106: {
-            sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
             const uint16_t file_handle = sftptr->file_handle;
             if (file_handle < MAX_FILES && open_files[file_handle]) {
                 fclose(open_files[file_handle]);
@@ -261,7 +351,11 @@ static inline bool redirector_handler() {
 
         // Read Remote File
         case 0x1108: {
-            sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
             const uint16_t file_handle = sftptr->file_handle; // We store our handle here
             if (file_handle < MAX_FILES && open_files[file_handle]) {
                 uint16_t bytes_to_read = CPU_CX;
@@ -275,7 +369,12 @@ static inline bool redirector_handler() {
                     break;
                 }
 
-                const uint32_t dta_addr = (*(uint16_t *) &RAM[sda_addr + 14] << 4) + *(uint16_t *) &RAM[sda_addr + 12];
+                uint32_t dta_addr = 0;
+                if (!guest_dta_address(&dta_addr) ||
+                    !guest_ram_range_ok(dta_addr, bytes_to_read)) {
+                    guest_memory_error();
+                    break;
+                }
                 size_t bytes_read = fread(&RAM[dta_addr], 1, bytes_to_read, open_files[file_handle]);
                 debug_log("bytes read %i at offset %ld -> %x\n", (int) bytes_read, sftptr->file_position, dta_addr);
 
@@ -293,7 +392,11 @@ static inline bool redirector_handler() {
 
         // Write Remote File
         case 0x1109: {
-            sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
             uint16_t file_handle = sftptr->file_handle; // We store our handle here
 
             if (file_handle < MAX_FILES && open_files[file_handle]) {
@@ -308,7 +411,12 @@ static inline bool redirector_handler() {
                     break;
                 }
 
-                const uint32_t dta_addr = (*(uint16_t *) &RAM[sda_addr + 14] << 4) + *(uint16_t *) &RAM[sda_addr + 12];
+                uint32_t dta_addr = 0;
+                if (!guest_dta_address(&dta_addr) ||
+                    !guest_ram_range_ok(dta_addr, bytes_to_write)) {
+                    guest_memory_error();
+                    break;
+                }
                 size_t bytes_written = fwrite(&RAM[dta_addr], 1, bytes_to_write, open_files[file_handle]);
                 debug_log("bytes written %i at offset %ld\n", (int) bytes_written, sftptr->file_position);
 
@@ -327,13 +435,16 @@ static inline bool redirector_handler() {
         // Rename Remote File
         case 0x1111: {
             char old_path[256], new_path[256];
+            char old_guest_path[128], new_guest_path[128];
 
             // Get old filename from first filename buffer in SDA
-            get_full_path(old_path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            get_full_path(old_path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, old_guest_path, sizeof(old_guest_path)));
 
             // Get new filename from second filename buffer in SDA (offset 0x16A for DOS 4+)
             // For DOS 3.x it's at offset 0x15E, but we'll use DOS 4+ layout
-            get_full_path(new_path, &RAM[sda_addr + 0x16A]);
+            get_full_path(new_path, guest_sda_string(
+                0x16A, new_guest_path, sizeof(new_guest_path)));
 
             debug_log("Renaming '%s' to '%s'\n", old_path, new_path);
 
@@ -350,7 +461,9 @@ static inline bool redirector_handler() {
 
         // Delete Remote File
         case 0x1113: {
-            get_full_path(path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            char guest_path[128];
+            get_full_path(path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
             int result = unlink(path);
             if (result == 0) {
                 CPU_AX = 0;
@@ -364,7 +477,9 @@ static inline bool redirector_handler() {
 
         // Open Existing File
         case 0x1116: {
-            const char *dos_path = &RAM[sda_addr + FIRST_FILENAME_OFFSET];
+            char dos_path_buf[128];
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
             get_full_path(path, dos_path);
             debug_log("Opening %s %s\n", dos_path, path);
 
@@ -382,7 +497,13 @@ static inline bool redirector_handler() {
                     const size_t file_size = ftell(open_files[file_handle]);
                     rewind(open_files[file_handle]);
 
-                    sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+                    sftstruct *sftptr = guest_sft_ptr();
+                    if (!sftptr) {
+                        fclose(open_files[file_handle]);
+                        open_files[file_handle] = NULL;
+                        guest_memory_error();
+                        break;
+                    }
 
                     // Extract just the filename from the path for SFT
                     const char *filename = strrchr(dos_path, '\\');
@@ -429,13 +550,21 @@ static inline bool redirector_handler() {
         case 0x1117: {
             const int8_t file_handle = get_free_handle();
             if (file_handle != -1) {
-                const char *dos_path = &RAM[sda_addr + FIRST_FILENAME_OFFSET];
+                char dos_path_buf[128];
+                const char *dos_path = guest_sda_string(
+                    FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
                 get_full_path(path, dos_path);
 
                 open_files[file_handle] = fopen(path, "wb+");
                 if (open_files[file_handle]) {
                     // Initialize SFT structure
-                    sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+                    sftstruct *sftptr = guest_sft_ptr();
+                    if (!sftptr) {
+                        fclose(open_files[file_handle]);
+                        open_files[file_handle] = NULL;
+                        guest_memory_error();
+                        break;
+                    }
 
                     // Extract just the filename from the path for SFT
                     const char *filename = strrchr(dos_path, '\\');
@@ -503,7 +632,9 @@ static inline bool redirector_handler() {
             // Input: AX=110Fh, SDA+9Eh → filename
             // Output: CF=0 if success with AX=attributes, BX:DI=file size, CX=time, DX=date
             //         CF=1 if error with AX=DOS error code
-            get_full_path(path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            char guest_path[128];
+            get_full_path(path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
 
             // Get file attributes
             struct stat file_info;
@@ -537,7 +668,9 @@ static inline bool redirector_handler() {
         // Find First File
         case 0x111B: {
             struct _finddata_t fileinfo;
-            get_full_path(path, &RAM[sda_addr + FIRST_FILENAME_OFFSET]);
+            char guest_path[128];
+            get_full_path(path, guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
             debug_log("find first file: '%s'\n", path);
 
 
@@ -548,7 +681,13 @@ static inline bool redirector_handler() {
             if ((handle = _findfirst(path, &fileinfo)) != -1) {
                 // Set actual DTA pointer
 
-                dta_ptr = (sdbstruct *) &RAM[(*(uint16_t *) &RAM[sda_addr + 14] << 4) + *(uint16_t *) &RAM[sda_addr + 12]];
+                uint32_t dta_addr = 0;
+                if (!guest_dta_address(&dta_addr) ||
+                    !guest_ram_range_ok(dta_addr, sizeof(sdbstruct))) {
+                    guest_memory_error();
+                    break;
+                }
+                dta_ptr = (sdbstruct *) &RAM[dta_addr];
                 dta_ptr->drive_letter = 'H' | 128; /* bit 7 set means 'network drive' (RBIL6 compliance) */
 
                 to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
@@ -573,7 +712,7 @@ static inline bool redirector_handler() {
             // Output: CF=0 if file found with DTA updated, CF=1 if no more files with AX=18
             //         Must preserve bit 7 in DTA first byte (RBIL6 requirement)
             struct _finddata_t fileinfo;
-            if (handle != -1 && _findnext(handle, &fileinfo) == 0) {
+            if (handle != -1 && dta_ptr && _findnext(handle, &fileinfo) == 0) {
                 dta_ptr->drive_letter |= 128; // Ensure bit 7 remains set (RBIL6 compliance)
                 to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
                 // Set file size
@@ -604,7 +743,11 @@ static inline bool redirector_handler() {
 
         // Seek from File End
         case 0x1121: {
-            sftstruct *sftptr = (sftstruct *) &RAM[((uint32_t) CPU_ES << 4) + CPU_DI];
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
             const uint16_t file_handle = sftptr->file_handle;
 
             if (file_handle < MAX_FILES && open_files[file_handle]) {

@@ -20,6 +20,20 @@ static inline uint32_t videoram_index(const uint32_t address)
     return address & VIDEORAM_MASK;
 }
 
+static inline uint32_t a20_wrap_address(const uint32_t address)
+{
+    return address & (HMA_START - 1u);
+}
+
+static inline int memory_range_inside(const uint32_t address,
+                                      const uint32_t start,
+                                      const uint32_t end,
+                                      const uint32_t bytes)
+{
+    return bytes != 0u && address >= start && address < end &&
+           bytes <= end - address;
+}
+
 static inline int videoram_uses_vga_path(void)
 {
     return ega_vga_enabled && videomode >= 0x0D && videomode <= 0x13;
@@ -125,7 +139,7 @@ void write86_ob(const uint32_t address, const uint8_t value) {
             RAM[address - HMA_START] = value;
         }
     } else if (!a20_enabled && address >= HMA_END) {
-        write86(address - HMA_START, value);
+        write86_ob(a20_wrap_address(address), value);
     }
 }
 
@@ -135,22 +149,25 @@ void writew86_ob(const uint32_t address, const uint16_t value) {
         write86(address, (uint8_t) (value & 0xFF));
         write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
     } else {
-        if (address < RAM_SIZE) {
+        if (memory_range_inside(address, 0u, RAM_SIZE, 2u)) {
             *(uint16_t *) &RAM[address] = value;
-        } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
+        } else if (memory_range_inside(address, VIDEORAM_START, VIDEORAM_END, 2u)) {
             videoram_write16(address, value);
-        } else if (address >= EMS_START && address < EMS_END) {
+        } else if (memory_range_inside(address, EMS_START, EMS_END, 2u)) {
             ems_writew(address - EMS_START, value);
-        } else if (address >= UMB_START && address < UMB_END) {
+        } else if (memory_range_inside(address, UMB_START, UMB_END, 2u)) {
             *(uint16_t *) &UMB[address - UMB_START] = value;
-        } else if (address >= HMA_START && address < HMA_END) {
+        } else if (memory_range_inside(address, HMA_START, HMA_END, 2u)) {
             if (a20_enabled) {
                 *(uint16_t *) &HMA[address - HMA_START] = value;
             } else {
                 *(uint16_t *) &RAM[address - HMA_START] = value;
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writew86(address - HMA_START, value);
+            writew86_ob(a20_wrap_address(address), value);
+        } else {
+            write86(address, (uint8_t) (value & 0xFF));
+            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
         }
     }
 }
@@ -162,22 +179,27 @@ void writedw86_ob(const uint32_t address, const uint32_t value) {
         write86(address + 2, (uint8_t) ((value >> 16) & 0xFF));
         write86(address + 3, (uint8_t) ((value >> 24) & 0xFF));
     } else {
-        if (address < RAM_SIZE) {
+        if (memory_range_inside(address, 0u, RAM_SIZE, 4u)) {
             *(uint32_t *) &RAM[address] = value;
-        } else if (address >= VIDEORAM_START && address < VIDEORAM_END) {
+        } else if (memory_range_inside(address, VIDEORAM_START, VIDEORAM_END, 4u)) {
             videoram_write32(address, value);
-        } else if (address >= EMS_START && address < EMS_END) {
+        } else if (memory_range_inside(address, EMS_START, EMS_END, 4u)) {
             ems_writedw(address - EMS_START, value);
-        } else if (address >= UMB_START && address < UMB_END) {
+        } else if (memory_range_inside(address, UMB_START, UMB_END, 4u)) {
             *(uint32_t *) &UMB[address - UMB_START] = value;
-        } else if (address >= HMA_START && address < HMA_END) {
+        } else if (memory_range_inside(address, HMA_START, HMA_END, 4u)) {
             if (a20_enabled) {
                 *(uint32_t *) &HMA[address - HMA_START] = value;
             } else {
                 *(uint32_t *) &RAM[address - HMA_START] = value;
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writedw86(address - HMA_START, value);
+            writedw86_ob(a20_wrap_address(address), value);
+        } else {
+            write86(address, (uint8_t) (value & 0xFF));
+            write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
+            write86(address + 2, (uint8_t) ((value >> 16) & 0xFF));
+            write86(address + 3, (uint8_t) ((value >> 24) & 0xFF));
         }
     }
 }
@@ -212,7 +234,7 @@ uint8_t read86_ob(const uint32_t address) {
         return RAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return read86(address - HMA_START);
+        return read86_ob(a20_wrap_address(address));
     }
     return 0xFF;
 }
@@ -222,34 +244,34 @@ uint16_t readw86_ob(const uint32_t address) {
     if (address & 1) {
         return (uint16_t) read86(address) | ((uint16_t) read86(address + 1) << 8);
     }
-    if (address < RAM_SIZE) {
+    if (memory_range_inside(address, 0u, RAM_SIZE, 2u)) {
         return *(uint16_t *) &RAM[address];
     }
-    if (address >= VIDEORAM_START && address < VIDEORAM_END) {
+    if (memory_range_inside(address, VIDEORAM_START, VIDEORAM_END, 2u)) {
         return videoram_read16(address);
     }
     // if (address >= VBIOS_START && address < VBIOS_END) {
         // return *(uint16_t *) &VGABIOS[address - VBIOS_START];
     // }
-    if (address >= EMS_START && address < EMS_END) {
+    if (memory_range_inside(address, EMS_START, EMS_END, 2u)) {
         return ems_readw(address - EMS_START);
     }
-    if (address >= UMB_START && address < UMB_END) {
+    if (memory_range_inside(address, UMB_START, UMB_END, 2u)) {
         return *(uint16_t *) &UMB[address - UMB_START];
     }
-    if (address >= BIOS_START && address < HMA_START) {
+    if (memory_range_inside(address, BIOS_START, HMA_START, 2u)) {
         return *(uint16_t *) &BIOS[address - BIOS_START];
     }
-    if (address >= HMA_START && address < HMA_END) {
+    if (memory_range_inside(address, HMA_START, HMA_END, 2u)) {
         if (a20_enabled) {
             return *(uint16_t *) &HMA[address - HMA_START];
         }
         return *(uint16_t *) &RAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readw86(address - HMA_START);
+        return readw86_ob(a20_wrap_address(address));
     }
-    return 0xFFFF;
+    return (uint16_t) read86(address) | ((uint16_t) read86(address + 1) << 8);
 }
 
 uint32_t readdw86_ob(const uint32_t address) {
@@ -259,34 +281,37 @@ uint32_t readdw86_ob(const uint32_t address) {
                | ((uint32_t) read86(address + 2) << 16)
                | ((uint32_t) read86(address + 3) << 24);
     }
-    if (address < RAM_SIZE) {
+    if (memory_range_inside(address, 0u, RAM_SIZE, 4u)) {
         return *(uint32_t *) &RAM[address];
     }
-    if (address >= VIDEORAM_START && address < VIDEORAM_END) {
+    if (memory_range_inside(address, VIDEORAM_START, VIDEORAM_END, 4u)) {
         return (uint32_t) read86(address)
                | ((uint32_t) read86(address + 1) << 8)
                | ((uint32_t) read86(address + 2) << 16)
                | ((uint32_t) read86(address + 3) << 24);
     }
-    if (address >= EMS_START && address < EMS_END) {
+    if (memory_range_inside(address, EMS_START, EMS_END, 4u)) {
         return ems_readdw(address - EMS_START);
     }
-    if (address >= UMB_START && address < UMB_END) {
+    if (memory_range_inside(address, UMB_START, UMB_END, 4u)) {
         return *(uint32_t *) &UMB[address - UMB_START];
     }
-    if (address >= BIOS_START && address < HMA_START) {
+    if (memory_range_inside(address, BIOS_START, HMA_START, 4u)) {
         return *(uint32_t *) &BIOS[address - BIOS_START];
     }
-    if (address >= HMA_START && address < HMA_END) {
+    if (memory_range_inside(address, HMA_START, HMA_END, 4u)) {
         if (a20_enabled) {
             return *(uint32_t *) &HMA[address - HMA_START];
         }
         return *(uint32_t *) &RAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readdw86(address - HMA_START);
+        return readdw86_ob(a20_wrap_address(address));
     }
-    return 0xFFFFFFFF;
+    return (uint32_t) read86(address)
+           | ((uint32_t) read86(address + 1) << 8)
+           | ((uint32_t) read86(address + 2) << 16)
+           | ((uint32_t) read86(address + 3) << 24);
 }
 
 #if PICO_ON_DEVICE
