@@ -188,14 +188,6 @@ static inline void renderer() {
 
     uint8_t cols = 80;
     for (int y = 0; y < 480; y++) {
-        if (y >= 399)
-            port3DA = 8;
-        else
-            port3DA = 0;
-
-        if (y & 1)
-            port3DA |= 1;
-
         uint16_t *pixels = SCREEN + y * 640;
 
         if (y < 400)

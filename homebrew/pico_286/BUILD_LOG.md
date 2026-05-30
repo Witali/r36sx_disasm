@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-05-30 realistic CGA status port timing
+
+Moved CGA status port `3DAh` emulation out of the renderer path.  `cga_portin`
+now calculates a simple CGA raster phase from a monotonic timer and reports:
+
+- bit 0 during horizontal/vertical blanking, when VRAM access is safe;
+- bit 3 during the vertical retrace window.
+
+The renderer no longer writes `port3DA` while drawing rows, so programs that
+poll `3DAh` for CGA snow avoidance are no longer limited by host frame
+presentation.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286`
+- Size: 1,020,252 bytes
+- SHA256: `B4C8B3C4AF8B2A893249ED1F8D6AC053141AE41AE28AEF5C8D355955B375536C`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-05-30 opcode 0F invalid-opcode handling
 
 CPUID is intentionally not implemented for the emulated 286-class CPU.  The

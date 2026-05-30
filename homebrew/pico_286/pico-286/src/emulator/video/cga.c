@@ -1,5 +1,10 @@
 #if PICO_ON_DEVICE
+#include "pico/time.h"
 #include "graphics.h"
+#elif defined(_WIN32)
+#include <windows.h>
+#else
+#include <time.h>
 #endif
 #include "emulator/emulator.h"
 
@@ -107,6 +112,51 @@ uint32_t cga_composite_palette[3][16] = {
 };
 uint8_t color_burst = 0;
 
+#define CGA_STATUS_FRAME_NS 16666667ULL
+#define CGA_STATUS_SCANLINES 262ULL
+#define CGA_STATUS_LINE_NS (CGA_STATUS_FRAME_NS / CGA_STATUS_SCANLINES)
+#define CGA_STATUS_VISIBLE_LINES 200ULL
+#define CGA_STATUS_HORIZONTAL_ACTIVE_NS 52600ULL
+#define CGA_STATUS_VRETRACE_START_LINE 224ULL
+#define CGA_STATUS_VRETRACE_LINES 16ULL
+
+static uint64_t cga_status_time_ns(void) {
+#if PICO_ON_DEVICE
+    return time_us_64() * 1000ULL;
+#elif defined(_WIN32)
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER counter;
+    if (!freq.QuadPart) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&counter);
+    return (uint64_t)((counter.QuadPart * 1000000000ULL) / freq.QuadPart);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+#endif
+}
+
+static uint8_t cga_status_from_raster(void) {
+    uint64_t frame_phase = cga_status_time_ns() % CGA_STATUS_FRAME_NS;
+    uint64_t scanline = frame_phase / CGA_STATUS_LINE_NS;
+    uint64_t line_phase = frame_phase - scanline * CGA_STATUS_LINE_NS;
+    uint8_t status = 0;
+
+    if (scanline >= CGA_STATUS_VISIBLE_LINES ||
+        line_phase >= CGA_STATUS_HORIZONTAL_ACTIVE_NS) {
+        status |= 0x01;
+    }
+
+    if (scanline >= CGA_STATUS_VRETRACE_START_LINE &&
+        scanline < CGA_STATUS_VRETRACE_START_LINE + CGA_STATUS_VRETRACE_LINES) {
+        status |= 0x08;
+    }
+
+    return status;
+}
+
 void cga_portout(uint16_t portnum, uint16_t value) {
     // https://www.youtube.com/watch?v=ttPhnUUxy94
     // https://www.youtube.com/watch?v=44eNkE1YoiI
@@ -187,8 +237,10 @@ void cga_portout(uint16_t portnum, uint16_t value) {
 }
 
 uint16_t cga_portin(uint16_t portnum) {
-     // port3DA ^= 1;
-     // if (!(port3DA & 1)) port3DA ^= 8;
-     // return port3DA;
-     return hercules_mode ? 0xFF : port3DA;
+     if (hercules_mode) {
+         return 0xFF;
+     }
+
+     port3DA = cga_status_from_raster();
+     return port3DA;
 }
