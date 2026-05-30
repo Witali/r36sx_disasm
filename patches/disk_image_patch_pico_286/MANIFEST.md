@@ -30,6 +30,11 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 configurable screenshot format
+
+The current `pico_286` binary reads `screenshot_format` from `pico_286.conf`.
+Supported values are `png` and `bmp`; `png` is the default.
+
 ## 2026-05-30 PNG screenshots
 
 The current `pico_286` binary saves `Fn` + D-pad `Up` screenshots as compressed

@@ -169,6 +169,8 @@ devices:
 cpu_mhz=32.768
 boot_mode=normal
 boot_order=fdd0,hdd0
+[screenshot]
+screenshot_format=png
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
@@ -188,6 +190,9 @@ not a cycle-exact 80286 timing model.
 `profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
 `profiling_log_ms` controls the reporting interval.  Profiling can also be
 compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
+
+`screenshot_format=png` saves compressed screenshots through zlib.
+`screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

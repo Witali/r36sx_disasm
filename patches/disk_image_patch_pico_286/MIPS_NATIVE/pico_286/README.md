@@ -20,14 +20,16 @@ This file documents the `pico_286` native executable for TinyMC.
 - Tap Fn: show or hide the on-screen keyboard.
 - Fn+Select: open the disk image menu.
 - Fn+Start: open the key preset editor.
-- Fn+D-pad Up: save a compressed 640x480 PNG screenshot.
+- Fn+D-pad Up: save a 640x480 screenshot.
 - Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 
 Screenshots are written to `MIPS_NATIVE/pico_286/screenshots` as
-`pico_286_YYYYMMDD_HHMMSS_NNN.png`.  If that absolute SD-card path is not
-available, Pico-286 falls back to a local `screenshots` directory.
+`pico_286_YYYYMMDD_HHMMSS_NNN.png` or
+`pico_286_YYYYMMDD_HHMMSS_NNN.bmp`, depending on `screenshot_format` in
+`pico_286.conf`.  If that absolute SD-card path is not available, Pico-286
+falls back to a local `screenshots` directory.
 
 ## On-Screen Keyboard
 
@@ -75,6 +77,9 @@ disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
 disk_cache_flush_ms=2000
 
+[screenshot]
+screenshot_format=png
+
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
@@ -87,6 +92,9 @@ application exits.
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
 compiled out with `build_pico_286.ps1 -DisableProfiling`.
+
+Set `screenshot_format=png` for compressed screenshots or
+`screenshot_format=bmp` for the old uncompressed 24-bit BMP output.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,

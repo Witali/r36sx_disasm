@@ -48,6 +48,7 @@ static char disk_cache_flush_sectors_text[16] = "4";
 static char disk_cache_flush_ms_text[16] = "2000";
 static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
+static char screenshot_format_text[8] = "png";
 static uint32_t cpu_exec_loops = 0;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
@@ -55,6 +56,8 @@ static uint32_t disk_cache_flush_sectors = 4u;
 static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
+static r36sx_pico286_screenshot_format_t screenshot_format =
+    R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -419,6 +422,37 @@ static int set_profiling_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_screenshot_format(const char *key, const char *value,
+                                 int line_no)
+{
+    if (!(key_equals(key, "screenshot_format") ||
+          key_equals(key, "screenshotformat") ||
+          key_equals(key, "screenshot_file_format"))) {
+        return 0;
+    }
+
+    if (key_equals(value, "png")) {
+        screenshot_format = R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
+        snprintf(screenshot_format_text, sizeof(screenshot_format_text),
+                 "png");
+        r36sx_pico286_debug_log("diskcfg: screenshot_format=png");
+        return 1;
+    }
+
+    if (key_equals(value, "bmp")) {
+        screenshot_format = R36SX_PICO286_SCREENSHOT_FORMAT_BMP;
+        snprintf(screenshot_format_text, sizeof(screenshot_format_text),
+                 "bmp");
+        r36sx_pico286_debug_log("diskcfg: screenshot_format=bmp");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid %s '%s' at line %d",
+        key, value, line_no);
+    return 1;
+}
+
 static int set_boot_order(char *value, int line_no)
 {
     uint8_t parsed[4] = { 0, 0, 0, 0 };
@@ -563,6 +597,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
         return 1;
     }
     if (set_profiling_value(key, value, line_no)) {
+        return 1;
+    }
+    if (set_screenshot_format(key, value, line_no)) {
         return 1;
     }
     if (key_equals(key, "osk_cursor_keys") ||
@@ -734,6 +771,9 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[profiling]\n");
     fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
     fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
+    fprintf(fp, "# Screenshot output format: png or bmp.\n");
+    fprintf(fp, "[screenshot]\n");
+    fprintf(fp, "screenshot_format=%s\n\n", screenshot_format_text);
     fprintf(fp, "fdd0=%s\n", disk_entries[0].value);
     fprintf(fp, "fdd1=%s\n", disk_entries[1].value);
     fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
@@ -851,4 +891,18 @@ uint32_t r36sx_pico286_profiling_log_ms(void)
     load_disk_config();
 
     return profiling_log_ms;
+}
+
+r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void)
+{
+    load_disk_config();
+
+    return screenshot_format;
+}
+
+const char *r36sx_pico286_screenshot_format_name(void)
+{
+    load_disk_config();
+
+    return screenshot_format_text;
 }

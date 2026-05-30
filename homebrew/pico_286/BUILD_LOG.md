@@ -1,5 +1,12 @@
 # pico-286 Build Log
 
+## 2026-05-30 configurable screenshot format
+
+Added `screenshot_format` to `pico_286.conf`.  Supported values are `png` and
+`bmp`; `png` remains the default.  The screenshot shortcut keeps the same
+`Fn` + D-pad `Up` binding and chooses the filename extension from the
+configured format.
+
 ## 2026-05-30 PNG screenshots
 
 Changed the `Fn` + D-pad `Up` screenshot writer from uncompressed 24-bit BMP

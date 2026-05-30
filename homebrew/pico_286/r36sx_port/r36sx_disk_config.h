@@ -13,6 +13,11 @@ typedef struct {
     uint16_t sects;
 } r36sx_pico286_chs_t;
 
+typedef enum {
+    R36SX_PICO286_SCREENSHOT_FORMAT_PNG = 0,
+    R36SX_PICO286_SCREENSHOT_FORMAT_BMP = 1,
+} r36sx_pico286_screenshot_format_t;
+
 // Return the configured host image path for a BIOS disk drive, or fallback_path.
 const char *r36sx_pico286_disk_path(uint8_t bios_drive,
                                     const char *fallback_path);
@@ -60,6 +65,12 @@ int r36sx_pico286_profiling_enabled(void);
 
 // Return how often profiling summaries should be written to the log.
 uint32_t r36sx_pico286_profiling_log_ms(void);
+
+// Return the configured screenshot file format.
+r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void);
+
+// Return the configured screenshot format text used when rewriting config.
+const char *r36sx_pico286_screenshot_format_name(void);
 
 #ifdef __cplusplus
 }

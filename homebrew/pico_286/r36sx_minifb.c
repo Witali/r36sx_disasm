@@ -25,6 +25,7 @@
 #include "../common/r36sx_screen_keyboard.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
+#include "r36sx_port/r36sx_disk_config.h"
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_PICO286_FRAME_USEC 16666u
@@ -156,6 +157,20 @@ static void r36sx_mfb_put_be32(uint8_t *dst, uint32_t value)
     dst[1] = (uint8_t)((value >> 16) & 0xffu);
     dst[2] = (uint8_t)((value >> 8) & 0xffu);
     dst[3] = (uint8_t)(value & 0xffu);
+}
+
+static void r36sx_mfb_put_le16(uint8_t *dst, uint16_t value)
+{
+    dst[0] = (uint8_t)(value & 0xffu);
+    dst[1] = (uint8_t)(value >> 8);
+}
+
+static void r36sx_mfb_put_le32(uint8_t *dst, uint32_t value)
+{
+    dst[0] = (uint8_t)(value & 0xffu);
+    dst[1] = (uint8_t)((value >> 8) & 0xffu);
+    dst[2] = (uint8_t)((value >> 16) & 0xffu);
+    dst[3] = (uint8_t)((value >> 24) & 0xffu);
 }
 
 static uint8_t r36sx_mfb_rgb565_to_r8(uint16_t color)
@@ -291,6 +306,76 @@ static int r36sx_mfb_write_png24(const char *path, const uint16_t *pixels,
     return rc;
 }
 
+static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
+                                 int width, int height)
+{
+    FILE *fp;
+    uint8_t header[54];
+    uint8_t *row;
+    uint32_t row_bytes;
+    uint32_t pixel_bytes;
+    uint32_t file_bytes;
+
+    if (!path || !pixels || width <= 0 || height <= 0) {
+        return -1;
+    }
+
+    row_bytes = (uint32_t)width * 3u;
+    pixel_bytes = row_bytes * (uint32_t)height;
+    file_bytes = 54u + pixel_bytes;
+    row = (uint8_t *)malloc(row_bytes);
+    if (!row) {
+        return -1;
+    }
+
+    memset(header, 0, sizeof(header));
+    header[0] = 'B';
+    header[1] = 'M';
+    r36sx_mfb_put_le32(&header[2], file_bytes);
+    r36sx_mfb_put_le32(&header[10], 54u);
+    r36sx_mfb_put_le32(&header[14], 40u);
+    r36sx_mfb_put_le32(&header[18], (uint32_t)width);
+    r36sx_mfb_put_le32(&header[22], (uint32_t)height);
+    r36sx_mfb_put_le16(&header[26], 1u);
+    r36sx_mfb_put_le16(&header[28], 24u);
+    r36sx_mfb_put_le32(&header[34], pixel_bytes);
+
+    fp = fopen(path, "wb");
+    if (!fp) {
+        free(row);
+        return -1;
+    }
+
+    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
+        fclose(fp);
+        free(row);
+        return -1;
+    }
+
+    for (int y = height - 1; y >= 0; y--) {
+        const uint16_t *src = pixels + (size_t)y * (size_t)width;
+        for (int x = 0; x < width; x++) {
+            uint16_t c = src[x];
+            row[(size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_b8(c);
+            row[(size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
+            row[(size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_r8(c);
+        }
+        if (fwrite(row, 1, row_bytes, fp) != row_bytes) {
+            fclose(fp);
+            free(row);
+            return -1;
+        }
+    }
+
+    if (fclose(fp) != 0) {
+        free(row);
+        return -1;
+    }
+
+    free(row);
+    return 0;
+}
+
 static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
                                             const uint16_t *pixels,
                                             char *saved_path,
@@ -301,6 +386,8 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     char stamp[32];
     char path[512];
     uint32_t seq;
+    r36sx_pico286_screenshot_format_t format;
+    const char *ext;
 
     if (!dir || !pixels) {
         return -1;
@@ -313,10 +400,18 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     }
     strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_now);
     seq = g_mfb.screenshot_counter++;
+    format = r36sx_pico286_screenshot_format();
+    ext = format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP ? "bmp" : "png";
 
-    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.png",
-             dir, stamp, (unsigned)(seq % 1000u));
-    if (r36sx_mfb_write_png24(path, pixels, g_mfb.width, g_mfb.height) != 0) {
+    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.%s",
+             dir, stamp, (unsigned)(seq % 1000u), ext);
+    if (format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP) {
+        if (r36sx_mfb_write_bmp24(path, pixels, g_mfb.width,
+                                  g_mfb.height) != 0) {
+            return -1;
+        }
+    } else if (r36sx_mfb_write_png24(path, pixels, g_mfb.width,
+                                     g_mfb.height) != 0) {
         return -1;
     }
 
