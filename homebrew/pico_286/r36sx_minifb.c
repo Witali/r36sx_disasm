@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #include "MiniFB.h"
 #include "../common/hardware.h"
@@ -149,18 +150,12 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
                       ((uint16_t)b >> 3));
 }
 
-static void r36sx_mfb_put_le16(uint8_t *dst, uint16_t value)
+static void r36sx_mfb_put_be32(uint8_t *dst, uint32_t value)
 {
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)(value >> 8);
-}
-
-static void r36sx_mfb_put_le32(uint8_t *dst, uint32_t value)
-{
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)((value >> 8) & 0xffu);
-    dst[2] = (uint8_t)((value >> 16) & 0xffu);
-    dst[3] = (uint8_t)((value >> 24) & 0xffu);
+    dst[0] = (uint8_t)((value >> 24) & 0xffu);
+    dst[1] = (uint8_t)((value >> 16) & 0xffu);
+    dst[2] = (uint8_t)((value >> 8) & 0xffu);
+    dst[3] = (uint8_t)(value & 0xffu);
 }
 
 static uint8_t r36sx_mfb_rgb565_to_r8(uint16_t color)
@@ -181,74 +176,119 @@ static uint8_t r36sx_mfb_rgb565_to_b8(uint16_t color)
     return (uint8_t)((b << 3) | (b >> 2));
 }
 
-static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
+static int r36sx_mfb_write_png_chunk(FILE *fp, const char type[4],
+                                     const uint8_t *data, uint32_t length)
+{
+    uint8_t header[8];
+    uint8_t crc_bytes[4];
+    uLong crc;
+
+    if (!fp || !type) {
+        return -1;
+    }
+
+    r36sx_mfb_put_be32(&header[0], length);
+    memcpy(&header[4], type, 4);
+    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
+        return -1;
+    }
+    if (length > 0 && (!data || fwrite(data, 1, length, fp) != length)) {
+        return -1;
+    }
+
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, &header[4], 4);
+    if (length > 0) {
+        crc = crc32(crc, data, length);
+    }
+    r36sx_mfb_put_be32(crc_bytes, (uint32_t)crc);
+    return fwrite(crc_bytes, 1, sizeof(crc_bytes), fp) == sizeof(crc_bytes) ?
+        0 : -1;
+}
+
+static int r36sx_mfb_write_png24(const char *path, const uint16_t *pixels,
                                  int width, int height)
 {
     FILE *fp;
-    uint8_t header[54];
-    uint8_t *row;
+    uint8_t ihdr[13];
+    uint8_t *raw;
+    uint8_t *compressed;
     uint32_t row_bytes;
-    uint32_t pixel_bytes;
-    uint32_t file_bytes;
+    uint32_t raw_bytes;
+    uLongf compressed_bytes;
+    int rc = -1;
+    static const uint8_t png_signature[8] = {
+        0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'
+    };
 
     if (!path || !pixels || width <= 0 || height <= 0) {
         return -1;
     }
 
     row_bytes = (uint32_t)width * 3u;
-    pixel_bytes = row_bytes * (uint32_t)height;
-    file_bytes = 54u + pixel_bytes;
-    row = (uint8_t *)malloc(row_bytes);
-    if (!row) {
+    raw_bytes = (row_bytes + 1u) * (uint32_t)height;
+    raw = (uint8_t *)malloc(raw_bytes);
+    if (!raw) {
         return -1;
     }
 
-    memset(header, 0, sizeof(header));
-    header[0] = 'B';
-    header[1] = 'M';
-    r36sx_mfb_put_le32(&header[2], file_bytes);
-    r36sx_mfb_put_le32(&header[10], 54u);
-    r36sx_mfb_put_le32(&header[14], 40u);
-    r36sx_mfb_put_le32(&header[18], (uint32_t)width);
-    r36sx_mfb_put_le32(&header[22], (uint32_t)height);
-    r36sx_mfb_put_le16(&header[26], 1u);
-    r36sx_mfb_put_le16(&header[28], 24u);
-    r36sx_mfb_put_le32(&header[34], pixel_bytes);
+    for (int y = 0; y < height; y++) {
+        uint8_t *row = raw + (size_t)y * (size_t)(row_bytes + 1u);
+        const uint16_t *src = pixels + (size_t)y * (size_t)width;
+
+        row[0] = 0; /* PNG filter type: none. */
+        for (int x = 0; x < width; x++) {
+            uint16_t c = src[x];
+            row[1u + (size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_r8(c);
+            row[1u + (size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
+            row[1u + (size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_b8(c);
+        }
+    }
+
+    compressed_bytes = compressBound(raw_bytes);
+    compressed = (uint8_t *)malloc(compressed_bytes);
+    if (!compressed) {
+        free(raw);
+        return -1;
+    }
+    if (compress2(compressed, &compressed_bytes, raw, raw_bytes,
+                  Z_DEFAULT_COMPRESSION) != Z_OK) {
+        free(compressed);
+        free(raw);
+        return -1;
+    }
 
     fp = fopen(path, "wb");
     if (!fp) {
-        free(row);
+        free(compressed);
+        free(raw);
         return -1;
     }
 
-    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
-        fclose(fp);
-        free(row);
-        return -1;
-    }
+    r36sx_mfb_put_be32(&ihdr[0], (uint32_t)width);
+    r36sx_mfb_put_be32(&ihdr[4], (uint32_t)height);
+    ihdr[8] = 8;  /* bit depth */
+    ihdr[9] = 2;  /* truecolor RGB */
+    ihdr[10] = 0; /* deflate compression */
+    ihdr[11] = 0; /* adaptive filtering */
+    ihdr[12] = 0; /* no interlace */
 
-    for (int y = height - 1; y >= 0; y--) {
-        const uint16_t *src = pixels + (size_t)y * (size_t)width;
-        for (int x = 0; x < width; x++) {
-            uint16_t c = src[x];
-            row[(size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_b8(c);
-            row[(size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
-            row[(size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_r8(c);
-        }
-        if (fwrite(row, 1, row_bytes, fp) != row_bytes) {
-            fclose(fp);
-            free(row);
-            return -1;
-        }
+    if (fwrite(png_signature, 1, sizeof(png_signature), fp) ==
+            sizeof(png_signature) &&
+        r36sx_mfb_write_png_chunk(fp, "IHDR", ihdr, sizeof(ihdr)) == 0 &&
+        r36sx_mfb_write_png_chunk(fp, "IDAT", compressed,
+                                  (uint32_t)compressed_bytes) == 0 &&
+        r36sx_mfb_write_png_chunk(fp, "IEND", NULL, 0) == 0) {
+        rc = 0;
     }
 
     if (fclose(fp) != 0) {
-        free(row);
-        return -1;
+        rc = -1;
     }
 
-    free(row);
-    return 0;
+    free(compressed);
+    free(raw);
+    return rc;
 }
 
 static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
@@ -274,9 +314,9 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_now);
     seq = g_mfb.screenshot_counter++;
 
-    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.bmp",
+    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.png",
              dir, stamp, (unsigned)(seq % 1000u));
-    if (r36sx_mfb_write_bmp24(path, pixels, g_mfb.width, g_mfb.height) != 0) {
+    if (r36sx_mfb_write_png24(path, pixels, g_mfb.width, g_mfb.height) != 0) {
         return -1;
     }
 

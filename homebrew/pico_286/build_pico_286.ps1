@@ -19,6 +19,7 @@ $ToolchainRoot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot
 $CppInclude = Join-Path $ToolchainRoot "mips-mti-linux-gnu\include\c++\6.3.0"
 $CppTargetInclude = Join-Path $CppInclude "mips-mti-linux-gnu"
 $GccLib = Join-Path $ToolchainRoot "lib\gcc\mips-mti-linux-gnu\6.3.0\mipsel-r2-hard\lib"
+$TargetZlib = Join-Path $SysrootUsrLib "libz.so.1.2.11"
 $Out = Join-Path $PSScriptRoot "pico_286"
 $ObjDir = Join-Path $PSScriptRoot "obj"
 $Crt1 = Join-Path $Sysroot "usr\lib\crt1.o"
@@ -35,6 +36,9 @@ if (!(Test-Path $PicoRoot)) {
 }
 if (!(Test-Path $PortRoot)) {
     throw "Missing homebrew\pico_286\r36sx_port source tree."
+}
+if (!(Test-Path $TargetZlib)) {
+    throw "Missing target zlib library: $TargetZlib"
 }
 
 $ObjDirFull = [IO.Path]::GetFullPath($ObjDir)
@@ -180,6 +184,7 @@ Invoke-Checked { & $Zig ld.lld `
     "-lpthread" `
     "-ldl" `
     "-lm" `
+    $TargetZlib `
     "-lstdc++" `
     "-lgcc_s" `
     "-lc" `

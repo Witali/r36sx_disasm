@@ -1,5 +1,20 @@
 # pico-286 Build Log
 
+## 2026-05-30 PNG screenshots
+
+Changed the `Fn` + D-pad `Up` screenshot writer from uncompressed 24-bit BMP
+to compressed PNG.  The R36SX MiniFB backend now writes PNG chunks directly and
+uses zlib `compress2()` for the `IDAT` stream, avoiding a libpng dependency
+while still producing standard `.png` files:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/pico_286/screenshots/pico_286_YYYYMMDD_HHMMSS_NNN.png
+```
+
+The build links the target `libz.so.1.2.11` explicitly because the SDK sysroot
+does not provide an unversioned `libz.so` linker symlink.  The original disk
+image already ships compatible `libz.so.1` libraries.
+
 ## 2026-05-30 direct-present video path
 
 Optimized the R36SX MiniFB present path for the normal no-menu case.

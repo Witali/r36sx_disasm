@@ -30,6 +30,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 PNG screenshots
+
+The current `pico_286` binary saves `Fn` + D-pad `Up` screenshots as compressed
+PNG files under `MIPS_NATIVE/pico_286/screenshots`:
+
+```text
+pico_286_YYYYMMDD_HHMMSS_NNN.png
+```
+
+The writer uses zlib directly.  The current build links the target
+`libz.so.1.2.11` explicitly because the SDK sysroot does not provide an
+unversioned `libz.so` linker symlink.  The original disk image already ships
+compatible `libz.so.1` libraries.
+
 ## 2026-05-30 direct-present video path
 
 The current `pico_286` binary presents normal DOS frames directly from the
