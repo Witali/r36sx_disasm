@@ -12,6 +12,7 @@ Project video:
 
 - [R36SX / SF3000 firmware research video](https://youtu.be/LYrICpUo6_A?si=NqGBL9BxAsdRZkY5)
 - [R36SX project follow-up video](https://youtu.be/MHDpizjIZhw?si=tPpelQQvGKRtDBP2)
+- [R36SX project video](http://youtube.com/watch?v=ZWJg3XiHGxE)
 
 ## Current Findings
 
