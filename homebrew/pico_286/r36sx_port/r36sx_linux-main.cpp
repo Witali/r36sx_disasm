@@ -34,6 +34,7 @@ extern "C" void r36sx_pico286_disk_flush_all(void);
 
 #define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
+#define R36SX_HLT_SLEEP_US 1000u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
 static volatile int soft_reset_requested = 0;
@@ -1171,6 +1172,9 @@ int main() {
                                     main_loop_count);
         }
         r36sx_profile_maybe_log();
+        if (r36sx_cpu_waiting_for_interrupt()) {
+            usleep(R36SX_HLT_SLEEP_US);
+        }
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);
 

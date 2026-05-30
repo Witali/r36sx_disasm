@@ -1,5 +1,58 @@
 # pico-286 Build Log
 
+## 2026-05-30 sleep only while emulated CPU is halted
+
+Changed the R36SX main loop so it no longer needs a fixed sleep/yield in every
+iteration.  The emulated `HLT` instruction already sets `hltstate` and makes
+`exec86()` return.  The CPU core now exposes:
+
+```c
+uint8_t r36sx_cpu_waiting_for_interrupt(void);
+```
+
+The function reports true only when the emulated CPU is halted and there is no
+unmasked pending IRQ ready to wake it.  The Linux main loop checks it at the end
+of each iteration and calls:
+
+```c
+usleep(R36SX_HLT_SLEEP_US); /* currently 1000 us */
+```
+
+only in that state.  Active DOS code still runs without a fixed per-loop sleep.
+Timer IRQs from `ticks_thread()` wake the halted CPU on the next `exec86()`
+call, matching the normal PC `HLT`/interrupt flow closely enough for this
+single-process emulator.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1124696` bytes
+- SHA256: `2F59AB363B2DAA1B28B07F86BC4415D3B5745B5913D090344714E69D084BDEC3`
+
+Scan commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+powershell -ExecutionPolicy Bypass -File .\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 80386 real-mode instruction coverage
 
 Reviewed the current 386 path and filled in the practical real-mode gaps that

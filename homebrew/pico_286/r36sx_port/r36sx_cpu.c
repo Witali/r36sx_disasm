@@ -69,6 +69,11 @@ static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
            (uint8_t)(~i8259_controller.interrupt_mask_register);
 }
 
+uint8_t r36sx_cpu_waiting_for_interrupt(void)
+{
+    return hltstate && !(ifl && r36sx_cpu_pending_maskable_irq());
+}
+
 static inline uint32_t r36sx_rep_batch_count(uint32_t count,
                                              uint32_t loopcount,
                                              uint32_t execloops)

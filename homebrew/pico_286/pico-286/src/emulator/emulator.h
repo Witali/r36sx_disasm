@@ -249,6 +249,7 @@ extern uint32_t tga_offset;
 
 // CPU
 extern void exec86(uint32_t execloops);
+extern uint8_t r36sx_cpu_waiting_for_interrupt(void);
 
 extern void reset86();
 void r36sx_keyboard_reset(void);

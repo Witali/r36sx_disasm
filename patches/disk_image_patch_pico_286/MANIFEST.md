@@ -30,6 +30,17 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-30 sleep only on emulated HLT
+
+The current `pico_286` binary now yields to Linux only when the emulated CPU has
+executed `HLT` and is waiting for an interrupt.  Active DOS code no longer needs
+a fixed sleep in every main-loop iteration.  The idle sleep is currently
+`1000 us`; timer IRQs from the ticks thread wake the CPU on the next `exec86()`
+call.
+
+pico_286 size: 1124696 bytes
+pico_286 SHA256: 2F59AB363B2DAA1B28B07F86BC4415D3B5745B5913D090344714E69D084BDEC3
+
 ## 2026-05-30 80386 real-mode instruction coverage
 
 The current `pico_286` binary expands the 80386 real-mode path:
