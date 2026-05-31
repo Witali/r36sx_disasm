@@ -2194,8 +2194,10 @@ void r36sx_screen_keyboard_draw(
     fill_rect(frame, width, height, stride_pixels, panel_x + 1, panel_y + 1,
               panel_w - 2, R36SX_OSK_HEADER_H, header);
     draw_text(frame, width, height, stride_pixels, panel_x + 5, panel_y + 3,
-              keyboard->symbol_mode ? "DOS KBD  SYM" : "DOS KBD  ABC", text,
-              1);
+              keyboard->symbol_mode ?
+                  "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE" :
+                  "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE",
+              text, 1);
 
     for (size_t row = 0; row < (size_t)keyboard_row_count(); row++) {
         int count = counts[row];

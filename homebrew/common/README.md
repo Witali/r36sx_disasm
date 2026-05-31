@@ -87,3 +87,5 @@ Current physical button bindings while the keyboard is visible:
 
 Holding A, Start, B, X, or Y repeats the emitted key after a short delay.
 Shift is still available as the on-screen `SHIFT` key.
+The keyboard header repeats the same compact binding hints while the keyboard
+is open.

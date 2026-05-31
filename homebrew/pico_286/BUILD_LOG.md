@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard header hints
+
+Restored compact physical-button hints in the on-screen keyboard header.  The
+header now keeps the `ABC`/`SYM` mode label and also shows:
+`A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `457856` bytes
+- `pico_286` SHA256:
+  `F25ABAD146132C1EF5F29A61F162AA55E4B7CB9A8CB1EB4357315332DD04DA02`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 cursor-block navigation
 
 Fixed vertical navigation in the optional right-side cursor/navigation block.

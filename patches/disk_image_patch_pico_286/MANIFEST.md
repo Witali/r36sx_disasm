@@ -37,6 +37,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard header hints
+
+The on-screen keyboard header again shows compact button hints next to the
+`ABC`/`SYM` mode label:
+`A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE`.
+
+```text
+pico_286 size: 457856 bytes
+pico_286 SHA256: F25ABAD146132C1EF5F29A61F162AA55E4B7CB9A8CB1EB4357315332DD04DA02
+Defender scan: found no threats
+```
+
 ## 2026-06-01 cursor-block navigation
 
 The optional right-side navigation cluster now moves vertically through the
