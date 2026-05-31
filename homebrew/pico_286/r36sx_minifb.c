@@ -1227,6 +1227,7 @@ static uint32_t r36sx_osk_draw_signature(void)
     hash = r36sx_osk_mix_signature(hash, keyboard->alt);
     hash = r36sx_osk_mix_signature(hash, keyboard->symbol_mode);
     hash = r36sx_osk_mix_signature(hash, keyboard->cursor_block);
+    hash = r36sx_osk_mix_signature(hash, keyboard->scroll_y);
     hash = r36sx_osk_mix_signature(hash, keyboard->press_zone);
     hash = r36sx_osk_mix_signature(hash, keyboard->press_row);
     hash = r36sx_osk_mix_signature(hash, keyboard->press_col);
@@ -2156,7 +2157,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_frame_generation = 0;
     r36sx_app_stats_init();
     r36sx_screen_keyboard_init(&g_mfb.osk);
-    r36sx_screen_keyboard_set_cursor_block(&g_mfb.osk, 0);
+    r36sx_screen_keyboard_set_cursor_block(&g_mfb.osk, 1);
     r36sx_disk_menu_init(&g_mfb.disk_menu);
     r36sx_key_presets_load(&g_mfb.key_presets);
     g_mfb.width = width;

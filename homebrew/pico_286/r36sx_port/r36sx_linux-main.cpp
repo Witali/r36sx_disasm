@@ -14,6 +14,7 @@
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
 #include "r36sx_profile.h"
+#include "../../common/r36sx_screen_keyboard.h"
 
 static uint16_t ALIGN(4, SCREEN[640 * 480]);
 uint8_t ALIGN(4, DEBUG_VRAM[80 * 10]) = {0};
@@ -900,6 +901,29 @@ static inline void renderer() {
 extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
     // Convert X11 keycode to PC scancode
     unsigned char scancode = 0;
+    int extended = 0;
+
+    if (keycode == R36SX_SCREEN_KEY_PAUSE) {
+        if (isKeyDown) {
+            static const uint8_t pause_make[] = {
+                0xE1, 0x1D, 0x45, 0xE1, 0x9D, 0xC5
+            };
+            for (size_t i = 0; i < sizeof(pause_make); i++) {
+                r36sx_keyboard_enqueue_scancode(pause_make[i]);
+            }
+        }
+        return;
+    }
+
+    if (keycode == R36SX_SCREEN_KEY_PRINT) {
+        static const uint8_t print_make[] = {0xE0, 0x2A, 0xE0, 0x37};
+        static const uint8_t print_break[] = {0xE0, 0xB7, 0xE0, 0xAA};
+        const uint8_t *seq = isKeyDown ? print_make : print_break;
+        for (size_t i = 0; i < sizeof(print_make); i++) {
+            r36sx_keyboard_enqueue_scancode(seq[i]);
+        }
+        return;
+    }
 
     switch (keycode) {
         case 27: scancode = 0x01;
@@ -1022,8 +1046,22 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // Ctrl
         case 18: scancode = 0x38;
             break; // Alt
+        case 20: scancode = 0x3A;
+            break; // Caps Lock
+        case 33: scancode = 0x49; extended = 1;
+            break; // Page Up
+        case 34: scancode = 0x51; extended = 1;
+            break; // Page Down
+        case 35: scancode = 0x4F; extended = 1;
+            break; // End
+        case 36: scancode = 0x47; extended = 1;
+            break; // Home
+        case 45: scancode = 0x52; extended = 1;
+            break; // Insert
         case 46: scancode = 0x53;
             break; // Delete
+        case 145: scancode = 0x46;
+            break; // Scroll Lock
         case 186: scancode = 0x27;
             break; // ; / :
         case 187: scancode = 0x0D;
@@ -1055,6 +1093,9 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
     }
 
     if (scancode != 0) {
+        if (extended) {
+            r36sx_keyboard_enqueue_scancode(0xE0);
+        }
         r36sx_keyboard_enqueue_scancode((uint8_t)scancode);
     }
 }

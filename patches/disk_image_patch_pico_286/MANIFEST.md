@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 PC-style on-screen keyboard layout
+
+The patch binary now uses a compact PC-style on-screen keyboard.  The top row
+has `Esc` and `F1` through `F12`, the right-side block has `Print Screen`,
+`Scroll Lock`, `Pause`, `Insert`, `Home`, `Page Up`, `Delete`, `End`,
+`Page Down`, and cursor arrows, and the taller key rows scroll vertically
+inside the fixed bottom panel.  The keyboard path also maps these new virtual
+keys to PC scancodes, including multi-byte Print Screen and Pause sequences.
+
+```text
+pico_286 size: 440636 bytes
+pico_286 SHA256: A4B2683B4587D64A15882F90D9FEB838B5EB46A120E93AE914902B3099122F02
+Defender scan: found no threats
+```
+
 ## 2026-05-31 HDD2 200 MiB image
 
 `MIPS_NATIVE/pico_286/images/hdd2.hdd` was recreated as a 200 MiB FAT16/MBR

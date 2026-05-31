@@ -76,8 +76,7 @@ directory is only for compiler output:
   available through the build option below.
 - `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
   `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
-  `81h`.  The same config also controls the optional on-screen keyboard cursor
-  block.  If the file is absent, it uses built-in defaults from `image_dir`:
+  `81h`.  If the file is absent, it uses built-in defaults from `image_dir`:
   `FreeDOS1.img`, `sopwith.img`, `hdd.hdd`, and `hdd2.hdd`.
 - `network-redirector.c.inl` overrides the upstream host filesystem redirector
   so DOS drive `H:` maps to the configured `host_drive_path` instead of the

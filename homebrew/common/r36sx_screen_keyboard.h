@@ -20,14 +20,23 @@ enum {
     R36SX_SCREEN_KEY_SHIFT = 16,
     R36SX_SCREEN_KEY_CONTROL = 17,
     R36SX_SCREEN_KEY_MENU = 18,
+    R36SX_SCREEN_KEY_PAUSE = 19,
+    R36SX_SCREEN_KEY_CAPITAL = 20,
     R36SX_SCREEN_KEY_ESCAPE = 27,
     R36SX_SCREEN_KEY_SPACE = 32,
+    R36SX_SCREEN_KEY_PRIOR = 33,
+    R36SX_SCREEN_KEY_NEXT = 34,
+    R36SX_SCREEN_KEY_END = 35,
+    R36SX_SCREEN_KEY_HOME = 36,
     R36SX_SCREEN_KEY_LEFT = 37,
     R36SX_SCREEN_KEY_UP = 38,
     R36SX_SCREEN_KEY_RIGHT = 39,
     R36SX_SCREEN_KEY_DOWN = 40,
+    R36SX_SCREEN_KEY_PRINT = 44,
+    R36SX_SCREEN_KEY_INSERT = 45,
     R36SX_SCREEN_KEY_DELETE = 46,
     R36SX_SCREEN_KEY_F1 = 112,
+    R36SX_SCREEN_KEY_SCROLL = 145,
     R36SX_SCREEN_KEY_OEM_1 = 186,
     R36SX_SCREEN_KEY_OEM_PLUS = 187,
     R36SX_SCREEN_KEY_OEM_COMMA = 188,
@@ -51,6 +60,7 @@ struct r36sx_screen_keyboard {
     uint8_t alt;
     uint8_t symbol_mode;
     uint8_t cursor_block;
+    uint8_t scroll_y;
     uint8_t press_zone;
     uint8_t press_row;
     uint8_t press_col;

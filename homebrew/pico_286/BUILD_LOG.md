@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-05-31 PC-style on-screen keyboard layout
+
+Reworked the shared on-screen keyboard module toward a compact PC keyboard
+layout:
+
+- the first row now contains `Esc` and `F1` through `F12`;
+- the normal keyboard uses wider modifier/space/enter/backspace keys;
+- the right-side block is enabled for the DOS keyboard and contains
+  `Print Screen`, `Scroll Lock`, `Pause`, `Insert`, `Home`, `Page Up`,
+  `Delete`, `End`, `Page Down`, and cursor arrows;
+- the panel keeps taller keys and larger labels, then scrolls the key rows
+  vertically inside the fixed bottom keyboard area with a small scrollbar.
+
+Added keycode/scancode support for Caps Lock, Insert, Home, Page Up, End,
+Page Down, Scroll Lock, Pause, and Print Screen.  Print Screen and Pause send
+their multi-byte PC set-1 sequences through the existing emulated keyboard
+queue.  The key preset picker can now name and assign these new keys as well.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+Result:
+
+- `pico_286` size: `440636` bytes
+- `pico_286` SHA256:
+  `A4B2683B4587D64A15882F90D9FEB838B5EB46A120E93AE914902B3099122F02`
+
+Verification: rebuilt only the normal WSL/GCC binary, copied it to
+`disk_image` and the Pico-286 patch, and scanned all three `pico_286` copies
+with `tools/scan-download.ps1`; Defender found no threats.  DSP side builds
+remain paused and were not rebuilt.
+
 ## 2026-05-31 protected-mode selector instructions
 
 Added the missing 286/386 selector-validation instructions used by protected

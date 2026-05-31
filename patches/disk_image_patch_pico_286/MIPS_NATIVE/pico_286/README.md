@@ -64,12 +64,15 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
-DOS keyboard does not show the right-side cursor-key block; that block is only
-shown by the key picker inside the preset editor.  The keyboard panel is drawn
-edge-to-edge along the bottom of the screen, keeps the header/status text, and
-uses a one-pixel inner gap around the key rows at the panel border.  A pressed
-virtual key shifts down-right and darkens until the physical button is
-released.  While the keyboard is visible, Pico-286 compresses only the active
+DOS keyboard now uses a PC-style layout with Esc/F1-F12 on the top row and a
+right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
+navigation, Delete/End/Page Down, and cursor arrows.  Taller key rows scroll
+inside the fixed bottom panel, with a small scrollbar at the right edge.  The
+keyboard panel is drawn edge-to-edge along the bottom of the screen, keeps the
+header/status text, and uses a one-pixel inner gap around the key rows at the
+panel border.  A pressed virtual key shifts down-right and darkens until the
+physical button is released.  While the keyboard is visible, Pico-286
+compresses only the active
 height of the emulated video mode into the remaining screen area; normal DOS
 text mode uses its 400 drawn rows rather than the full 480-pixel framebuffer.
 Set `[video] keyboard_mode=overlay` to draw the keyboard over the DOS image
