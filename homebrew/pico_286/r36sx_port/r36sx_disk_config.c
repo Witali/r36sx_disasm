@@ -45,10 +45,10 @@ static r36sx_pico286_disk_entry_t disk_entries[] = {
       R36SX_PICO286_IMAGES_DIR "/FreeDOS1.img", 1 },
     { 1, "fdd1", "drive1", "sopwith.img",
       R36SX_PICO286_IMAGES_DIR "/sopwith.img", 1 },
-    { 128, "hdd0", "drive128", "hdd.img",
-      R36SX_PICO286_IMAGES_DIR "/hdd.img", 1 },
-    { 129, "hdd1", "drive129", "hdd2.img",
-      R36SX_PICO286_IMAGES_DIR "/hdd2.img", 1 },
+    { 128, "hdd0", "drive128", "hdd.hdd",
+      R36SX_PICO286_IMAGES_DIR "/hdd.hdd", 1 },
+    { 129, "hdd1", "drive129", "hdd2.hdd",
+      R36SX_PICO286_IMAGES_DIR "/hdd2.hdd", 1 },
 };
 
 static int disk_config_loaded = 0;
@@ -1491,7 +1491,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[host_drive]\n");
     fprintf(fp, "host_drive_path=%s\n\n", host_drive_value);
 
-    fprintf(fp, "# Directory that contains .img files used by short file names below.\n");
+    fprintf(fp, "# Directory that contains disk images used by short file names below.\n");
     fprintf(fp, "# Relative paths are resolved next to pico_286.conf.\n");
     fprintf(fp, "[disk_images]\n");
     fprintf(fp, "image_dir=%s\n\n", image_dir_value);

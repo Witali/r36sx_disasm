@@ -85,9 +85,10 @@ Open it with Fn+Select.
 - A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
 
-The menu searches for `.img` files in the configured `image_dir`.  If the BIOS
-mode changes, `SAVE/APPLY` also requests a soft reset so the selected ROM
-starts.
+The menu searches the configured `image_dir` by drive type.  Floppy rows accept
+`.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and `.dsk`; hard-disk rows accept
+`.hdd`, `.hd`, `.hdi`, and `.raw`.  If the BIOS mode changes, `SAVE/APPLY`
+also requests a soft reset so the selected ROM starts.
 
 ## Disk Image Cache
 
@@ -148,9 +149,9 @@ fdd0=FreeDOS1.img
 fdd1=sopwith.img
 
 [hard_drives]
-hdd0=hdd.img
+hdd0=hdd.hdd
 hdd0_geometry=65,16,63
-hdd1=hdd2.img
+hdd1=hdd2.hdd
 hdd1_geometry=65,16,63
 ```
 

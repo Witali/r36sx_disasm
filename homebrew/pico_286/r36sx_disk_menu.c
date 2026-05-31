@@ -25,20 +25,24 @@
 #define R36SX_DISK_BIOS_NORMAL 0u
 #define R36SX_DISK_BIOS_TEST386 1u
 
+#define R36SX_DISK_IMAGE_FLOPPY 0x01u
+#define R36SX_DISK_IMAGE_HARD 0x02u
+
 extern uint8_t insertdisk(uint8_t drivenum, const char *pathname);
 
 struct r36sx_disk_drive_info {
     uint8_t bios_drive;
+    uint8_t image_mask;
     const char *config_key;
     const char *label;
     const char *fallback;
 };
 
 static const struct r36sx_disk_drive_info g_drives[] = {
-    { 0, "fdd0", "FDD0 A:", "FreeDOS1.img" },
-    { 1, "fdd1", "FDD1 B:", "sopwith.img" },
-    { 128, "hdd0", "HDD0 C:", "hdd.img" },
-    { 129, "hdd1", "HDD1 D:", "hdd2.img" },
+    { 0, R36SX_DISK_IMAGE_FLOPPY, "fdd0", "FDD0 A:", "FreeDOS1.img" },
+    { 1, R36SX_DISK_IMAGE_FLOPPY, "fdd1", "FDD1 B:", "sopwith.img" },
+    { 128, R36SX_DISK_IMAGE_HARD, "hdd0", "HDD0 C:", "hdd.hdd" },
+    { 129, R36SX_DISK_IMAGE_HARD, "hdd1", "HDD1 D:", "hdd2.hdd" },
 };
 
 static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
@@ -221,18 +225,74 @@ static void draw_text(uint16_t *frame, int width, int height, int stride,
     }
 }
 
-static int ends_with_img(const char *name)
+static int ext_equals(const char *left, const char *right)
 {
-    size_t len = strlen(name);
+    while (*left && *right) {
+        if (tolower((unsigned char)*left) !=
+            tolower((unsigned char)*right)) {
+            return 0;
+        }
+        left++;
+        right++;
+    }
+    return *left == '\0' && *right == '\0';
+}
 
-    if (len < 5) {
+static const char *file_extension(const char *name)
+{
+    const char *dot;
+    const char *slash;
+    const char *backslash;
+    const char *sep;
+
+    if (!name) {
+        return "";
+    }
+    dot = strrchr(name, '.');
+    if (!dot) {
+        return "";
+    }
+    slash = strrchr(name, '/');
+    backslash = strrchr(name, '\\');
+    sep = slash && (!backslash || slash > backslash) ? slash : backslash;
+    if (sep && dot < sep) {
+        return "";
+    }
+    return dot;
+}
+
+static uint8_t image_mask_for_name(const char *name)
+{
+    const char *ext = file_extension(name);
+
+    if (ext_equals(ext, ".img") || ext_equals(ext, ".ima") ||
+        ext_equals(ext, ".flp") || ext_equals(ext, ".fdd") ||
+        ext_equals(ext, ".vfd") || ext_equals(ext, ".dsk")) {
+        return R36SX_DISK_IMAGE_FLOPPY;
+    }
+    if (ext_equals(ext, ".hdd") || ext_equals(ext, ".hd") ||
+        ext_equals(ext, ".hdi") || ext_equals(ext, ".raw")) {
+        return R36SX_DISK_IMAGE_HARD;
+    }
+    return 0;
+}
+
+static int image_allowed_for_drive(int drive, const char *name)
+{
+    if (drive < 0 || drive >= R36SX_DISK_MENU_DRIVE_COUNT) {
         return 0;
     }
-    name += len - 4;
-    return tolower((unsigned char)name[0]) == '.' &&
-           tolower((unsigned char)name[1]) == 'i' &&
-           tolower((unsigned char)name[2]) == 'm' &&
-           tolower((unsigned char)name[3]) == 'g';
+    return (image_mask_for_name(name) & g_drives[drive].image_mask) != 0;
+}
+
+static int first_image_for_drive(const struct r36sx_disk_menu *menu, int drive)
+{
+    for (int i = 0; i < menu->image_count; i++) {
+        if (image_allowed_for_drive(drive, menu->images[i])) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 static int image_index(const struct r36sx_disk_menu *menu, const char *name)
@@ -283,7 +343,7 @@ static void scan_image_dir(struct r36sx_disk_menu *menu, const char *dir,
         if (entry->d_name[0] == '.') {
             continue;
         }
-        if (ends_with_img(entry->d_name)) {
+        if (image_mask_for_name(entry->d_name) != 0) {
             char value[R36SX_DISK_MENU_IMAGE_NAME_LEN];
             snprintf(value, sizeof(value), "%s%s",
                      value_prefix ? value_prefix : "", entry->d_name);
@@ -320,14 +380,22 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
         const char *current = r36sx_pico286_disk_value(
             g_drives[i].bios_drive, g_drives[i].fallback);
         int index = image_index(menu, current);
+        if (!image_allowed_for_drive((int)i, current)) {
+            current = g_drives[i].fallback;
+            index = image_index(menu, current);
+        }
         if (index < 0) {
             index = add_image(menu, current);
+        }
+        if (index < 0 || !image_allowed_for_drive((int)i,
+                                                  menu->images[index])) {
+            index = first_image_for_drive(menu, (int)i);
         }
         menu->selected_image[i] = (uint8_t)(index >= 0 ? index : 0);
     }
 
     if (menu->image_count == 0) {
-        add_image(menu, "hdd.img");
+        add_image(menu, "hdd.hdd");
     }
 
     count = r36sx_pico286_boot_order(order, (uint8_t)sizeof(order));
@@ -349,6 +417,7 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
 static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
 {
     int next;
+    int count;
 
     if (drive < 0 || drive >= R36SX_DISK_MENU_DRIVE_COUNT ||
         menu->image_count == 0) {
@@ -356,12 +425,18 @@ static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
     }
 
     next = (int)menu->selected_image[drive] + direction;
-    if (next < 0) {
-        next = (int)menu->image_count - 1;
-    } else if (next >= menu->image_count) {
-        next = 0;
+    for (count = 0; count < menu->image_count; count++) {
+        if (next < 0) {
+            next = (int)menu->image_count - 1;
+        } else if (next >= menu->image_count) {
+            next = 0;
+        }
+        if (image_allowed_for_drive(drive, menu->images[next])) {
+            menu->selected_image[drive] = (uint8_t)next;
+            return;
+        }
+        next += direction;
     }
-    menu->selected_image[drive] = (uint8_t)next;
 }
 
 static void cycle_boot_order(struct r36sx_disk_menu *menu, int direction)

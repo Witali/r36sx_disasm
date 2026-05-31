@@ -44,6 +44,14 @@ __pycache__/
 *.tar.gz
 *.tgz
 *.img
+*.ima
+*.flp
+*.fdd
+*.vfd
+*.dsk
+*.hdd
+*.hdi
+*.raw
 *.iso
 *.bin
 homebrew/pico_286/tests/test386.asm/build/

@@ -75,8 +75,8 @@ directory is only for compiler output:
 - `r36sx_disk_config.c` reads `pico_286.conf` from the app directory and maps
   `fdd0`, `fdd1`, `hdd0`, and `hdd1` to BIOS drives `00h`, `01h`, `80h`, and
   `81h`.  The same config also controls the optional on-screen keyboard cursor
-  block.  If the file is absent, it falls back to the legacy internal disk
-  names `fdd0.img`, `fdd1.img`, `hdd.img`, and `hdd2.img`.
+  block.  If the file is absent, it uses built-in defaults from `image_dir`:
+  `FreeDOS1.img`, `sopwith.img`, `hdd.hdd`, and `hdd2.hdd`.
 - `network-redirector.c.inl` overrides the upstream host filesystem redirector
   so DOS drive `H:` maps to the configured `host_drive_path` instead of the
   upstream Linux default `/tmp`.
@@ -159,8 +159,9 @@ means B deletes a character and X closes the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
-or A/Y on a drive row cycles through `.img` files found in the configured
-`image_dir`.
+or A/Y on a drive row cycles through matching files found in the configured
+`image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
+`.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
 The
 `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try the
 floppy or hard disk first.  The `SAVE/APPLY` row writes current bindings to
@@ -203,7 +204,7 @@ configurable with `scaling_filter=nearest` or `scaling_filter=bilinear`.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
 `pico_286.conf` lives next to the executable, `image_dir` points at the
-subdirectory with `.img` files, and drive bindings use short file names:
+subdirectory with disk images, and drive bindings use short file names:
 
 ```ini
 [cpu]
@@ -262,9 +263,9 @@ fdd0=FreeDOS1.img
 fdd1=sopwith.img
 
 [hard_drives]
-hdd0=hdd.img
+hdd0=hdd.hdd
 hdd0_geometry=65,16,63
-hdd1=hdd2.img
+hdd1=hdd2.hdd
 hdd1_geometry=65,16,63
 ```
 
@@ -389,7 +390,8 @@ loads the external 64 KB BIOS ROM named by `test_bios_rom`, which defaults to
 from `image_dir`; leaving a value empty disables that drive.  If
 `pico_286.conf` is missing, `image_dir` defaults to `images`.  Additional
 images should be placed in `image_dir` and selected through the disk image
-menu.
+menu.  `.img` remains a floppy-only extension in the menu so the FreeDOS
+diskettes keep their original names; hard disks use `.hdd` by default.
 
 `hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
 `cylinders,heads,sectors` order.  The current bundled hard disk images are
@@ -407,9 +409,9 @@ a separate Sopwith game floppy:
 - `FreeDOS7.img`: `144m/x86DSK06.img`, sixth FreeDOS package floppy.
 - `sopwith.img`: 1.44 MB FAT12 floppy with Sopwith (The Author's Edition),
   available as DOS `B:` in the current `pico_286.conf`.
-- `hdd.img`: 33,546,240-byte hard disk image with MBR and one FAT16 primary
+- `hdd.hdd`: 33,546,240-byte hard disk image with MBR and one FAT16 primary
   partition, 65 cylinders, 16 heads, 63 sectors.
-- `hdd2.img`: second FAT16 hard disk image with the same geometry.
+- `hdd2.hdd`: second FAT16 hard disk image with the same geometry.
 
 The hard disk images are generated on the host with
 `tools/create_fat16_hdd.py`.  This avoids booting DOS with a completely blank

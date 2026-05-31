@@ -18,8 +18,8 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/images/FreeDOS6.img`
 - `MIPS_NATIVE/pico_286/images/FreeDOS7.img`
 - `MIPS_NATIVE/pico_286/images/sopwith.img`
-- `MIPS_NATIVE/pico_286/images/hdd.img`
-- `MIPS_NATIVE/pico_286/images/hdd2.img`
+- `MIPS_NATIVE/pico_286/images/hdd.hdd`
+- `MIPS_NATIVE/pico_286/images/hdd2.hdd`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 
@@ -32,12 +32,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 drive-type image extensions
+
+The current `pico_286` binary filters disk menu choices by drive type.
+Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and `.dsk`; hard-disk
+rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.  `.img` stays floppy-only so the
+FreeDOS disks keep their original names.  The bundled hard-disk images are now
+`images/hdd.hdd` and `images/hdd2.hdd`.
+
+pico_286 size: 1406268 bytes
+pico_286 SHA256: 3ACBCB6CF26D6FE424FB55EE6EF2CEC5AB8091C774C3069DD7C1460D41FD68E5
+
 ## 2026-05-31 configurable image directory
 
 The current `pico_286` binary reads `[disk_images] image_dir=images` from
 `pico_286.conf`.  Drive bindings now store only file names, for example
-`fdd0=FreeDOS1.img` and `hdd0=hdd.img`; those names are resolved inside
-`image_dir`.  The disk menu scans only that configured image directory.
+`fdd0=FreeDOS1.img` and `hdd0=hdd.hdd`; those names are resolved inside
+`image_dir`.  The disk menu scans that configured image directory by drive
+type: `.img` stays floppy-only, while bundled hard disks use `.hdd`.
 
 pico_286 size: 1398776 bytes
 pico_286 SHA256: E5BE7E33C4858A223C1A89E3CCDD63376E94A6C069C462EAB5390DF25407F20C

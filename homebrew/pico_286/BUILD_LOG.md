@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-05-31 drive-type image extensions
+
+Separated disk image selection by emulated drive type.
+
+- Floppy drive rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and `.dsk`.
+- Hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
+- `.img` remains floppy-only so the FreeDOS floppy images keep their original
+  names.
+- Bundled hard-disk images are now named `hdd.hdd` and `hdd2.hdd`.
+- `.hdd` and other disk-image extensions were added to `.gitignore` so large
+  raw images are not staged accidentally.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1406268` bytes
+- `pico_286` SHA256:
+  `3ACBCB6CF26D6FE424FB55EE6EF2CEC5AB8091C774C3069DD7C1460D41FD68E5`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 configurable image directory
 
 Moved the Pico-286 disk image directory into `pico_286.conf`.
