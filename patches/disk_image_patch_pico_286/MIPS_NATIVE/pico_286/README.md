@@ -195,8 +195,11 @@ Set `screenshot_format=png` for compressed screenshots or
 
 Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
-instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
-Set it to `0` to disable the shortcut and overlay.
+instruction loops in K/s, host disk image read/write KB/s, and presented FPS
+using a compact pixel font.  The rendered block is cached between one-second
+statistics samples; direct-present frames only save the covered rectangle,
+blit the cached block, present, and restore the previous pixels.  Set it to
+`0` to disable the shortcut and overlay.
 
 Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps
@@ -206,7 +209,9 @@ after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,
 disk menu, and key preset editor.  The small disk activity LED is drawn into
-`SCREEN` only for the present call, then its saved rectangle is restored.
+`SCREEN` only for the present call, then its saved rectangle is restored.  The
+statistics overlay uses the same saved-rectangle path when no large menu or
+keyboard overlay is active.
 
 This build also enables the computed-goto CPU opcode dispatcher, so the main
 `exec86()` loop jumps directly to opcode handlers instead of entering the large

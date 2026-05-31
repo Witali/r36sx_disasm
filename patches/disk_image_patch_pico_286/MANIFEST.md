@@ -32,6 +32,17 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 cached pixel-font stats overlay
+
+The current `pico_286` binary draws the `Fn` + D-pad `Down` statistics overlay
+with a compact built-in pixel font.  The rendered stats block is cached between
+one-second statistics samples.  When no large menu or keyboard overlay is
+active, the block is drawn into `SCREEN` using the same save/present/restore
+path as the disk activity LED instead of forcing full-frame composition.
+
+pico_286 size: 1350728 bytes
+pico_286 SHA256: D379B1E0CA43D28A40FB1E8A760E8DE4672514EBA27A9F2A44B6CCE64570D1B5
+
 ## 2026-05-31 configurable scaling filter
 
 The current `pico_286` binary reads `[video] scaling_filter` from

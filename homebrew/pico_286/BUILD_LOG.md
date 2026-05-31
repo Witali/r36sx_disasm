@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-31 cached pixel-font stats overlay
+
+Changed the `Fn` + D-pad `Down` statistics overlay to avoid full-frame
+composition when it is the only overlay on screen.
+
+- The statistics table now uses a small built-in pixel font instead of the
+  regular 8x8 font path.
+- The rendered stats block is cached in a small RGB565 buffer and refreshed at
+  most once per second, matching the statistics sampling period.
+- Direct-present frames save the covered `SCREEN` rectangle, blit the cached
+  stats block, present through `driver.so`, and then restore the original
+  pixels, matching the disk LED approach.
+- Statistics no longer make `mfb_update()` enter the large-overlay composition
+  path by themselves.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1350728` bytes
+- `pico_286` SHA256:
+  `D379B1E0CA43D28A40FB1E8A760E8DE4672514EBA27A9F2A44B6CCE64570D1B5`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 configurable scaling filter
 
 Added a configurable scaling filter for cases where the DOS image is resized

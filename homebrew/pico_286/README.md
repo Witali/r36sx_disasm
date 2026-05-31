@@ -28,7 +28,9 @@ integration pieces:
 - `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
   lower-right corner when the emulator reads or writes disk image sectors.  In
   direct-present mode it saves and restores the small LED rectangle instead of
-  copying the whole framebuffer.
+  copying the whole framebuffer.  The app statistics overlay uses the same
+  saved-rectangle path and caches its pixel-font block between one-second
+  statistics refreshes.
 - `r36sx_pico286_compat.h` is forced into the build to provide POSIX prototypes
   and harmless Pico PSRAM/swap stubs for upstream branches that are parsed but
   not used by the Linux/host configuration.
@@ -316,8 +318,11 @@ shortcuts.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a lower-right
 two-column overlay above the disk LED.  It shows decoded x86 instruction loops
-in K/s, host disk image read/write KB/s, and presented FPS.  Set it to `0` to
-disable the shortcut and overlay.
+in K/s, host disk image read/write KB/s, and presented FPS using a compact
+pixel font.  The rendered block is cached between one-second statistics
+samples; direct-present frames only save the covered rectangle, blit the cached
+block, present, and restore the previous pixels.  Set it to `0` to disable the
+shortcut and overlay.
 
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are

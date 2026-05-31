@@ -47,6 +47,13 @@
 #define R36SX_PICO286_SCREENSHOT_PREVIEW_H 120
 #define R36SX_PICO286_KEY_REPEAT_DELAY_US 420000ull
 #define R36SX_PICO286_KEY_REPEAT_INTERVAL_US 70000ull
+#define R36SX_PICO286_SAVED_RECT_MAX_PIXELS (192 * 96)
+#define R36SX_PICO286_STATS_CACHE_REFRESH_MS 1000u
+#define R36SX_PICO286_STATS_FONT_W 3
+#define R36SX_PICO286_STATS_FONT_H 5
+#define R36SX_PICO286_STATS_FONT_SCALE 2
+#define R36SX_PICO286_STATS_CHAR_ADVANCE \
+    ((R36SX_PICO286_STATS_FONT_W + 1) * R36SX_PICO286_STATS_FONT_SCALE)
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -63,6 +70,7 @@ struct r36sx_mfb_driver {
     cube_ioctl_fn cube_ioctl;
     uint16_t *frame;
     uint16_t *base_frame;
+    uint16_t *stats_overlay;
     uint16_t *screenshot_preview;
     int width;
     int height;
@@ -91,11 +99,17 @@ struct r36sx_mfb_driver {
     uint8_t screenshot_toast_success;
     uint8_t screenshot_preview_valid;
     uint8_t fn_help_visible;
+    uint8_t stats_overlay_valid;
     int base_content_h;
     int base_source_h;
     r36sx_pico286_scaling_filter_t base_scaling_filter;
+    int stats_overlay_x;
+    int stats_overlay_y;
+    int stats_overlay_w;
+    int stats_overlay_h;
     uint32_t base_generation;
     uint32_t presented_generation;
+    uint32_t stats_overlay_last_ms;
     uint32_t screenshot_counter;
     uint32_t screenshot_toast_until_ms;
 };
@@ -105,8 +119,7 @@ struct r36sx_mfb_saved_rect {
     int y;
     int w;
     int h;
-    uint16_t pixels[R36SX_PICO286_DISK_LED_DIAMETER *
-                    R36SX_PICO286_DISK_LED_DIAMETER];
+    uint16_t pixels[R36SX_PICO286_SAVED_RECT_MAX_PIXELS];
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -167,8 +180,10 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
                       ((uint16_t)b >> 3));
 }
 
-static void r36sx_mfb_fill_rect_target(uint16_t *target, int x, int y,
-                                       int w, int h, uint16_t color)
+static void r36sx_mfb_fill_rect_surface(uint16_t *target, int surface_w,
+                                        int surface_h, int stride_pixels,
+                                        int x, int y, int w, int h,
+                                        uint16_t color)
 {
     if (!target || w <= 0 || h <= 0) {
         return;
@@ -181,23 +196,30 @@ static void r36sx_mfb_fill_rect_target(uint16_t *target, int x, int y,
         h += y;
         y = 0;
     }
-    if (x + w > g_mfb.width) {
-        w = g_mfb.width - x;
+    if (x + w > surface_w) {
+        w = surface_w - x;
     }
-    if (y + h > g_mfb.height) {
-        h = g_mfb.height - y;
+    if (y + h > surface_h) {
+        h = surface_h - y;
     }
     if (w <= 0 || h <= 0) {
         return;
     }
 
     for (int row = 0; row < h; row++) {
-        uint16_t *dst = target + (size_t)(y + row) * (size_t)g_mfb.width +
+        uint16_t *dst = target + (size_t)(y + row) * (size_t)stride_pixels +
                         (size_t)x;
         for (int col = 0; col < w; col++) {
             dst[col] = color;
         }
     }
+}
+
+static void r36sx_mfb_fill_rect_target(uint16_t *target, int x, int y,
+                                       int w, int h, uint16_t color)
+{
+    r36sx_mfb_fill_rect_surface(target, g_mfb.width, g_mfb.height,
+                                g_mfb.width, x, y, w, h, color);
 }
 
 static void r36sx_mfb_stroke_rect(uint16_t *target, int x, int y, int w,
@@ -207,6 +229,21 @@ static void r36sx_mfb_stroke_rect(uint16_t *target, int x, int y, int w,
     r36sx_mfb_fill_rect_target(target, x, y + h - 1, w, 1, color);
     r36sx_mfb_fill_rect_target(target, x, y, 1, h, color);
     r36sx_mfb_fill_rect_target(target, x + w - 1, y, 1, h, color);
+}
+
+static void r36sx_mfb_stroke_rect_surface(uint16_t *target, int surface_w,
+                                          int surface_h, int stride_pixels,
+                                          int x, int y, int w, int h,
+                                          uint16_t color)
+{
+    r36sx_mfb_fill_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                x, y, w, 1, color);
+    r36sx_mfb_fill_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                x, y + h - 1, w, 1, color);
+    r36sx_mfb_fill_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                x, y, 1, h, color);
+    r36sx_mfb_fill_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                x + w - 1, y, 1, h, color);
 }
 
 static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
@@ -237,76 +274,282 @@ static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
     }
 }
 
+static const uint8_t *r36sx_mfb_stats_glyph(char ch)
+{
+    static const uint8_t blank[5] = { 0, 0, 0, 0, 0 };
+    static const uint8_t digits[10][5] = {
+        { 7, 5, 5, 5, 7 },
+        { 2, 6, 2, 2, 7 },
+        { 7, 1, 7, 4, 7 },
+        { 7, 1, 7, 1, 7 },
+        { 5, 5, 7, 1, 1 },
+        { 7, 4, 7, 1, 7 },
+        { 7, 4, 7, 5, 7 },
+        { 7, 1, 2, 2, 2 },
+        { 7, 5, 7, 5, 7 },
+        { 7, 5, 7, 1, 7 }
+    };
+    static const uint8_t slash[5] = { 1, 1, 2, 4, 4 };
+    static const uint8_t glyph_a[5] = { 7, 5, 7, 5, 5 };
+    static const uint8_t glyph_d[5] = { 6, 5, 5, 5, 6 };
+    static const uint8_t glyph_e[5] = { 7, 4, 6, 4, 7 };
+    static const uint8_t glyph_f[5] = { 7, 4, 6, 4, 4 };
+    static const uint8_t glyph_i[5] = { 7, 2, 2, 2, 7 };
+    static const uint8_t glyph_k[5] = { 5, 5, 6, 5, 5 };
+    static const uint8_t glyph_p[5] = { 6, 5, 6, 4, 4 };
+    static const uint8_t glyph_r[5] = { 6, 5, 6, 5, 5 };
+    static const uint8_t glyph_s[5] = { 7, 4, 7, 1, 7 };
+    static const uint8_t glyph_t[5] = { 7, 2, 2, 2, 2 };
+    static const uint8_t glyph_w[5] = { 5, 5, 5, 7, 5 };
+    static const uint8_t glyph_x[5] = { 5, 5, 2, 5, 5 };
+
+    if (ch >= '0' && ch <= '9') {
+        return digits[ch - '0'];
+    }
+    if (ch >= 'a' && ch <= 'z') {
+        ch = (char)(ch - 'a' + 'A');
+    }
+
+    switch (ch) {
+    case '/': return slash;
+    case 'A': return glyph_a;
+    case 'D': return glyph_d;
+    case 'E': return glyph_e;
+    case 'F': return glyph_f;
+    case 'I': return glyph_i;
+    case 'K': return glyph_k;
+    case 'P': return glyph_p;
+    case 'R': return glyph_r;
+    case 'S': return glyph_s;
+    case 'T': return glyph_t;
+    case 'W': return glyph_w;
+    case 'X': return glyph_x;
+    default: return blank;
+    }
+}
+
+static int r36sx_mfb_stats_text_width(const char *text)
+{
+    int len = text ? (int)strlen(text) : 0;
+
+    if (len <= 0) {
+        return 0;
+    }
+    return len * R36SX_PICO286_STATS_CHAR_ADVANCE -
+           R36SX_PICO286_STATS_FONT_SCALE;
+}
+
+static void r36sx_mfb_draw_stats_text_surface(uint16_t *target, int surface_w,
+                                              int surface_h,
+                                              int stride_pixels,
+                                              int x, int y,
+                                              const char *text,
+                                              uint16_t color)
+{
+    for (int i = 0; text && text[i] != '\0'; i++) {
+        const uint8_t *glyph = r36sx_mfb_stats_glyph(text[i]);
+        int char_x = x + i * R36SX_PICO286_STATS_CHAR_ADVANCE;
+
+        for (int row = 0; row < R36SX_PICO286_STATS_FONT_H; row++) {
+            uint8_t bits = glyph[row];
+            for (int col = 0; col < R36SX_PICO286_STATS_FONT_W; col++) {
+                if ((bits & (uint8_t)(1u << (R36SX_PICO286_STATS_FONT_W -
+                                             1 - col))) == 0) {
+                    continue;
+                }
+                r36sx_mfb_fill_rect_surface(
+                    target,
+                    surface_w,
+                    surface_h,
+                    stride_pixels,
+                    char_x + col * R36SX_PICO286_STATS_FONT_SCALE,
+                    y + row * R36SX_PICO286_STATS_FONT_SCALE,
+                    R36SX_PICO286_STATS_FONT_SCALE,
+                    R36SX_PICO286_STATS_FONT_SCALE,
+                    color);
+            }
+        }
+    }
+}
+
 static void r36sx_mfb_disk_led_center(int *cx, int *cy);
 
-static void r36sx_mfb_draw_stats_overlay(uint16_t *target)
+struct r36sx_mfb_stats_view {
+    const char *labels[4];
+    char values[4][16];
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+static void r36sx_mfb_prepare_stats_view(struct r36sx_mfb_stats_view *view)
 {
     r36sx_app_stats_snapshot_t stats;
-    const char *labels[] = {
+    static const char *labels[] = {
         "X86",
         "READ",
         "WRITE",
         "FPS"
     };
-    char values[4][16];
-    int label_w = 5 * 8;
+    int label_w = 0;
     int value_w = 0;
-    int box_w;
-    int box_h;
-    int x;
-    int y;
     int led_cx;
     int led_cy;
-    const int pad = 5;
-    const int gap = 8;
-    const int row_h = 10;
+    const int pad = 4;
+    const int gap = 7;
+    const int row_h = 12;
     const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
 
-    if (!target || !r36sx_app_stats_is_visible()) {
-        return;
+    memset(view, 0, sizeof(*view));
+    for (int i = 0; i < 4; i++) {
+        view->labels[i] = labels[i];
     }
 
     r36sx_app_stats_snapshot(&stats);
-    snprintf(values[0], sizeof(values[0]), "%luK/s",
+    snprintf(view->values[0], sizeof(view->values[0]), "%luK/S",
              (unsigned long)(stats.x86_per_sec / 1000u));
-    snprintf(values[1], sizeof(values[1]), "%luK/s",
+    snprintf(view->values[1], sizeof(view->values[1]), "%luK/S",
              (unsigned long)stats.disk_read_kb_per_sec);
-    snprintf(values[2], sizeof(values[2]), "%luK/s",
+    snprintf(view->values[2], sizeof(view->values[2]), "%luK/S",
              (unsigned long)stats.disk_write_kb_per_sec);
-    snprintf(values[3], sizeof(values[3]), "%lu",
+    snprintf(view->values[3], sizeof(view->values[3]), "%lu",
              (unsigned long)stats.fps);
+
     for (int i = 0; i < 4; i++) {
-        int w = (int)strlen(values[i]) * 8;
-        if (w > value_w) {
-            value_w = w;
+        int lw = r36sx_mfb_stats_text_width(labels[i]);
+        int vw = r36sx_mfb_stats_text_width(view->values[i]);
+        if (lw > label_w) {
+            label_w = lw;
+        }
+        if (vw > value_w) {
+            value_w = vw;
         }
     }
 
-    box_w = pad * 2 + label_w + gap + value_w;
-    box_h = pad * 2 + 4 * row_h - 2;
+    view->w = pad * 2 + label_w + gap + value_w;
+    view->h = pad * 2 + 4 * row_h -
+              (row_h - R36SX_PICO286_STATS_FONT_H *
+                       R36SX_PICO286_STATS_FONT_SCALE);
     r36sx_mfb_disk_led_center(&led_cx, &led_cy);
-    x = led_cx + outer_radius - box_w;
-    y = led_cy - outer_radius - 4 - box_h;
-    if (x < 0) {
-        x = 0;
+    view->x = led_cx + outer_radius - view->w;
+    view->y = led_cy - outer_radius - 4 - view->h;
+    if (view->x < 0) {
+        view->x = 0;
     }
-    if (x + box_w > g_mfb.width) {
-        x = g_mfb.width - box_w;
+    if (view->x + view->w > g_mfb.width) {
+        view->x = g_mfb.width - view->w;
     }
-    if (y < 0) {
-        y = 0;
+    if (view->y < 0) {
+        view->y = 0;
+    }
+}
+
+static void r36sx_mfb_draw_stats_view_surface(
+    uint16_t *target, int surface_w, int surface_h, int stride_pixels,
+    const struct r36sx_mfb_stats_view *view)
+{
+    const int pad = 4;
+    const int gap = 7;
+    const int row_h = 12;
+    int label_w = r36sx_mfb_stats_text_width("WRITE");
+
+    if (!target || !view || view->w <= 0 || view->h <= 0) {
+        return;
     }
 
-    r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h,
-                               r36sx_mfb_rgb565(5, 8, 12));
-    r36sx_mfb_stroke_rect(target, x, y, box_w, box_h,
-                          r36sx_mfb_rgb565(70, 96, 112));
+    r36sx_mfb_fill_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                view->x, view->y, view->w, view->h,
+                                r36sx_mfb_rgb565(5, 8, 12));
+    r36sx_mfb_stroke_rect_surface(target, surface_w, surface_h, stride_pixels,
+                                  view->x, view->y, view->w, view->h,
+                                  r36sx_mfb_rgb565(70, 96, 112));
     for (int i = 0; i < 4; i++) {
-        int row_y = y + pad + i * row_h;
-        r36sx_mfb_draw_text8(target, x + pad, row_y, labels[i],
-                             r36sx_mfb_rgb565(176, 202, 214));
-        r36sx_mfb_draw_text8(target, x + pad + label_w + gap, row_y,
-                             values[i], r36sx_mfb_rgb565(236, 242, 220));
+        int row_y = view->y + pad + i * row_h;
+        r36sx_mfb_draw_stats_text_surface(target, surface_w, surface_h,
+                                          stride_pixels, view->x + pad,
+                                          row_y, view->labels[i],
+                                          r36sx_mfb_rgb565(176, 202, 214));
+        r36sx_mfb_draw_stats_text_surface(
+            target, surface_w, surface_h, stride_pixels,
+            view->x + pad + label_w + gap, row_y, view->values[i],
+            r36sx_mfb_rgb565(236, 242, 220));
+    }
+}
+
+static int r36sx_mfb_stats_cache_due(uint32_t now_ms)
+{
+    if (!g_mfb.stats_overlay_valid) {
+        return 1;
+    }
+    return (int32_t)(now_ms - g_mfb.stats_overlay_last_ms) >=
+           (int32_t)R36SX_PICO286_STATS_CACHE_REFRESH_MS;
+}
+
+static int r36sx_mfb_refresh_stats_overlay(uint32_t now_ms)
+{
+    struct r36sx_mfb_stats_view screen_view;
+    struct r36sx_mfb_stats_view cache_view;
+    size_t pixels;
+
+    if (!g_mfb.stats_overlay || !r36sx_app_stats_is_visible()) {
+        g_mfb.stats_overlay_valid = 0;
+        return 0;
+    }
+    if (!r36sx_mfb_stats_cache_due(now_ms)) {
+        return 1;
+    }
+
+    r36sx_mfb_prepare_stats_view(&screen_view);
+    pixels = (size_t)screen_view.w * (size_t)screen_view.h;
+    if (screen_view.w <= 0 || screen_view.h <= 0 ||
+        pixels > R36SX_PICO286_SAVED_RECT_MAX_PIXELS) {
+        g_mfb.stats_overlay_valid = 0;
+        return 0;
+    }
+
+    cache_view = screen_view;
+    cache_view.x = 0;
+    cache_view.y = 0;
+    memset(g_mfb.stats_overlay, 0, pixels * sizeof(g_mfb.stats_overlay[0]));
+    r36sx_mfb_draw_stats_view_surface(g_mfb.stats_overlay,
+                                      screen_view.w, screen_view.h,
+                                      screen_view.w, &cache_view);
+
+    g_mfb.stats_overlay_x = screen_view.x;
+    g_mfb.stats_overlay_y = screen_view.y;
+    g_mfb.stats_overlay_w = screen_view.w;
+    g_mfb.stats_overlay_h = screen_view.h;
+    g_mfb.stats_overlay_last_ms = now_ms;
+    g_mfb.stats_overlay_valid = 1;
+    return 1;
+}
+
+static void r36sx_mfb_blit_stats_overlay(uint16_t *target)
+{
+    if (!target || !g_mfb.stats_overlay_valid || !g_mfb.stats_overlay) {
+        return;
+    }
+
+    for (int row = 0; row < g_mfb.stats_overlay_h; row++) {
+        memcpy(target +
+                   (size_t)(g_mfb.stats_overlay_y + row) *
+                       (size_t)g_mfb.width +
+                   (size_t)g_mfb.stats_overlay_x,
+               g_mfb.stats_overlay +
+                   (size_t)row * (size_t)g_mfb.stats_overlay_w,
+               (size_t)g_mfb.stats_overlay_w *
+                   sizeof(g_mfb.stats_overlay[0]));
+    }
+}
+
+static void r36sx_mfb_draw_stats_overlay(uint16_t *target, uint32_t now_ms)
+{
+    if (!target || !r36sx_app_stats_is_visible()) {
+        return;
+    }
+    if (r36sx_mfb_refresh_stats_overlay(now_ms)) {
+        r36sx_mfb_blit_stats_overlay(target);
     }
 }
 
@@ -866,6 +1109,7 @@ static void r36sx_osk_set_visible(int visible)
         g_mfb.fn_help_visible = 0;
     }
     g_mfb.base_frame_valid = 0;
+    g_mfb.stats_overlay_valid = 0;
     g_mfb.force_present = 1;
     g_mfb.input_release_guard = 1;
     r36sx_pico286_debug_log("minifb: osk %s", visible ? "open" : "close");
@@ -877,6 +1121,7 @@ static void r36sx_osk_handle_buttons(uint32_t pressed, uint32_t held)
         &g_mfb.osk, pressed, held, r36sx_mfb_emit_osk_key, NULL);
 
     if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
+        g_mfb.stats_overlay_valid = 0;
         g_mfb.input_release_guard = 1;
         r36sx_pico286_debug_log("minifb: osk close");
     }
@@ -1003,6 +1248,7 @@ static void r36sx_mfb_toggle_stats_overlay(void)
     }
 
     r36sx_app_stats_toggle_visible();
+    g_mfb.stats_overlay_valid = 0;
     g_mfb.force_present = 1;
     r36sx_pico286_debug_log("minifb: Fn+Down stats overlay %s",
                             r36sx_app_stats_is_visible() ? "on" : "off");
@@ -1073,26 +1319,14 @@ static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms)
     }
 }
 
-static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
-                                         struct r36sx_mfb_saved_rect *saved)
+static int r36sx_mfb_save_rect(uint16_t *target, int x0, int y0, int x1,
+                               int y1, struct r36sx_mfb_saved_rect *saved)
 {
-    int cx;
-    int cy;
-    int x0;
-    int y0;
-    int x1;
-    int y1;
-    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
+    size_t pixels;
 
-    if (!target || !saved || !r36sx_mfb_disk_led_visible(now_ms)) {
+    if (!target || !saved) {
         return 0;
     }
-
-    r36sx_mfb_disk_led_center(&cx, &cy);
-    x0 = cx - outer_radius;
-    y0 = cy - outer_radius;
-    x1 = cx + outer_radius;
-    y1 = cy + outer_radius;
     if (x0 < 0) {
         x0 = 0;
     }
@@ -1113,14 +1347,74 @@ static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
     saved->y = y0;
     saved->w = x1 - x0 + 1;
     saved->h = y1 - y0 + 1;
+    pixels = (size_t)saved->w * (size_t)saved->h;
+    if (pixels > R36SX_PICO286_SAVED_RECT_MAX_PIXELS) {
+        saved->w = 0;
+        saved->h = 0;
+        return 0;
+    }
+
     for (int row = 0; row < saved->h; row++) {
         memcpy(&saved->pixels[(size_t)row * (size_t)saved->w],
                &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
                        (size_t)saved->x],
                (size_t)saved->w * sizeof(saved->pixels[0]));
     }
+    return 1;
+}
+
+static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
+                                         struct r36sx_mfb_saved_rect *saved)
+{
+    int cx;
+    int cy;
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
+
+    if (!target || !saved || !r36sx_mfb_disk_led_visible(now_ms)) {
+        return 0;
+    }
+
+    r36sx_mfb_disk_led_center(&cx, &cy);
+    x0 = cx - outer_radius;
+    y0 = cy - outer_radius;
+    x1 = cx + outer_radius;
+    y1 = cy + outer_radius;
+    if (!r36sx_mfb_save_rect(target, x0, y0, x1, y1, saved)) {
+        return 0;
+    }
 
     r36sx_mfb_draw_disk_led_on(target, now_ms);
+    return 1;
+}
+
+static int r36sx_mfb_draw_stats_saved(uint16_t *target, uint32_t now_ms,
+                                      struct r36sx_mfb_saved_rect *saved)
+{
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+
+    if (!target || !saved || !r36sx_app_stats_is_visible()) {
+        return 0;
+    }
+    if (!r36sx_mfb_refresh_stats_overlay(now_ms)) {
+        return 0;
+    }
+
+    x0 = g_mfb.stats_overlay_x;
+    y0 = g_mfb.stats_overlay_y;
+    x1 = x0 + g_mfb.stats_overlay_w - 1;
+    y1 = y0 + g_mfb.stats_overlay_h - 1;
+    if (!r36sx_mfb_save_rect(target, x0, y0, x1, y1, saved)) {
+        return 0;
+    }
+
+    r36sx_mfb_blit_stats_overlay(target);
     return 1;
 }
 
@@ -1157,7 +1451,6 @@ static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
     return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
            r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
-           r36sx_app_stats_is_visible() ||
            g_mfb.fn_help_visible ||
            g_mfb.screenshot_requested ||
            r36sx_mfb_screenshot_toast_visible(now_ms);
@@ -1534,6 +1827,9 @@ int mfb_open(const char *name, int width, int height, int scale)
                                      sizeof(g_mfb.frame[0]));
     g_mfb.base_frame = (uint16_t *)calloc((size_t)width * (size_t)height,
                                           sizeof(g_mfb.base_frame[0]));
+    g_mfb.stats_overlay =
+        (uint16_t *)calloc(R36SX_PICO286_SAVED_RECT_MAX_PIXELS,
+                           sizeof(g_mfb.stats_overlay[0]));
     g_mfb.screenshot_preview =
         (uint16_t *)calloc((size_t)R36SX_PICO286_SCREENSHOT_PREVIEW_W *
                                R36SX_PICO286_SCREENSHOT_PREVIEW_H,
@@ -1545,6 +1841,9 @@ int mfb_open(const char *name, int width, int height, int scale)
     }
     if (!g_mfb.screenshot_preview) {
         r36sx_pico286_debug_log("minifb: screenshot preview allocation failed");
+    }
+    if (!g_mfb.stats_overlay) {
+        r36sx_pico286_debug_log("minifb: stats overlay cache allocation failed");
     }
     if (r36sx_mfb_load_driver() != 0) {
         mfb_close();
@@ -1607,6 +1906,8 @@ int mfb_update(void *buffer, int fps_limit)
     int source_changed;
     int large_overlay_active;
     int disk_led_active;
+    int stats_overlay_visible;
+    int stats_refresh_due;
     int screenshot_toast_visible;
     int need_present;
     r36sx_pico286_scaling_filter_t scaling_filter;
@@ -1643,11 +1944,16 @@ int mfb_update(void *buffer, int fps_limit)
     screenshot_toast_visible = r36sx_mfb_screenshot_toast_visible(now_ms);
     large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
+    stats_overlay_visible = r36sx_app_stats_is_visible();
+    stats_refresh_due =
+        stats_overlay_visible && g_mfb.stats_overlay &&
+        r36sx_mfb_stats_cache_due(now_ms);
     need_present =
         source_changed ||
         large_overlay_active ||
         disk_led_active ||
         g_mfb.disk_led_was_active ||
+        stats_refresh_due ||
         screenshot_toast_visible ||
         g_mfb.screenshot_toast_was_visible ||
         g_mfb.force_present ||
@@ -1678,7 +1984,7 @@ int mfb_update(void *buffer, int fps_limit)
         } else {
             r36sx_osk_draw();
         }
-        r36sx_mfb_draw_stats_overlay(g_mfb.frame);
+        r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
         r36sx_mfb_draw_fn_help_overlay(g_mfb.frame);
         if (g_mfb.screenshot_requested) {
             r36sx_mfb_finish_screenshot(g_mfb.frame);
@@ -1688,7 +1994,10 @@ int mfb_update(void *buffer, int fps_limit)
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
     } else {
-        struct r36sx_mfb_saved_rect saved_led;
+        static struct r36sx_mfb_saved_rect saved_led;
+        static struct r36sx_mfb_saved_rect saved_stats;
+        int stats_saved =
+            r36sx_mfb_draw_stats_saved(src, now_ms, &saved_stats);
         int led_saved =
             r36sx_mfb_draw_disk_led_saved(src, now_ms, &saved_led);
 
@@ -1699,6 +2008,9 @@ int mfb_update(void *buffer, int fps_limit)
         r36sx_app_stats_record_frame();
         if (led_saved) {
             r36sx_mfb_restore_saved_rect(src, &saved_led);
+        }
+        if (stats_saved) {
+            r36sx_mfb_restore_saved_rect(src, &saved_stats);
         }
     }
 
@@ -1740,6 +2052,9 @@ void mfb_close(void)
     }
     if (g_mfb.base_frame) {
         free(g_mfb.base_frame);
+    }
+    if (g_mfb.stats_overlay) {
+        free(g_mfb.stats_overlay);
     }
     if (g_mfb.screenshot_preview) {
         free(g_mfb.screenshot_preview);
