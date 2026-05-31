@@ -1766,3 +1766,21 @@ pico_286.dsp size: 427564 bytes
 pico_286.dsp SHA256: 2F1EE781BAF4E3DAD76569658524861566FE22CC8528FB9D021CA5DE33D05657
 Defender scan: found no threats
 ```
+
+## 2026-05-31 32-bit protected-mode execution groundwork
+
+The current `pico_286` and `pico_286.dsp` binaries keep `CPU_IP` as 32-bit
+`EIP`, use CS descriptor D/B for default 32-bit operand/address size, let
+`66h`/`67h` toggle those sizes, use `ESP` for stack operations when SS is a
+32-bit stack segment, and avoid truncating 32-bit protected-mode calls, jumps,
+returns, and interrupt gate offsets to 16 bits.  DOS extenders may still need
+more work: paging, privilege transitions, call gates, task gates/TSS stack
+switching, DPMI/VCPI, and additional 32-bit opcode forms are still incomplete.
+
+```text
+pico_286 size: 437392 bytes
+pico_286 SHA256: E36ABD32EDB0697687802E5B446AAF85CE48B64270FD4784BDFF40CEAE2A6651
+pico_286.dsp size: 431740 bytes
+pico_286.dsp SHA256: 8D27534FA936910F7114C7EEF06CB4312EDF693BD6823829EE523A1F88A51886
+Defender scan: found no threats
+```

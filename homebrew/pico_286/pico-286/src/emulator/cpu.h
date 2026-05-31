@@ -114,7 +114,7 @@ uint32_t r36sx_cpu_segbase(uint16_t selector);
 #define CPU_BP    wordregs[regbp << 1]
 #define CPU_SP    wordregs[regsp << 1]
 extern uint32_t ip32;
-#define CPU_IP    (*(uint16_t*)&ip32)
+#define CPU_IP    ip32
 #define ip        (*(uint16_t*)&ip32)
 
 #define CPU_AL    byteregs[regal]

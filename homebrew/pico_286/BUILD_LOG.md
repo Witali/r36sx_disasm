@@ -1834,6 +1834,56 @@ Result:
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.dsp`
 
+## 2026-05-31 32-bit protected-mode execution groundwork
+
+Protected-mode DOS extenders such as the ones used by Doom need more than
+GDT/IDT entry: they normally switch to 386 code descriptors where the CS D/B
+bit makes operand and address size default to 32 bits, and the SS D/B bit makes
+stack operations use `ESP`.  The current `pico_286` and `pico_286.dsp`
+binaries now keep `CPU_IP` as a 32-bit `EIP`, mask it only for 16-bit code
+segments, toggle effective operand/address size with `66h`/`67h`, use 32-bit
+defaults from CS descriptors, and route `push`/`pop` through `ESP` when SS is a
+32-bit stack segment.  The 32-bit opcode helper also no longer truncates near
+and far 32-bit calls, jumps, returns, and protected interrupt target offsets to
+16 bits.
+
+This is still not enough to guarantee DOS/4GW or Doom compatibility.  Paging,
+privilege transitions, task gates/TSS stack switching, call gates, DPMI/VCPI,
+and missing 32-bit forms of less common opcodes remain likely blockers.
+
+Build commands:
+
+```powershell
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: 437,392 bytes
+- `pico_286` SHA256:
+  `E36ABD32EDB0697687802E5B446AAF85CE48B64270FD4784BDFF40CEAE2A6651`
+- `pico_286.dsp` size: 431,740 bytes
+- `pico_286.dsp` SHA256:
+  `8D27534FA936910F7114C7EEF06CB4312EDF693BD6823829EE523A1F88A51886`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.dsp`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.dsp`
+
 ## 2026-05-31 native fast memory path
 
 Added `R36SX_NATIVE_FAST_MEMORY`, enabled by default in both Pico-286 build

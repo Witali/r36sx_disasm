@@ -246,9 +246,39 @@ static inline void r36sx_cpu_use_segment(uint8_t segid)
     useseg_base = segbase32[segid];
 }
 
+static inline uint8_t r36sx_cpu_code_default32(void)
+{
+    return r36sx_cpu_protected_enabled() &&
+           r36sx_seg_cache[regcs].valid &&
+           r36sx_descriptor_is_code(&r36sx_seg_cache[regcs]) &&
+           (r36sx_seg_cache[regcs].flags & R36SX_DESCRIPTOR_FLAG_DB);
+}
+
+static inline uint8_t r36sx_cpu_stack_default32(void)
+{
+    return r36sx_cpu_protected_enabled() &&
+           r36sx_seg_cache[regss].valid &&
+           (r36sx_seg_cache[regss].flags & R36SX_DESCRIPTOR_FLAG_DB);
+}
+
+static inline uint32_t r36sx_cpu_mask_ip(uint32_t value)
+{
+    return r36sx_cpu_code_default32() ? value : (uint16_t)value;
+}
+
+static inline void r36sx_cpu_set_ip(uint32_t value)
+{
+    ip32 = r36sx_cpu_mask_ip(value);
+}
+
+static inline void r36sx_cpu_add_ip(int32_t delta)
+{
+    r36sx_cpu_set_ip(ip32 + (uint32_t)delta);
+}
+
 void r36sx_cpu_step_ip(uint32_t delta)
 {
-    CPU_IP = (uint16_t)(CPU_IP + delta);
+    r36sx_cpu_set_ip(ip32 + delta);
 }
 
 static inline uint32_t r36sx_cpu_linear_ea(uint32_t offset)
@@ -1417,25 +1447,63 @@ __not_in_flash() void getea(uint8_t rmval) {
 }
 
 static INLINE void push(uint16_t pushval) {
-    CPU_SP = CPU_SP - 2;
-    putmem16(CPU_SS, CPU_SP, pushval);
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP -= 2u;
+        putmem16(CPU_SS, CPU_ESP, pushval);
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP - 2u);
+        putmem16(CPU_SS, CPU_SP, pushval);
+    }
 }
 
 static INLINE uint16_t pop() {
-    uint16_t tempval = getmem16(CPU_SS, CPU_SP);
-    CPU_SP = CPU_SP + 2;
+    uint32_t sp = r36sx_cpu_stack_default32() ? CPU_ESP : CPU_SP;
+    uint16_t tempval = getmem16(CPU_SS, sp);
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP += 2u;
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP + 2u);
+    }
     return tempval;
 }
 
 static INLINE void push32(uint32_t pushval) {
-    CPU_SP = CPU_SP - 4;
-    putmem32(CPU_SS, CPU_SP, pushval);
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP -= 4u;
+        putmem32(CPU_SS, CPU_ESP, pushval);
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP - 4u);
+        putmem32(CPU_SS, CPU_SP, pushval);
+    }
 }
 
 static INLINE uint32_t pop32(void) {
-    uint32_t tempval = getmem32(CPU_SS, CPU_SP);
-    CPU_SP = CPU_SP + 4;
+    uint32_t sp = r36sx_cpu_stack_default32() ? CPU_ESP : CPU_SP;
+    uint32_t tempval = getmem32(CPU_SS, sp);
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP += 4u;
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP + 4u);
+    }
     return tempval;
+}
+
+static INLINE void r36sx_cpu_adjust_stack(uint32_t bytes)
+{
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP += bytes;
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP + bytes);
+    }
+}
+
+static INLINE void r36sx_cpu_set_stack_pointer(uint32_t value)
+{
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP = value;
+    } else {
+        CPU_SP = (uint16_t)value;
+    }
 }
 
 static INLINE uint32_t readrm32(uint8_t rmval) {
@@ -2063,7 +2131,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
     }
 
     r36sx_cpu_commit_segment_cache(regcs, selector, &target_cs);
-    CPU_IP = (uint16_t)offset;
+    r36sx_cpu_set_ip(offset);
     if (type == 0x06u || type == 0x0eu) {
         ifl = 0;
     }
@@ -2450,26 +2518,26 @@ void intcall86(uint8_t intnum) {
     tf = 0;
 }
 
-static inline void r36sx_cpu_invalid_opcode(uint16_t fault_ip)
+static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
 {
 #if DEBUG
     r36sx_pico286_debug_log(
-        "[CPU] INT6 invalid opcode at %04X:%04X bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
-        CPU_CS, fault_ip,
+        "[CPU] INT6 invalid opcode at %04X:%08lX bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
+        CPU_CS, (unsigned long)fault_ip,
         getmem8(CPU_CS, fault_ip),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 1u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 2u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 3u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 4u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 5u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 6u)),
-        getmem8(CPU_CS, (uint16_t)(fault_ip + 7u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 1u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 2u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 3u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 4u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 5u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 6u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 7u)),
         (uint16_t)(2u | x86_flags.value),
         CPU_AX, CPU_BX, CPU_CX, CPU_DX,
         CPU_SI, CPU_DI, CPU_BP, CPU_SP,
         CPU_DS, CPU_ES, CPU_SS);
 #endif
-    CPU_IP = fault_ip;
+    r36sx_cpu_set_ip(fault_ip);
     intcall86(6);
 }
 
@@ -3363,7 +3431,7 @@ static inline uint32_t r36sx_read_moffs(void)
 }
 
 static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
-                                                             uint16_t fault_ip,
+                                                             uint32_t fault_ip,
                                                              uint32_t execloops,
                                                              uint32_t *loopcount,
                                                              bool trace_active)
@@ -3516,8 +3584,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             StepIP(2);
             push(CPU_CS);
             push32(CPU_IP);
-            CPU_IP = (uint16_t)target_ip;
             r36sx_cpu_load_segment(regcs, target_cs);
+            r36sx_cpu_set_ip(target_ip);
             return true;
         }
 
@@ -3562,7 +3630,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                 *loopcount += batch;
                 if (r36sx_rep_get_count() != 0) {
-                    CPU_IP = fault_ip;
+                    r36sx_cpu_set_ip(fault_ip);
                 }
                 return true;
             }
@@ -3588,7 +3656,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                 *loopcount += batch;
                 if (r36sx_rep_get_count() != 0) {
-                    CPU_IP = fault_ip;
+                    r36sx_cpu_set_ip(fault_ip);
                 }
                 return true;
             }
@@ -3608,7 +3676,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             }
             (*loopcount)++;
             if (reptype) {
-                CPU_IP = fault_ip;
+                r36sx_cpu_set_ip(fault_ip);
             }
             return true;
         }
@@ -3631,7 +3699,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             }
             (*loopcount)++;
             if (reptype) {
-                CPU_IP = fault_ip;
+                r36sx_cpu_set_ip(fault_ip);
             }
             return true;
         }
@@ -3655,13 +3723,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         case 0xC2: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
-            CPU_IP = (uint16_t)pop32();
-            CPU_SP = (uint16_t)(CPU_SP + bytes);
+            r36sx_cpu_set_ip(pop32());
+            r36sx_cpu_adjust_stack(bytes);
             return true;
         }
 
         case 0xC3:
-            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_set_ip(pop32());
             return true;
 
         case 0xC7:
@@ -3675,26 +3743,26 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
 
         case 0xC9:
-            CPU_SP = CPU_BP;
+            r36sx_cpu_set_stack_pointer(CPU_EBP);
             CPU_EBP = pop32();
             return true;
 
         case 0xCA: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
-            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, pop());
-            CPU_SP = (uint16_t)(CPU_SP + bytes);
+            r36sx_cpu_adjust_stack(bytes);
             return true;
         }
 
         case 0xCB:
-            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, pop());
             return true;
 
         case 0xCF:
-            CPU_IP = (uint16_t)pop32();
+            r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, (uint16_t)pop32());
             decodeflagsdword(pop32());
             return true;
@@ -3713,14 +3781,14 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             push32(CPU_IP);
-            CPU_IP = (uint16_t)(CPU_IP + rel);
+            r36sx_cpu_add_ip(rel);
             return true;
         }
 
         case 0xE9: {
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
-            CPU_IP = (uint16_t)(CPU_IP + rel);
+            r36sx_cpu_add_ip(rel);
             return true;
         }
 
@@ -3728,8 +3796,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
-            CPU_IP = (uint16_t)target_ip;
             r36sx_cpu_load_segment(regcs, target_cs);
+            r36sx_cpu_set_ip(target_ip);
             return true;
         }
 
@@ -3762,7 +3830,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 case 2: { /* CALL Ev */
                     uint32_t target = readrm32(rm);
                     push32(CPU_IP);
-                    CPU_IP = (uint16_t)target;
+                    r36sx_cpu_set_ip(target);
                     return true;
                 }
                 case 3: { /* CALL Mp */
@@ -3771,17 +3839,18 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     uint16_t target_cs = readw86(ea + 4);
                     push(CPU_CS);
                     push32(CPU_IP);
-                    CPU_IP = (uint16_t)target_ip;
                     r36sx_cpu_load_segment(regcs, target_cs);
+                    r36sx_cpu_set_ip(target_ip);
                     return true;
                 }
                 case 4: /* JMP Ev */
-                    CPU_IP = (uint16_t)readrm32(rm);
+                    r36sx_cpu_set_ip(readrm32(rm));
                     return true;
                 case 5: { /* JMP Mp */
                     getea(rm);
-                    CPU_IP = (uint16_t)readdw86(ea);
+                    uint32_t target_ip = readdw86(ea);
                     r36sx_cpu_load_segment(regcs, readw86(ea + 4));
+                    r36sx_cpu_set_ip(target_ip);
                     return true;
                 }
                 case 6: /* PUSH Ev */
@@ -3842,7 +3911,7 @@ static __not_in_flash() void r36sx_cpu_exec_bit_test(uint8_t operation,
     }
 }
 
-static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
+static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 {
     uint8_t op2 = getmem8(CPU_CS, CPU_IP);
     StepIP(1);
@@ -3859,13 +3928,13 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             if (take) {
-                CPU_IP = (uint16_t)(CPU_IP + rel);
+                r36sx_cpu_add_ip(rel);
             }
         } else {
             int16_t rel = (int16_t)getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (take) {
-                CPU_IP = (uint16_t)(CPU_IP + rel);
+                r36sx_cpu_add_ip(rel);
             }
         }
         return;
@@ -4227,7 +4296,7 @@ extern volatile int16_t last_sb_sample;
 extern volatile bool ask_to_blast;
 
 void __not_in_flash() exec86(uint32_t execloops) {
-    static uint16_t firstip;
+    static uint32_t firstip;
     static bool was_TF;
     uint32_t loopcount = 0;
 
@@ -4253,8 +4322,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
         reptype = 0;
         segoverride = 0;
-        operandSizeOverride = false;
-        addressSizeOverride = false;
+        operandSizeOverride = r36sx_cpu_code_default32();
+        addressSizeOverride = r36sx_cpu_code_default32();
         r36sx_cpu_use_segment(regds);
         uint8_t docontinue = 0;
         uint8_t prefix_exception = 0;
@@ -4301,7 +4370,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #if CPU_386_EXTENDED_OPS
                 case 0x64: /* segment CPU_FS */
                     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
                         docontinue = 1;
@@ -4313,7 +4382,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 
                 case 0x65: /* segment CPU_GS */
                     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
                         docontinue = 1;
@@ -4325,7 +4394,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #else
                 case 0x64:
                 case 0x65:
-                    CPU_IP = firstip;
+                    r36sx_cpu_set_ip(firstip);
                     intcall86(6);
                     prefix_exception = 1;
                     docontinue = 1;
@@ -4335,24 +4404,24 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #if CPU_386_EXTENDED_OPS
                 case 0x66: /* operand-size override */
                     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
                         docontinue = 1;
                         break;
                     }
-                    operandSizeOverride = true;
+                    operandSizeOverride = !operandSizeOverride;
                     break;
 
                 case 0x67: /* address-size override */
                     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
                         docontinue = 1;
                         break;
                     }
-                    addressSizeOverride = true;
+                    addressSizeOverride = !addressSizeOverride;
                     break;
 #endif
 
@@ -5610,7 +5679,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     CPU_EDI = pop32();
                     CPU_ESI = pop32();
                     CPU_EBP = pop32();
-                    CPU_SP += 4;
+                    r36sx_cpu_adjust_stack(4u);
                     CPU_EBX = pop32();
                     CPU_EDX = pop32();
                     CPU_ECX = pop32();
@@ -5620,7 +5689,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 CPU_DI = pop();
                 CPU_SI = pop();
                 CPU_BP = pop();
-                CPU_SP += 2;
+                r36sx_cpu_adjust_stack(2u);
                 CPU_BX = pop();
                 CPU_DX = pop();
                 CPU_CX = pop();
@@ -5782,7 +5851,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0x6D:
@@ -5814,7 +5883,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0x6E:
@@ -5846,7 +5915,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0x6F:
@@ -5878,7 +5947,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 #endif
 
@@ -5890,7 +5959,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (of) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5902,7 +5971,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!of) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5914,7 +5983,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5926,7 +5995,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5938,7 +6007,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5950,7 +6019,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5962,7 +6031,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf || zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5974,7 +6043,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf && !zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5986,7 +6055,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -5998,7 +6067,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!sf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6010,7 +6079,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (pf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6022,7 +6091,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!pf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6034,7 +6103,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf != of) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6046,7 +6115,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf == of) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6058,7 +6127,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if ((sf != of) || zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6072,7 +6141,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 if (!
                     zf && (sf
                            == of)) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -6451,8 +6520,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(2);
                 push(CPU_CS);
                 push(CPU_IP);
-                CPU_IP = oper1;
                 r36sx_cpu_load_segment(regcs, oper2);
+                r36sx_cpu_set_ip(oper1);
                 break;
 
             case 0x9B:
@@ -6565,7 +6634,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     CPU_CX = (uint16_t)(CPU_CX - batch);
                     loopcount += batch;
                     if (CPU_CX != 0) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                     }
                     break;
                 }
@@ -6595,7 +6664,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     CPU_CX = (uint16_t)(CPU_CX - batch);
                     loopcount += batch;
                     if (CPU_CX != 0) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                     }
                     break;
                 }
@@ -6642,7 +6711,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xA7:
@@ -6685,7 +6754,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xA8:
@@ -6733,7 +6802,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     CPU_CX = (uint16_t)(CPU_CX - batch);
                     loopcount += batch;
                     if (CPU_CX != 0) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                     }
                     break;
                 }
@@ -6763,7 +6832,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     CPU_CX = (uint16_t)(CPU_CX - batch);
                     loopcount += batch;
                     if (CPU_CX != 0) {
-                        CPU_IP = firstip;
+                        r36sx_cpu_set_ip(firstip);
                     }
                     break;
                 }
@@ -6799,7 +6868,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xAD:
@@ -6830,7 +6899,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xAE:
@@ -6869,7 +6938,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xAF:
@@ -6909,7 +6978,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
 
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 break;
 
             case 0xB0:
@@ -7101,8 +7170,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* C2 RET Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
-                CPU_IP = pop();
-                CPU_SP = CPU_SP + oper1;
+                r36sx_cpu_set_ip(pop());
+                r36sx_cpu_adjust_stack(oper1);
                 break;
 
             case 0xC3:
@@ -7110,7 +7179,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_C3: ;
 #endif
                 /* C3 RET */
-                CPU_IP = pop();
+                r36sx_cpu_set_ip(pop());
                 break;
 
             case 0xC4:
@@ -7204,7 +7273,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                CPU_SP = CPU_BP;
+                r36sx_cpu_set_stack_pointer(CPU_BP);
                 CPU_BP = pop();
                 break;
 
@@ -7214,9 +7283,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* CA RETF Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
-                CPU_IP = pop();
+                r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
-                CPU_SP = CPU_SP + oper1;
+                r36sx_cpu_adjust_stack(oper1);
                 break;
 
             case 0xCB:
@@ -7224,7 +7293,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CB: ;
 #endif
                 /* CB RETF */
-                CPU_IP = pop();
+                r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
                 break;
 
@@ -7261,7 +7330,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CF: ;
 #endif
                 /* CF IRET */
-                CPU_IP = pop();
+                r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
 #ifdef CPU_SET_HIGH_FLAGS
                 decodeflagsword(pop() | 0xF000);
@@ -7417,7 +7486,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
                 if ((CPU_CX) && !zf) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -7430,7 +7499,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
                 if (CPU_CX && (zf == 1)) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -7443,7 +7512,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(1);
                 CPU_CX = CPU_CX - 1;
                 if (CPU_CX) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -7455,7 +7524,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!CPU_CX) {
-                    CPU_IP = CPU_IP + temp16;
+                    r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
 
@@ -7509,7 +7578,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 push(CPU_IP);
-                CPU_IP = CPU_IP + oper1;
+                r36sx_cpu_add_ip((int16_t)oper1);
                 break;
 
             case 0xE9:
@@ -7519,7 +7588,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E9 JMP Jv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                CPU_IP = CPU_IP + oper1;
+                r36sx_cpu_add_ip((int16_t)oper1);
                 break;
 
             case 0xEA:
@@ -7530,8 +7599,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
-                CPU_IP = oper1;
                 r36sx_cpu_load_segment(regcs, oper2);
+                r36sx_cpu_set_ip(oper1);
                 break;
 
             case 0xEB:
@@ -7541,7 +7610,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* EB JMP Jb */
                 oper1 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
-                CPU_IP = CPU_IP + oper1;
+                r36sx_cpu_add_ip((int16_t)oper1);
                 break;
 
             case 0xEC:
@@ -7788,7 +7857,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_default: ;
 #endif
 #ifdef CPU_ALLOW_ILLEGAL_OP_EXCEPTION
-                CPU_IP = firstip;
+                r36sx_cpu_set_ip(firstip);
                 intcall86(6); /* trip invalid opcode exception. this occurs on the 80186+, 8086/8088 CPUs treat them as NOPs. */
                 /* technically they aren't exactly like NOPs in most cases, but for our pursoses, that's accurate enough. */
                 r36sx_pico286_debug_log("[CPU] Invalid opcode 0x%02x exception at %04X:%04X",

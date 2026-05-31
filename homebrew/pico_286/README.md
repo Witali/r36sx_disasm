@@ -289,11 +289,13 @@ mode, then may enter protected mode with `LMSW` or `MOV CR0`.  The port now
 emulates `CR0`, `CR2`, `CR3`, `GDTR`, `IDTR`, `LDTR`/`TR` selectors, basic
 GDT/LDT-backed segment descriptor caches, code/data/stack descriptor type
 checks, far `CALL`/`JMP`/`RET`/`IRET` segment reloads, protected-mode
-interrupt/trap gates, and the 386 system instructions `0F 00`, `0F 01`,
+interrupt/trap gates, 32-bit default operand/address size from CS descriptors,
+32-bit `EIP` stepping for 386 code segments, 32-bit stack pointer updates for
+32-bit SS descriptors, and the 386 system instructions `0F 00`, `0F 01`,
 `0F 20`, and `0F 22`.  Paging, privilege checks, task switching/TSS stack
-switching, call gates, and full 32-bit `EIP` execution are not complete yet,
-so keep `cpu_mode=real` for normal DOS use.  Protected-mode support can be
-compiled out with `R36SX_ENABLE_PROTECTED_MODE=0`.
+switching, call gates, and DOS extender services such as DPMI/VCPI are not
+complete yet, so keep `cpu_mode=real` for normal DOS use.  Protected-mode
+support can be compiled out with `R36SX_ENABLE_PROTECTED_MODE=0`.
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
