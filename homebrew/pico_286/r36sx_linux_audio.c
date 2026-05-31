@@ -21,6 +21,8 @@
 #include "linux-audio.h"
 #include "../common/driver_audio.h"
 
+#define R36SX_PICO286_AUDIO_DECLICK_FRAMES 32u
+
 struct r36sx_pico286_audio {
     void *handle;
     r36sx_cube_ioctl_fn cube_ioctl;
@@ -32,6 +34,9 @@ struct r36sx_pico286_audio {
     uint32_t shutter_pos;
     uint32_t shutter_len;
     uint32_t shutter_noise;
+    int16_t last_left;
+    int16_t last_right;
+    int have_last_sample;
     int initialized;
 };
 
@@ -97,6 +102,63 @@ static int16_t r36sx_pico286_audio_next_shutter_sample(void)
         g_audio.shutter_noise * 1664525u + 1013904223u;
     noise = (int32_t)((g_audio.shutter_noise >> 16) & 0xffffu) - 32768;
     return (int16_t)((noise * (int32_t)amp) / 32768);
+}
+
+static int r36sx_pico286_audio_make_mutable(const int16_t **play_buffer,
+                                            size_t play_frames)
+{
+    size_t stereo_samples;
+
+    if (!play_buffer || !*play_buffer) {
+        return 0;
+    }
+    if (*play_buffer == g_audio.mix_buffer) {
+        return 1;
+    }
+    if (!g_audio.mix_buffer || play_frames > g_audio.mix_buffer_frames) {
+        return 0;
+    }
+
+    stereo_samples = play_frames * R36SX_DRIVER_AUDIO_CHANNELS;
+    memcpy(g_audio.mix_buffer, *play_buffer,
+           stereo_samples * sizeof(g_audio.mix_buffer[0]));
+    *play_buffer = g_audio.mix_buffer;
+    return 1;
+}
+
+static void r36sx_pico286_audio_declick(int16_t *buffer, size_t frames)
+{
+    size_t fade_frames = R36SX_PICO286_AUDIO_DECLICK_FRAMES;
+
+    if (!buffer || frames == 0) {
+        return;
+    }
+    if (fade_frames > frames) {
+        fade_frames = frames;
+    }
+
+    if (g_audio.have_last_sample) {
+        for (size_t frame = 0; frame < fade_frames; frame++) {
+            const int32_t old_weight = (int32_t)(fade_frames - frame);
+            const int32_t new_weight = (int32_t)(frame + 1u);
+            const int32_t denom = (int32_t)fade_frames + 1;
+            size_t idx = frame * R36SX_DRIVER_AUDIO_CHANNELS;
+
+            buffer[idx] = (int16_t)(
+                ((int32_t)g_audio.last_left * old_weight +
+                 (int32_t)buffer[idx] * new_weight) / denom);
+            buffer[idx + 1u] = (int16_t)(
+                ((int32_t)g_audio.last_right * old_weight +
+                 (int32_t)buffer[idx + 1u] * new_weight) / denom);
+        }
+    }
+
+    {
+        size_t last = (frames - 1u) * R36SX_DRIVER_AUDIO_CHANNELS;
+        g_audio.last_left = buffer[last];
+        g_audio.last_right = buffer[last + 1u];
+        g_audio.have_last_sample = 1;
+    }
 }
 
 void r36sx_pico286_audio_play_shutter(void)
@@ -208,13 +270,7 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
 
     if (g_audio.shutter_pos < g_audio.shutter_len &&
         g_audio.mix_buffer && play_frames <= g_audio.mix_buffer_frames) {
-        size_t stereo_samples = play_frames * R36SX_DRIVER_AUDIO_CHANNELS;
-
-        if (play_buffer != g_audio.mix_buffer) {
-            memcpy(g_audio.mix_buffer, play_buffer,
-                   stereo_samples * sizeof(g_audio.mix_buffer[0]));
-            play_buffer = g_audio.mix_buffer;
-        }
+        (void)r36sx_pico286_audio_make_mutable(&play_buffer, play_frames);
         for (size_t frame = 0; frame < play_frames; frame++) {
             int16_t click = r36sx_pico286_audio_next_shutter_sample();
             size_t idx = frame * R36SX_DRIVER_AUDIO_CHANNELS;
@@ -227,6 +283,9 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
                     (int32_t)g_audio.mix_buffer[idx + 1u] + click);
         }
         play_buffer = g_audio.mix_buffer;
+    }
+    if (r36sx_pico286_audio_make_mutable(&play_buffer, play_frames)) {
+        r36sx_pico286_audio_declick((int16_t *)play_buffer, play_frames);
     }
     pthread_mutex_unlock(&g_audio_lock);
 

@@ -32,6 +32,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 audio frame de-clicking
+
+The current `pico_286` binary reduces audible clicks at audio block
+boundaries.  The tick thread now writes to double-buffered audio blocks, the
+sound thread copies a complete block into a private playback buffer before
+calling `driver.so`, and `r36sx_linux_audio.c` applies a short 32-frame linear
+de-click ramp between blocks.  Audio block length now follows `target_fps`; at
+the default 60 Hz and 44.1 kHz output this is about 735 stereo frames per
+block.
+
+pico_286 size: 1408448 bytes
+pico_286 SHA256: F73F874CF6868D3AD9F2B55A407B1B19CC1DC2EA5713824EC762F32EE89AB611
+
 ## 2026-05-31 drive-type image extensions
 
 The current `pico_286` binary filters disk menu choices by drive type.

@@ -181,7 +181,9 @@ about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
 `exec86()` quantum when emulation itself overruns, grows it back when there is
 spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 1000
 instructions per frame.  Rendering overlays such as the on-screen keyboard do
-not reduce the CPU quantum.
+not reduce the CPU quantum.  The same target also sets the audio block size
+sent to `driver.so`; the default 60 Hz produces about 735 stereo frames per
+block at 44.1 kHz.
 
 `scaling_filter` controls how the DOS image is resized when a large overlay
 leaves less than the full display height for the emulated screen.  The default
@@ -192,6 +194,9 @@ The `[audio]` switches mute emulated playback devices without disabling their
 I/O ports.  The built-in PC speaker/beeper always remains active.
 `audio_sample_rate` can be `44100` or `22050`; `22050` halves internal mixer
 work and is duplicated back to 44.1 kHz for the stock `driver.so` output path.
+Completed audio blocks are copied into a private playback buffer before
+`sound_driver_playframe()` and are smoothed with a 32-frame de-click ramp at
+block boundaries.
 Set any non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
 (`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
 (`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI

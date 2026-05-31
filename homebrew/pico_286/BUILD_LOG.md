@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-31 audio frame de-clicking
+
+Reduced audible clicks at Pico-286 audio block boundaries.
+
+- The audio producer now uses two source buffers and the sound thread copies a
+  completed block into a private playback buffer before calling `driver.so`.
+  This prevents the tick thread from overwriting a block while it is being sent
+  to `sound_driver_playframe()`.
+- Audio block size is now derived from `target_fps`.  At the default 60 Hz and
+  44.1 kHz output this produces about 735 stereo frames per block instead of
+  the previous 100 ms chunk.
+- `r36sx_linux_audio.c` applies a short 32-frame linear de-click ramp between
+  consecutive blocks before passing audio to `driver.so`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1408448` bytes
+- `pico_286` SHA256:
+  `F73F874CF6868D3AD9F2B55A407B1B19CC1DC2EA5713824EC762F32EE89AB611`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 drive-type image extensions
 
 Separated disk image selection by emulated drive type.
