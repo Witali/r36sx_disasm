@@ -32,6 +32,16 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 DOSBox 386 CPU comparison fixes
+
+The current `pico_286` binary adopts several small CPU semantics from DOSBox:
+protected-mode-only `0F 00`, implemented `CLTS`, operand-size-aware
+`LGDT`/`LIDT`, 386-style CR0 reserved-bit reads, and page-directory-aligned
+CR3 reads/writes.
+
+pico_286 size: 1332700 bytes
+pico_286 SHA256: 46FB1C062F4400D0CC54CAA8B2586CDD8CE38667C8290436FC680AEAE29C3C10
+
 ## 2026-05-31 minimum adaptive quantum raised
 
 The current `pico_286` binary keeps the adaptive `exec86()` quantum at no less

@@ -68,6 +68,8 @@ uint32_t dwordregs[8];
 #define R36SX_CR0_EM 0x00000004u
 #define R36SX_CR0_TS 0x00000008u
 #define R36SX_CR0_ET 0x00000010u
+#define R36SX_CR0_386_RESERVED_READ_MASK 0x7ffffff0u
+#define R36SX_CR3_PAGE_DIRECTORY_MASK 0xfffff000u
 #define R36SX_DESCRIPTOR_PRESENT 0x80u
 #define R36SX_DESCRIPTOR_CODE_DATA 0x10u
 #define R36SX_DESCRIPTOR_EXECUTABLE 0x08u
@@ -246,6 +248,15 @@ static void r36sx_cpu_set_cr0(uint32_t value)
     }
 }
 
+static inline uint32_t r36sx_cpu_read_cr0(void)
+{
+    /*
+     * DOSBox reports 386 CR0 reads with bits 4..30 set.  This matches the
+     * 80386 reserved-bit behavior that some CPU probes expect.
+     */
+    return r36sx_cr0 | R36SX_CR0_386_RESERVED_READ_MASK;
+}
+
 static void r36sx_cpu_lmsw(uint16_t value)
 {
     uint32_t low = value & 0x000fu;
@@ -265,10 +276,11 @@ static void r36sx_cpu_store_descriptor_table(uint32_t addr,
 
 static void r36sx_cpu_load_descriptor_table(uint32_t addr,
                                             uint16_t *limit,
-                                            uint32_t *base)
+                                            uint32_t *base,
+                                            uint32_t base_mask)
 {
     *limit = readw86(addr);
-    *base = readdw86(addr + 2u);
+    *base = readdw86(addr + 2u) & base_mask;
 }
 
 static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
@@ -3133,7 +3145,7 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
     StepIP(1);
 
     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
-        op2 != 0x00 && op2 != 0x01) {
+        op2 != 0x00 && op2 != 0x01 && op2 != 0x06) {
         r36sx_cpu_invalid_opcode(fault_ip);
         return;
     }
@@ -3164,6 +3176,10 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
 
     switch (op2) {
         case 0x00: { /* SLDT/STR/LLDT/LTR/VERR/VERW */
+            if (!r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
             modregrm();
             switch (reg) {
                 case 0: /* SLDT Ew */
@@ -3227,7 +3243,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
                     }
                     getea(rm);
                     r36sx_cpu_load_descriptor_table(
-                        ea, &r36sx_gdtr_limit, &r36sx_gdtr_base);
+                        ea, &r36sx_gdtr_limit, &r36sx_gdtr_base,
+                        operandSizeOverride ? 0xffffffffu : 0x00ffffffu);
                     return;
                 case 3: /* LIDT Ms */
                     if (mode == 3) {
@@ -3236,7 +3253,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
                     }
                     getea(rm);
                     r36sx_cpu_load_descriptor_table(
-                        ea, &r36sx_idtr_limit, &r36sx_idtr_base);
+                        ea, &r36sx_idtr_limit, &r36sx_idtr_base,
+                        operandSizeOverride ? 0xffffffffu : 0x00ffffffu);
                     return;
                 case 4: /* SMSW Ew */
                     writerm16(rm, (uint16_t)r36sx_cr0);
@@ -3249,6 +3267,10 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             return;
         }
 
+        case 0x06: /* CLTS */
+            r36sx_cr0 &= ~R36SX_CR0_TS;
+            return;
+
         case 0x20: { /* MOV Rd,Cd */
             modregrm();
             if (mode != 3) {
@@ -3257,13 +3279,13 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
             }
             switch (reg) {
                 case 0:
-                    putreg32(rm, r36sx_cr0);
+                    putreg32(rm, r36sx_cpu_read_cr0());
                     return;
                 case 2:
                     putreg32(rm, r36sx_cr2);
                     return;
                 case 3:
-                    putreg32(rm, r36sx_cr3);
+                    putreg32(rm, r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK);
                     return;
             }
             r36sx_cpu_invalid_opcode(fault_ip);
@@ -3284,7 +3306,7 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
                     r36sx_cr2 = getreg32(rm);
                     return;
                 case 3:
-                    r36sx_cr3 = getreg32(rm);
+                    r36sx_cr3 = getreg32(rm) & R36SX_CR3_PAGE_DIRECTORY_MASK;
                     return;
             }
             r36sx_cpu_invalid_opcode(fault_ip);

@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-31 DOSBox 386 CPU comparison fixes
+
+Compared the local 386-related CPU code against DOSBox 0.74-3 and adopted a
+small set of compatible semantics instead of importing the whole CPU core:
+
+- `0F 00` group 6 (`SLDT`, `STR`, `LLDT`, `LTR`, `VERR`, `VERW`) now rejects
+  real-mode execution, matching DOSBox's protected-mode-only behavior.
+- `0F 06 CLTS` is implemented for 286+ CPU modes and clears `CR0.TS`.
+- `LGDT`/`LIDT` now load a 24-bit base without `66h` and a full 32-bit base
+  with `66h`, matching DOSBox's `prefix_0f` vs `prefix_66_0f` handlers.
+- `MOV Rd,CR0` now reports 386-style reserved bits 4..30 set.
+- CR3 writes/reads now keep only the page-directory-aligned upper bits.
+
+Detailed notes: `CPU_386_DOSBOX_COMPARISON.md`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1332700` bytes
+- `pico_286` SHA256:
+  `46FB1C062F4400D0CC54CAA8B2586CDD8CE38667C8290436FC680AEAE29C3C10`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 raise minimum adaptive exec86 quantum
 
 Raised `R36SX_EXEC86_MIN_LOOPS` from `100` to `1000` instructions.
