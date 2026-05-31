@@ -260,16 +260,23 @@ maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,
 allocator from `D000:0000` upward, and `xms_kb` limits the built-in XMS handler.
 
 `profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
+`profiling_log_ms` controls the reporting interval.  Profiling can also be
+compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 ### CPU Test Floppy
 
 `cpu_tests.img` is a 1.44 MB FAT12 floppy image stored next to the Pico-286
 executable.  It contains PCjs `ID.COM` and `TEST386.COM` CPU/protected-mode
-tests, their `ID.ASM`/`CPUID.ASM` sources, and a short `README.TXT`.  Boot
-FreeDOS from `FreeDOS1.img`, mount `cpu_tests.img` as `B:` from the disk menu
-or set `fdd1=cpu_tests.img`, then run `B:`, `ID`, and `TEST386`.
-`profiling_log_ms` controls the reporting interval.  Profiling can also be
-compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
+tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `T386ROM.BIN`.
+`T386ROM.BIN` is the R36SX debug build of
+`homebrew/pico_286/tests/test386.asm`, configured with `DEBUG=1`, ASCII output
+port `191h`, and POST port `190h`.  Pico-286 logs those ports to
+`pico_286.log`.
+
+Boot FreeDOS from `FreeDOS1.img`, mount `cpu_tests.img` as `B:` from the disk
+menu or set `fdd1=cpu_tests.img`, then run `B:`, `ID`, and `TEST386`.
+`T386ROM.BIN` is not a DOS `.COM` program; it is a 64 KB BIOS replacement ROM
+payload that must be loaded at physical `F0000h` by the emulator to execute.
 
 `screenshot_format=png` saves compressed screenshots through zlib.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.

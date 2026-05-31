@@ -1,5 +1,108 @@
 # pico-286 Build Log
 
+## 2026-05-31 test386.asm debug ROM payload
+
+Downloaded `barotto/test386.asm` into `homebrew/pico_286/tests/test386.asm`
+and kept it as a local source copy.  The downloaded source tree was scanned
+with Microsoft Defender through `tools/scan-download.ps1`; no threats were
+reported.
+
+The R36SX build changes `src/configuration.asm` to use Pico-286 debug ports:
+
+- `POST_PORT equ 0x190`
+- `OUT_PORT equ 0x191`
+- `DEBUG equ 1`
+
+`r36sx_ports.c` now logs writes to those ports as `test386:` lines in
+`pico_286.log`.  Port `190h` logs POST byte values, and port `191h` collects
+ASCII text until newline.
+
+Downloaded official NASM 3.01 for Windows x86-64 from:
+
+```text
+https://www.nasm.us/pub/nasm/releasebuilds/3.01/win64/nasm-3.01-win64.zip
+```
+
+The ZIP archive, extracted NASM directory, and `nasm.exe` were scanned with
+Microsoft Defender; no threats were reported.
+
+Build command:
+
+```powershell
+.\homebrew\pico_286\tests\build_test386_r36sx.ps1
+```
+
+Equivalent NASM command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test386.asm\src\ -f bin .\homebrew\pico_286\tests\test386.asm\src\test386.asm -w-all -l .\homebrew\pico_286\tests\test386.asm\build\test386-r36sx.lst -o .\homebrew\pico_286\tests\test386.asm\build\test386-r36sx.bin
+```
+
+ROM payload:
+
+- `homebrew/pico_286/tests/test386.asm/build/test386-r36sx.bin`
+- Size: `65536` bytes
+- SHA256: `7E91F03B910FE52508D28ADD2AC4CF4F73B3D23F5DB7B77A5315D6F0DD234497`
+
+`test386-r36sx.bin` was scanned with Microsoft Defender; no threats were
+reported.
+
+Rebuilt the CPU test floppy:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+```
+
+The resulting `cpu_tests.img` contains:
+
+- `ID.COM`
+- `TEST386.COM`
+- `T386ROM.BIN`
+- `CPUID.ASM`
+- `ID.ASM`
+- `README.TXT`
+
+`T386ROM.BIN` is the R36SX `test386.asm` build.  It is a 64 KB BIOS replacement
+ROM, not a DOS `.COM` program, so the floppy stores it as a payload/reference;
+executing it requires an emulator path that maps it at physical `F0000h` and
+resets into its reset vector.
+
+CPU test floppy:
+
+- `homebrew/pico_286/cpu_tests.img`
+- Size: `1474560` bytes
+- SHA256: `FA485FA653CD90D48836D1E201FA81D9D604F9F18CDF5D8C233FAE8149070C2A`
+
+The rebuilt floppy image was scanned with Microsoft Defender; no threats were
+reported.  The same image was copied to:
+
+- `disk_image/MIPS_NATIVE/pico_286/cpu_tests.img`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/cpu_tests.img`
+
+Rebuilt Pico-286 so the debug ports are active:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1308684` bytes
+- SHA256: `8C141C077990A7A8A6CD7A6BE6A3F96729280DE3ED2B2DF2138C6AFF36056FA0`
+
+The homebrew and disk-image binary copies were scanned with Microsoft Defender;
+no threats were reported.  The patch binary is byte-identical to those copies
+by SHA256.
+
 ## 2026-05-31 VGA DAC palette handling
 
 Fixed VGA DAC palette programming for mode 13h/VGA software that writes the

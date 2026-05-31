@@ -1,0 +1,36 @@
+# Pico-286 Test Payloads
+
+This directory stores CPU and platform test sources that are useful for the
+R36SX Pico-286 port.
+
+## test386.asm
+
+`test386.asm` is vendored from:
+
+https://github.com/barotto/test386.asm
+
+The R36SX copy is configured in `test386.asm/src/configuration.asm` with:
+
+- `POST_PORT equ 0x190`
+- `OUT_PORT equ 0x191`
+- `DEBUG equ 1`
+
+Pico-286 logs writes to those ports from `r36sx_ports.c` as `test386:` lines in
+`pico_286.log`.
+
+Build the ROM payload with:
+
+```powershell
+.\homebrew\pico_286\tests\build_test386_r36sx.ps1
+```
+
+Rebuild `cpu_tests.img` with:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+```
+
+The generated `test386-r36sx.bin` is a 64 KB BIOS replacement ROM. It is not a
+DOS `.COM` program, so it cannot be launched from the DOS prompt. The test disk
+stores it as `T386ROM.BIN` for reference and for future emulator BIOS-loading
+work.

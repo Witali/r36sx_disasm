@@ -28,12 +28,38 @@ int sound_chips_clock = 0;
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
 #define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
+#define R36SX_TEST386_POST_PORT 0x190u
+#define R36SX_TEST386_ASCII_PORT 0x191u
 
 static uint8_t keyboard_queue[R36SX_KEYBOARD_QUEUE_CAPACITY];
 static uint8_t keyboard_queue_head;
 static uint8_t keyboard_queue_count;
 static uint8_t keyboard_output_full;
 static uint64_t keyboard_next_ready_us;
+
+static void r36sx_test386_ascii_out(uint8_t value) {
+    static char line[192];
+    static uint8_t line_pos;
+
+    if (value == '\r') {
+        return;
+    }
+    if (value == '\n') {
+        if (line_pos > 0) {
+            line[line_pos] = 0;
+            r36sx_pico286_debug_log("test386: %s", line);
+            line_pos = 0;
+        }
+        return;
+    }
+    if (value >= 32 && value < 127 && line_pos < sizeof(line) - 1u) {
+        line[line_pos++] = (char)value;
+    }
+}
+
+static void r36sx_test386_post_out(uint8_t value) {
+    r36sx_pico286_debug_log("test386: POST=0x%02x", value);
+}
 
 static INLINE uint64_t r36sx_keyboard_now_us(void) {
     struct timespec ts;
@@ -205,6 +231,12 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 
 void portout(uint16_t portnum, uint16_t value) {
     switch (portnum) {
+        case R36SX_TEST386_POST_PORT:
+            r36sx_test386_post_out((uint8_t)value);
+            return;
+        case R36SX_TEST386_ASCII_PORT:
+            r36sx_test386_ascii_out((uint8_t)value);
+            return;
         case 0x00:
         case 0x01:
         case 0x02:
@@ -344,7 +376,7 @@ if (sound_chips_clock) {
 
         case 0x278:
 // Covox Speech Thing
-            covox_sample = (int16_t) (value - 128 << 6);
+            covox_sample = (int16_t)((value - 128) << 6);
             return;
         case 0x330:
         case 0x331:

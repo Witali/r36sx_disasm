@@ -12,6 +12,13 @@ TEST386.COM
   program or as a ROM image in PCjs. On Pico-286, run it from DOS after
   booting FreeDOS.
 
+T386ROM.BIN
+  R36SX build of barotto/test386.asm. This is a 64KB BIOS replacement test
+  ROM, not a DOS COM program. It is stored here as a test payload/reference.
+  The source is in homebrew/pico_286/tests/test386.asm. This build enables
+  DEBUG, writes ASCII output to port 0191h, and writes POST codes to port
+  0190h. The Pico-286 port logs those ports to pico_286.log.
+
 CPUID.ASM
 ID.ASM
   Source files from PCjs for reference.
@@ -27,6 +34,9 @@ Suggested use:
    ID
    TEST386
 
+4. T386ROM.BIN is not launched from DOS. To execute it, the emulator must load
+   it as the BIOS/test ROM at physical F0000h and reset into its reset vector.
+
 Notes:
 
 SingleStepTests 8086/80286/80386 are not DOS COM programs. They are
@@ -40,3 +50,6 @@ https://www.pcjs.org/software/pcx86/test/cpu/
 
 SingleStepTests:
 https://github.com/SingleStepTests
+
+barotto/test386.asm:
+https://github.com/barotto/test386.asm

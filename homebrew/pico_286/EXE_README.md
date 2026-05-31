@@ -149,7 +149,10 @@ application exits.
 
 `cpu_tests.img` is an optional FAT12 floppy image beside the executable.  It
 contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`, then
-run `ID` or `TEST386`.
+run `ID` or `TEST386`.  It also contains `T386ROM.BIN`, the R36SX debug build
+of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM, not a
+DOS `.COM` program; Pico-286 currently stores it as a payload/reference and
+logs its configured debug ports `190h`/`191h` when it is loaded as a ROM.
 
 The `[memory]` values are in KB.  `conventional_kb` is reported through the
 BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`

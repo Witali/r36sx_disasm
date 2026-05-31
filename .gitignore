@@ -46,6 +46,9 @@ __pycache__/
 *.img
 *.iso
 *.bin
+homebrew/pico_286/tests/test386.asm/build/
+homebrew/pico_286/tests/test386.asm/build/*.lst
+homebrew/pico_286/tests/test386.asm/test386-EE-reference.txt
 
 # OS/editor noise
 Thumbs.db

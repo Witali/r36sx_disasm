@@ -8,6 +8,7 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/README.md`
 - `MIPS_NATIVE/pico_286/keypresets.conf`
+- `MIPS_NATIVE/pico_286/cpu_tests.img`
 - `MIPS_NATIVE/pico_286/FreeDOS1.img`
 - `MIPS_NATIVE/pico_286/FreeDOS2.img`
 - `MIPS_NATIVE/pico_286/FreeDOS3.img`
@@ -29,6 +30,23 @@ The default binary is built with `DEBUG=0`.  Builds made with
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-05-31 test386.asm debug ROM payload
+
+The current patch includes an updated `cpu_tests.img` with `T386ROM.BIN`, an
+R36SX debug build of `barotto/test386.asm`.
+
+- `T386ROM.BIN` is a 64 KB BIOS replacement ROM payload, not a DOS `.COM`
+  program.
+- The source copy is stored in `homebrew/pico_286/tests/test386.asm`.
+- The build uses `DEBUG=1`, POST port `190h`, and ASCII output port `191h`.
+- The current `pico_286` binary logs those ports to `pico_286.log` as
+  `test386:` lines.
+
+pico_286 size: 1308684 bytes
+pico_286 SHA256: 8C141C077990A7A8A6CD7A6BE6A3F96729280DE3ED2B2DF2138C6AFF36056FA0
+cpu_tests.img size: 1474560 bytes
+cpu_tests.img SHA256: FA485FA653CD90D48836D1E201FA81D9D604F9F18CDF5D8C233FAE8149070C2A
 
 ## 2026-05-31 VGA DAC palette handling
 
