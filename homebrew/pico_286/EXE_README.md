@@ -100,7 +100,7 @@ stdio buffer controlled by:
 [cpu]
 cpu_model=80386
 cpu_mode=real
-cpu_mhz=32.768
+cpu_mhz=10.0
 
 [timing]
 target_fps=60
@@ -109,9 +109,19 @@ target_fps=60
 scaling_filter=nearest
 keyboard_mode=normal
 
+[audio]
+audio_sample_rate=44100
+audio_adlib=1
+audio_sound_blaster=1
+audio_cms=1
+audio_sn76489=0
+audio_mpu401=0
+audio_disney=1
+audio_covox=1
+
 [boot]
 boot_mode=normal
-boot_order=fdd0,hdd0
+boot_order=hdd0,fdd0
 
 [bios]
 bios=normal
@@ -136,13 +146,13 @@ host_drive_path=host
 image_dir=images
 
 [disk_cache]
-disk_cache_buffer_kb=64
-disk_cache_flush_sectors=4
+disk_cache_buffer_kb=256
+disk_cache_flush_sectors=16
 disk_cache_flush_ms=2000
 
 [profiling]
 profiling_enabled=0
-profiling_log_ms=5000
+profiling_log_ms=10000
 
 [floppy_drives]
 fdd0=FreeDOS1.img
@@ -211,11 +221,11 @@ It shows a lower-right two-column table above the disk LED with decoded x86
 instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
 Set it to `0` to disable the shortcut and overlay.
 
-`Fn` + D-pad `Right` toggles a compact POST-code overlay.  Pico-286 captures
-standard BIOS POST writes to port `80h` and the legacy R36SX test386 POST port
-`190h`.  The rebuilt `test386.bin` writes POST codes to the standard `80h`
-port.  The embedded Turbo XT BIOS image has no obvious `OUT 80h` POST sequence,
-so the normal BIOS may not produce values.
+`Fn` + D-pad `Right` toggles a lower-left POST-code overlay using a larger
+pixel font.  Pico-286 captures standard BIOS POST writes to port `80h` and the
+legacy R36SX test386 POST port `190h`.  The rebuilt `test386.bin` writes POST
+codes to the standard `80h` port.  The embedded Turbo XT BIOS image has no
+obvious `OUT 80h` POST sequence, so the normal BIOS may not produce values.
 
 Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps

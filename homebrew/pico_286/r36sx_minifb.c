@@ -54,6 +54,9 @@
 #define R36SX_PICO286_STATS_FONT_SCALE 2
 #define R36SX_PICO286_STATS_CHAR_ADVANCE \
     ((R36SX_PICO286_STATS_FONT_W + 1) * R36SX_PICO286_STATS_FONT_SCALE)
+#define R36SX_PICO286_POST_FONT_SCALE 2
+#define R36SX_PICO286_POST_PAD 6
+#define R36SX_PICO286_POST_MARGIN 8
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -312,6 +315,38 @@ static void r36sx_mfb_draw_text8(uint16_t *target, int x, int y,
                     target[(size_t)py * (size_t)g_mfb.width + (size_t)px] =
                         color;
                 }
+            }
+        }
+    }
+}
+
+static void r36sx_mfb_draw_text8_scaled(uint16_t *target, int x, int y,
+                                        const char *text, uint16_t color,
+                                        int scale)
+{
+    if (scale <= 1) {
+        r36sx_mfb_draw_text8(target, x, y, text, color);
+        return;
+    }
+
+    for (int i = 0; text && text[i] != '\0'; i++) {
+        unsigned char ch = (unsigned char)text[i];
+        const unsigned char *glyph = &font_8x8[(size_t)ch * 8u];
+        int char_x = x + i * 8 * scale;
+
+        for (int row = 0; row < 8; row++) {
+            unsigned char bits = glyph[row];
+            for (int col = 0; col < 8; col++) {
+                if ((bits & (unsigned char)(1u << col)) == 0) {
+                    continue;
+                }
+                r36sx_mfb_fill_rect_target(
+                    target,
+                    char_x + col * scale,
+                    y + row * scale,
+                    scale,
+                    scale,
+                    color);
             }
         }
     }
@@ -604,9 +639,9 @@ static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
     uint8_t value = g_post_code_value;
     int text_w;
     int box_w;
-    const int box_h = 20;
-    int x;
-    int y = 8;
+    int box_h;
+    int x = R36SX_PICO286_POST_MARGIN;
+    int y;
     uint16_t bg = r36sx_mfb_rgb565(8, 12, 18);
     uint16_t border = r36sx_mfb_rgb565(96, 148, 170);
     uint16_t text = r36sx_mfb_rgb565(255, 228, 120);
@@ -622,15 +657,29 @@ static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
                  (unsigned int)port, (unsigned int)value);
     }
 
-    text_w = (int)strlen(line) * 8;
-    box_w = text_w + 14;
-    x = g_mfb.width - box_w - 8;
-    if (x < 8) {
-        x = 8;
+    text_w = (int)strlen(line) * 8 * R36SX_PICO286_POST_FONT_SCALE;
+    box_w = text_w + R36SX_PICO286_POST_PAD * 2;
+    box_h = 8 * R36SX_PICO286_POST_FONT_SCALE +
+            R36SX_PICO286_POST_PAD * 2;
+    y = g_mfb.height - box_h - R36SX_PICO286_POST_MARGIN;
+    if (x + box_w > g_mfb.width) {
+        x = g_mfb.width - box_w;
     }
+    if (x < 0) {
+        x = 0;
+    }
+    if (y < 0) {
+        y = 0;
+    }
+
     r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h, bg);
     r36sx_mfb_stroke_rect(target, x, y, box_w, box_h, border);
-    r36sx_mfb_draw_text8(target, x + 7, y + 6, line, text);
+    r36sx_mfb_draw_text8_scaled(target,
+                                x + R36SX_PICO286_POST_PAD,
+                                y + R36SX_PICO286_POST_PAD,
+                                line,
+                                text,
+                                R36SX_PICO286_POST_FONT_SCALE);
 }
 
 static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
@@ -1601,16 +1650,24 @@ static int r36sx_mfb_draw_stats_saved(uint16_t *target, uint32_t now_ms,
 static int r36sx_mfb_draw_post_codes_saved(
     uint16_t *target, struct r36sx_mfb_saved_rect *saved)
 {
-    int box_w = 112;
-    int box_h = 20;
-    int x = g_mfb.width - box_w - 8;
-    int y = 8;
+    int box_w = 11 * 8 * R36SX_PICO286_POST_FONT_SCALE +
+                R36SX_PICO286_POST_PAD * 2;
+    int box_h = 8 * R36SX_PICO286_POST_FONT_SCALE +
+                R36SX_PICO286_POST_PAD * 2;
+    int x = R36SX_PICO286_POST_MARGIN;
+    int y = g_mfb.height - box_h - R36SX_PICO286_POST_MARGIN;
 
     if (!target || !saved || !g_mfb.post_codes_visible) {
         return 0;
     }
-    if (x < 8) {
-        x = 8;
+    if (x + box_w > g_mfb.width) {
+        x = g_mfb.width - box_w;
+    }
+    if (x < 0) {
+        x = 0;
+    }
+    if (y < 0) {
+        y = 0;
     }
     if (!r36sx_mfb_save_rect(target, x, y, x + box_w - 1, y + box_h - 1,
                              saved)) {

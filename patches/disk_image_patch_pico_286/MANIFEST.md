@@ -32,6 +32,15 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 lower-left POST-code overlay
+
+The current `pico_286` binary shows the optional `Fn` + D-pad `Right`
+POST-code overlay in the lower-left corner with larger 2x `font8x8` text.
+The overlay save/restore rectangle was moved with it.
+
+pico_286 size: 1433476 bytes
+pico_286 SHA256: 22058A510063091ECAED3F83014C97609061E0C2E7A0D8ED3ED728D6761CB396
+
 ## 2026-05-31 vendored inih config parser
 
 The current `pico_286` binary uses vendored `inih` release `r62` for

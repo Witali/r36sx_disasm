@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-05-31 lower-left POST-code overlay
+
+Moved the optional POST-code overlay from the upper-right corner to the lower
+left corner and enlarged it by drawing the `font8x8` text at 2x scale.  The
+save/restore rectangle used by direct-present frames now covers the larger
+lower-left box, so overlay cleanup remains aligned when the DOS frame is not
+rerendered.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1433476` bytes
+- `pico_286` SHA256:
+  `22058A510063091ECAED3F83014C97609061E0C2E7A0D8ED3ED728D6761CB396`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 WSL GCC build path
 
 Added an alternate Pico-286 build path for WSL using the Linux
