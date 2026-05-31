@@ -37,6 +37,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 HDD2 200 MiB image
+
+`MIPS_NATIVE/pico_286/images/hdd2.hdd` was recreated as a 200 MiB FAT16/MBR
+raw hard-disk image for HDD1/D:.  The config now uses `hdd1_geometry=800,16,32`,
+which matches the image exactly:
+
+```text
+800 cylinders * 16 heads * 32 sectors * 512 bytes = 209,715,200 bytes
+```
+
+The image contains the small `README.TXT` seed file from
+`homebrew/pico_286/dos_files/hdd/README.TXT`.
+
+```text
+hdd2.hdd size: 209715200 bytes
+hdd2.hdd SHA256: D49DE89B93F5743FC98933747230E429928762F4DB6C555AB4CAE92BFF04FA16
+Defender scan: found no threats
+```
+
 ## 2026-05-31 protected-mode selector instructions
 
 The patch binary now includes the 286/386 selector-validation opcodes used by

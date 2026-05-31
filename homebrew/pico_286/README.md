@@ -274,7 +274,7 @@ fdd1=sopwith.img
 hdd0=hdd.hdd
 hdd0_geometry=65,16,63
 hdd1=hdd2.hdd
-hdd1_geometry=65,16,63
+hdd1_geometry=800,16,32
 ```
 
 `cpu_model` selects the emulated instruction compatibility level: `8086`,
@@ -447,7 +447,8 @@ a separate Sopwith game floppy:
   available as DOS `B:` in the current `pico_286.conf`.
 - `hdd.hdd`: 33,546,240-byte hard disk image with MBR and one FAT16 primary
   partition, 65 cylinders, 16 heads, 63 sectors.
-- `hdd2.hdd`: second FAT16 hard disk image with the same geometry.
+- `hdd2.hdd`: second FAT16 hard disk image, 209,715,200 bytes
+  (CHS 800,16,32), used as HDD1/D:.
 
 The hard disk images are generated on the host with
 `tools/create_fat16_hdd.py`.  This avoids booting DOS with a completely blank
