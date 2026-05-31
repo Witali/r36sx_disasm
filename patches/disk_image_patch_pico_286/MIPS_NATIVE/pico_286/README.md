@@ -71,8 +71,8 @@ right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
 left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
 same left edge.  The bottom row includes `CTRL WIN ALT`, a wide `SPC`, then
-`ALT MENU CLS CTRL`; `WIN` and `MENU` send the PC extended scancodes `E0 5B`
-and `E0 5D`.  The function-key row keeps grouped gaps, with the late group
+`ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes `E0 5B` and
+`E0 5D`.  The function-key row keeps grouped gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
 also changes the
 visible labels: letters switch between lowercase and uppercase, while the

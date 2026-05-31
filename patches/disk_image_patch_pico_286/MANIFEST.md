@@ -37,6 +37,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard bottom row cleanup
+
+The bottom on-screen keyboard row no longer includes the `CLS` key.  It now
+ends as `ALT MNU CTRL`; `MNU` is a wider context-menu key, `SPC` is stretched
+on the half-unit grid, and `Select` remains the keyboard close shortcut.
+
+```text
+pico_286 size: 457840 bytes
+pico_286 SHA256: 38D53E9AD44F517882AF3078E1C8A8320AA42FEF45C0D631FB2D2D8367815F80
+Defender scan: found no threats
+```
+
 ## 2026-06-01 on-screen keyboard header hints
 
 The on-screen keyboard header again shows compact button hints next to the
@@ -66,7 +78,8 @@ Defender scan: found no threats
 
 The bottom on-screen keyboard row now applies its row-width remainder to `SPC`
 instead of right `CTRL`, so the gaps around `CTRL`, `WIN`, `ALT`, `SPC`,
-`MENU`, and `CLS` match the upper rows while the right edge stays aligned.
+`MNU`, and right `CTRL` match the upper rows while the right edge stays
+aligned.
 
 ```text
 pico_286 size: 457840 bytes
@@ -106,10 +119,10 @@ Defender scan: found no threats
 The patch binary now draws the on-screen keyboard rows from a shared left edge:
 `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` line up vertically.
 `SHIFT` uses its full label, the bottom row now includes `CTRL WIN ALT`,
-a much wider `SPC`, then `ALT MENU CLS CTRL`, and the late function-key group
+a much wider `SPC`, then `ALT MNU CTRL`, and the late function-key group
 is nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.
 
-The new `WIN` and `MENU` keys emit PC extended scancodes `E0 5B` and `E0 5D`
+The new `WIN` and `MNU` keys emit PC extended scancodes `E0 5B` and `E0 5D`
 and are available in the key-preset picker.
 
 ```text

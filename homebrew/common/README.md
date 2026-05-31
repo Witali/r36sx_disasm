@@ -67,12 +67,13 @@ moving up from Left Arrow selects `DEL` instead of the Up Arrow key.
 
 The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
 `CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row
-includes `WIN`, a stretched `SPC`, and a context `MENU` key; host applications
+includes `WIN`, a stretched `SPC`, and a context `MNU` key; host applications
 can map these emitted Windows-like keycodes as needed.  The last key in each
 row absorbs the row-width remainder so `F12`, Backspace, `\`, Enter, right
 `SHIFT`, and right `CTRL` share a clean visual right edge.  On the bottom row,
 the spacebar absorbs that remainder instead, keeping the visible gaps between
-`CTRL`, `WIN`, `ALT`, `SPC`, `MENU`, and `CLS` consistent with the rows above.
+`CTRL`, `WIN`, `ALT`, `SPC`, `MNU`, and right `CTRL` consistent with the rows
+above.
 
 Current physical button bindings while the keyboard is visible:
 

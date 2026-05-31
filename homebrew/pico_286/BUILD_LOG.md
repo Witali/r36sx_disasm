@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard bottom row cleanup
+
+Removed the on-screen `CLS` key from the bottom keyboard row.  The bottom row
+now ends as `ALT MNU CTRL`; `MNU` is a wider context-menu key, and `SPC` uses a
+6.5-unit base width plus the row remainder so the visible gaps stay consistent
+with the upper rows.  Closing the keyboard remains available through `Select`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `457840` bytes
+- `pico_286` SHA256:
+  `38D53E9AD44F517882AF3078E1C8A8320AA42FEF45C0D631FB2D2D8367815F80`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard header hints
 
 Restored compact physical-button hints in the on-screen keyboard header.  The
