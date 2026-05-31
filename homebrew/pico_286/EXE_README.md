@@ -216,9 +216,9 @@ the output frame and skip DOS-frame composition underneath them.
 `keyboard_mode=normal` resizes the DOS image above the on-screen keyboard;
 `keyboard_mode=overlay` keeps the DOS image unscaled and draws the keyboard over
 it from a cached keyboard buffer.  Small overlays such as app statistics, the
-disk LED, and the overlay keyboard are drawn into a stable present buffer, so
-the emulator `SCREEN` buffer is not restored immediately after `driver.so`
-receives a frame pointer.
+POST-code box, disk LED, and overlay keyboard save only their covered
+rectangles, draw into `SCREEN`, and restore those rectangles at the next
+`mfb_update()` unless the DOS renderer already produced a dirty frame.
 
 This build also enables the computed-goto CPU opcode dispatcher, so the main
 `exec86()` loop jumps directly to opcode handlers instead of entering the large

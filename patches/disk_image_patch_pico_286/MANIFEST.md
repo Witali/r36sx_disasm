@@ -32,6 +32,17 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 delayed direct-overlay restore
+
+The current `pico_286` binary avoids full-frame copies for small overlays.  App
+statistics, POST-code overlay, disk LED, and overlay keyboard draw directly
+into `SCREEN` after saving only the covered rectangles.  Those pixels are
+restored at the start of the next `mfb_update()` after the next x86 execution
+slice, or discarded if the DOS renderer already produced a dirty frame.
+
+pico_286 size: 1397156 bytes
+pico_286 SHA256: D50AC2DCE79CD8B2BC4058B8A18DBE7155797CB047C2AF93F154CC12D3640FE2
+
 ## 2026-05-31 POST-code overlay and standard test ROM port
 
 The current `pico_286` binary can show POST-code writes with `Fn` + D-pad
@@ -53,11 +64,11 @@ images/cpu_tests.img SHA256: EEA493C9E526B8083F96F3FB4A93326459A4D425F28E8E4F4DF
 
 ## 2026-05-31 stable direct-overlay present buffer
 
-The current `pico_286` binary fixes flicker in small direct overlays.  App
-statistics, the disk LED, and the overlay keyboard now draw into a stable output
-frame before calling `driver.so`, instead of drawing into `SCREEN` and
-restoring it immediately after `video_driver_disp_frame()`.  Plain DOS frames
-still present `SCREEN` directly when no overlay is active.
+That `pico_286` binary fixed flicker in small direct overlays by drawing app
+statistics, the disk LED, and the overlay keyboard into a stable output frame
+before calling `driver.so`, instead of drawing into `SCREEN` and restoring it
+immediately after `video_driver_disp_frame()`.  A later build replaced this
+with delayed rectangle restore to avoid full-frame copies.
 
 pico_286 size: 1386804 bytes
 pico_286 SHA256: 37CB2FD6156F8EE3E6270E6AE3BF0202D09D3484CC717C20CD5F78876A8DD9A5
@@ -77,9 +88,9 @@ pico_286 SHA256: 3258BA6D20AD2591F4E9F6D0F7827E6D17D8BF250BDE468DC7033CA5A332425
 The current `pico_286` binary optimizes `[video] keyboard_mode=overlay`.
 The keyboard panel is rendered into a dedicated `640x96` RGB565 cache that is
 updated only when the visible keyboard state changes.  A later build draws that
-cached panel into a stable output frame instead of restoring `SCREEN`
-immediately after present.  If the cache buffer cannot be allocated, the old
-full composition path remains as a fallback.
+cached panel through the delayed-restore path instead of copying a whole output
+frame.  If the cache buffer cannot be allocated, the old full composition path
+remains as a fallback.
 
 pico_286 size: 1389944 bytes
 pico_286 SHA256: A8C42591D887C254D37E212EDC64557E4E745B1F9DAE9CBB4247F351486A1620
@@ -102,8 +113,8 @@ pico_286 SHA256: 74B49EADAB77E66333D07D7E058FFDFE5514DB24E18A235B2546D81888922CB
 The current `pico_286` binary tracks visible video changes and only rerenders
 the DOS framebuffer after emulated VRAM, video registers, palette state,
 active page, or cursor/blink state changes.  Small overlays such as disk LED
-and app statistics later changed to use a stable output frame without forcing a
-full DOS-screen render.
+and app statistics later changed to use delayed rectangle restore without
+forcing a full DOS-screen render.
 
 pico_286 size: 1374052 bytes
 pico_286 SHA256: 27B016E967771004E0D489E9977A17B262A6E90CF718BBC60613E64004857D8D
@@ -540,8 +551,8 @@ compatible `libz.so.1` libraries.
 The current `pico_286` binary presents normal DOS frames directly from the
 emulator `SCREEN` buffer to `driver.so`.  Full-screen menus later changed to
 draw directly into the output frame without precomposing a DOS frame underneath
-them.  Small overlays later changed to use a stable output frame, so they do
-not leave pixels inside the emulator framebuffer.
+them.  Small overlays later changed to use delayed rectangle restore, so they
+do not leave pixels inside the emulator framebuffer.
 
 ## 2026-05-30 runtime profiling option
 

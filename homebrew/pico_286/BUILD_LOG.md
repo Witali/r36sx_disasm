@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-05-31 delayed direct-overlay restore
+
+Optimized the small-overlay present path to avoid full-frame copies.
+
+- App statistics, POST-code overlay, disk LED, and overlay keyboard now draw
+  directly into `SCREEN`.
+- Before drawing, MiniFB saves only the covered rectangles: small fixed
+  rectangles for stats/POST/LED and a `640x96` underlay buffer for the overlay
+  keyboard panel.
+- The saved pixels are restored at the start of the next `mfb_update()` after
+  the next x86 execution slice.  If the DOS renderer already produced a dirty
+  frame, the pending restore is discarded because `SCREEN` has already been
+  regenerated.
+- Plain DOS frames still go directly from `SCREEN` to `driver.so`; full-screen
+  menus still draw directly into the output frame without DOS-frame
+  composition underneath them.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1397156` bytes
+- `pico_286` SHA256:
+  `D50AC2DCE79CD8B2BC4058B8A18DBE7155797CB047C2AF93F154CC12D3640FE2`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 POST-code overlay and standard test ROM port
 
 Added an optional on-screen POST-code overlay.
@@ -1953,7 +1994,9 @@ The red disk activity LED originally used a small save/restore rectangle in
 direct mode: the LED was drawn into `SCREEN` for the
 `video_driver_disp_frame()` call, then the original pixels were restored
 immediately.  Small overlays later changed to use a stable output frame instead
-of restoring `SCREEN` right after handing the frame pointer to `driver.so`.
+of restoring `SCREEN` right after handing the frame pointer to `driver.so`;
+then later changed again to delayed rectangle restore to avoid full-frame
+copies.
 
 ## 2026-05-30 runtime profiling option
 

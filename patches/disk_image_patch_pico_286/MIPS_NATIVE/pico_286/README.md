@@ -223,8 +223,9 @@ Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
 instruction loops in K/s, host disk image read/write KB/s, and presented FPS
 using a compact pixel font.  The rendered block is cached between one-second
-statistics samples; direct-present frames use a stable output buffer when a
-small overlay is active.  Set it to `0` to disable the shortcut and overlay.
+statistics samples; direct-present frames restore small overlay rectangles on
+the next `mfb_update()` when the DOS frame was not rerendered.  Set it to `0`
+to disable the shortcut and overlay.
 
 `Fn` + D-pad `Right` toggles a compact POST-code overlay.  Pico-286 captures
 standard BIOS POST writes to port `80h` and the legacy R36SX test386 POST port
@@ -243,9 +244,9 @@ the output frame and skip DOS-frame composition underneath them.
 `keyboard_mode=normal` resizes the DOS image above the on-screen keyboard;
 `keyboard_mode=overlay` keeps the DOS image unscaled and draws the keyboard over
 it from a cached keyboard buffer.  Small overlays such as app statistics, the
-disk LED, and the overlay keyboard are drawn into a stable present buffer, so
-the emulator `SCREEN` buffer is not restored immediately after `driver.so`
-receives a frame pointer.
+POST-code box, disk LED, and overlay keyboard save only their covered
+rectangles, draw into `SCREEN`, and restore those rectangles at the next
+`mfb_update()` unless the DOS renderer already produced a dirty frame.
 
 This build also enables the computed-goto CPU opcode dispatcher, so the main
 `exec86()` loop jumps directly to opcode handlers instead of entering the large

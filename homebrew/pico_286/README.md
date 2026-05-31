@@ -12,10 +12,11 @@ integration pieces:
   `/mnt/sdcard/cubegm/driver.so` video and joypad input.  The R36SX renderer
   now uses a 16-bit RGB565 `SCREEN` buffer end-to-end.  Normal DOS frames are
   presented directly from `SCREEN`.  Full-screen menus draw directly into the
-  output frame and skip DOS-frame composition.  Small overlays are drawn into a
-  stable present buffer, so `SCREEN` is not restored immediately after
-  `driver.so` receives a frame pointer.  The expensive DOS-video renderer runs
-  only after visible emulated video state changes.  `[video] keyboard_mode`
+  output frame and skip DOS-frame composition.  Small overlays save their
+  covered rectangles, draw into `SCREEN`, and restore those rectangles at the
+  next `mfb_update()` unless the DOS renderer already produced a dirty frame.
+  The expensive DOS-video renderer runs only after visible emulated video state
+  changes.  `[video] keyboard_mode`
   controls whether the on-screen keyboard resizes the DOS image (`normal`) or
   covers it without scaling (`overlay`).  In overlay mode, the keyboard panel
   is cached in its own RGB565 buffer and refreshed only when the visible
@@ -34,10 +35,10 @@ integration pieces:
   - `disks-win32.c.inl`
 - `r36sx_minifb.c` also draws a blinking red disk activity indicator in the
   lower-right corner when the emulator reads or writes disk image sectors.  In
-  direct-present mode it uses the stable present buffer when a small overlay is
-  visible, while plain DOS frames still go straight from `SCREEN` to
-  `driver.so`.  The app statistics overlay caches its pixel-font block between
-  one-second statistics refreshes.
+  direct-present mode it uses the delayed-restore small-overlay path, while
+  plain DOS frames still go straight from `SCREEN` to `driver.so`.  The app
+  statistics overlay caches its pixel-font block between one-second statistics
+  refreshes.
 - `r36sx_pico286_compat.h` is forced into the build to provide POSIX prototypes
   and harmless Pico PSRAM/swap stubs for upstream branches that are parsed but
   not used by the Linux/host configuration.
@@ -354,8 +355,9 @@ so the normal BIOS may not produce values.
 two-column overlay above the disk LED.  It shows decoded x86 instruction loops
 in K/s, host disk image read/write KB/s, and presented FPS using a compact
 pixel font.  The rendered block is cached between one-second statistics
-samples; direct-present frames use a stable output buffer when a small overlay
-is active.  Set it to `0` to disable the shortcut and overlay.
+samples; direct-present frames restore small overlay rectangles on the next
+`mfb_update()` when the DOS frame was not rerendered.  Set it to `0` to disable
+the shortcut and overlay.
 
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are
