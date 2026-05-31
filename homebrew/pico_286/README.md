@@ -496,10 +496,18 @@ This wrapper runs `build_pico_286_wsl.sh` inside WSL and uses the Linux
 `-mtune=74kc`, because Zig/LLVM's MIPS backend does not recognize `74kc` as a
 CPU name.
 
+The WSL wrapper also accepts `-OptLevel O0|O1|O2|O3|Os|Og|Ofast`; the shell
+script uses the equivalent `--opt-level`.  For an experimental optimized GCC
+build that leaves the normal executable untouched:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
+```
+
 Equivalent direct WSL command:
 
 ```powershell
-wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_286_wsl.sh"
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286.gcc.o3"
 ```
 
 Before replacing the vendored `homebrew/pico_286/pico-286` source snapshot,

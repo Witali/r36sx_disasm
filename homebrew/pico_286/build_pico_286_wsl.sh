@@ -11,6 +11,7 @@ Options:
   --debug-log              Build with DEBUG=1.
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
+  --opt-level LEVEL        GCC optimization level. Default: O2.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
   --out PATH               Output path. Default: homebrew/pico_286/pico_286.gcc
   --help                   Show this help.
@@ -43,6 +44,7 @@ DEBUG_VALUE=0
 PROFILING_VALUE=1
 COMPUTED_GOTO_VALUE=1
 DO_STRIP=0
+OPT_LEVEL=O2
 
 while (($#)); do
     case "$1" in
@@ -57,6 +59,22 @@ while (($#)); do
         --disable-computed-goto)
             COMPUTED_GOTO_VALUE=0
             shift
+            ;;
+        --opt-level)
+            if (($# < 2)); then
+                echo "--opt-level requires a value such as O2 or O3" >&2
+                exit 2
+            fi
+            case "$2" in
+                O0|O1|O2|O3|Os|Og|Ofast)
+                    OPT_LEVEL="$2"
+                    ;;
+                *)
+                    echo "Unsupported --opt-level value: $2" >&2
+                    exit 2
+                    ;;
+            esac
+            shift 2
             ;;
         --strip)
             DO_STRIP=1
@@ -143,7 +161,7 @@ common_args=(
     "-DEMU8950_NO_PERCUSSION_MODE=1"
     "-DEMU8950_LINEAR=1"
     "-include" "$COMPAT_HEADER"
-    "-O2"
+    "-$OPT_LEVEL"
     "-fPIC"
     "-fms-extensions"
     "-fno-strict-aliasing"

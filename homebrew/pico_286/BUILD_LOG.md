@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-31 WSL GCC O3 build trial
+
+Added an explicit optimization-level switch to the WSL/GCC build scripts:
+
+- `build_pico_286_wsl.ps1 -OptLevel O3`
+- `build_pico_286_wsl.sh --opt-level O3`
+
+The default remains `O2`; this keeps the normal WSL build stable while allowing
+performance experiments with `O3`, `Os`, or other GCC levels.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
+```
+
+Result:
+
+- `pico_286.gcc.o3` size: `416032` bytes
+- `pico_286.gcc.o3` SHA256:
+  `9B9FD752574DB3C81BDBA304A31F6CC0AC1FBCAB495192B42D0CB3303B31BA08`
+
+ELF check:
+
+```text
+ELF32, little-endian MIPS, executable, o32, mips32r2, hard-float, stripped
+interpreter: /lib/ld.so.1
+needed: libpthread.so.0, libdl.so.2, libm.so.6, libz.so.1,
+        libstdc++.so.6, libgcc_s.so.1, libc.so.6
+```
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.gcc.o3
+```
+
+Microsoft Defender reported no threats.  This binary was left as a separate
+experimental artifact and was not copied over the normal deployed `pico_286`
+binary.  GCC emitted existing warnings in the emulator sources, including
+sequence-point warnings in renderer pixel writes; those should be fixed before
+treating `O3` as the default build.
+
 ## 2026-05-31 lower-left POST-code overlay
 
 Moved the optional POST-code overlay from the upper-right corner to the lower
