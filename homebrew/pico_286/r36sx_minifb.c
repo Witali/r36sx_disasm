@@ -763,24 +763,6 @@ static void r36sx_mfb_put_le32(uint8_t *dst, uint32_t value)
     dst[3] = (uint8_t)((value >> 24) & 0xffu);
 }
 
-static uint8_t r36sx_mfb_rgb565_to_r8(uint16_t color)
-{
-    uint8_t r = (uint8_t)((color >> 11) & 0x1fu);
-    return (uint8_t)((r << 3) | (r >> 2));
-}
-
-static uint8_t r36sx_mfb_rgb565_to_g8(uint16_t color)
-{
-    uint8_t g = (uint8_t)((color >> 5) & 0x3fu);
-    return (uint8_t)((g << 2) | (g >> 4));
-}
-
-static uint8_t r36sx_mfb_rgb565_to_b8(uint16_t color)
-{
-    uint8_t b = (uint8_t)(color & 0x1fu);
-    return (uint8_t)((b << 3) | (b >> 2));
-}
-
 static int r36sx_mfb_write_png_chunk(FILE *fp, const char type[4],
                                      const uint8_t *data, uint32_t length)
 {
@@ -842,12 +824,7 @@ static int r36sx_mfb_write_png24(const char *path, const uint16_t *pixels,
         const uint16_t *src = pixels + (size_t)y * (size_t)width;
 
         row[0] = 0; /* PNG filter type: none. */
-        for (int x = 0; x < width; x++) {
-            uint16_t c = src[x];
-            row[1u + (size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_r8(c);
-            row[1u + (size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
-            row[1u + (size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_b8(c);
-        }
+        r36sx_mips_dsp_rgb565_to_rgb24(&row[1], src, (size_t)width);
     }
 
     compressed_bytes = compressBound(raw_bytes);
@@ -944,12 +921,7 @@ static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
 
     for (int y = height - 1; y >= 0; y--) {
         const uint16_t *src = pixels + (size_t)y * (size_t)width;
-        for (int x = 0; x < width; x++) {
-            uint16_t c = src[x];
-            row[(size_t)x * 3u + 0u] = r36sx_mfb_rgb565_to_b8(c);
-            row[(size_t)x * 3u + 1u] = r36sx_mfb_rgb565_to_g8(c);
-            row[(size_t)x * 3u + 2u] = r36sx_mfb_rgb565_to_r8(c);
-        }
+        r36sx_mips_dsp_rgb565_to_bgr24(row, src, (size_t)width);
         if (fwrite(row, 1, row_bytes, fp) != row_bytes) {
             fclose(fp);
             free(row);

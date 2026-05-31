@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-31 DSP RGB565 screenshot conversion helpers
+
+Extended `r36sx_mips_dsp.h` with batch `RGB565 -> RGB24/BGR24` helpers used by
+the screenshot writers.  The normal build keeps the scalar fallback.  The DSP
+build aligns the RGB565 source row and converts two pixels per iteration with
+MIPS DSP halfword shifts (`shrl.ph` / `shll.ph`).  The assembly probe now also
+emits a byte-lane `addu.qb` instruction so the DSP binary clearly shows both
+packed byte and packed halfword DSP coverage in `objdump`.
+
+This path is deliberately limited to screenshot export because the active
+frame renderer already runs in RGB565.  The per-palette `RGB888 -> RGB565`
+conversion remains scalar: it is small, lookup-oriented, and does not gain
+enough from DSP byte operations to justify more packing code.
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -EnableMipsDsp -Strip -Out .\homebrew\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `418436` bytes
+- `pico_286` SHA256:
+  `637193DE3D0CCD038AE1B2C9E5C5EF95E0CCF0DFAB1F0594B9D4BA816F43921C`
+- `pico_286.dsp` size: `414436` bytes
+- `pico_286.dsp` SHA256:
+  `5BEA04BE036B91D9C30F16C3B8D255EFF2E6924984A682A40D81B0B6B1C77B97`
+
+Verification:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+```
+
+Microsoft Defender reported no threats for both files.  WSL `objdump`
+confirmed that `pico_286.dsp` contains `addu.qb`, `shrl.ph`, and `shll.ph`,
+while the normal binary contains none of those DSP instructions.  The
+`disk_image` and patch copies are byte-identical by SHA256.
+
 ## 2026-05-31 test386 VGA breadcrumbs
 
 Added direct VGA text-memory breadcrumbs to the R36SX `test386.asm` BIOS

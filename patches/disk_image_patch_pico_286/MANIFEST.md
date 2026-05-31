@@ -56,17 +56,20 @@ images/cpu_tests.img SHA256: 1B3B5B663E7B7D03BCC24E002052A52B22573A5EB1D09F3EF22
 The patch now includes a side-by-side `pico_286.dsp` binary built with
 `-mdspr2` and `R36SX_MIPS_DSP=1`.  The DSP build routes hot RGB565
 framebuffer and audio buffer copies through shared helpers that keep portable
-fallbacks and emit the packed-halfword MIPS DSP instruction `addu.ph`.
+fallbacks and emit the packed-halfword MIPS DSP instruction `addu.ph`.  It
+also accelerates screenshot `RGB565 -> RGB24/BGR24` row conversion with
+`shrl.ph` / `shll.ph` and emits packed-byte `addu.qb` from the probe for
+objdump verification.
 
 The default `pico_286` binary remains the non-DSP GCC build.  Test
 `pico_286.dsp` only on hardware expected to support MIPS DSP ASE Rev2; a CPU
 without DSP support may raise an illegal-instruction fault.
 
 pico_286 size: 418436 bytes
-pico_286 SHA256: F5F3CDB962223B5997834BD45A29A3320B9F65F8A38E1BF6E1ADA5A46EC048E5
+pico_286 SHA256: 637193DE3D0CCD038AE1B2C9E5C5EF95E0CCF0DFAB1F0594B9D4BA816F43921C
 
-pico_286.dsp size: 412276 bytes
-pico_286.dsp SHA256: AD8FDA75D9278FEC176BE692F5E0DD25D77D31F77165886B02B3C4DAC5715257
+pico_286.dsp size: 414436 bytes
+pico_286.dsp SHA256: 5BEA04BE036B91D9C30F16C3B8D255EFF2E6924984A682A40D81B0B6B1C77B97
 
 ## 2026-05-31 BIOS VGA mode reset and GCC primary build
 
