@@ -61,7 +61,9 @@ be vertically compressed or clipped while the keyboard is visible.
 `r36sx_screen_keyboard_set_cursor_block()` optionally adds a compact cursor-key
 cluster to the right side of the keyboard.  The main keys are narrowed to keep
 the whole keyboard inside the same panel, and the cursor keys use a physical
-inverted-T layout with Up above Left/Down/Right.
+inverted-T layout with Up above Left/Down/Right.  Vertical navigation inside
+this side cluster follows the same physical column and skips empty rows, so
+moving up from Left Arrow selects `DEL` instead of the Up Arrow key.
 
 The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
 `CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row

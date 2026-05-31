@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 cursor-block navigation
+
+Fixed vertical navigation in the optional right-side cursor/navigation block.
+The selector now searches the next key in the same physical column and skips
+empty rows instead of snapping to the nearest key on the immediate row.  This
+makes Left Arrow + Up select `DEL`, and `DEL` + Down select Left Arrow again.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `457840` bytes
+- `pico_286` SHA256:
+  `2D30081FA9979BE97F75FA41101BEDD9AD6696E33F026DBF3E7D68E5627A9BDC`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard bottom row spacing
 
 Adjusted the bottom keyboard row so the row-width remainder is applied to the

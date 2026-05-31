@@ -37,6 +37,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 cursor-block navigation
+
+The optional right-side navigation cluster now moves vertically through the
+same physical column, skipping empty rows.  For example, Left Arrow + Up now
+selects `DEL`, and `DEL` + Down returns to Left Arrow instead of landing on an
+empty row or a diagonal key.
+
+```text
+pico_286 size: 457840 bytes
+pico_286 SHA256: 2D30081FA9979BE97F75FA41101BEDD9AD6696E33F026DBF3E7D68E5627A9BDC
+Defender scan: found no threats
+```
+
 ## 2026-06-01 on-screen keyboard bottom row spacing
 
 The bottom on-screen keyboard row now applies its row-width remainder to `SPC`

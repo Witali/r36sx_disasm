@@ -1366,17 +1366,15 @@ static void move_cursor_selection(struct r36sx_screen_keyboard *keyboard,
                                   int dx, int dy)
 {
     if (dy != 0) {
+        int col = (int)keyboard->col;
         int row = (int)keyboard->row + dy;
-        int col;
-        if (row < 0) {
-            row = R36SX_OSK_CURSOR_BLOCK_ROWS - 1;
-        } else if (row >= R36SX_OSK_CURSOR_BLOCK_ROWS) {
-            row = 0;
-        }
-        keyboard->row = (uint8_t)row;
-        col = nearest_cursor_col(row, keyboard->col);
-        if (col >= 0) {
-            keyboard->col = (uint8_t)col;
+        while (row >= 0 && row < R36SX_OSK_CURSOR_BLOCK_ROWS) {
+            if (cursor_key_at(row, col)) {
+                keyboard->row = (uint8_t)row;
+                keyboard->col = (uint8_t)col;
+                return;
+            }
+            row += dy;
         }
         return;
     }
