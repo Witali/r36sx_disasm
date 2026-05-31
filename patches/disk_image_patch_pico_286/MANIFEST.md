@@ -32,6 +32,14 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 minimum adaptive quantum raised
+
+The current `pico_286` binary keeps the adaptive `exec86()` quantum at no less
+than 1000 instructions per frame.
+
+pico_286 size: 1332160 bytes
+pico_286 SHA256: B5E9101584E255B90BA51C61EC094F8D4AB1CF680896292366BC0F2717B60681
+
 ## 2026-05-31 adaptive quantum ignores overlay rendering cost
 
 The current `pico_286` binary adjusts the `exec86()` quantum from the elapsed
@@ -52,7 +60,7 @@ The current `pico_286` binary adds adaptive main-loop CPU quantum control.
 - Slow active frames reduce the quantum toward the budget by at most one
   quarter per frame.
 - Fast active frames grow the quantum back by one quarter per frame.
-- The minimum quantum is 100 instructions per frame.
+- The minimum quantum is 1000 instructions per frame.
 
 pico_286 size: 1332016 bytes
 pico_286 SHA256: 4D8F4D8C89C6E5BDA4831D375B2449A4C246FF0702CB3084C994F960F6F71604

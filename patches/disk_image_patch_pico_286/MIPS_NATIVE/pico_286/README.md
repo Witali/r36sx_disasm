@@ -156,7 +156,7 @@ gates, and full 32-bit `EIP` execution are still incomplete, so keep
 `target_fps` controls the main-loop frame budget.  The default `60` targets
 about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
 `exec86()` quantum when emulation itself overruns, grows it back when there is
-spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 100
+spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 1000
 instructions per frame.  Rendering overlays such as the on-screen keyboard do
 not reduce the CPU quantum.
 

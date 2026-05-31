@@ -268,7 +268,7 @@ instruction quantum every frame: when emulation itself is too slow, it
 estimates the quantum that would fit the target budget and steps down by at
 most one quarter; when there is spare CPU time, it grows back by one quarter up
 to the `cpu_mhz` limit.  Rendering overlays such as the on-screen keyboard do
-not reduce the CPU quantum.  The quantum never drops below 100 instructions.
+not reduce the CPU quantum.  The quantum never drops below 1000 instructions.
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
 maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,

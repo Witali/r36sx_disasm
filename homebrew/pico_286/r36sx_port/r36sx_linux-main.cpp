@@ -37,7 +37,7 @@ extern "C" void r36sx_pico286_disk_flush_all(void);
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
 #define R36SX_HLT_SLEEP_US 1000u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
-#define R36SX_EXEC86_MIN_LOOPS 100u
+#define R36SX_EXEC86_MIN_LOOPS 1000u
 static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
 static int sample_index = 0;
 static volatile int soft_reset_requested = 0;

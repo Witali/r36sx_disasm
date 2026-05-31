@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-05-31 raise minimum adaptive exec86 quantum
+
+Raised `R36SX_EXEC86_MIN_LOOPS` from `100` to `1000` instructions.
+This keeps the adaptive controller from shrinking a frame's emulated CPU work
+into very tiny chunks under heavy host-side load.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1332160` bytes
+- `pico_286` SHA256:
+  `B5E9101584E255B90BA51C61EC094F8D4AB1CF680896292366BC0F2717B60681`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 keep overlay cost out of adaptive exec86 quantum
 
 Changed adaptive quantum timing to measure only the `exec86()` call.
