@@ -1,5 +1,60 @@
 # pico-286 Build Log
 
+## 2026-05-31 experimental MIPS DSP framebuffer build
+
+Added an experimental WSL/GCC build mode for MIPS DSP ASE Rev2:
+
+- PowerShell wrapper: `-EnableMipsDsp`
+- Shell script: `--enable-mips-dsp`
+- compiler flags/defines: `-mdspr2`, `R36SX_MIPS_DSP_FRAMEBUFFER=1`
+
+`r36sx_minifb.c` now routes RGB565 framebuffer row copies and fills through
+`r36sx_mfb_copy_pixels()` / `r36sx_mfb_fill_pixels()`.  The default build keeps
+the normal portable path.  The DSP build uses aligned 32-bit operations over
+two RGB565 pixels at a time and emits MIPS DSP packed-halfword `addu.ph` as a
+hardware compatibility probe.  This is intentionally experimental; future
+work should move bilinear/halftone scaling and renderer pixel expansion into
+real packed arithmetic once the binary is proven to run on the console.
+
+Primary non-DSP rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286
+```
+
+Experimental DSP rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -EnableMipsDsp -Strip -Out .\homebrew\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `418404` bytes
+- `pico_286` SHA256:
+  `6BCDB9903DCEF96897B4A16A8B0C181B18699683979F6A4669A1C76DC0C8B3FD`
+- `pico_286.dsp` size: `414340` bytes
+- `pico_286.dsp` SHA256:
+  `6400EC7AFB2682AF7DCD551C6A5FC14DED70169F53B4F442463C42834D212295`
+
+Verification:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+```
+
+Microsoft Defender reported no threats for both files.  `objdump` confirmed
+that the DSP binary contains `addu.ph` instructions.  The `disk_image` and
+patch copies are byte-identical by SHA256.
+
+Reference notes:
+
+- GCC documents `-mdsp` / `-mdspr2` for MIPS DSP ASE; `-mdspr2` implies
+  `-mdsp` and defines `__mips_dsp` / `__mips_dspr2`.
+- The MIPS 74Kc datasheet describes DSP ASE Rev2 support, but the runtime
+  still needs testing on this exact console SoC.
+
 ## 2026-05-31 BIOS VGA mode reset and GCC primary build
 
 Moved the active Pico-286 rebuild path to WSL/GCC.  The deployed

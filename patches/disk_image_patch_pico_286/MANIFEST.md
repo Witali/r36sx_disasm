@@ -5,6 +5,7 @@ Adds the first native pico-286 port build for TinyMC.
 Copy this patch over the original SD-card filesystem root.  It installs:
 
 - `MIPS_NATIVE/pico_286/pico_286`
+- `MIPS_NATIVE/pico_286/pico_286.dsp`
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/README.md`
 - `MIPS_NATIVE/pico_286/keypresets.conf`
@@ -22,6 +23,9 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/images/hdd2.hdd`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
+The `pico_286.dsp` binary is an experimental MIPS DSP Rev2 build for side-by-
+side testing; if it works on the device, it can be temporarily renamed to
+`pico_286` for direct comparison.
 
 The default binary is built with `DEBUG=0`.  Builds made with
 `build_pico_286.ps1 -DebugLog` write a startup/runtime log to:
@@ -31,6 +35,23 @@ The default binary is built with `DEBUG=0`.  Builds made with
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-05-31 experimental MIPS DSP framebuffer build
+
+The patch now includes a side-by-side `pico_286.dsp` binary built with
+`-mdspr2` and `R36SX_MIPS_DSP_FRAMEBUFFER=1`.  The DSP build routes RGB565
+framebuffer row copies/fills through helpers that operate on two pixels per
+32-bit word and emit the packed-halfword MIPS DSP instruction `addu.ph`.
+
+The default `pico_286` binary remains the non-DSP GCC build.  Test
+`pico_286.dsp` only on hardware expected to support MIPS DSP ASE Rev2; a CPU
+without DSP support may raise an illegal-instruction fault.
+
+pico_286 size: 418404 bytes
+pico_286 SHA256: 6BCDB9903DCEF96897B4A16A8B0C181B18699683979F6A4669A1C76DC0C8B3FD
+
+pico_286.dsp size: 414340 bytes
+pico_286.dsp SHA256: 6400EC7AFB2682AF7DCD551C6A5FC14DED70169F53B4F442463C42834D212295
 
 ## 2026-05-31 BIOS VGA mode reset and GCC primary build
 

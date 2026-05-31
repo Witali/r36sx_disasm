@@ -12,6 +12,7 @@ Options:
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
   --opt-level LEVEL        GCC optimization level. Default: O2.
+  --enable-mips-dsp        Experimental framebuffer helpers with MIPS DSP Rev2.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
   --out PATH               Output path. Default: homebrew/pico_286/pico_286.gcc
   --help                   Show this help.
@@ -45,6 +46,7 @@ PROFILING_VALUE=1
 COMPUTED_GOTO_VALUE=1
 DO_STRIP=0
 OPT_LEVEL=O2
+MIPS_DSP_VALUE=0
 
 while (($#)); do
     case "$1" in
@@ -75,6 +77,10 @@ while (($#)); do
                     ;;
             esac
             shift 2
+            ;;
+        --enable-mips-dsp)
+            MIPS_DSP_VALUE=1
+            shift
             ;;
         --strip)
             DO_STRIP=1
@@ -142,6 +148,7 @@ common_args=(
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
     "-DR36SX_VIDEO_DIRTY_TRACKING=1"
+    "-DR36SX_MIPS_DSP_FRAMEBUFFER=$MIPS_DSP_VALUE"
     "-DINI_HANDLER_LINENO=1"
     "-DINI_MAX_LINE=512"
     "-DINI_ALLOW_MULTILINE=0"
@@ -173,6 +180,10 @@ common_args=(
     "-Wno-unused-function"
     "-Wno-missing-field-initializers"
 )
+
+if ((MIPS_DSP_VALUE)); then
+    common_args+=("-mdspr2")
+fi
 
 objects=()
 

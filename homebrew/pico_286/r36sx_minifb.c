@@ -58,6 +58,16 @@
 #define R36SX_PICO286_POST_PAD 6
 #define R36SX_PICO286_POST_MARGIN 8
 
+#ifndef R36SX_MIPS_DSP_FRAMEBUFFER
+#define R36SX_MIPS_DSP_FRAMEBUFFER 0
+#endif
+
+#if R36SX_MIPS_DSP_FRAMEBUFFER && defined(__mips_dspr2)
+#define R36SX_MFB_DSP_FRAMEBUFFER_ENABLED 1
+#else
+#define R36SX_MFB_DSP_FRAMEBUFFER_ENABLED 0
+#endif
+
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
 typedef void (*video_driver_disp_frame_fn)(void *, int, int, int);
@@ -226,6 +236,93 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
                       ((uint16_t)b >> 3));
 }
 
+#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
+static inline uint32_t r36sx_mfb_dsp_pair_passthrough(uint32_t pixels)
+{
+    uint32_t result;
+
+    __asm__ volatile ("addu.ph %0,%1,$zero"
+                      : "=r"(result)
+                      : "r"(pixels));
+    return result;
+}
+#endif
+
+static void r36sx_mfb_copy_pixels(uint16_t *dst, const uint16_t *src,
+                                  size_t pixels)
+{
+    if (!dst || !src || pixels == 0) {
+        return;
+    }
+
+#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
+    while (pixels > 0 &&
+           (((uintptr_t)dst | (uintptr_t)src) & (uintptr_t)3u) != 0) {
+        *dst++ = *src++;
+        pixels--;
+    }
+
+    if (pixels >= 2) {
+        uint32_t *dst32 = (uint32_t *)dst;
+        const uint32_t *src32 = (const uint32_t *)src;
+        size_t pairs = pixels >> 1;
+
+        for (size_t i = 0; i < pairs; i++) {
+            uint32_t pair = src32[i];
+            dst32[i] = r36sx_mfb_dsp_pair_passthrough(pair);
+        }
+
+        dst += pairs << 1;
+        src += pairs << 1;
+        pixels &= 1u;
+    }
+
+    if (pixels != 0) {
+        *dst = *src;
+    }
+#else
+    memcpy(dst, src, pixels * sizeof(dst[0]));
+#endif
+}
+
+static void r36sx_mfb_fill_pixels(uint16_t *dst, uint16_t color,
+                                  size_t pixels)
+{
+    if (!dst || pixels == 0) {
+        return;
+    }
+
+#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
+    while (pixels > 0 && (((uintptr_t)dst) & (uintptr_t)3u) != 0) {
+        *dst++ = color;
+        pixels--;
+    }
+
+    if (pixels >= 2) {
+        uint32_t pair =
+            ((uint32_t)color << 16) | (uint32_t)color;
+        uint32_t pair_dsp = r36sx_mfb_dsp_pair_passthrough(pair);
+        uint32_t *dst32 = (uint32_t *)dst;
+        size_t pairs = pixels >> 1;
+
+        for (size_t i = 0; i < pairs; i++) {
+            dst32[i] = pair_dsp;
+        }
+
+        dst += pairs << 1;
+        pixels &= 1u;
+    }
+
+    if (pixels != 0) {
+        *dst = color;
+    }
+#else
+    for (size_t i = 0; i < pixels; i++) {
+        dst[i] = color;
+    }
+#endif
+}
+
 static void r36sx_mfb_fill_rect_surface(uint16_t *target, int surface_w,
                                         int surface_h, int stride_pixels,
                                         int x, int y, int w, int h,
@@ -255,9 +352,7 @@ static void r36sx_mfb_fill_rect_surface(uint16_t *target, int surface_w,
     for (int row = 0; row < h; row++) {
         uint16_t *dst = target + (size_t)(y + row) * (size_t)stride_pixels +
                         (size_t)x;
-        for (int col = 0; col < w; col++) {
-            dst[col] = color;
-        }
+        r36sx_mfb_fill_pixels(dst, color, (size_t)w);
     }
 }
 
@@ -589,7 +684,7 @@ static int r36sx_mfb_refresh_stats_overlay(uint32_t now_ms)
     cache_view = screen_view;
     cache_view.x = 0;
     cache_view.y = 0;
-    memset(g_mfb.stats_overlay, 0, pixels * sizeof(g_mfb.stats_overlay[0]));
+    r36sx_mfb_fill_pixels(g_mfb.stats_overlay, 0, pixels);
     r36sx_mfb_draw_stats_view_surface(g_mfb.stats_overlay,
                                       screen_view.w, screen_view.h,
                                       screen_view.w, &cache_view);
@@ -610,14 +705,14 @@ static void r36sx_mfb_blit_stats_overlay(uint16_t *target)
     }
 
     for (int row = 0; row < g_mfb.stats_overlay_h; row++) {
-        memcpy(target +
-                   (size_t)(g_mfb.stats_overlay_y + row) *
-                       (size_t)g_mfb.width +
-                   (size_t)g_mfb.stats_overlay_x,
-               g_mfb.stats_overlay +
-                   (size_t)row * (size_t)g_mfb.stats_overlay_w,
-               (size_t)g_mfb.stats_overlay_w *
-                   sizeof(g_mfb.stats_overlay[0]));
+        r36sx_mfb_copy_pixels(
+            target +
+                (size_t)(g_mfb.stats_overlay_y + row) *
+                    (size_t)g_mfb.width +
+                (size_t)g_mfb.stats_overlay_x,
+            g_mfb.stats_overlay +
+                (size_t)row * (size_t)g_mfb.stats_overlay_w,
+            (size_t)g_mfb.stats_overlay_w);
     }
 }
 
@@ -1103,12 +1198,12 @@ static void r36sx_mfb_draw_screenshot_toast(uint16_t *target,
     preview_x = x + preview_pad;
     preview_y = y + text_h;
     for (int row = 0; row < R36SX_PICO286_SCREENSHOT_PREVIEW_H; row++) {
-        memcpy(target + (size_t)(preview_y + row) * (size_t)g_mfb.width +
-                   (size_t)preview_x,
-               g_mfb.screenshot_preview +
-                   (size_t)row * R36SX_PICO286_SCREENSHOT_PREVIEW_W,
-               R36SX_PICO286_SCREENSHOT_PREVIEW_W *
-                   sizeof(g_mfb.screenshot_preview[0]));
+        r36sx_mfb_copy_pixels(
+            target + (size_t)(preview_y + row) * (size_t)g_mfb.width +
+                (size_t)preview_x,
+            g_mfb.screenshot_preview +
+                (size_t)row * R36SX_PICO286_SCREENSHOT_PREVIEW_W,
+            R36SX_PICO286_SCREENSHOT_PREVIEW_W);
     }
     r36sx_mfb_stroke_rect(target, preview_x - 1, preview_y - 1,
                           R36SX_PICO286_SCREENSHOT_PREVIEW_W + 2,
@@ -1159,9 +1254,7 @@ static void r36sx_mfb_fill_rect(int x, int y, int w, int h, uint16_t color)
     for (int row = 0; row < h; row++) {
         uint16_t *dst = g_mfb.frame + (size_t)(y + row) * (size_t)g_mfb.width +
                         (size_t)x;
-        for (int col = 0; col < w; col++) {
-            dst[col] = color;
-        }
+        r36sx_mfb_fill_pixels(dst, color, (size_t)w);
     }
 }
 
@@ -1318,8 +1411,8 @@ static int r36sx_mfb_refresh_osk_overlay(void)
         return 1;
     }
 
-    memset(g_mfb.osk_overlay, 0,
-           r36sx_osk_overlay_pixels() * sizeof(g_mfb.osk_overlay[0]));
+    r36sx_mfb_fill_pixels(g_mfb.osk_overlay, 0,
+                          r36sx_osk_overlay_pixels());
     r36sx_screen_keyboard_draw(&g_mfb.osk, g_mfb.osk_overlay, g_mfb.width,
                                R36SX_SCREEN_KEYBOARD_PANEL_H, g_mfb.width);
     g_mfb.osk_overlay_signature = signature;
@@ -1567,10 +1660,11 @@ static int r36sx_mfb_save_rect(uint16_t *target, int x0, int y0, int x1,
     }
 
     for (int row = 0; row < saved->h; row++) {
-        memcpy(&saved->pixels[(size_t)row * (size_t)saved->w],
-               &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
-                       (size_t)saved->x],
-               (size_t)saved->w * sizeof(saved->pixels[0]));
+        r36sx_mfb_copy_pixels(
+            &saved->pixels[(size_t)row * (size_t)saved->w],
+            &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
+                    (size_t)saved->x],
+            (size_t)saved->w);
     }
     return 1;
 }
@@ -1583,10 +1677,11 @@ static void r36sx_mfb_restore_saved_rect(
     }
 
     for (int row = 0; row < saved->h; row++) {
-        memcpy(&target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
-                       (size_t)saved->x],
-               &saved->pixels[(size_t)row * (size_t)saved->w],
-               (size_t)saved->w * sizeof(saved->pixels[0]));
+        r36sx_mfb_copy_pixels(
+            &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
+                    (size_t)saved->x],
+            &saved->pixels[(size_t)row * (size_t)saved->w],
+            (size_t)saved->w);
     }
     saved->w = 0;
     saved->h = 0;
@@ -1699,12 +1794,14 @@ static int r36sx_mfb_draw_osk_overlay_saved(uint16_t *target)
     }
 
     for (int row = 0; row < h; row++) {
-        memcpy(g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
-               target + (size_t)(y + row) * (size_t)g_mfb.width,
-               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
-        memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
-               g_mfb.osk_overlay + (size_t)row * (size_t)g_mfb.width,
-               (size_t)g_mfb.width * sizeof(g_mfb.osk_overlay[0]));
+        r36sx_mfb_copy_pixels(
+            g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
+            target + (size_t)(y + row) * (size_t)g_mfb.width,
+            (size_t)g_mfb.width);
+        r36sx_mfb_copy_pixels(
+            target + (size_t)(y + row) * (size_t)g_mfb.width,
+            g_mfb.osk_overlay + (size_t)row * (size_t)g_mfb.width,
+            (size_t)g_mfb.width);
     }
     g_mfb.osk_restore_pending = 1;
     return 1;
@@ -1734,9 +1831,10 @@ static void r36sx_mfb_restore_osk_overlay(uint16_t *target)
     }
 
     for (int row = 0; row < h; row++) {
-        memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
-               g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
-               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
+        r36sx_mfb_copy_pixels(
+            target + (size_t)(y + row) * (size_t)g_mfb.width,
+            g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
+            (size_t)g_mfb.width);
     }
     g_mfb.osk_restore_pending = 0;
 }
@@ -1824,7 +1922,7 @@ static void r36sx_mfb_copy_scaled_nearest(uint16_t *src, int content_h,
         uint16_t *dst_row =
             g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
 
-        memcpy(dst_row, src_row, (size_t)g_mfb.width * sizeof(dst_row[0]));
+        r36sx_mfb_copy_pixels(dst_row, src_row, (size_t)g_mfb.width);
     }
 }
 
@@ -1855,9 +1953,10 @@ static void r36sx_mfb_copy_scaled_bilinear(uint16_t *src, int content_h,
 
         if (sy0 >= source_h - 1) {
             sy0 = source_h - 1;
-            memcpy(dst_row,
-                   src + (size_t)sy0 * (size_t)g_mfb.width,
-                   (size_t)g_mfb.width * sizeof(dst_row[0]));
+            r36sx_mfb_copy_pixels(
+                dst_row,
+                src + (size_t)sy0 * (size_t)g_mfb.width,
+                (size_t)g_mfb.width);
             continue;
         }
 
@@ -1866,8 +1965,7 @@ static void r36sx_mfb_copy_scaled_bilinear(uint16_t *src, int content_h,
         src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
 
         if (frac == 0) {
-            memcpy(dst_row, src_row0,
-                   (size_t)g_mfb.width * sizeof(dst_row[0]));
+            r36sx_mfb_copy_pixels(dst_row, src_row0, (size_t)g_mfb.width);
             continue;
         }
 
@@ -1899,14 +1997,15 @@ static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
             const uint16_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
             uint16_t *dst_row =
                 g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
-            memcpy(dst_row, src_row, (size_t)g_mfb.width * sizeof(dst_row[0]));
+            r36sx_mfb_copy_pixels(dst_row, src_row, (size_t)g_mfb.width);
         }
     } else {
         if (content_h == source_h) {
             for (int y = 0; y < content_h; y++) {
-                memcpy(g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width,
-                       src + (size_t)y * (size_t)g_mfb.width,
-                       (size_t)g_mfb.width * sizeof(g_mfb.base_frame[0]));
+                r36sx_mfb_copy_pixels(
+                    g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width,
+                    src + (size_t)y * (size_t)g_mfb.width,
+                    (size_t)g_mfb.width);
             }
         } else if (filter == R36SX_PICO286_SCALING_BILINEAR) {
             r36sx_mfb_copy_scaled_bilinear(src, content_h, source_h);
@@ -1916,10 +2015,11 @@ static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
     }
 
     if (rows_to_copy < g_mfb.height) {
-        memset(g_mfb.base_frame + (size_t)rows_to_copy * (size_t)g_mfb.width,
-               0,
-               (size_t)(g_mfb.height - rows_to_copy) *
-                   (size_t)g_mfb.width * sizeof(g_mfb.base_frame[0]));
+        r36sx_mfb_fill_pixels(
+            g_mfb.base_frame + (size_t)rows_to_copy * (size_t)g_mfb.width,
+            0,
+            (size_t)(g_mfb.height - rows_to_copy) *
+                (size_t)g_mfb.width);
     }
 }
 
@@ -2157,6 +2257,8 @@ int mfb_open(const char *name, int width, int height, int scale)
     }
     r36sx_pico286_debug_log("minifb: open name=%s size=%dx%d scale=%d cwd=%s",
                             name ? name : "(null)", width, height, scale, cwd);
+    r36sx_pico286_debug_log("minifb: mips dsp framebuffer=%d",
+                            R36SX_MFB_DSP_FRAMEBUFFER_ENABLED);
 
     setenv("LD_LIBRARY_PATH",
            "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",
@@ -2353,9 +2455,10 @@ int mfb_update(void *buffer, int fps_limit)
                 g_mfb.base_scaling_filter = scaling_filter;
                 g_mfb.base_frame_valid = 1;
             }
-            memcpy(g_mfb.frame, g_mfb.base_frame,
-                   (size_t)g_mfb.width * (size_t)g_mfb.height *
-                       sizeof(g_mfb.frame[0]));
+            r36sx_mfb_copy_pixels(
+                g_mfb.frame,
+                g_mfb.base_frame,
+                (size_t)g_mfb.width * (size_t)g_mfb.height);
             r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
         }
         if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {

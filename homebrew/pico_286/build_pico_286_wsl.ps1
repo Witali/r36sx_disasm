@@ -4,6 +4,7 @@ param(
     [switch]$DisableComputedGoto,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og", "Ofast")]
     [string]$OptLevel = "O2",
+    [switch]$EnableMipsDsp,
     [switch]$Strip,
     [string]$Out
 )
@@ -25,6 +26,7 @@ if ($OptLevel) {
     $ArgsList += "--opt-level"
     $ArgsList += $OptLevel
 }
+if ($EnableMipsDsp) { $ArgsList += "--enable-mips-dsp" }
 if ($Strip) { $ArgsList += "--strip" }
 if ($Out) {
     $ArgsList += "--out"

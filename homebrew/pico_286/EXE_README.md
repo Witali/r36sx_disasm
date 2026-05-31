@@ -2,6 +2,12 @@
 
 This file documents the `pico_286` native executable for TinyMC.
 
+The normal `pico_286` binary is the WSL/GCC `-O3` build.  `pico_286.dsp` is an
+experimental side-by-side build compiled with MIPS DSP ASE Rev2
+(`-EnableMipsDsp` / `-mdspr2`).  It may fail with an illegal-instruction fault
+on hardware without DSP support; test it separately before replacing the
+normal executable.
+
 ## Main DOS Controls
 
 The default key preset maps physical buttons like this:
