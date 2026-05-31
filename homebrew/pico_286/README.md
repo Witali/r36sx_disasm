@@ -239,10 +239,11 @@ bios=normal
 test_bios_rom=test386.bin
 
 [memory]
-conventional_kb=640
-upper_kb=176
-extended_kb=64
-xms_kb=4096
+total_memory_kb=4912
+# conventional_kb=640
+# upper_kb=176
+# xms_kb=4096
+# extended_kb=4096
 
 [screenshot]
 screenshot_format=png
@@ -292,7 +293,9 @@ checks, far `CALL`/`JMP`/`RET`/`IRET` segment reloads, protected-mode
 interrupt/trap gates, 32-bit default operand/address size from CS descriptors,
 32-bit `EIP` stepping for 386 code segments, 32-bit stack pointer updates for
 32-bit SS descriptors, and the 386 system instructions `0F 00`, `0F 01`,
-`0F 20`, and `0F 22`.  Paging, privilege checks, task switching/TSS stack
+`0F 20`, and `0F 22`.  Linear physical memory above 1 MB is backed by the
+same XMS buffer, so simple flat descriptors can access the configured
+extended RAM.  Paging, privilege checks, task switching/TSS stack
 switching, call gates, and DOS extender services such as DPMI/VCPI are not
 complete yet, so keep `cpu_mode=real` for normal DOS use.  Protected-mode
 support can be compiled out with `R36SX_ENABLE_PROTECTED_MODE=0`.
@@ -336,9 +339,13 @@ Set any non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
 Thing (`audio_covox`).
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
-maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,
-`extended_kb` is returned by `INT 15h AH=88h`, `upper_kb` limits the XMS UMB
-allocator from `D000:0000` upward, and `xms_kb` limits the built-in XMS handler.
+maximum buffers.  `total_memory_kb` is distributed automatically as
+conventional DOS memory first, then upper/UMB memory, then XMS/extended RAM.
+If `conventional_kb`, `upper_kb`, `xms_kb`, or `extended_kb` are uncommented,
+those values override the automatic split.  `conventional_kb` is reported
+through the BIOS Data Area, `upper_kb` limits the XMS UMB allocator from
+`D000:0000` upward, `xms_kb` backs both the built-in XMS handler and linear
+physical RAM above 1 MB, and `extended_kb` is returned by `INT 15h AH=88h`.
 
 `profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
 `profiling_log_ms` controls the reporting interval.  Profiling can also be

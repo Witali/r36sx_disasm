@@ -166,6 +166,9 @@ int r36sx_pico286_audio_covox_enabled(void);
 // Return the configured internal audio mixer rate, normally 44100 or 22050 Hz.
 uint32_t r36sx_pico286_audio_sample_rate(uint32_t fallback_rate);
 
+// Return total emulated RAM budget used to auto-size memory areas.
+uint32_t r36sx_pico286_total_memory_kb(void);
+
 // Return conventional DOS memory reported through the BIOS Data Area.
 uint32_t r36sx_pico286_conventional_memory_kb(void);
 

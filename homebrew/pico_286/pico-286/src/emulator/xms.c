@@ -128,6 +128,11 @@ static uint32_t configured_xms_memory_kb(void)
     return kb;
 }
 
+uint32_t xms_configured_memory_bytes(void)
+{
+    return configured_xms_memory_kb() << 10;
+}
+
 static uint32_t xms_free_kb(void)
 {
     uint32_t limit_kb = configured_xms_memory_kb();
@@ -137,7 +142,7 @@ static uint32_t xms_free_kb(void)
 
 static int xms_range_valid(uint32_t offset, uint32_t length)
 {
-    uint32_t limit = configured_xms_memory_kb() << 10;
+    uint32_t limit = xms_configured_memory_bytes();
 
     return offset <= limit && length <= limit - offset;
 }
@@ -146,7 +151,7 @@ static void reset_xms_allocations(void)
 {
     memset(xms_handle_kb, 0, sizeof(xms_handle_kb));
     xms_allocated_kb = 0;
-    xms_available = configured_xms_memory_kb() << 10;
+    xms_available = xms_configured_memory_bytes();
     xms_handles = 0;
 }
 

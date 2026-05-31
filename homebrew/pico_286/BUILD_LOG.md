@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-31 total memory auto layout and flat extended RAM
+
+Added `total_memory_kb` to `pico_286.conf`.  When only the total is set, the
+runtime now distributes it as conventional memory first, then upper/UMB
+memory, then XMS/extended memory.  Explicit `conventional_kb`, `upper_kb`,
+`xms_kb`, or `extended_kb` lines still override the automatic split.
+
+The R36SX memory backend now maps linear physical addresses from `0x100000`
+through the configured XMS size to the same XMS backing array.  That means
+flat 386 protected-mode descriptors can read and write configured RAM above
+1 MB instead of receiving `0xFF`/no-op accesses.  `extended_kb` defaults to
+the effective `xms_kb` value unless explicitly configured, keeping INT 15h
+and the XMS handler consistent for the default setup.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `440036` bytes
+- `pico_286` SHA256:
+  `849F3E5EF5AD38CFCF918F16A34B7D8CAC8DAE1B72D5462B54E4E97B73952EFC`
+- `pico_286.dsp` size: `432656` bytes
+- `pico_286.dsp` SHA256:
+  `EF33EFCD2607D445FA3378355714CE51513DD0669D5EE9B4940D66F7623B7408`
+
+Verification:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Defender reported no threats for all six scanned files.
+
 ## 2026-05-31 Shadow Palette RGB565 updates
 
 Added explicit Shadow Palette comments and moved dynamic palette conversion out

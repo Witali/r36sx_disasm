@@ -89,6 +89,8 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 
 #define EMS_MEMORY_SIZE (2048 << 10) // 2 MB
 #define XMS_MEMORY_SIZE (4096 << 10) // 4 MB
+#define EXTENDED_MEMORY_START HMA_START
+#define EXTENDED_MEMORY_END (EXTENDED_MEMORY_START + XMS_MEMORY_SIZE)
 
 #define BIOS_MEMORY_SIZE                0x413
 #define BIOS_TRUE_MEMORY_SIZE           0x415
@@ -101,6 +103,8 @@ extern uint32_t VIDEORAM[VIDEORAM_SIZE];
 extern uint8_t SVGA_VRAM[SVGA_VRAM_SIZE];
 extern uint8_t UMB[UMB_END - UMB_START];
 extern uint8_t HMA[HMA_END - HMA_START];
+extern uint8_t XMS[XMS_MEMORY_SIZE];
+uint32_t xms_configured_memory_bytes(void);
 // for non-butter-psram modes
 #define SRAM_BLOCK_SIZE 0x2C000
 extern uint8_t SRAM[SRAM_BLOCK_SIZE];

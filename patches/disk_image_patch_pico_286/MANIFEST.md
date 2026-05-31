@@ -36,6 +36,27 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 total memory auto layout and flat extended RAM
+
+The patch binaries now support `total_memory_kb` in `pico_286.conf`.  The
+default `total_memory_kb=4912` is automatically split into 640 KB conventional
+RAM, 176 KB upper/UMB RAM, and 4096 KB XMS/extended RAM.  Uncommenting
+`conventional_kb`, `upper_kb`, `xms_kb`, or `extended_kb` overrides that part
+of the automatic split.
+
+Linear physical addresses from `0x100000` through the configured XMS size now
+map to the same XMS backing store.  This gives simple flat 386 protected-mode
+descriptors real RAM above 1 MB instead of unmapped `0xFF` reads and ignored
+writes.
+
+```text
+pico_286 size: 440036 bytes
+pico_286 SHA256: 849F3E5EF5AD38CFCF918F16A34B7D8CAC8DAE1B72D5462B54E4E97B73952EFC
+pico_286.dsp size: 432656 bytes
+pico_286.dsp SHA256: EF33EFCD2607D445FA3378355714CE51513DD0669D5EE9B4940D66F7623B7408
+Defender scan: found no threats
+```
+
 ## 2026-05-31 Shadow Palette binary update
 
 The patch binaries now keep RGB565 shadow palettes in sync with the emulated

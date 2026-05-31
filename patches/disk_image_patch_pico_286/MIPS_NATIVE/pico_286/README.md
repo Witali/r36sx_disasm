@@ -134,10 +134,11 @@ bios=normal
 test_bios_rom=test386.bin
 
 [memory]
-conventional_kb=640
-upper_kb=176
-extended_kb=64
-xms_kb=4096
+total_memory_kb=4912
+# conventional_kb=640
+# upper_kb=176
+# xms_kb=4096
+# extended_kb=4096
 
 [screenshot]
 screenshot_format=png
@@ -177,10 +178,11 @@ features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, `PUSHAD`/`POPAD`,
 32-bit `MOV`/ALU/stack/shift forms, `MOVZX`/`MOVSX`, `SETcc`, near `Jcc`,
 `BSF`/`BSR`, and `IMUL` require `cpu_model=80386`.  Protected mode is
 experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
-`LGDT`/`LIDT`, reload descriptors through far control transfers, and use basic
-protected interrupt gates.  Paging, privilege checks, task switching, call
-gates, and full 32-bit `EIP` execution are still incomplete, so keep
-`cpu_mode=real` for normal DOS use.
+`LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
+protected interrupt gates, and access linear physical memory above 1 MB
+through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
+switching, call gates, and DOS extender services such as DPMI/VCPI are still
+incomplete, so keep `cpu_mode=real` for normal DOS use.
 
 `target_fps` controls the main-loop frame budget.  The default `60` targets
 about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
@@ -192,26 +194,10 @@ cadence.  At 60 Hz this is about 735 stereo frames at 44.1 kHz, but delayed
 packets are sized from the actual elapsed time since the previous audio send,
 up to the 100 ms source buffer capacity.
 
-`scaling_filter` controls how the DOS image is resized when a large overlay
-leaves less than the full display height for the emulated screen.  The default
-`nearest` keeps hard pixel edges.  `bilinear` blends neighboring source rows
-for smoother scaled text/graphics.
 Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
-(800x600x16 RGB565) are rendered through a 960 KB SVGA framebuffer and
-downsampled to 640x480.  The banked VGA window is `A000:0000`; linear
+(800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`, and
+the 800x600 image is downsampled to the native 640x480 screen.  Linear
 framebuffer requests are rejected.
-
-The `[audio]` switches mute emulated playback devices without disabling their
-I/O ports.  The built-in PC speaker/beeper always remains active.
-`audio_sample_rate` can be `44100` or `22050`; `22050` halves internal mixer
-work and is duplicated back to 44.1 kHz for the stock `driver.so` output path.
-Completed audio blocks are queued with their own frame count and copied into a
-private playback buffer before `sound_driver_playframe()`.
-Set any non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
-(`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
-(`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI
-(`audio_mpu401`), Disney Sound Source (`audio_disney`), or Covox Speech
-Thing (`audio_covox`).
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
@@ -229,10 +215,11 @@ early `POST 01` branch/loop tests: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 
-The `[memory]` values are in KB.  `conventional_kb` is reported through the
-BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`
-limits XMS UMB allocations from `D000:0000` upward, and `xms_kb` limits the
-built-in XMS handler.
+The `[memory]` values are in KB.  `total_memory_kb` is split automatically:
+conventional memory first, then upper/UMB memory, then XMS/extended RAM.  The
+individual `conventional_kb`, `upper_kb`, `xms_kb`, and `extended_kb` keys are
+optional overrides.  `xms_kb` also backs linear physical RAM above 1 MB, while
+`extended_kb` is the value returned by `INT 15h AH=88h`.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
@@ -243,11 +230,8 @@ Set `screenshot_format=png` for compressed screenshots or
 
 Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
-instruction loops in K/s, host disk image read/write KB/s, and presented FPS
-using a compact pixel font.  The rendered block is cached between one-second
-statistics samples; direct-present frames restore small overlay rectangles on
-the next `mfb_update()` when the DOS frame was not rerendered.  Set it to `0`
-to disable the shortcut and overlay.
+instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
+Set it to `0` to disable the shortcut and overlay.
 
 `Fn` + D-pad `Right` toggles a lower-left POST-code overlay using a larger
 pixel font.  Pico-286 captures standard BIOS POST writes to port `80h` and the

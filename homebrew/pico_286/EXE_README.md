@@ -134,10 +134,11 @@ bios=normal
 test_bios_rom=test386.bin
 
 [memory]
-conventional_kb=640
-upper_kb=176
-extended_kb=64
-xms_kb=4096
+total_memory_kb=4912
+# conventional_kb=640
+# upper_kb=176
+# xms_kb=4096
+# extended_kb=4096
 
 [screenshot]
 screenshot_format=png
@@ -177,10 +178,11 @@ features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, `PUSHAD`/`POPAD`,
 32-bit `MOV`/ALU/stack/shift forms, `MOVZX`/`MOVSX`, `SETcc`, near `Jcc`,
 `BSF`/`BSR`, and `IMUL` require `cpu_model=80386`.  Protected mode is
 experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
-`LGDT`/`LIDT`, reload descriptors through far control transfers, and use basic
-protected interrupt gates.  Paging, privilege checks, task switching, call
-gates, and full 32-bit `EIP` execution are still incomplete, so keep
-`cpu_mode=real` for normal DOS use.
+`LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
+protected interrupt gates, and access linear physical memory above 1 MB
+through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
+switching, call gates, and DOS extender services such as DPMI/VCPI are still
+incomplete, so keep `cpu_mode=real` for normal DOS use.
 
 `target_fps` controls the main-loop frame budget.  The default `60` targets
 about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
@@ -213,10 +215,11 @@ early `POST 01` branch/loop tests: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 
-The `[memory]` values are in KB.  `conventional_kb` is reported through the
-BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`
-limits XMS UMB allocations from `D000:0000` upward, and `xms_kb` limits the
-built-in XMS handler.
+The `[memory]` values are in KB.  `total_memory_kb` is split automatically:
+conventional memory first, then upper/UMB memory, then XMS/extended RAM.  The
+individual `conventional_kb`, `upper_kb`, `xms_kb`, and `extended_kb` keys are
+optional overrides.  `xms_kb` also backs linear physical RAM above 1 MB, while
+`extended_kb` is the value returned by `INT 15h AH=88h`.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be

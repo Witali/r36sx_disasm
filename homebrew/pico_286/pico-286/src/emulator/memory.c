@@ -36,6 +36,53 @@ static inline int memory_range_inside(const uint32_t address,
            bytes <= end - address;
 }
 
+static inline int extended_memory_range_inside(const uint32_t address,
+                                               const uint32_t bytes)
+{
+    return memory_range_inside(address,
+                               EXTENDED_MEMORY_START,
+                               EXTENDED_MEMORY_START + xms_configured_memory_bytes(),
+                               bytes);
+}
+
+static inline uint32_t extended_memory_offset(const uint32_t address)
+{
+    return address - EXTENDED_MEMORY_START;
+}
+
+static inline void extended_memory_write8(const uint32_t address,
+                                          const uint8_t value)
+{
+    XMS[extended_memory_offset(address)] = value;
+}
+
+static inline void extended_memory_write16(const uint32_t address,
+                                           const uint16_t value)
+{
+    *(uint16_t *)&XMS[extended_memory_offset(address)] = value;
+}
+
+static inline void extended_memory_write32(const uint32_t address,
+                                           const uint32_t value)
+{
+    *(uint32_t *)&XMS[extended_memory_offset(address)] = value;
+}
+
+static inline uint8_t extended_memory_read8(const uint32_t address)
+{
+    return XMS[extended_memory_offset(address)];
+}
+
+static inline uint16_t extended_memory_read16(const uint32_t address)
+{
+    return *(uint16_t *)&XMS[extended_memory_offset(address)];
+}
+
+static inline uint32_t extended_memory_read32(const uint32_t address)
+{
+    return *(uint32_t *)&XMS[extended_memory_offset(address)];
+}
+
 static inline int r36sx_external_bios_read16(uint32_t address,
                                              uint16_t *value)
 {
@@ -186,14 +233,10 @@ void write86_ob(const uint32_t address, const uint8_t value) {
         return;
     } else if (address >= UMB_START && address < UMB_END) {
         UMB[address - UMB_START] = value;
-    } else if (address >= HMA_START && address < HMA_END) {
-        if (a20_enabled) {
-            HMA[address - HMA_START] = value;
-        } else {
-            RAM[address - HMA_START] = value;
-        }
-    } else if (!a20_enabled && address >= HMA_END) {
+    } else if (!a20_enabled && address >= HMA_START) {
         write86_ob(a20_wrap_address(address), value);
+    } else if (extended_memory_range_inside(address, 1u)) {
+        extended_memory_write8(address, value);
     }
 }
 
@@ -213,14 +256,10 @@ void writew86_ob(const uint32_t address, const uint16_t value) {
             return;
         } else if (memory_range_inside(address, UMB_START, UMB_END, 2u)) {
             *(uint16_t *) &UMB[address - UMB_START] = value;
-        } else if (memory_range_inside(address, HMA_START, HMA_END, 2u)) {
-            if (a20_enabled) {
-                *(uint16_t *) &HMA[address - HMA_START] = value;
-            } else {
-                *(uint16_t *) &RAM[address - HMA_START] = value;
-            }
-        } else if (!a20_enabled && address >= HMA_END) {
+        } else if (!a20_enabled && address >= HMA_START) {
             writew86_ob(a20_wrap_address(address), value);
+        } else if (extended_memory_range_inside(address, 2u)) {
+            extended_memory_write16(address, value);
         } else {
             write86(address, (uint8_t) (value & 0xFF));
             write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
@@ -245,14 +284,10 @@ void writedw86_ob(const uint32_t address, const uint32_t value) {
             return;
         } else if (memory_range_inside(address, UMB_START, UMB_END, 4u)) {
             *(uint32_t *) &UMB[address - UMB_START] = value;
-        } else if (memory_range_inside(address, HMA_START, HMA_END, 4u)) {
-            if (a20_enabled) {
-                *(uint32_t *) &HMA[address - HMA_START] = value;
-            } else {
-                *(uint32_t *) &RAM[address - HMA_START] = value;
-            }
-        } else if (!a20_enabled && address >= HMA_END) {
+        } else if (!a20_enabled && address >= HMA_START) {
             writedw86_ob(a20_wrap_address(address), value);
+        } else if (extended_memory_range_inside(address, 4u)) {
+            extended_memory_write32(address, value);
         } else {
             write86(address, (uint8_t) (value & 0xFF));
             write86(address + 1, (uint8_t) ((value >> 8) & 0xFF));
@@ -290,14 +325,11 @@ uint8_t read86_ob(const uint32_t address) {
     if (address >= BIOS_START && address < HMA_START) {
         return BIOS[address - BIOS_START];
     }
-    if (address >= HMA_START && address < HMA_END) {
-        if (a20_enabled) {
-            return HMA[address - HMA_START];
-        }
-        return RAM[address - HMA_START];
-    }
-    if (!a20_enabled && address >= HMA_END) {
+    if (!a20_enabled && address >= HMA_START) {
         return read86_ob(a20_wrap_address(address));
+    }
+    if (extended_memory_range_inside(address, 1u)) {
+        return extended_memory_read8(address);
     }
     return 0xFF;
 }
@@ -330,14 +362,11 @@ uint16_t readw86_ob(const uint32_t address) {
     if (memory_range_inside(address, BIOS_START, HMA_START, 2u)) {
         return *(uint16_t *) &BIOS[address - BIOS_START];
     }
-    if (memory_range_inside(address, HMA_START, HMA_END, 2u)) {
-        if (a20_enabled) {
-            return *(uint16_t *) &HMA[address - HMA_START];
-        }
-        return *(uint16_t *) &RAM[address - HMA_START];
-    }
-    if (!a20_enabled && address >= HMA_END) {
+    if (!a20_enabled && address >= HMA_START) {
         return readw86_ob(a20_wrap_address(address));
+    }
+    if (extended_memory_range_inside(address, 2u)) {
+        return extended_memory_read16(address);
     }
     return (uint16_t) read86(address) | ((uint16_t) read86(address + 1) << 8);
 }
@@ -372,14 +401,11 @@ uint32_t readdw86_ob(const uint32_t address) {
     if (memory_range_inside(address, BIOS_START, HMA_START, 4u)) {
         return *(uint32_t *) &BIOS[address - BIOS_START];
     }
-    if (memory_range_inside(address, HMA_START, HMA_END, 4u)) {
-        if (a20_enabled) {
-            return *(uint32_t *) &HMA[address - HMA_START];
-        }
-        return *(uint32_t *) &RAM[address - HMA_START];
-    }
-    if (!a20_enabled && address >= HMA_END) {
+    if (!a20_enabled && address >= HMA_START) {
         return readdw86_ob(a20_wrap_address(address));
+    }
+    if (extended_memory_range_inside(address, 4u)) {
+        return extended_memory_read32(address);
     }
     return (uint32_t) read86(address)
            | ((uint32_t) read86(address + 1) << 8)
