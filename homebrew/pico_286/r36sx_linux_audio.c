@@ -20,6 +20,7 @@
 
 #include "linux-audio.h"
 #include "../common/driver_audio.h"
+#include "r36sx_mips_dsp.h"
 
 struct r36sx_pico286_audio {
     void *handle;
@@ -115,8 +116,9 @@ static int r36sx_pico286_audio_make_mutable(const int16_t **play_buffer,
     }
 
     stereo_samples = play_frames * R36SX_DRIVER_AUDIO_CHANNELS;
-    memcpy(g_audio.mix_buffer, *play_buffer,
-           stereo_samples * sizeof(g_audio.mix_buffer[0]));
+    r36sx_mips_dsp_copy_u16((uint16_t *)g_audio.mix_buffer,
+                            (const uint16_t *)*play_buffer,
+                            stereo_samples);
     *play_buffer = g_audio.mix_buffer;
     return 1;
 }

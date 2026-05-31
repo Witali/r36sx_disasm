@@ -12,7 +12,7 @@ Options:
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
   --opt-level LEVEL        GCC optimization level. Default: O2.
-  --enable-mips-dsp        Experimental framebuffer helpers with MIPS DSP Rev2.
+  --enable-mips-dsp        Experimental buffer helpers with MIPS DSP Rev2.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
   --out PATH               Output path. Default: homebrew/pico_286/pico_286.gcc
   --help                   Show this help.
@@ -148,7 +148,7 @@ common_args=(
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
     "-DR36SX_VIDEO_DIRTY_TRACKING=1"
-    "-DR36SX_MIPS_DSP_FRAMEBUFFER=$MIPS_DSP_VALUE"
+    "-DR36SX_MIPS_DSP=$MIPS_DSP_VALUE"
     "-DINI_HANDLER_LINENO=1"
     "-DINI_MAX_LINE=512"
     "-DINI_ALLOW_MULTILINE=0"
@@ -213,6 +213,25 @@ compile_cpp() {
     objects+=("$obj")
 }
 
+compile_asm() {
+    local src="$1"
+    local obj
+    local asm_args=(
+        -EL
+        -mips32r2
+        -mabi=32
+        -march=mips32r2
+        -mtune=74kc
+        "-DR36SX_MIPS_DSP=$MIPS_DSP_VALUE"
+    )
+    obj="$(object_path_for "$src")"
+    if ((MIPS_DSP_VALUE)); then
+        asm_args+=("-mdspr2")
+    fi
+    "$CC" "${asm_args[@]}" -x assembler-with-cpp -c "$src" -o "$obj"
+    objects+=("$obj")
+}
+
 mapfile -t emulator_c < <(
     find "$PICO_ROOT/src/emulator" -type f -name '*.c' \
         ! -name 'cpu.c' ! -name 'ports.c' | sort
@@ -232,6 +251,7 @@ for src in "${findfirst_c[@]}"; do
 done
 
 for src in \
+    "$SCRIPT_DIR/r36sx_mips_dsp_probe.S" \
     "$PICO_ROOT/src/printf/printf.c" \
     "$ROOT/homebrew/common/r36sx_screen_keyboard.c" \
     "$ROOT/homebrew/common/inih/ini.c" \
@@ -246,7 +266,10 @@ for src in \
     "$PORT_ROOT/r36sx_profile.c" \
     "$PORT_ROOT/r36sx_cpu.c" \
     "$PORT_ROOT/r36sx_ports.c"; do
-    compile_c "$src"
+    case "$src" in
+        *.S) compile_asm "$src" ;;
+        *) compile_c "$src" ;;
+    esac
 done
 
 compile_cpp "$PICO_ROOT/src/emu8950/slot_render.cpp"

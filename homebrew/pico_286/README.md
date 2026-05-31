@@ -501,12 +501,11 @@ that leaves the normal executable untouched:
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
 ```
 
-There is also an experimental MIPS DSP Rev2 framebuffer build.  It enables
-`-mdspr2`, defines `R36SX_MIPS_DSP_FRAMEBUFFER=1`, and routes RGB565
-framebuffer row copies/fills through helpers that process two pixels per
-32-bit word.  The DSP helper uses the packed-halfword `addu.ph` instruction as
-a first hardware-compatibility probe.  Keep it side-by-side until it has been
-tested on the device:
+There is also an experimental MIPS DSP Rev2 build.  It enables `-mdspr2`,
+defines `R36SX_MIPS_DSP=1`, and routes hot RGB565 framebuffer and audio buffer
+copies through shared helpers with portable fallbacks.  The helper path uses
+the packed-halfword `addu.ph` instruction as a first hardware-compatibility
+probe.  Keep it side-by-side until it has been tested on the device:
 
 ```powershell
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -EnableMipsDsp -Strip -Out .\homebrew\pico_286\pico_286.dsp

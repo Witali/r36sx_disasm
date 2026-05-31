@@ -12,6 +12,7 @@
 #include "emu8950.h"
 #include "linux-audio.h"
 #include "r36sx_disk_config.h"
+#include "r36sx_mips_dsp.h"
 #include "r36sx_profile.h"
 
 static uint16_t ALIGN(4, SCREEN[640 * 480]);
@@ -1113,11 +1114,11 @@ static void r36sx_pico286_audio_queue_current_locked(uint32_t frames)
         (audio_write_buffer + 1u) % R36SX_AUDIO_BUFFER_COUNT;
     sample_index = 0;
     if (leftover_frames > 0) {
-        memcpy(audio_buffers[audio_write_buffer],
-               &audio_buffers[old_write_buffer]
-                             [frames * R36SX_AUDIO_CHANNELS],
-               (size_t)leftover_frames * R36SX_AUDIO_CHANNELS *
-                   sizeof(audio_buffers[0][0]));
+        r36sx_mips_dsp_copy_u16(
+            (uint16_t *)audio_buffers[audio_write_buffer],
+            (const uint16_t *)&audio_buffers[old_write_buffer]
+                                            [frames * R36SX_AUDIO_CHANNELS],
+            (size_t)leftover_frames * R36SX_AUDIO_CHANNELS);
         sample_index = (int)(leftover_frames * R36SX_AUDIO_CHANNELS);
     }
     update_ready = 1;
@@ -1189,10 +1190,11 @@ void *sound_thread(void *arg) {
         if (playback_frames > g_audio_buffer_capacity_frames) {
             playback_frames = g_audio_buffer_capacity_frames;
         }
-        memcpy(audio_playback_buffer, audio_buffers[audio_ready_head],
-               (size_t)playback_frames *
-                   R36SX_AUDIO_CHANNELS *
-                   sizeof(audio_playback_buffer[0]));
+        r36sx_mips_dsp_copy_u16((uint16_t *)audio_playback_buffer,
+                                (const uint16_t *)
+                                    audio_buffers[audio_ready_head],
+                                (size_t)playback_frames *
+                                    R36SX_AUDIO_CHANNELS);
         audio_ready_frames[audio_ready_head] = 0;
         audio_ready_head =
             (audio_ready_head + 1u) % R36SX_AUDIO_BUFFER_COUNT;

@@ -24,6 +24,7 @@
 #include "emulator/includes/font8x8.h"
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
+#include "r36sx_mips_dsp.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
 #include "r36sx_port/r36sx_app_stats.h"
@@ -57,16 +58,6 @@
 #define R36SX_PICO286_POST_FONT_SCALE 2
 #define R36SX_PICO286_POST_PAD 6
 #define R36SX_PICO286_POST_MARGIN 8
-
-#ifndef R36SX_MIPS_DSP_FRAMEBUFFER
-#define R36SX_MIPS_DSP_FRAMEBUFFER 0
-#endif
-
-#if R36SX_MIPS_DSP_FRAMEBUFFER && defined(__mips_dspr2)
-#define R36SX_MFB_DSP_FRAMEBUFFER_ENABLED 1
-#else
-#define R36SX_MFB_DSP_FRAMEBUFFER_ENABLED 0
-#endif
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -236,91 +227,16 @@ static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
                       ((uint16_t)b >> 3));
 }
 
-#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
-static inline uint32_t r36sx_mfb_dsp_pair_passthrough(uint32_t pixels)
-{
-    uint32_t result;
-
-    __asm__ volatile ("addu.ph %0,%1,$zero"
-                      : "=r"(result)
-                      : "r"(pixels));
-    return result;
-}
-#endif
-
 static void r36sx_mfb_copy_pixels(uint16_t *dst, const uint16_t *src,
                                   size_t pixels)
 {
-    if (!dst || !src || pixels == 0) {
-        return;
-    }
-
-#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
-    while (pixels > 0 &&
-           (((uintptr_t)dst | (uintptr_t)src) & (uintptr_t)3u) != 0) {
-        *dst++ = *src++;
-        pixels--;
-    }
-
-    if (pixels >= 2) {
-        uint32_t *dst32 = (uint32_t *)dst;
-        const uint32_t *src32 = (const uint32_t *)src;
-        size_t pairs = pixels >> 1;
-
-        for (size_t i = 0; i < pairs; i++) {
-            uint32_t pair = src32[i];
-            dst32[i] = r36sx_mfb_dsp_pair_passthrough(pair);
-        }
-
-        dst += pairs << 1;
-        src += pairs << 1;
-        pixels &= 1u;
-    }
-
-    if (pixels != 0) {
-        *dst = *src;
-    }
-#else
-    memcpy(dst, src, pixels * sizeof(dst[0]));
-#endif
+    r36sx_mips_dsp_copy_u16(dst, src, pixels);
 }
 
 static void r36sx_mfb_fill_pixels(uint16_t *dst, uint16_t color,
                                   size_t pixels)
 {
-    if (!dst || pixels == 0) {
-        return;
-    }
-
-#if R36SX_MFB_DSP_FRAMEBUFFER_ENABLED
-    while (pixels > 0 && (((uintptr_t)dst) & (uintptr_t)3u) != 0) {
-        *dst++ = color;
-        pixels--;
-    }
-
-    if (pixels >= 2) {
-        uint32_t pair =
-            ((uint32_t)color << 16) | (uint32_t)color;
-        uint32_t pair_dsp = r36sx_mfb_dsp_pair_passthrough(pair);
-        uint32_t *dst32 = (uint32_t *)dst;
-        size_t pairs = pixels >> 1;
-
-        for (size_t i = 0; i < pairs; i++) {
-            dst32[i] = pair_dsp;
-        }
-
-        dst += pairs << 1;
-        pixels &= 1u;
-    }
-
-    if (pixels != 0) {
-        *dst = color;
-    }
-#else
-    for (size_t i = 0; i < pixels; i++) {
-        dst[i] = color;
-    }
-#endif
+    r36sx_mips_dsp_fill_u16(dst, color, pixels);
 }
 
 static void r36sx_mfb_fill_rect_surface(uint16_t *target, int surface_w,
@@ -2257,8 +2173,8 @@ int mfb_open(const char *name, int width, int height, int scale)
     }
     r36sx_pico286_debug_log("minifb: open name=%s size=%dx%d scale=%d cwd=%s",
                             name ? name : "(null)", width, height, scale, cwd);
-    r36sx_pico286_debug_log("minifb: mips dsp framebuffer=%d",
-                            R36SX_MFB_DSP_FRAMEBUFFER_ENABLED);
+    r36sx_pico286_debug_log("minifb: mips dsp=%d",
+                            R36SX_MIPS_DSP_ENABLED);
 
     setenv("LD_LIBRARY_PATH",
            "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",

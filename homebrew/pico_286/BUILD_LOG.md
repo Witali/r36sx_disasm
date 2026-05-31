@@ -43,21 +43,28 @@ Verification:
 Microsoft Defender reported no threats.  The `disk_image` and patch copies are
 byte-identical by SHA256.
 
-## 2026-05-31 experimental MIPS DSP framebuffer build
+## 2026-05-31 unified MIPS DSP helper build
 
-Added an experimental WSL/GCC build mode for MIPS DSP ASE Rev2:
+Renamed the experimental MIPS DSP build switch to a project-wide define and
+added a tiny assembly probe object:
 
 - PowerShell wrapper: `-EnableMipsDsp`
 - Shell script: `--enable-mips-dsp`
-- compiler flags/defines: `-mdspr2`, `R36SX_MIPS_DSP_FRAMEBUFFER=1`
+- compiler flags/defines: `-mdspr2`, `R36SX_MIPS_DSP=1`
+- probe object: `r36sx_mips_dsp_probe.S`
 
-`r36sx_minifb.c` now routes RGB565 framebuffer row copies and fills through
-`r36sx_mfb_copy_pixels()` / `r36sx_mfb_fill_pixels()`.  The default build keeps
-the normal portable path.  The DSP build uses aligned 32-bit operations over
-two RGB565 pixels at a time and emits MIPS DSP packed-halfword `addu.ph` as a
-hardware compatibility probe.  This is intentionally experimental; future
-work should move bilinear/halftone scaling and renderer pixel expansion into
-real packed arithmetic once the binary is proven to run on the console.
+`r36sx_mips_dsp.h` now owns the `R36SX_MIPS_DSP` / `R36SX_MIPS_DSP_ENABLED`
+logic and provides portable fallbacks for every helper.  The first accelerated
+paths cover hot 16-bit buffer operations:
+
+- RGB565 framebuffer row copies and fills in `r36sx_minifb.c`
+- audio mix/playback buffer copies in `r36sx_linux_audio.c`
+- audio queue copies in `r36sx_port/r36sx_linux-main.cpp`
+
+The DSP path aligns pointers, operates on two 16-bit values per 32-bit word,
+and uses packed-halfword `addu.ph` as the first hardware compatibility probe.
+The normal build compiles the same helpers to the portable C path and contains
+no `addu.ph` instruction.
 
 Primary non-DSP rebuild command:
 
@@ -73,12 +80,12 @@ Experimental DSP rebuild command:
 
 Result:
 
-- `pico_286` size: `418404` bytes
+- `pico_286` size: `418436` bytes
 - `pico_286` SHA256:
-  `6BCDB9903DCEF96897B4A16A8B0C181B18699683979F6A4669A1C76DC0C8B3FD`
-- `pico_286.dsp` size: `414340` bytes
+  `F5F3CDB962223B5997834BD45A29A3320B9F65F8A38E1BF6E1ADA5A46EC048E5`
+- `pico_286.dsp` size: `412276` bytes
 - `pico_286.dsp` SHA256:
-  `6400EC7AFB2682AF7DCD551C6A5FC14DED70169F53B4F442463C42834D212295`
+  `AD8FDA75D9278FEC176BE692F5E0DD25D77D31F77165886B02B3C4DAC5715257`
 
 Verification:
 
@@ -87,9 +94,10 @@ Verification:
 .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
 ```
 
-Microsoft Defender reported no threats for both files.  `objdump` confirmed
-that the DSP binary contains `addu.ph` instructions.  The `disk_image` and
-patch copies are byte-identical by SHA256.
+Microsoft Defender reported no threats for both files.  WSL `objdump`
+confirmed that the DSP binary contains `addu.ph` instructions and that the
+normal binary contains none.  The `disk_image` and patch copies are
+byte-identical by SHA256.
 
 Reference notes:
 
