@@ -37,6 +37,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard bottom row spacing
+
+The bottom on-screen keyboard row now applies its row-width remainder to `SPC`
+instead of right `CTRL`, so the gaps around `CTRL`, `WIN`, `ALT`, `SPC`,
+`MENU`, and `CLS` match the upper rows while the right edge stays aligned.
+
+```text
+pico_286 size: 457840 bytes
+pico_286 SHA256: E1AE608C8AA8D86A6F2E6EF0EB49DD6C7B3AB9CC4226BC15107297D91A1ACB38
+Defender scan: found no threats
+```
+
 ## 2026-06-01 on-screen keyboard right edge alignment
 
 The patch binary now aligns the right edge of the main on-screen keyboard rows:
