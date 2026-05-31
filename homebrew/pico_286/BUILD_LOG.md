@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard right edge alignment
+
+Adjusted the shared on-screen keyboard geometry so the right edge is visually
+even across `F12`, Backspace, `\`, Enter, right `SHIFT`, and right `CTRL`.
+The F1-F4 group is nudged one pixel to the right while the gap before F5 is
+reduced by the same amount, keeping the later function-key groups in place.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `457840` bytes
+- `pico_286` SHA256:
+  `8C168A641D8528DCE7915537B7599179322F2CC33460C84F89BB8586C21060DE`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 key preset combinations
 
 Added combo bindings to the full-screen key preset editor.  A preset entry can

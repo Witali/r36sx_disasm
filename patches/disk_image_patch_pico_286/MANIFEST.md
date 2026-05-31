@@ -37,6 +37,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard right edge alignment
+
+The patch binary now aligns the right edge of the main on-screen keyboard rows:
+`F12`, Backspace, `\`, Enter, right `SHIFT`, and right `CTRL` end on the same
+pixel column.  The F1-F4 group is also nudged one pixel to the right without
+moving the later function-key groups.
+
+```text
+pico_286 size: 457840 bytes
+pico_286 SHA256: 8C168A641D8528DCE7915537B7599179322F2CC33460C84F89BB8586C21060DE
+Defender scan: found no threats
+```
+
 ## 2026-06-01 key preset combinations
 
 The full-screen key preset editor now supports combo assignments.  Existing

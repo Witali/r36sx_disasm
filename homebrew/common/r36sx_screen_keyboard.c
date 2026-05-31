@@ -1161,10 +1161,48 @@ static int row_extra_gap_w(int row, int col, int unit_w)
      * the =/Backspace split in the number row.  The wide Backspace key on a
      * real keyboard visually consumes that internal gap.
      */
+    if (row == 0 && col == 0) {
+        gap += 1;
+    }
+    if (row == 0 && col == 4) {
+        gap -= 1;
+    }
     if (row == 0 && col == 8) {
         gap += 3;
     }
     return gap;
+}
+
+static int row_pixel_w(const struct r36sx_osk_key *const *rows,
+                       const uint8_t *counts,
+                       int row,
+                       int unit_w)
+{
+    int width = 0;
+
+    for (int col = 0; col < counts[row]; col++) {
+        width += key_pixel_w(&rows[row][col], unit_w);
+        if (col + 1 < counts[row]) {
+            width += R36SX_OSK_KEY_GAP +
+                     row_extra_gap_w(row, col, unit_w);
+        }
+    }
+    return width;
+}
+
+static int max_main_row_pixel_w(const struct r36sx_osk_key *const *rows,
+                                const uint8_t *counts,
+                                int unit_w)
+{
+    int max_width = 1;
+
+    for (int row = 0; row < keyboard_row_count(); row++) {
+        int width = row_pixel_w(rows, counts, row, unit_w);
+        if (width > max_width) {
+            max_width = width;
+        }
+    }
+    return max_width;
 }
 
 static int key_text_scale(const char *label, int key_w)
@@ -2121,6 +2159,7 @@ void r36sx_screen_keyboard_draw(
     const int main_w = compact ?
         content_w - side_w - side_gap : content_w;
     const int unit_w = main_unit_w(rows, counts, main_w);
+    const int row_target_w = max_main_row_pixel_w(rows, counts, unit_w);
     const int view_y = panel_y + 1 + R36SX_OSK_HEADER_H +
         R36SX_OSK_INNER_PAD;
     const int view_h = keyboard_view_h();
@@ -2152,11 +2191,16 @@ void r36sx_screen_keyboard_draw(
         int count = counts[row];
         int x = content_x;
         int y = keys_y + (int)row * R36SX_OSK_ROW_STEP;
+        int row_w = row_pixel_w(rows, counts, (int)row, unit_w);
+        int tail_extra = row_target_w > row_w ? row_target_w - row_w : 0;
         if (y < view_y || y + R36SX_OSK_KEY_H > view_bottom) {
             continue;
         }
         for (int col = 0; col < count; col++) {
             int key_w = key_pixel_w(&rows[row][col], unit_w);
+            if (col + 1 == count) {
+                key_w += tail_extra;
+            }
             draw_key(keyboard, &rows[row][col], frame, width, height,
                      stride_pixels, x, y, key_w,
                      keyboard->zone == R36SX_OSK_ZONE_MAIN &&
