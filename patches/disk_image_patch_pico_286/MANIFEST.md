@@ -32,6 +32,16 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 CRTC stride for tweaked VGA modes
+
+The current `pico_286` binary uses VGA CRTC Offset Register `13h` when
+rendering graphics rows and preserves both bytes of the CRTC start address.
+This is intended to fix tweaked planar layouts such as the Supaplex/SPFIX
+320-wide mode with a 122-byte logical row.
+
+pico_286 size: 1330908 bytes
+pico_286 SHA256: 7A56639A52C887A0CF831BB97976B4C7418FD3978174DC50400CE1FF7570B9E2
+
 ## 2026-05-31 DOSBox 386 CPU comparison fixes
 
 The current `pico_286` binary adopts several small CPU semantics from DOSBox:

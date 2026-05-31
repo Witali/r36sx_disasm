@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-31 CRTC stride for tweaked VGA modes
+
+Updated the R36SX renderer to respect VGA CRTC row layout for graphics modes.
+
+- CRTC start-address writes (`0Ch`/`0Dh`) now preserve the other byte instead
+  of partially resetting `vram_offset`.
+- The renderer now uses CRTC Offset Register `13h` for planar and chunky VGA
+  row stride.
+- Mode `0Dh` keeps the normal 40-byte visible stride, but handles tweaked
+  layouts such as Supaplex/SPFIX `3Dh` as 122-byte rows.
+- Modes `0Eh`, `0Fh`, `10h`, `11h`, `12h`, and `13h` also use the CRTC offset
+  instead of hard-coded 80/320-byte rows.
+
+Line compare and pixel-panning behavior are still deferred.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1330908` bytes
+- `pico_286` SHA256:
+  `7A56639A52C887A0CF831BB97976B4C7418FD3978174DC50400CE1FF7570B9E2`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 DOSBox 386 CPU comparison fixes
 
 Compared the local 386-related CPU code against DOSBox 0.74-3 and adopted a

@@ -283,6 +283,73 @@ static inline uint16_t ega_mono_pixel(uint32_t plane_bits, int bit)
     return (plane_bits & mask) ? 0xffff : 0x0000;
 }
 
+static inline uint32_t vga_crtc_offset_register(void)
+{
+    return (uint32_t)crt_controller[0x13];
+}
+
+static inline uint32_t vga_crtc_planar_stride(uint32_t fallback_stride,
+                                              uint8_t half_clock_320)
+{
+    uint32_t offset = vga_crtc_offset_register();
+
+    if (offset == 0) {
+        return fallback_stride;
+    }
+
+    /*
+     * CRTC offset is normally in word units. EGA 320-wide mode 0Dh uses a
+     * half-clocked 40-byte visible row, but tweaked modes (for example
+     * Supaplex/SPFIX with offset 3Dh) expect the word interpretation.
+     */
+    if (half_clock_320 && offset <= fallback_stride) {
+        return offset;
+    }
+
+    return offset << 1;
+}
+
+static inline uint32_t vga_crtc_chunky_stride(uint32_t fallback_stride)
+{
+    uint32_t offset = vga_crtc_offset_register();
+
+    if (offset == 0) {
+        return fallback_stride;
+    }
+
+    return offset << 3;
+}
+
+static inline void vga_render_planar_4bpp(uint16_t **out_pixels,
+                                          uint32_t vram_base,
+                                          uint32_t cells,
+                                          uint8_t x_scale)
+{
+    uint16_t *pixels = *out_pixels;
+
+    for (uint32_t i = 0; i < cells; ++i) {
+        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
+        uint8_t plane0 =  eight_pixels        & 0xFF;
+        uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
+        uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
+        uint8_t plane3 = (eight_pixels >> 24) & 0xFF;
+
+        for (int bit = 7; bit >= 0; --bit) {
+            uint8_t color_index = ((plane0 >> bit) & 1)
+                                | (((plane1 >> bit) & 1) << 1)
+                                | (((plane2 >> bit) & 1) << 2)
+                                | (((plane3 >> bit) & 1) << 3);
+            uint16_t color = vga_palette565[color_index];
+            *pixels++ = color;
+            if (x_scale == 2) {
+                *pixels++ = color;
+            }
+        }
+    }
+
+    *out_pixels = pixels;
+}
+
 static inline uint32_t cga_graphics_base(void)
 {
     return 0x8000u + ((uint32_t)(vram_offset & 0xffffu) << 1);
@@ -559,44 +626,22 @@ static inline void renderer() {
                 }
                 case 0x0D: /* EGA 320x200 16-color */ {
                     if (y >= 400) break;
-                    uint32_t vram_base = vram_offset + (y / 2) * (320 / 8);
-                    for (int i = 0; i < (320 / 8); ++i) {
-                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
-                        uint8_t plane0 =  eight_pixels        & 0xFF;
-                        uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
-                        uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
-                        uint8_t plane3 = (eight_pixels >> 24) & 0xFF;
-
-                        for (int bit = 7; bit >= 0; --bit) {
-                            uint8_t color_index = ((plane0 >> bit) & 1)
-                                                | (((plane1 >> bit) & 1) << 1)
-                                                | (((plane2 >> bit) & 1) << 2)
-                                                | (((plane3 >> bit) & 1) << 3);
-                            uint16_t color = vga_palette565[color_index];
-                            *pixels++ = color;
-                            *pixels++ = color;
-                        }
-                    }
+                    const uint32_t visible_cells = 320u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 1);
+                    uint32_t vram_base = vram_offset +
+                                         (uint32_t)(y / 2) * stride;
+                    vga_render_planar_4bpp(&pixels, vram_base,
+                                            visible_cells, 2);
                     break;
                 }
                 case 0x0E: /* EGA 640x200 16-color */ {
                     if (y >= 400) break;
-                    uint32_t vram_base = vram_offset + (y / 2) * (640 / 8);
-                    for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
-                        uint8_t plane0 =  eight_pixels        & 0xFF;
-                        uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
-                        uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
-                        uint8_t plane3 = (eight_pixels >> 24) & 0xFF;
-
-                        for (int bit = 7; bit >= 0; --bit) {
-                            uint8_t color_index = ((plane0 >> bit) & 1)
-                                                | (((plane1 >> bit) & 1) << 1)
-                                                | (((plane2 >> bit) & 1) << 2)
-                                                | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette565[color_index];
-                        }
-                    }
+                    const uint32_t visible_cells = 640u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                    uint32_t vram_base = vram_offset +
+                                         (uint32_t)(y / 2) * stride;
+                    vga_render_planar_4bpp(&pixels, vram_base,
+                                            visible_cells, 1);
                     break;
                 }
                 case 0x0F: /* EGA 640x350 monochrome */ {
@@ -604,8 +649,10 @@ static inline void renderer() {
                         fill_black_row(pixels);
                         break;
                     }
-                    uint32_t vram_base = vram_offset + y * (640 / 8);
-                    for (int i = 0; i < (640 / 8); ++i) {
+                    const uint32_t visible_cells = 640u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                    uint32_t vram_base = vram_offset + (uint32_t)y * stride;
+                    for (uint32_t i = 0; i < visible_cells; ++i) {
                         uint32_t eight_pixels = vga_vram_cell(vram_base + i);
                         for (int bit = 7; bit >= 0; --bit) {
                             *pixels++ = ega_mono_pixel(eight_pixels, bit);
@@ -615,28 +662,19 @@ static inline void renderer() {
                 }
                 case 0x10: /* EGA 640x350 16-color */ {
                     if (y >= 350) break;
-                    uint32_t vram_base = vram_offset + y * (640 / 8);
-                    for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
-                        uint8_t plane0 =  eight_pixels        & 0xFF;
-                        uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
-                        uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
-                        uint8_t plane3 = (eight_pixels >> 24) & 0xFF;
-
-                        for (int bit = 7; bit >= 0; --bit) {
-                            uint8_t color_index = ((plane0 >> bit) & 1)
-                                                | (((plane1 >> bit) & 1) << 1)
-                                                | (((plane2 >> bit) & 1) << 2)
-                                                | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette565[color_index];
-                        }
-                    }
+                    const uint32_t visible_cells = 640u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                    uint32_t vram_base = vram_offset + (uint32_t)y * stride;
+                    vga_render_planar_4bpp(&pixels, vram_base,
+                                            visible_cells, 1);
                     break;
                 }
                 case 0x11: /* VGA 640x480 2-color */ {
                     // Each byte containing 8 pixels
-                    uint32_t vram_base = vram_offset + y * (640 / 8);
-                    for (int i = 0; i < (640 / 8); ++i) {
+                    const uint32_t visible_cells = 640u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                    uint32_t vram_base = vram_offset + (uint32_t)y * stride;
+                    for (uint32_t i = 0; i < visible_cells; ++i) {
                         uint8_t cga_byte = (uint8_t)(vga_vram_cell(vram_base + i) & 0xFFu);
 
                         *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * 15];
@@ -653,28 +691,20 @@ static inline void renderer() {
                 }
                 case 0x12: /* VGA 640x480 16-color */ {
                     if (y >= 480) break;
-                    uint32_t vram_base = vram_offset + y * (640 / 8);
-                    for (int i = 0; i < (640 / 8); ++i) {
-                        uint32_t eight_pixels = vga_vram_cell(vram_base + i);
-                        uint8_t plane0 =  eight_pixels        & 0xFF;
-                        uint8_t plane1 = (eight_pixels >> 8)  & 0xFF;
-                        uint8_t plane2 = (eight_pixels >> 16) & 0xFF;
-                        uint8_t plane3 = (eight_pixels >> 24) & 0xFF;
-
-                        for (int bit = 7; bit >= 0; --bit) {
-                            uint8_t color_index = ((plane0 >> bit) & 1)
-                                                | (((plane1 >> bit) & 1) << 1)
-                                                | (((plane2 >> bit) & 1) << 2)
-                                                | (((plane3 >> bit) & 1) << 3);
-                            *pixels++ = vga_palette565[color_index];
-                        }
-                    }
+                    const uint32_t visible_cells = 640u / 8u;
+                    uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                    uint32_t vram_base = vram_offset + (uint32_t)y * stride;
+                    vga_render_planar_4bpp(&pixels, vram_base,
+                                            visible_cells, 1);
                     break;
                 }
                 case 0x13: {
                     if (vga_planar_mode) {
-                        uint32_t vram_base = vram_offset + (y >> 1) * (320 / 4);
-                        for (int x = 0; x < 320 / 4; x++) {
+                        const uint32_t visible_cells = 320u / 4u;
+                        uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
+                        uint32_t vram_base = vram_offset +
+                                             ((uint32_t)y >> 1) * stride;
+                        for (uint32_t x = 0; x < visible_cells; x++) {
                             uint32_t four_pixels = vga_vram_cell(vram_base + x);
                             *pixels++ = *pixels++ = vga_palette565[four_pixels & 0xFFu];
                             *pixels++ = *pixels++ = vga_palette565[(four_pixels >> 8) & 0xFFu];
@@ -682,7 +712,9 @@ static inline void renderer() {
                             *pixels++ = *pixels++ = vga_palette565[(four_pixels >> 24) & 0xFFu];
                         }
                     } else {
-                        uint32_t vram_base = vram_offset + (y >> 1) * 320;
+                        uint32_t stride = vga_crtc_chunky_stride(320u);
+                        uint32_t vram_base = vram_offset +
+                                             ((uint32_t)y >> 1) * stride;
                         for (int x = 0; x < 320; x++) {
                             uint16_t color = vga_palette565[vga_vram_cell(vram_base + x) & 0xFFu];
                             *pixels++ = *pixels++ = color;

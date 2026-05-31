@@ -249,6 +249,7 @@ extern uint16_t portin16(uint16_t portnum);
 
 extern uint8_t port60, port61, port64;
 extern volatile uint8_t port3DA;
+extern uint8_t crt_controller_idx, crt_controller[32];
 extern uint32_t vram_offset;
 extern uint32_t tga_offset;
 
