@@ -1713,6 +1713,7 @@ void intcall86(uint8_t intnum) {
                     // http://www.techhelpmanual.com/89-video_memory_layouts.html
 
                     videomode = CPU_AL & 0x7F;
+                    vga_set_standard_mode((uint8_t)videomode);
 
                     FIRST_RAM_PAGE[0x449] = CPU_AL;
                     FIRST_RAM_PAGE[0x44A] = videomode <= 1 || (videomode >= 0x8 && videomode <= 0xa) ? 40 : 80;
@@ -1722,9 +1723,6 @@ void intcall86(uint8_t intnum) {
                     if ((CPU_AL & 0x80) == 0x00) {
                         memset(VIDEORAM, 0x0, sizeof(VIDEORAM));
                     }
-                    vga_plane_offset = 0;
-                    vga_planar_mode = 0;
-                    vga_svga_disable();
                     tga_offset = 0x8000;
                     FIRST_RAM_PAGE[0x462] = 0;
                     r36sx_bios_set_cursor(0, 0, 0);

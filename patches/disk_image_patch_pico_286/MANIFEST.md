@@ -32,6 +32,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 BIOS VGA mode reset and GCC primary build
+
+The current `pico_286` binary is built with the WSL/Linux
+`mips-mti-linux-gnu-gcc` toolchain using `-march=mips32r2 -mtune=74kc -O3`
+and `mips-mti-linux-gnu-strip`.
+
+The BIOS `INT 10h AH=00h` set-video-mode handler now reloads standard VGA
+register tables for mode changes.  This resets Misc Output, Sequencer, CRTC,
+Graphics Controller, Attribute Controller, DAC state, default VGA palette,
+start address, and the emulator's derived VGA cache.  The goal is to prevent a
+program that leaves tweaked VGA registers behind from breaking the next
+program's standard mode, for example Supaplex/SPFIX followed by SuperScape or
+3DBENCH.
+
+pico_286 size: 418356 bytes
+pico_286 SHA256: 627130BAAC6ABF8FA39015A5C328340BDF1B20620D7A4761B7D7080440638784
+
 ## 2026-05-31 lower-left POST-code overlay
 
 The current `pico_286` binary shows the optional `Fn` + D-pad `Right`

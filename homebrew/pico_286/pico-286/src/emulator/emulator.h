@@ -219,6 +219,7 @@ int vga_svga_set_mode(uint16_t mode, int clear_memory);
 void vga_svga_disable(void);
 void vga_svga_set_bank(uint16_t bank);
 uint16_t vga_svga_get_bank(void);
+void vga_set_standard_mode(uint8_t mode);
 
 #if PICO_ON_DEVICE
     extern bool ega_vga_enabled;

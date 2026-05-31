@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-05-31 BIOS VGA mode reset and GCC primary build
+
+Moved the active Pico-286 rebuild path to WSL/GCC.  The deployed
+`homebrew/pico_286/pico_286` binary is now produced by the Linux
+`mips-mti-linux-gnu-gcc` toolchain with `-march=mips32r2 -mtune=74kc -O3` and
+stripped by `mips-mti-linux-gnu-strip`.
+
+The BIOS `INT 10h AH=00h` set-video-mode handler now calls
+`vga_set_standard_mode()`.  That routine loads standard VGA register tables for
+text mode `03h` and graphics modes `0Dh`, `0Eh`, `0Fh/10h`, `11h`, `12h`, and
+`13h`: Misc Output, Sequencer, CRTC, Graphics Controller, Attribute Controller,
+DAC state, default VGA palette, start address, and derived cache flags are
+reset together.  This mirrors the way VGA BIOS mode setting reprograms the
+controller instead of leaving tweaked registers from the previous program.
+
+This specifically targets the Supaplex/SPFIX -> SuperScape/3DBENCH sequence:
+Supaplex can leave nonstandard VGA/CRTC state behind, and a later mode set must
+restore a complete standard mode before rendering the next program.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286
+```
+
+Result:
+
+- `pico_286` size: `418356` bytes
+- `pico_286` SHA256:
+  `627130BAAC6ABF8FA39015A5C328340BDF1B20620D7A4761B7D7080440638784`
+
+ELF check:
+
+```text
+ELF32, little-endian MIPS, executable, o32, mips32r2, hard-float, stripped
+interpreter: /lib/ld.so.1
+needed: libpthread.so.0, libdl.so.2, libm.so.6, libz.so.1,
+        libstdc++.so.6, libgcc_s.so.1, libc.so.6
+```
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 WSL GCC O3 build trial
 
 Added an explicit optimization-level switch to the WSL/GCC build scripts:
