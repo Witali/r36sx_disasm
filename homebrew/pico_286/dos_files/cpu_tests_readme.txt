@@ -27,7 +27,7 @@ Suggested use:
 
 1. Boot FreeDOS from A:.
 2. Mount this image as B: with the Pico-286 disk menu, or set fdd1 to
-   cpu_tests.img in pico_286.conf.
+   images/cpu_tests.img in pico_286.conf.
 3. Run:
 
    B:

@@ -80,8 +80,9 @@ Open it with Fn+Select.
 - A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
 
-The menu searches for `.img` files next to `pico_286.conf`.  If the BIOS mode
-changes, `SAVE/APPLY` also requests a soft reset so the selected ROM starts.
+The menu searches for `.img` files in `images/` next to `pico_286.conf`, and
+also accepts legacy root-level `.img` files.  If the BIOS mode changes,
+`SAVE/APPLY` also requests a soft reset so the selected ROM starts.
 
 ## Disk Image Cache
 
@@ -128,13 +129,13 @@ profiling_enabled=0
 profiling_log_ms=5000
 
 [floppy_drives]
-fdd0=FreeDOS1.img
-fdd1=sopwith.img
+fdd0=images/FreeDOS1.img
+fdd1=images/sopwith.img
 
 [hard_drives]
-hdd0=hdd.img
+hdd0=images/hdd.img
 hdd0_geometry=65,16,63
-hdd1=hdd2.img
+hdd1=images/hdd2.img
 hdd1_geometry=65,16,63
 ```
 
@@ -153,12 +154,12 @@ Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
 
-`cpu_tests.img` is an optional FAT12 floppy image beside the executable.  It
-contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`, then
-run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug build
-of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM, not a
-DOS `.COM` program; Pico-286 currently stores it as a payload/reference and
-logs its configured debug ports `190h`/`191h` when it is loaded as a ROM.
+`images/cpu_tests.img` is an optional FAT12 floppy image beside the executable.
+It contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`,
+then run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug
+build of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM,
+not a DOS `.COM` program; Pico-286 currently stores it as a payload/reference
+and logs its configured debug ports `190h`/`191h` when it is loaded as a ROM.
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 

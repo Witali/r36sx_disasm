@@ -30,6 +30,9 @@ Rebuild `cpu_tests.img` with:
 .\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
 ```
 
+The script writes the floppy image to
+`homebrew/pico_286/images/cpu_tests.img`.
+
 The generated `test386.bin` is a 64 KB BIOS replacement ROM. It is not a
 DOS `.COM` program, so it cannot be launched from the DOS prompt. The test disk
 stores it as `TEST386.BIN` for reference and for future emulator BIOS-loading

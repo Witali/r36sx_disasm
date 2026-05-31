@@ -12,7 +12,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $CreateFat = Join-Path $RepoRoot "tools\create_fat12_floppy.py"
-$OutputImage = Join-Path $PicoRoot "cpu_tests.img"
+$ImagesDir = Join-Path $PicoRoot "images"
+$OutputImage = Join-Path $ImagesDir "cpu_tests.img"
 $Test386Bin = Join-Path $TestsRoot "test386.asm\build\test386.bin"
 $ExeSideTest386Bin = Join-Path $PicoRoot "test386.bin"
 $Readme = Join-Path $PicoRoot "dos_files\cpu_tests_readme.txt"
@@ -24,6 +25,8 @@ if (!(Test-Path -LiteralPath $CreateFat)) {
 if (!(Test-Path -LiteralPath $PcjsRoot)) {
     throw "PCjs CPU test sources were not found at $PcjsRoot."
 }
+
+New-Item -ItemType Directory -Force -Path $ImagesDir | Out-Null
 
 python $CreateFat `
     --output $OutputImage `

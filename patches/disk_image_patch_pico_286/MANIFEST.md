@@ -8,18 +8,18 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/pico_286.conf`
 - `MIPS_NATIVE/pico_286/README.md`
 - `MIPS_NATIVE/pico_286/keypresets.conf`
-- `MIPS_NATIVE/pico_286/cpu_tests.img`
 - `MIPS_NATIVE/pico_286/test386.bin`
-- `MIPS_NATIVE/pico_286/FreeDOS1.img`
-- `MIPS_NATIVE/pico_286/FreeDOS2.img`
-- `MIPS_NATIVE/pico_286/FreeDOS3.img`
-- `MIPS_NATIVE/pico_286/FreeDOS4.img`
-- `MIPS_NATIVE/pico_286/FreeDOS5.img`
-- `MIPS_NATIVE/pico_286/FreeDOS6.img`
-- `MIPS_NATIVE/pico_286/FreeDOS7.img`
-- `MIPS_NATIVE/pico_286/sopwith.img`
-- `MIPS_NATIVE/pico_286/hdd.img`
-- `MIPS_NATIVE/pico_286/hdd2.img`
+- `MIPS_NATIVE/pico_286/images/cpu_tests.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS1.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS2.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS3.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS4.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS5.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS6.img`
+- `MIPS_NATIVE/pico_286/images/FreeDOS7.img`
+- `MIPS_NATIVE/pico_286/images/sopwith.img`
+- `MIPS_NATIVE/pico_286/images/hdd.img`
+- `MIPS_NATIVE/pico_286/images/hdd2.img`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 
@@ -31,6 +31,24 @@ The default binary is built with `DEBUG=0`.  Builds made with
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-05-31 disk image directory migration
+
+All Pico-286 `.img` files in the patch are now stored under
+`MIPS_NATIVE/pico_286/images/`.
+
+- `pico_286.conf` uses `images/...` paths for floppy and hard-disk bindings.
+- The disk menu scans `images/` first, then also scans the Pico-286 root for
+  legacy root-level images.
+- Legacy config values without a directory separator, such as `FreeDOS1.img`,
+  resolve to `images/FreeDOS1.img` when the root file is missing.
+- `cpu_tests.img`, FreeDOS floppy images, Sopwith, `hdd.img`, and `hdd2.img`
+  should be copied inside `MIPS_NATIVE/pico_286/images/`.
+
+pico_286 size: 1325040 bytes
+pico_286 SHA256: 23C2463906890A1DC830F0528E66E6C14AF29DBA86EB4384C9B1D4D32D7D0D7F
+images/cpu_tests.img size: 1474560 bytes
+images/cpu_tests.img SHA256: C4A8CC49F87BD3BBFEDC77061B18065603BB5297E0D97BF13AA18B06F9A1C483
 
 ## 2026-05-31 BIOS mode menu and test386 ROM
 
@@ -48,12 +66,12 @@ R36SX debug build of `barotto/test386.asm`.
 - `MIPS_NATIVE/pico_286/test386.bin` is copied next to the executable and is
   mapped at physical `F0000h-FFFFFh` when the test BIOS is selected.
 
-pico_286 size: 1322776 bytes
-pico_286 SHA256: 18BDBBEF191F7A463EACF756B93F6F3A92D6EA5FEA7E2E31836159CE845A4016
+pico_286 size: 1325040 bytes
+pico_286 SHA256: 23C2463906890A1DC830F0528E66E6C14AF29DBA86EB4384C9B1D4D32D7D0D7F
 test386.bin size: 65536 bytes
 test386.bin SHA256: 7E91F03B910FE52508D28ADD2AC4CF4F73B3D23F5DB7B77A5315D6F0DD234497
 cpu_tests.img size: 1474560 bytes
-cpu_tests.img SHA256: 6FF84B315AF6235934DE90CB775C517CDB2909BF2C9DFB567625D86BFCBB2A06
+cpu_tests.img SHA256: C4A8CC49F87BD3BBFEDC77061B18065603BB5297E0D97BF13AA18B06F9A1C483
 
 ## 2026-05-31 VGA DAC palette handling
 

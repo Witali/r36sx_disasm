@@ -39,10 +39,10 @@ typedef struct {
 } r36sx_pico286_disk_entry_t;
 
 static r36sx_pico286_disk_entry_t disk_entries[] = {
-    { 0, "fdd0", "drive0", "FreeDOS1.img", "FreeDOS1.img", 1 },
-    { 1, "fdd1", "drive1", "sopwith.img", "sopwith.img", 1 },
-    { 128, "hdd0", "drive128", "hdd.img", "hdd.img", 1 },
-    { 129, "hdd1", "drive129", "hdd2.img", "hdd2.img", 1 },
+    { 0, "fdd0", "drive0", "images/FreeDOS1.img", "images/FreeDOS1.img", 1 },
+    { 1, "fdd1", "drive1", "images/sopwith.img", "images/sopwith.img", 1 },
+    { 128, "hdd0", "drive128", "images/hdd.img", "images/hdd.img", 1 },
+    { 129, "hdd1", "drive129", "images/hdd2.img", "images/hdd2.img", 1 },
 };
 
 static int disk_config_loaded = 0;
@@ -213,6 +213,18 @@ static int is_absolute_path(const char *path)
            (isalpha((unsigned char)path[0]) && path[1] == ':');
 }
 
+static int path_has_separator(const char *path)
+{
+    return path && (strchr(path, '/') || strchr(path, '\\'));
+}
+
+static int file_exists(const char *path)
+{
+    struct stat st;
+
+    return path && path[0] && stat(path, &st) == 0;
+}
+
 static void resolve_config_relative_path(char *dest, size_t dest_size,
                                          const char *value)
 {
@@ -238,6 +250,16 @@ static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
     snprintf(entry->value, sizeof(entry->value), "%s", value ? value : "");
     resolve_config_relative_path(entry->path, sizeof(entry->path),
                                  entry->value);
+    if (entry->value[0] &&
+        !is_absolute_path(entry->value) &&
+        !path_has_separator(entry->value) &&
+        disk_config_dir[0] &&
+        !file_exists(entry->path)) {
+        char migrated[R36SX_PICO286_MAX_DISK_PATH];
+        snprintf(migrated, sizeof(migrated), "images/%s", entry->value);
+        resolve_config_relative_path(entry->path, sizeof(entry->path),
+                                     migrated);
+    }
     entry->configured = 1;
 }
 

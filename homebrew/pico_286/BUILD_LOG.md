@@ -1,5 +1,51 @@
 # pico-286 Build Log
 
+## 2026-05-31 disk image directory migration
+
+Moved Pico-286 disk images into an `images/` subdirectory so they no longer
+mix with the executable, config files, ROMs, and logs.
+
+- Default disk config paths now use `images/FreeDOS1.img`,
+  `images/sopwith.img`, `images/hdd.img`, and `images/hdd2.img`.
+- The disk menu scans `images/` first, while still listing legacy root-level
+  `.img` files for compatibility.
+- Legacy relative config values without a directory separator, such as
+  `FreeDOS1.img`, resolve to `images/FreeDOS1.img` if the root file is absent.
+- `rebuild_cpu_tests_disk.ps1` now writes
+  `homebrew/pico_286/images/cpu_tests.img`.
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1325040` bytes
+- `pico_286` SHA256:
+  `23C2463906890A1DC830F0528E66E6C14AF29DBA86EB4384C9B1D4D32D7D0D7F`
+- `test386.bin` size: `65536` bytes
+- `test386.bin` SHA256:
+  `7E91F03B910FE52508D28ADD2AC4CF4F73B3D23F5DB7B77A5315D6F0DD234497`
+- `images/cpu_tests.img` size: `1474560` bytes
+- `images/cpu_tests.img` SHA256:
+  `C4A8CC49F87BD3BBFEDC77061B18065603BB5297E0D97BF13AA18B06F9A1C483`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\images\cpu_tests.img
+```
+
+Microsoft Defender reported no threats for both files.  The `disk_image` and
+patch copies are byte-identical by SHA256.
+
 ## 2026-05-31 BIOS mode menu switch
 
 Added a configurable BIOS ROM provider for the native R36SX Pico-286 build.
@@ -47,7 +93,7 @@ Scan commands:
 
 ```powershell
 .\tools\scan-download.ps1 .\homebrew\pico_286\test386.bin
-.\tools\scan-download.ps1 .\homebrew\pico_286\cpu_tests.img
+.\tools\scan-download.ps1 .\homebrew\pico_286\images\cpu_tests.img
 .\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
 ```
 
