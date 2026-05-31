@@ -110,6 +110,20 @@ Tiny MC:
 `cubegm/rkgame` is included as the stock game frontend binary so the Fn-started
 stock `icube` supervisor has the expected target to launch.
 
+## 2026-05-31 vendored inih config parser
+
+The current `tiny_mc` binary uses vendored `inih` release `r62` for
+`tiny_mc.conf` loading instead of its local hand-written line parser.  The
+existing config keys and aliases are unchanged.
+
+```text
+Tiny MC:
+  Size: 69564 bytes
+  SHA256: 45B9BD376266CF284F9CA1ED5C76EEF4E7386DF09466DAFAF0743E10DCB2458C
+Defender scan:
+  homebrew\tiny_mc\tiny_mc: found no threats
+```
+
 ## Verification
 
 ```text

@@ -36,6 +36,7 @@
 #include FT_FREETYPE_H
 
 #include "../common/hardware.h"
+#include "../common/inih/ini.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 1024
@@ -481,22 +482,6 @@ static void log_msg(const char *fmt, ...)
 }
 #endif
 
-static char *strip_space(char *s)
-{
-    char *end;
-
-    while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') {
-        s++;
-    }
-    end = s + strlen(s);
-    while (end > s &&
-           (end[-1] == ' ' || end[-1] == '\t' ||
-            end[-1] == '\r' || end[-1] == '\n')) {
-        *--end = '\0';
-    }
-    return s;
-}
-
 static int parse_bounded_int(const char *text, int min_value, int max_value, int fallback)
 {
     char *end = NULL;
@@ -522,25 +507,95 @@ static int parse_bounded_int(const char *text, int min_value, int max_value, int
     return (int)value;
 }
 
+struct tiny_config_parse_context {
+    int row_h_set;
+};
+
+static int config_ini_handler(void *user, const char *section,
+                              const char *name, const char *value,
+                              int line_no)
+{
+    struct tiny_config_parse_context *ctx =
+        (struct tiny_config_parse_context *)user;
+
+    (void)section;
+    (void)line_no;
+
+    if (!name || !value) {
+        return 1;
+    }
+
+    if (strcmp(name, "font") == 0 || strcmp(name, "font_path") == 0) {
+        if (*value != '\0' && strcmp(value, "default") != 0) {
+            snprintf(g_config.font_path, sizeof(g_config.font_path), "%s", value);
+        } else {
+            snprintf(g_config.font_path, sizeof(g_config.font_path), "%s",
+                     R36SX_DEFAULT_MONO_FONT_PATH);
+        }
+    } else if (strcmp(name, "text_extensions") == 0 ||
+               strcmp(name, "viewer_extensions") == 0 ||
+               strcmp(name, "text_ext") == 0) {
+        if (*value != '\0' && strcmp(value, "default") != 0) {
+            snprintf(g_config.text_extensions,
+                     sizeof(g_config.text_extensions), "%s", value);
+        } else {
+            snprintf(g_config.text_extensions,
+                     sizeof(g_config.text_extensions), "%s",
+                     DEFAULT_TEXT_EXTENSIONS);
+        }
+    } else if (strcmp(name, "small_px") == 0 ||
+               strcmp(name, "font_small_px") == 0) {
+        g_config.font_small_px =
+            parse_bounded_int(value, 6, 32, g_config.font_small_px);
+    } else if (strcmp(name, "large_px") == 0 ||
+               strcmp(name, "font_large_px") == 0 ||
+               strcmp(name, "font_size") == 0) {
+        g_config.font_large_px =
+            parse_bounded_int(value, 8, 48, g_config.font_large_px);
+    } else if (strcmp(name, "list_row_h") == 0 ||
+               strcmp(name, "row_h") == 0) {
+        g_config.list_row_h =
+            parse_bounded_int(value, 10, 64, g_config.list_row_h);
+        if (ctx) {
+            ctx->row_h_set = 1;
+        }
+    }
+
+    return 1;
+}
+
 static void config_load(void)
 {
     static const char *paths[] = {
         TINY_MC_CONFIG_PATH,
         TINY_MC_CONFIG_LOCAL_PATH
     };
-    FILE *fp = NULL;
     const char *loaded_path = NULL;
-    char line[512];
-    int row_h_set = 0;
+    struct tiny_config_parse_context ctx;
+    int parse_result;
 
+    memset(&ctx, 0, sizeof(ctx));
     for (size_t i = 0; i < ARRAY_COUNT(paths); i++) {
-        fp = fopen(paths[i], "r");
-        if (fp) {
+        FILE *fp = fopen(paths[i], "r");
+
+        if (!fp) {
+            continue;
+        }
+        parse_result = ini_parse_file(fp, config_ini_handler, &ctx);
+        fclose(fp);
+        if (parse_result > 0) {
+            log_msg("config parse warning near line %d in %s",
+                    parse_result, paths[i]);
+        } else if (parse_result < 0) {
+            log_msg("config parser failed with code %d for %s",
+                    parse_result, paths[i]);
+        }
+        if (parse_result >= 0) {
             loaded_path = paths[i];
             break;
         }
     }
-    if (!fp) {
+    if (!loaded_path) {
         log_msg("config not found; defaults font=%s text_ext=%s small=%d large=%d row=%d",
                 g_config.font_path, g_config.text_extensions,
                 g_config.font_small_px, g_config.font_large_px,
@@ -548,64 +603,7 @@ static void config_load(void)
         return;
     }
 
-    while (fgets(line, sizeof(line), fp)) {
-        char *hash = strchr(line, '#');
-        char *eq;
-        char *key;
-        char *value;
-
-        if (hash) {
-            *hash = '\0';
-        }
-        key = strip_space(line);
-        if (*key == '\0') {
-            continue;
-        }
-        eq = strchr(key, '=');
-        if (!eq) {
-            continue;
-        }
-        *eq = '\0';
-        value = strip_space(eq + 1);
-        key = strip_space(key);
-
-        if (strcmp(key, "font") == 0 || strcmp(key, "font_path") == 0) {
-            if (*value != '\0' && strcmp(value, "default") != 0) {
-                snprintf(g_config.font_path, sizeof(g_config.font_path), "%s", value);
-            } else {
-                snprintf(g_config.font_path, sizeof(g_config.font_path), "%s",
-                         R36SX_DEFAULT_MONO_FONT_PATH);
-            }
-        } else if (strcmp(key, "text_extensions") == 0 ||
-                   strcmp(key, "viewer_extensions") == 0 ||
-                   strcmp(key, "text_ext") == 0) {
-            if (*value != '\0' && strcmp(value, "default") != 0) {
-                snprintf(g_config.text_extensions,
-                         sizeof(g_config.text_extensions), "%s", value);
-            } else {
-                snprintf(g_config.text_extensions,
-                         sizeof(g_config.text_extensions), "%s",
-                         DEFAULT_TEXT_EXTENSIONS);
-            }
-        } else if (strcmp(key, "small_px") == 0 ||
-                   strcmp(key, "font_small_px") == 0) {
-            g_config.font_small_px =
-                parse_bounded_int(value, 6, 32, g_config.font_small_px);
-        } else if (strcmp(key, "large_px") == 0 ||
-                   strcmp(key, "font_large_px") == 0 ||
-                   strcmp(key, "font_size") == 0) {
-            g_config.font_large_px =
-                parse_bounded_int(value, 8, 48, g_config.font_large_px);
-        } else if (strcmp(key, "list_row_h") == 0 ||
-                   strcmp(key, "row_h") == 0) {
-            g_config.list_row_h =
-                parse_bounded_int(value, 10, 64, g_config.list_row_h);
-            row_h_set = 1;
-        }
-    }
-    fclose(fp);
-
-    if (!row_h_set && g_config.list_row_h < g_config.font_large_px + 3) {
+    if (!ctx.row_h_set && g_config.list_row_h < g_config.font_large_px + 3) {
         g_config.list_row_h = g_config.font_large_px + 3;
     }
 

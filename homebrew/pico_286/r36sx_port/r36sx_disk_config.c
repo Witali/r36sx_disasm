@@ -1,5 +1,7 @@
 #include "r36sx_disk_config.h"
 
+#include "../../common/inih/ini.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -1247,12 +1249,31 @@ static int set_config_value(const char *key, const char *value, int line_no)
     return 1;
 }
 
+static int disk_config_ini_handler(void *user, const char *section,
+                                   const char *name, const char *value,
+                                   int line_no)
+{
+    char mutable_value[384];
+    char *trimmed_value;
+
+    (void)user;
+    (void)section;
+
+    if (!name || !value) {
+        return 1;
+    }
+
+    snprintf(mutable_value, sizeof(mutable_value), "%s", value);
+    trimmed_value = trim_quotes(trim_space(mutable_value));
+    set_config_value(name, trimmed_value, line_no);
+    return 1;
+}
+
 static void load_disk_config(void)
 {
     FILE *fp;
     const char *loaded_path;
-    char line[384];
-    int line_no = 0;
+    int parse_result;
 
     if (disk_config_loaded) {
         return;
@@ -1276,27 +1297,13 @@ static void load_disk_config(void)
     snprintf(disk_config_path, sizeof(disk_config_path), "%s", loaded_path);
     set_config_dir(loaded_path);
 
-    while (fgets(line, sizeof(line), fp)) {
-        char *equals;
-        char *key;
-        char *value;
-
-        line_no++;
-        key = trim_space(line);
-        if (key[0] == '\0' || key[0] == '#' || key[0] == ';') {
-            continue;
-        }
-
-        equals = strchr(key, '=');
-        if (!equals) {
-            r36sx_pico286_debug_log("diskcfg: ignoring malformed line %d", line_no);
-            continue;
-        }
-
-        *equals = '\0';
-        value = trim_quotes(trim_space(equals + 1));
-        key = trim_space(key);
-        set_config_value(key, value, line_no);
+    parse_result = ini_parse_file(fp, disk_config_ini_handler, NULL);
+    if (parse_result > 0) {
+        r36sx_pico286_debug_log(
+            "diskcfg: INI parse warning near line %d", parse_result);
+    } else if (parse_result < 0) {
+        r36sx_pico286_debug_log(
+            "diskcfg: INI parser failed with code %d", parse_result);
     }
 
     fclose(fp);

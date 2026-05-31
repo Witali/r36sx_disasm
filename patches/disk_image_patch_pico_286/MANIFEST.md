@@ -32,6 +32,15 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 vendored inih config parser
+
+The current `pico_286` binary uses vendored `inih` release `r62` for
+`pico_286.conf` and `keypresets.conf` loading instead of local hand-written
+line parsing.  The existing config format and save paths are unchanged.
+
+pico_286 size: 1431956 bytes
+pico_286 SHA256: C5C3DA77147592CD380F04B61D227FF8EBA1DE2E572790CE58A35BBD8FA16290
+
 ## 2026-05-31 disabled audio de-click ramp
 
 The current `pico_286` binary removes the experimental 32-frame audio de-click

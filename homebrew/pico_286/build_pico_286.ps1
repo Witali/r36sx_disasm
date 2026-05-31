@@ -84,6 +84,9 @@ $CommonArgs = @(
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",
     "-DR36SX_VIDEO_DIRTY_TRACKING=1",
+    "-DINI_HANDLER_LINENO=1",
+    "-DINI_MAX_LINE=512",
+    "-DINI_ALLOW_MULTILINE=0",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",
@@ -155,6 +158,7 @@ $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "src\emu8950") -File -Filter
 $CFiles += Get-ChildItem -Path (Join-Path $PicoRoot "findfirst") -File -Filter "*.c"
 $CFiles += Get-Item (Join-Path $PicoRoot "src\printf\printf.c")
 $CFiles += Get-Item (Join-Path $Root "homebrew\common\r36sx_screen_keyboard.c")
+$CFiles += Get-Item (Join-Path $Root "homebrew\common\inih\ini.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_disk_menu.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_key_presets.c")
 $CFiles += Get-Item (Join-Path $PSScriptRoot "r36sx_minifb.c")

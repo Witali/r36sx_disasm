@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../common/hardware.h"
+#include "../common/inih/ini.h"
 #include "../common/r36sx_screen_keyboard.h"
 
 #define R36SX_KEY_PRESETS_CONF "keypresets.conf"
@@ -386,6 +387,93 @@ static void set_default_preset(struct r36sx_key_preset *preset)
     }
 }
 
+struct key_preset_parse_context {
+    struct r36sx_key_presets *state;
+    char active_name[R36SX_KEY_PRESET_NAME_LEN];
+};
+
+static int starts_with_preset_prefix(const char *section)
+{
+    static const char prefix[] = "preset";
+
+    if (!section) {
+        return 0;
+    }
+
+    for (size_t i = 0; prefix[i] != '\0'; i++) {
+        if (tolower((unsigned char)section[i]) !=
+            (unsigned char)prefix[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int preset_index_for_section(struct key_preset_parse_context *ctx,
+                                    const char *section)
+{
+    char section_copy[64];
+    char *name;
+
+    if (!ctx || !ctx->state || !starts_with_preset_prefix(section)) {
+        return -1;
+    }
+
+    snprintf(section_copy, sizeof(section_copy), "%s", section + 6);
+    name = trim_space(section_copy);
+    if (name[0] == '\0') {
+        return -1;
+    }
+
+    for (uint8_t i = 0; i < ctx->state->count; i++) {
+        if (str_equals(ctx->state->presets[i].name, name)) {
+            return (int)i;
+        }
+    }
+
+    if (ctx->state->count >= R36SX_KEY_PRESETS_MAX) {
+        return -1;
+    }
+
+    {
+        int index = (int)ctx->state->count++;
+        set_default_preset(&ctx->state->presets[index]);
+        snprintf(ctx->state->presets[index].name,
+                 sizeof(ctx->state->presets[index].name), "%s", name);
+        return index;
+    }
+}
+
+static int key_presets_ini_handler(void *user, const char *section,
+                                   const char *name, const char *value,
+                                   int line_no)
+{
+    struct key_preset_parse_context *ctx =
+        (struct key_preset_parse_context *)user;
+    int preset_index;
+
+    (void)line_no;
+
+    if (!ctx || !ctx->state || !name || !value) {
+        return 1;
+    }
+
+    if (str_equals(name, "active")) {
+        snprintf(ctx->active_name, sizeof(ctx->active_name), "%s", value);
+        return 1;
+    }
+
+    preset_index = preset_index_for_section(ctx, section);
+    if (preset_index >= 0) {
+        int button = button_index_for_config_key(name);
+        if (button >= 0) {
+            ctx->state->presets[preset_index].keycodes[button] =
+                keycode_for_label(value);
+        }
+    }
+    return 1;
+}
+
 void r36sx_key_presets_init(struct r36sx_key_presets *state)
 {
     if (!state) {
@@ -419,9 +507,8 @@ static FILE *open_config_for_read(struct r36sx_key_presets *state)
 void r36sx_key_presets_load(struct r36sx_key_presets *state)
 {
     FILE *fp;
-    char line[256];
-    int current_preset = -1;
-    char active_name[R36SX_KEY_PRESET_NAME_LEN] = "";
+    int parse_result;
+    struct key_preset_parse_context ctx;
 
     if (!state) {
         return;
@@ -435,57 +522,16 @@ void r36sx_key_presets_load(struct r36sx_key_presets *state)
         return;
     }
 
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.state = state;
     state->count = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        char *text = trim_space(line);
-        char *equals;
-
-        if (text[0] == '\0' || text[0] == '#' || text[0] == ';') {
-            continue;
-        }
-        if (text[0] == '[') {
-            char *end = strchr(text, ']');
-            if (!end || state->count >= R36SX_KEY_PRESETS_MAX) {
-                current_preset = -1;
-                continue;
-            }
-            *end = '\0';
-            text++;
-            if (strlen(text) >= 6 &&
-                tolower((unsigned char)text[0]) == 'p' &&
-                tolower((unsigned char)text[1]) == 'r' &&
-                tolower((unsigned char)text[2]) == 'e' &&
-                tolower((unsigned char)text[3]) == 's' &&
-                tolower((unsigned char)text[4]) == 'e' &&
-                tolower((unsigned char)text[5]) == 't') {
-                char *name = trim_space(text + 6);
-                current_preset = (int)state->count++;
-                set_default_preset(&state->presets[current_preset]);
-                snprintf(state->presets[current_preset].name,
-                         sizeof(state->presets[current_preset].name),
-                         "%s", name);
-            }
-            continue;
-        }
-
-        equals = strchr(text, '=');
-        if (!equals) {
-            continue;
-        }
-        *equals = '\0';
-        {
-            char *key = trim_space(text);
-            char *value = trim_space(equals + 1);
-            if (str_equals(key, "active")) {
-                snprintf(active_name, sizeof(active_name), "%s", value);
-            } else if (current_preset >= 0) {
-                int button = button_index_for_config_key(key);
-                if (button >= 0) {
-                    state->presets[current_preset].keycodes[button] =
-                        keycode_for_label(value);
-                }
-            }
-        }
+    parse_result = ini_parse_file(fp, key_presets_ini_handler, &ctx);
+    if (parse_result > 0) {
+        r36sx_pico286_debug_log(
+            "keypresets: INI parse warning near line %d", parse_result);
+    } else if (parse_result < 0) {
+        r36sx_pico286_debug_log(
+            "keypresets: INI parser failed with code %d", parse_result);
     }
     fclose(fp);
 
@@ -495,7 +541,7 @@ void r36sx_key_presets_load(struct r36sx_key_presets *state)
     }
 
     for (uint8_t i = 0; i < state->count; i++) {
-        if (str_equals(active_name, state->presets[i].name)) {
+        if (str_equals(ctx.active_name, state->presets[i].name)) {
             state->active = i;
             break;
         }

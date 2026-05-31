@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-05-31 vendored inih config parser
+
+Replaced Pico-286's hand-written config readers with the vendored `inih`
+release `r62` source in `homebrew/common/inih`.
+
+- `pico_286.conf` is parsed through `ini_parse_file()` in
+  `r36sx_disk_config.c`.
+- `keypresets.conf` is parsed through `ini_parse_file()` in
+  `r36sx_key_presets.c`.
+- The existing config file format and save paths remain unchanged.
+- The build compiles `homebrew/common/inih/ini.c` with
+  `INI_HANDLER_LINENO=1`, `INI_MAX_LINE=512`, and `INI_ALLOW_MULTILINE=0`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.  The rebuild still emits existing upstream warnings
+from inherited emulator/audio sources.
+
+Result:
+
+- `pico_286` size: `1431956` bytes
+- `pico_286` SHA256:
+  `C5C3DA77147592CD380F04B61D227FF8EBA1DE2E572790CE58A35BBD8FA16290`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .tmp\inih-r62\ini.c
+.\tools\scan-download.ps1 .tmp\inih-r62\ini.h
+.\tools\scan-download.ps1 .tmp\inih-r62\LICENSE.txt
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 disabled audio de-click ramp
 
 Removed the experimental 32-frame audio de-click ramp from `r36sx_linux_audio.c`.

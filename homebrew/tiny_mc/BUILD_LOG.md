@@ -1,5 +1,32 @@
 # Build log: Tiny MC
 
+## 2026-05-31 vendored inih config parser
+
+Replaced Tiny MC's hand-written `tiny_mc.conf` line parser with the vendored
+`inih` release `r62` source in `homebrew/common/inih`.
+
+- `tiny_mc.conf` is now parsed through `ini_parse_file()`.
+- Existing keys and aliases are unchanged: `font`, `font_path`,
+  `text_extensions`, `viewer_extensions`, `text_ext`, `small_px`,
+  `font_small_px`, `large_px`, `font_large_px`, `font_size`, `list_row_h`, and
+  `row_h`.
+- The build now compiles `homebrew/common/inih/ini.c` as `inih.o` with
+  `INI_HANDLER_LINENO=1`, `INI_MAX_LINE=512`, and `INI_ALLOW_MULTILINE=0`.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\tiny_mc\build_tiny_mc.ps1
+```
+
+Verification:
+
+```text
+Tiny MC size: 69564 bytes
+Tiny MC SHA256: 45B9BD376266CF284F9CA1ED5C76EEF4E7386DF09466DAFAF0743E10DCB2458C
+Defender scan homebrew\tiny_mc\tiny_mc: found no threats
+```
+
 ## 2026-05-29 text viewer rebuild
 
 Purpose:

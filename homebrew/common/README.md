@@ -3,6 +3,12 @@
 This directory contains small reusable helpers for native and libretro-style
 R36SX experiments.
 
+## `inih`
+
+`inih/ini.c` and `inih/ini.h` vendor `benhoyt/inih` release `r62`, a small
+BSD-3-Clause callback-based C INI parser.  Pico-286 and Tiny MC use it for
+runtime `.conf` file loading instead of local hand-written line parsers.
+
 ## `r36sx_screen_keyboard`
 
 `r36sx_screen_keyboard.h` / `r36sx_screen_keyboard.c` implement the compact
