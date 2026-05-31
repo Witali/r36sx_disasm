@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-01 key preset combinations
+
+Added combo bindings to the full-screen key preset editor.  A preset entry can
+now be a single key label such as `ENTER` or a modifier combo such as
+`CTRL+S`, `SHIFT+A`, or `CTRL+ALT+DEL`.  Existing single-key configs remain
+valid.  In key-picker mode, physical `L` toggles Shift, `R` toggles Ctrl, and
+`L2` toggles Alt before A/Y accepts the highlighted key.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `457840` bytes
+- `pico_286` SHA256:
+  `CCEF18294841D693E6FD7C4588C2F65EE416BB283251E42EE970CFC3422426BF`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard left alignment
 
 Updated the shared on-screen keyboard layout to better match a physical PC

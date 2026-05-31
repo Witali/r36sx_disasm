@@ -281,6 +281,9 @@ Open it with Fn+Start.
 - A or Y on `RENAME`: edit the preset name with the on-screen keyboard.
 - A or Y on `ADD NEW`: create a new preset by copying the current one.
 - A or Y on a button row: open the key picker for that physical button.
+- L in key picker mode: toggle Shift for the assignment.
+- R in key picker mode: toggle Ctrl for the assignment.
+- L2 in key picker mode: toggle Alt for the assignment.
 - A or Y in key picker mode: assign the highlighted on-screen key.
 - B in key picker mode: assign Backspace.
 - X in key picker mode: assign Escape.
@@ -289,3 +292,5 @@ Open it with Fn+Start.
 - `CANCEL`: close without saving.
 
 The default preset is stored in `keypresets.conf` next to the executable.
+Preset values can be single labels such as `A`, `ENTER`, and `F1`, or combos
+such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.

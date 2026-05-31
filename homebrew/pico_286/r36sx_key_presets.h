@@ -8,6 +8,9 @@
 #define R36SX_KEY_PRESETS_MAX 8
 #define R36SX_KEY_PRESET_NAME_LEN 32
 #define R36SX_KEY_PRESET_RESULT_CLOSED 0x01u
+#define R36SX_KEY_PRESET_MOD_SHIFT 0x01u
+#define R36SX_KEY_PRESET_MOD_CTRL 0x02u
+#define R36SX_KEY_PRESET_MOD_ALT 0x04u
 
 enum r36sx_key_preset_button {
     R36SX_KEY_PRESET_BUTTON_UP = 0,
@@ -27,9 +30,14 @@ enum r36sx_key_preset_button {
     R36SX_KEY_PRESET_BUTTON_COUNT
 };
 
+struct r36sx_key_binding {
+    uint16_t keycode;
+    uint8_t mods;
+};
+
 struct r36sx_key_preset {
     char name[R36SX_KEY_PRESET_NAME_LEN];
-    uint16_t keycodes[R36SX_KEY_PRESET_BUTTON_COUNT];
+    struct r36sx_key_binding bindings[R36SX_KEY_PRESET_BUTTON_COUNT];
 };
 
 struct r36sx_key_presets {
@@ -44,6 +52,7 @@ struct r36sx_key_presets {
     uint8_t selected_row;
     uint8_t edit_mode;
     uint8_t picker_button;
+    uint8_t picker_mods;
     char config_path[192];
 };
 
@@ -54,6 +63,8 @@ int r36sx_key_presets_is_visible(const struct r36sx_key_presets *state);
 void r36sx_key_presets_set_visible(struct r36sx_key_presets *state,
                                    int visible);
 uint16_t r36sx_key_presets_key_for_mask(
+    const struct r36sx_key_presets *state, uint32_t raw_mask);
+struct r36sx_key_binding r36sx_key_presets_binding_for_mask(
     const struct r36sx_key_presets *state, uint32_t raw_mask);
 uint32_t r36sx_key_presets_handle_buttons(struct r36sx_key_presets *state,
                                           uint32_t pressed,

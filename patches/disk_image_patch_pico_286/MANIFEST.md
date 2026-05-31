@@ -37,6 +37,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 key preset combinations
+
+The full-screen key preset editor now supports combo assignments.  Existing
+single-key values like `ENTER`, `SHIFT`, and `F1` still work, and config values
+can also use `CTRL+S`, `SHIFT+A`, or `CTRL+ALT+DEL`.  In key-picker mode,
+physical `L` toggles Shift, `R` toggles Ctrl, and `L2` toggles Alt before A/Y
+accepts the highlighted key.
+
+```text
+pico_286 size: 457840 bytes
+pico_286 SHA256: CCEF18294841D693E6FD7C4588C2F65EE416BB283251E42EE970CFC3422426BF
+Defender scan: found no threats
+```
+
 ## 2026-06-01 on-screen keyboard left alignment
 
 The patch binary now draws the on-screen keyboard rows from a shared left edge:

@@ -1988,6 +1988,32 @@ static uint32_t r36sx_mfb_read_raw_keys(void)
     return g_mfb.cube_key_mem[0] | g_mfb.cube_key_mem[1];
 }
 
+static void r36sx_mfb_mark_key_down(uint8_t *new_down, size_t count,
+                                    uint16_t keycode)
+{
+    if (keycode > 0 && keycode < count) {
+        new_down[keycode] = 1;
+    }
+}
+
+static void r36sx_mfb_mark_binding_down(uint8_t *new_down, size_t count,
+                                        struct r36sx_key_binding binding)
+{
+    if (binding.keycode == 0) {
+        return;
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_SHIFT) != 0) {
+        r36sx_mfb_mark_key_down(new_down, count, R36SX_SCREEN_KEY_SHIFT);
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_CTRL) != 0) {
+        r36sx_mfb_mark_key_down(new_down, count, R36SX_SCREEN_KEY_CONTROL);
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_ALT) != 0) {
+        r36sx_mfb_mark_key_down(new_down, count, R36SX_SCREEN_KEY_MENU);
+    }
+    r36sx_mfb_mark_key_down(new_down, count, binding.keycode);
+}
+
 static int r36sx_mfb_poll_input(void)
 {
     static const uint32_t preset_masks[] = {
@@ -2123,12 +2149,10 @@ static int r36sx_mfb_poll_input(void)
     memset(new_down, 0, sizeof(new_down));
     for (size_t i = 0; i < R36SX_PICO286_ARRAY_COUNT(preset_masks); i++) {
         if ((raw & preset_masks[i]) != 0) {
-            uint16_t keycode =
-                r36sx_key_presets_key_for_mask(&g_mfb.key_presets,
-                                                preset_masks[i]);
-            if (keycode > 0 && keycode < sizeof(new_down)) {
-                new_down[keycode] = 1;
-            }
+            struct r36sx_key_binding binding =
+                r36sx_key_presets_binding_for_mask(&g_mfb.key_presets,
+                                                   preset_masks[i]);
+            r36sx_mfb_mark_binding_down(new_down, sizeof(new_down), binding);
         }
     }
 

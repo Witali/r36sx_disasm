@@ -122,7 +122,8 @@ and Fn+R2 currently have no action.  Select+Start is not an exit shortcut in
 Pico-286.
 
 The default game/input mapping is stored in `keypresets.conf` next to the
-executable:
+executable.  Values can be a single key label or a modifier combo such as
+`CTRL+S`, `SHIFT+A`, or `CTRL+ALT+DEL`:
 
 ```ini
 active=Default
@@ -154,9 +155,12 @@ button row, A/Y opens the key picker.  On `OK`, A/Y saves all draft changes to
 `keypresets.conf`; on `CANCEL`, A/Y closes without saving.
 The `RENAME` row opens the on-screen keyboard for editing the current preset
 name and shows a blinking underscore cursor next to the text.  In picker mode,
-A/Y accepts the highlighted on-screen key.  B always enters Backspace and X
-always enters Escape while the picker keyboard is visible; in name editing this
-means B deletes a character and X closes the picker.
+A/Y accepts the highlighted on-screen key.  In key-binding picker mode,
+physical L toggles Shift, physical R toggles Ctrl, and physical L2 toggles Alt
+before A/Y accepts the highlighted key, allowing assignments such as `CTRL+S`
+or `SHIFT+A`.  B always enters Backspace and X always enters Escape while the
+picker keyboard is visible; in name editing this means B deletes a character
+and X closes the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right

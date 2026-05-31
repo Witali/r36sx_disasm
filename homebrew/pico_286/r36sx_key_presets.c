@@ -360,16 +360,6 @@ static const char *choice_label(uint16_t keycode)
     return "NONE";
 }
 
-static int choice_index_for_keycode(uint16_t keycode)
-{
-    for (size_t i = 0; i < sizeof(g_choices) / sizeof(g_choices[0]); i++) {
-        if (g_choices[i].keycode == keycode) {
-            return (int)i;
-        }
-    }
-    return 0;
-}
-
 static uint16_t keycode_for_label(const char *label)
 {
     for (size_t i = 0; i < sizeof(g_choices) / sizeof(g_choices[0]); i++) {
@@ -378,6 +368,126 @@ static uint16_t keycode_for_label(const char *label)
         }
     }
     return 0;
+}
+
+static struct r36sx_key_binding binding_make(uint16_t keycode, uint8_t mods)
+{
+    struct r36sx_key_binding binding;
+
+    binding.keycode = keycode;
+    binding.mods = keycode != 0 ? mods : 0;
+    return binding;
+}
+
+static void append_label_part(char *buf, size_t buf_size, const char *part)
+{
+    size_t len;
+
+    if (!buf || buf_size == 0 || !part) {
+        return;
+    }
+    len = strlen(buf);
+    if (len > 0 && len + 1 < buf_size) {
+        buf[len++] = '+';
+        buf[len] = '\0';
+    }
+    if (len < buf_size) {
+        snprintf(buf + len, buf_size - len, "%s", part);
+    }
+}
+
+static const char *binding_label(struct r36sx_key_binding binding,
+                                 char *buf,
+                                 size_t buf_size)
+{
+    if (!buf || buf_size == 0) {
+        return "NONE";
+    }
+    buf[0] = '\0';
+    if (binding.keycode == 0) {
+        snprintf(buf, buf_size, "NONE");
+        return buf;
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_CTRL) != 0) {
+        append_label_part(buf, buf_size, "CTRL");
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_SHIFT) != 0) {
+        append_label_part(buf, buf_size, "SHIFT");
+    }
+    if ((binding.mods & R36SX_KEY_PRESET_MOD_ALT) != 0) {
+        append_label_part(buf, buf_size, "ALT");
+    }
+    append_label_part(buf, buf_size, choice_label(binding.keycode));
+    return buf;
+}
+
+static int binding_parse_modifier(const char *label, uint8_t *mod)
+{
+    if (!label || !mod) {
+        return 0;
+    }
+    if (str_equals(label, "CTRL") || str_equals(label, "CONTROL")) {
+        *mod = R36SX_KEY_PRESET_MOD_CTRL;
+        return 1;
+    }
+    if (str_equals(label, "SHIFT")) {
+        *mod = R36SX_KEY_PRESET_MOD_SHIFT;
+        return 1;
+    }
+    if (str_equals(label, "ALT")) {
+        *mod = R36SX_KEY_PRESET_MOD_ALT;
+        return 1;
+    }
+    return 0;
+}
+
+static struct r36sx_key_binding binding_for_label(const char *label)
+{
+    char copy[96];
+    char split[96];
+    char *trimmed;
+    char *token;
+    int has_plus = 0;
+    struct r36sx_key_binding binding = binding_make(0, 0);
+
+    if (!label) {
+        return binding;
+    }
+    snprintf(copy, sizeof(copy), "%s", label);
+    trimmed = trim_space(copy);
+    if (trimmed[0] == '\0') {
+        return binding;
+    }
+
+    for (const char *p = trimmed; *p != '\0'; p++) {
+        if (*p == '+') {
+            has_plus = 1;
+            break;
+        }
+    }
+    if (!has_plus) {
+        return binding_make(keycode_for_label(trimmed), 0);
+    }
+
+    snprintf(split, sizeof(split), "%s", trimmed);
+    token = strtok(split, "+");
+    while (token) {
+        char *part = trim_space(token);
+        uint8_t mod = 0;
+        if (part[0] != '\0') {
+            if (binding_parse_modifier(part, &mod)) {
+                binding.mods |= mod;
+            } else {
+                binding.keycode = keycode_for_label(part);
+            }
+        }
+        token = strtok(NULL, "+");
+    }
+
+    if (binding.keycode == 0) {
+        binding.mods = 0;
+    }
+    return binding;
 }
 
 static int button_index_for_config_key(const char *key)
@@ -394,7 +504,7 @@ static void set_default_preset(struct r36sx_key_preset *preset)
 {
     snprintf(preset->name, sizeof(preset->name), "Default");
     for (size_t i = 0; i < sizeof(g_buttons) / sizeof(g_buttons[0]); i++) {
-        preset->keycodes[i] = g_buttons[i].default_keycode;
+        preset->bindings[i] = binding_make(g_buttons[i].default_keycode, 0);
     }
 }
 
@@ -478,8 +588,8 @@ static int key_presets_ini_handler(void *user, const char *section,
     if (preset_index >= 0) {
         int button = button_index_for_config_key(name);
         if (button >= 0) {
-            ctx->state->presets[preset_index].keycodes[button] =
-                keycode_for_label(value);
+            ctx->state->presets[preset_index].bindings[button] =
+                binding_for_label(value);
         }
     }
     return 1;
@@ -583,13 +693,16 @@ void r36sx_key_presets_save(struct r36sx_key_presets *state)
 
     snprintf(state->config_path, sizeof(state->config_path), "%s", path);
     fprintf(fp, "# Pico-286 key presets for the R36SX native port.\n");
-    fprintf(fp, "# Values use labels such as A, ENTER, ESC, SPACE, CTRL, F1.\n\n");
+    fprintf(fp, "# Values use labels such as A, ENTER, ESC, SPACE, CTRL, F1.\n");
+    fprintf(fp, "# Modifiers can be combined with '+': CTRL+S, SHIFT+A, CTRL+ALT+DEL.\n\n");
     fprintf(fp, "active=%s\n\n", state->presets[state->active].name);
     for (uint8_t preset = 0; preset < state->count; preset++) {
         fprintf(fp, "[preset %s]\n", state->presets[preset].name);
         for (size_t i = 0; i < sizeof(g_buttons) / sizeof(g_buttons[0]); i++) {
+            char label[64];
             fprintf(fp, "%s=%s\n", g_buttons[i].config_key,
-                    choice_label(state->presets[preset].keycodes[i]));
+                    binding_label(state->presets[preset].bindings[i], label,
+                                  sizeof(label)));
         }
         fputc('\n', fp);
     }
@@ -648,6 +761,7 @@ static void begin_edit_session(struct r36sx_key_presets *state)
     state->selected_row = 0;
     state->edit_mode = R36SX_KEY_PRESET_PICKER_NONE;
     state->picker_button = R36SX_KEY_PRESET_PICKER_BUTTON_NONE;
+    state->picker_mods = 0;
     r36sx_screen_keyboard_init(&state->picker_keyboard);
 }
 
@@ -655,6 +769,7 @@ static void close_picker(struct r36sx_key_presets *state)
 {
     state->edit_mode = R36SX_KEY_PRESET_PICKER_NONE;
     state->picker_button = R36SX_KEY_PRESET_PICKER_BUTTON_NONE;
+    state->picker_mods = 0;
     r36sx_screen_keyboard_set_visible(&state->picker_keyboard, 0);
 }
 
@@ -719,18 +834,24 @@ void r36sx_key_presets_set_visible(struct r36sx_key_presets *state, int visible)
 uint16_t r36sx_key_presets_key_for_mask(
     const struct r36sx_key_presets *state, uint32_t raw_mask)
 {
+    return r36sx_key_presets_binding_for_mask(state, raw_mask).keycode;
+}
+
+struct r36sx_key_binding r36sx_key_presets_binding_for_mask(
+    const struct r36sx_key_presets *state, uint32_t raw_mask)
+{
     const struct r36sx_key_preset *preset;
 
     if (!state || state->count == 0 || state->active >= state->count) {
-        return 0;
+        return binding_make(0, 0);
     }
     preset = &state->presets[state->active];
     for (size_t i = 0; i < sizeof(g_buttons) / sizeof(g_buttons[0]); i++) {
         if (g_buttons[i].raw_mask == raw_mask) {
-            return preset->keycodes[i];
+            return preset->bindings[i];
         }
     }
-    return 0;
+    return binding_make(0, 0);
 }
 
 static void select_next_draft_preset(struct r36sx_key_presets *state,
@@ -965,9 +1086,45 @@ static void start_picker(struct r36sx_key_presets *state, uint8_t mode,
 {
     state->edit_mode = mode;
     state->picker_button = button;
+    state->picker_mods = 0;
     r36sx_screen_keyboard_init(&state->picker_keyboard);
     r36sx_screen_keyboard_set_cursor_block(&state->picker_keyboard, 1);
     r36sx_screen_keyboard_set_visible(&state->picker_keyboard, 1);
+}
+
+static void toggle_picker_mods(struct r36sx_key_presets *state,
+                               uint32_t pressed)
+{
+    if ((pressed & R36SX_RKGAME_KEY_L) != 0) {
+        state->picker_mods ^= R36SX_KEY_PRESET_MOD_SHIFT;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_R) != 0) {
+        state->picker_mods ^= R36SX_KEY_PRESET_MOD_CTRL;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_L2) != 0) {
+        state->picker_mods ^= R36SX_KEY_PRESET_MOD_ALT;
+    }
+}
+
+static const char *picker_mods_label(uint8_t mods, char *buf, size_t buf_size)
+{
+    if (!buf || buf_size == 0) {
+        return "NONE";
+    }
+    buf[0] = '\0';
+    if ((mods & R36SX_KEY_PRESET_MOD_CTRL) != 0) {
+        append_label_part(buf, buf_size, "CTRL");
+    }
+    if ((mods & R36SX_KEY_PRESET_MOD_SHIFT) != 0) {
+        append_label_part(buf, buf_size, "SHIFT");
+    }
+    if ((mods & R36SX_KEY_PRESET_MOD_ALT) != 0) {
+        append_label_part(buf, buf_size, "ALT");
+    }
+    if (buf[0] == '\0') {
+        snprintf(buf, buf_size, "NONE");
+    }
+    return buf;
 }
 
 static void handle_picker_buttons(struct r36sx_key_presets *state,
@@ -977,6 +1134,13 @@ static void handle_picker_buttons(struct r36sx_key_presets *state,
     uint16_t keycode = 0;
     uint32_t result = r36sx_screen_keyboard_handle_picker_buttons(
         &state->picker_keyboard, pressed, held, &keycode);
+
+    if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY &&
+        (pressed & (R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R |
+                    R36SX_RKGAME_KEY_L2)) != 0) {
+        toggle_picker_mods(state, pressed);
+        return;
+    }
 
     if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
         close_picker(state);
@@ -989,7 +1153,8 @@ static void handle_picker_buttons(struct r36sx_key_presets *state,
     if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY) {
         struct r36sx_key_preset *preset = current_draft_preset(state);
         if (preset && state->picker_button < R36SX_KEY_PRESET_BUTTON_COUNT) {
-            preset->keycodes[state->picker_button] = keycode;
+            preset->bindings[state->picker_button] =
+                binding_make(keycode, state->picker_mods);
         }
         close_picker(state);
     } else if (state->edit_mode == R36SX_KEY_PRESET_PICKER_NAME) {
@@ -1169,13 +1334,15 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         int col = button_visual_col(i);
         int row = button_visual_row(i);
         int item = R36SX_KEY_PRESET_BUTTON_ITEM_FIRST + i;
+        char binding[64];
         if (col < 0 || row < 0) {
             continue;
         }
         int draw_x = col == 0 ? x : right_x;
         int draw_y = button_y + row * (row_h + grid_gap);
         snprintf(line, sizeof(line), "%-5s %s", g_buttons[i].label,
-                 choice_label(preset->keycodes[i]));
+                 binding_label(preset->bindings[i], binding,
+                               sizeof(binding)));
         draw_row(state, frame, width, height, stride_pixels, item, draw_x,
                  draw_y, col_w, row_h, line);
     }
@@ -1189,8 +1356,12 @@ void r36sx_key_presets_draw(const struct r36sx_key_presets *state,
         int keyboard_y = r36sx_screen_keyboard_panel_y(height);
         if (state->edit_mode == R36SX_KEY_PRESET_PICKER_KEY &&
             state->picker_button < R36SX_KEY_PRESET_BUTTON_COUNT) {
-            snprintf(line, sizeof(line), "PICK KEY FOR %s  A/Y OK  X/B CANCEL",
-                     g_buttons[state->picker_button].label);
+            char mods[48];
+            snprintf(line, sizeof(line),
+                     "PICK %s MOD:%s  L=SHIFT R=CTRL L2=ALT",
+                     g_buttons[state->picker_button].label,
+                     picker_mods_label(state->picker_mods, mods,
+                                       sizeof(mods)));
         } else {
             snprintf(line, sizeof(line),
                      "RENAME PRESET: %s%s  A/Y TYPE  X/B CANCEL",
