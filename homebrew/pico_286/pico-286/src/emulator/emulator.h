@@ -162,6 +162,11 @@ extern int videomode;
 #define CURSOR_Y FIRST_RAM_PAGE[0x451]
 extern uint8_t cursor_start, cursor_end;
 extern uint32_t vga_palette[256];
+uint8_t vga_dac_6_to_8(uint8_t value);
+uint8_t vga_dac_8_to_6(uint8_t value);
+uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6);
+void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6);
+void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6);
 
 // TGA
 extern uint32_t tga_palette[16];

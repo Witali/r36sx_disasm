@@ -12,6 +12,7 @@ static uint8_t sequencer_register = 0;
 static uint8_t graphics_control_register = 0;
 
 static uint8_t color_index = 0, read_color_index = 0, vga_register;
+static uint8_t dac_write_component = 0, dac_read_component = 0, dac_state = 0;
 static uint8_t attribute_data_mode = 0;
 static uint8_t attribute_controller[0x20];
 static uint8_t dac_mask = 0xFF;
@@ -68,6 +69,35 @@ uint32_t vga_palette[256] = {
 #if PICO_ON_DEVICE
 bool ega_vga_enabled = true;
 #endif
+
+uint8_t vga_dac_6_to_8(uint8_t value) {
+    value &= 0x3Fu;
+    return (uint8_t)((value << 2) | (value >> 4));
+}
+
+uint8_t vga_dac_8_to_6(uint8_t value) {
+    return (uint8_t)(value >> 2);
+}
+
+uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6) {
+    return rgb(vga_dac_6_to_8(red6),
+               vga_dac_6_to_8(green6),
+               vga_dac_6_to_8(blue6));
+}
+
+void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6) {
+    vga_palette[index] = vga_dac_color(red6, green6, blue6);
+#if PICO_ON_DEVICE
+    graphics_set_palette(index, vga_palette[index]);
+#endif
+}
+
+void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6) {
+    uint32_t color = vga_palette[index];
+    *red6 = vga_dac_8_to_6((uint8_t)(color >> 16));
+    *green6 = vga_dac_8_to_6((uint8_t)(color >> 8));
+    *blue6 = vga_dac_8_to_6((uint8_t)color);
+}
 
 // Utility: replicate an 8-bit value into all four bytes of a 32-bit word
 inline static uint32_t expand_to_u32(const uint8_t value) {
@@ -507,6 +537,11 @@ void vga_init(void) {
     vga_latch32 = 0;
     sequencer_register = graphics_control_register = 0;
     attribute_data_mode = 0;
+    color_index = 0;
+    read_color_index = 0;
+    dac_write_component = 0;
+    dac_read_component = 0;
+    dac_state = 0;
     dac_mask = 0xFF;
     misc_output_register = 0x63;
     for (uint8_t i = 0; i < 0x10; i++) {
@@ -570,25 +605,25 @@ void vga_portout(uint16_t portnum, uint16_t value) {
             break;
         case 0x3C7:
             read_color_index = value & 0xff;
+            dac_read_component = 0;
+            dac_state = 3;
             break;
         case 0x3C6:
             dac_mask = value & 0xFFu;
             break;
         case 0x3C8: //color index register (write operations)
             color_index = value & 0xff;
+            dac_write_component = 0;
+            dac_state = 0;
             break;
         case 0x3C9: {
             //RGB data register
             static uint8_t RGB[3] = {0, 0, 0};
-            static uint8_t rgb_index = 0;
 
-            RGB[rgb_index++] = value << 2;
-            if (rgb_index == 3) {
-                vga_palette[color_index++] = rgb(RGB[0], RGB[1], RGB[2]);
-#if PICO_ON_DEVICE
-                graphics_set_palette(color_index - 1, vga_palette[color_index - 1]);
-#endif
-                rgb_index = 0;
+            RGB[dac_write_component++] = value & 0x3Fu;
+            if (dac_write_component == 3) {
+                vga_set_dac_color(color_index++, RGB[0], RGB[1], RGB[2]);
+                dac_write_component = 0;
             }
             break;
         }
@@ -618,21 +653,27 @@ uint16_t vga_portin(uint16_t portnum) {
             return 0;
         case 0x3C5: return vga.sequencer[sequencer_register];
         case 0x3C6: return dac_mask;
+        case 0x3C7:
+            return dac_state;
         case 0x3CC: return misc_output_register;
         case 0x3CF: return vga.graphics_controller[graphics_control_register];
         case 0x3C8:
-            return read_color_index;
+            return color_index;
         case 0x3C9: {
-            static uint8_t rgb_index = 0;
-            switch (rgb_index++) {
+            uint8_t red, green, blue;
+            vga_get_dac_color(read_color_index, &red, &green, &blue);
+            switch (dac_read_component++) {
                 case 0:
-                    return ((vga_palette[read_color_index] >> 18)) & 63;
+                    return red;
                 case 1:
-                    return ((vga_palette[read_color_index] >> 10)) & 63;
+                    return green;
                 case 2:
-                    rgb_index = 0;
-                    return ((vga_palette[read_color_index++] >> 2)) & 63;
+                    dac_read_component = 0;
+                    read_color_index++;
+                    return blue;
             }
+            dac_read_component = 0;
+            return blue;
         }
         default:
             return 0xff;

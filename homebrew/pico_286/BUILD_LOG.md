@@ -1,5 +1,56 @@
 # pico-286 Build Log
 
+## 2026-05-31 VGA DAC palette handling
+
+Fixed VGA DAC palette programming for mode 13h/VGA software that writes the
+palette directly through ports `3C7h`, `3C8h`, and `3C9h`:
+
+- `3C8h` write now resets the DAC write RGB component counter.
+- `3C7h` write now resets the DAC read RGB component counter and switches the
+  DAC state to read mode.
+- `3C9h` write now masks incoming DAC components to 6 bits and expands them to
+  RGB888 with `(value << 2) | (value >> 4)`.
+- `3C9h` read now returns red, green, and blue sequentially and auto-increments
+  the read palette index after blue.
+- BIOS `INT 10h AX=1010h/1012h/1015h/1017h` uses the same DAC helpers.
+  `AX=1012h` and `AX=1017h` now iterate exactly `CX` palette entries, so a
+  full 256-color block starting at index 0 works correctly.
+
+Reference behavior: standard VGA mode 13h palette programming writes the DAC
+start index to `3C8h`, then writes 6-bit red/green/blue components to `3C9h`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+The compiler still reports pre-existing warnings in upstream FPU/audio/pragma
+code.  No new warnings came from the VGA DAC changes.  `zig objcopy
+--strip-all` still returned `error: unimplemented`, so the unstripped binary
+was kept.
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- Size: `1308072` bytes
+- SHA256: `61DE9B773E8814C44D1EDDF626C73B8B29D4BFA794E1EBBD883BAF9E8747B9CB`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.
+
 ## 2026-05-30 compiler warning cleanup
 
 Cleaned up the remaining Pico-286 compile warnings seen in the native R36SX

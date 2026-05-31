@@ -30,6 +30,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 VGA DAC palette handling
+
+The current `pico_286` binary fixes VGA DAC palette programming for mode 13h
+software that writes palette entries through ports `3C7h`, `3C8h`, and `3C9h`.
+
+- DAC write/read component counters are reset when the guest writes `3C8h` or
+  `3C7h`.
+- `3C9h` writes now accept real VGA 6-bit RGB values and expand them to RGB888.
+- `3C9h` reads now return RGB components sequentially and auto-increment after
+  blue.
+- BIOS palette services `INT 10h AX=1010h/1012h/1015h/1017h` use the same DAC
+  helpers, and block set/read now handles `CX=256`.
+
+pico_286 size: 1308072 bytes
+pico_286 SHA256: 61DE9B773E8814C44D1EDDF626C73B8B29D4BFA794E1EBBD883BAF9E8747B9CB
+
 ## 2026-05-30 compiler warning cleanup
 
 The current `pico_286` binary was rebuilt after cleaning the remaining native

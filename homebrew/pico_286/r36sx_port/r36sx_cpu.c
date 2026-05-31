@@ -1572,43 +1572,37 @@ void intcall86(uint8_t intnum) {
                         }
                         case 0x10: {
                             // Set One DAC Color Register
-                            vga_palette[CPU_BL] = rgb((CPU_DH & 63) << 2, (CPU_CH & 63) << 2,
-                                                      (CPU_CL & 63) << 2);
-#if PICO_ON_DEVICE
-                            graphics_set_palette(CPU_BL, vga_palette[CPU_BL]);
-#endif
+                            vga_set_dac_color(CPU_BL, CPU_DH, CPU_CH, CPU_CL);
                             return;
                         }
                         case 0x12: {
                             // set block of DAC color registers               VGA
                             uint32_t memloc = CPU_ES * 16 + CPU_DX;
-                            for (int color_index = CPU_BX; color_index < ((CPU_BX + CPU_CX) & 0xFF); color_index++) {
+                            for (uint16_t i = 0; i < CPU_CX; i++) {
+                                uint8_t color_index = (uint8_t)(CPU_BX + i);
                                 uint8_t red = read86(memloc++);
                                 uint8_t green = read86(memloc++);
                                 uint8_t blue = read86(memloc++);
-                                vga_palette[color_index] =
-                                    rgb((red << 2), (green << 2), (blue << 2));
-#if PICO_ON_DEVICE
-                                graphics_set_palette(color_index, vga_palette[color_index]);
-#endif
+                                vga_set_dac_color(color_index, red, green, blue);
                             }
                             return;
                         }
                         case 0x15: {
                             // Read One DAC Color Register
                             const uint8_t color_index = CPU_BX & 0xFF;
-                            CPU_CL = ((vga_palette[color_index] >> 2)) & 63;
-                            CPU_CH = ((vga_palette[color_index] >> 10)) & 63;
-                            CPU_DH = ((vga_palette[color_index] >> 18)) & 63;
+                            vga_get_dac_color(color_index, &CPU_DH, &CPU_CH, &CPU_CL);
                             return;
                         }
                         case 0x17: {
                             // Read a Block of DAC Color Registers
                             uint32_t memloc = CPU_ES * 16 + CPU_DX;
-                            for (int color_index = CPU_BX; color_index < ((CPU_BX + CPU_CX) & 0xFF); color_index++) {
-                                write86(memloc++, ((vga_palette[color_index] >> 2)) & 63);
-                                write86(memloc++, ((vga_palette[color_index] >> 10)) & 63);
-                                write86(memloc++, ((vga_palette[color_index] >> 18)) & 63);
+                            for (uint16_t i = 0; i < CPU_CX; i++) {
+                                uint8_t color_index = (uint8_t)(CPU_BX + i);
+                                uint8_t red, green, blue;
+                                vga_get_dac_color(color_index, &red, &green, &blue);
+                                write86(memloc++, red);
+                                write86(memloc++, green);
+                                write86(memloc++, blue);
                             }
                             return;
                         }

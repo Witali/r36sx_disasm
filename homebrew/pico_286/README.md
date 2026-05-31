@@ -77,6 +77,11 @@ directory is only for compiler output:
 - `r36sx_ports.c` routes OPL output through a temporary `int32_t` sample buffer
   before clamping to the emulator's `int16_t` stereo buffer, avoiding the
   upstream host cast from `int16_t *` to `int32_t *` on MIPS.
+- VGA DAC palette writes are handled with explicit `3C7h`/`3C8h`/`3C9h`
+  read/write state.  Mode 13h programs can set 256-color palettes with 6-bit
+  RGB components either through direct DAC ports or BIOS
+  `INT 10h AX=1010h/1012h`, and reads through `AX=1015h/1017h` return the same
+  6-bit component order.
 
 Default input mapping:
 
