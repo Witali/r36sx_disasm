@@ -13,6 +13,17 @@
   `LGDT`/`LIDT`, `LLDT`/`LTR`, `MOV CR0`/`LMSW`, and the first protected-mode
   fault or unsupported opcode.  This should distinguish "DPMI host missing"
   from "raw 386 protected-mode switch failed".
+- [x] Add first-pass protected exception delivery with Intel-style error-code
+  pushes for protected IDT trap/interrupt gates.  This is same-ring only for
+  now; ring transitions, task gates, and double-fault escalation still need
+  work.
+- [x] Add first-pass CPL/DPL/RPL checks for CS, SS, and data segment loads, plus
+  common segment type/limit checks for `readrm*` / `writerm*` memory operands.
+- [x] Add first-pass 80386 paging translation for CPU linear accesses when
+  `CR0.PG` is set.  It uses CR3, PDE/PTE present checks, CR2, and accessed/dirty
+  bits.  It still needs stronger integration with instruction restart,
+  privilege-transition stacks, task switches, and page faults during descriptor
+  walks.
 - [ ] Implement enough DPMI detection for DOS extenders.  `INT 2Fh AX=1687h`
   should report a DPMI entry point when a host is enabled, including 32-bit
   support, processor type, DPMI version, private data size, and the real-mode

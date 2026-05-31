@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-31 protected-mode paging and exception groundwork
+
+Added the next protected-mode CPU layer against the Intel 80386 protected-mode
+model:
+
+- protected exceptions can now push Intel-style error codes through the
+  protected IDT path;
+- segment loads validate basic CPL/DPL/RPL privilege rules for CS, SS, and data
+  segment registers;
+- CR0 rejects `PG=1` while `PE=0` with a general-protection exception;
+- CPU linear memory accesses now pass through a basic 80386 two-level paging
+  translator when `CR0.PG` is set, using CR3, PDE/PTE present checks, CR2, and
+  accessed/dirty bits;
+- common `readrm*`/`writerm*` memory operands now perform segment type and limit
+  checks before touching memory.
+
+This is still not a complete protected-mode kernel model: call gates, task
+gates, hardware task switching, ring-changing IRET, v86, and a DPMI host remain
+future work.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+Result:
+
+- `pico_286` size: `436136` bytes
+- `pico_286` SHA256:
+  `142F9C8EF68F17AA16917C37330EB24D09E5A4D017A079DBF911A0C4623649FE`
+
+Verification: rebuilt only the normal WSL/GCC binary, copied it to
+`disk_image` and the Pico-286 patch, and scanned all three `pico_286` copies
+with `tools/scan-download.ps1`; Defender found no threats.  DSP side builds
+remain paused and were not rebuilt.
+
 ## 2026-05-31 DSP side build paused
 
 The experimental MIPS DSP Rev2 side build is paused.  From this point, normal

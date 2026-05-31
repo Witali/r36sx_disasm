@@ -37,6 +37,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 protected-mode paging and exception groundwork
+
+The patch binary now includes the next protected-mode CPU layer: protected
+exceptions with error-code pushes, basic CPL/DPL/RPL checks for segment loads,
+CR0 `PG` validation, basic 80386 CR3/PDE/PTE paging translation with CR2, and
+segment type/limit checks for common memory operands.  This is not yet a full
+DPMI/task-gate/ring-transition implementation.
+
+```text
+pico_286 size: 436136 bytes
+pico_286 SHA256: 142F9C8EF68F17AA16917C37330EB24D09E5A4D017A079DBF911A0C4623649FE
+Defender scan: found no threats
+```
+
 ## 2026-05-31 HMA request/release support
 
 The patch binaries now implement XMS High Memory Area ownership instead of
