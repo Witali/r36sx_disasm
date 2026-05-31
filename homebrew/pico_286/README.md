@@ -348,9 +348,11 @@ executable.  It contains PCjs `ID.COM` and `TEST386.COM` CPU/protected-mode
 tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `TEST386.BIN`.
 `TEST386.BIN` is the R36SX debug build of
 `homebrew/pico_286/tests/test386.asm`, configured with `DEBUG=1`, ASCII output
-port `191h`, and standard POST port `80h`.  Pico-286 also still accepts the
-legacy R36SX test POST port `190h`.  Pico-286 logs those ports to
-`pico_286.log`.
+port `191h`, standard POST port `80h`, and `VGA_DEBUG=1`.  Pico-286 also still
+accepts the legacy R36SX test POST port `190h`.  Pico-286 logs those ports to
+`pico_286.log`.  The BIOS payload also writes short top-left VGA breadcrumbs
+for the early `POST 01` diagnostics: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
+`LOOPNZ`.
 
 Boot FreeDOS from `FreeDOS1.img`, mount `cpu_tests.img` as `B:` from the disk
 menu or set `fdd1=cpu_tests.img`, then run `B:`, `ID`,

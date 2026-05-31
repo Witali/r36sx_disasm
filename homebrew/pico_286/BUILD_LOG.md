@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-05-31 test386 VGA breadcrumbs
+
+Added direct VGA text-memory breadcrumbs to the R36SX `test386.asm` BIOS
+payload.  The ROM now writes short markers to `B800:0000` while running the
+early `POST 01` branch/loop diagnostics:
+
+- `JCC8`
+- `JCC16`
+- `LOOP`
+- `LOOPZ`
+- `LOOPNZ`
+
+The active breadcrumbs use only `MOV` stores into VGA text memory, so they do
+not call BIOS services or DOS.  Finer-grained Jcc breadcrumbs are left compiled
+out because inserting bytes inside the upstream Jcc macro changes the rel8
+branch distances being tested.  If the test ROM stops at `POST 080:01`, the
+top-left VGA marker narrows the failure to the last displayed subtest.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+```
+
+Result:
+
+- `test386.bin` size: `65536` bytes
+- `test386.bin` SHA256:
+  `CD75263B4D856EF0AC03FC2B9718A0D2C51290DD98B080E8AC48B29F989E7F66`
+- `images/cpu_tests.img` size: `1474560` bytes
+- `images/cpu_tests.img` SHA256:
+  `1B3B5B663E7B7D03BCC24E002052A52B22573A5EB1D09F3EF229B0309106F81E`
+
+Verification:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\test386.bin
+.\tools\scan-download.ps1 .\homebrew\pico_286\images\cpu_tests.img
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 experimental MIPS DSP framebuffer build
 
 Added an experimental WSL/GCC build mode for MIPS DSP ASE Rev2:

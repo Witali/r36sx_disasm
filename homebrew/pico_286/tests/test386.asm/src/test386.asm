@@ -133,6 +133,7 @@ cpuTest:
 	mov ds, dx
 	mov dx, D2_SEG_REAL
 	mov es, dx
+	VGA_TRACE 'T386 00 real init       '
 
 
 ;-------------------------------------------------------------------------------
@@ -141,8 +142,11 @@ cpuTest:
 ;
 ;   Conditional jumps
 ;
+	VGA_TRACE 'T386 01 JCC LOOP        '
 %include "tests/jcc_m.asm"
+	VGA_TRACE_LINE 'JCC8    '
 	testJcc 8
+	VGA_TRACE_LINE 'JCC16   '
 	testJcc 16
 
 ;
@@ -161,6 +165,7 @@ cpuTest:
 ;   Quick tests of unsigned 32-bit multiplication and division
 ;   Thorough arithmetical and logical tests are done later
 ;
+	VGA_TRACE 'T386 02 IMUL MUL DIV    '
 	mov    eax, 0x80000001
 	imul   eax
 	mov    eax, 0x44332211

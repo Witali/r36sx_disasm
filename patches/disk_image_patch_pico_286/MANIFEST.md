@@ -36,6 +36,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 test386 VGA breadcrumbs
+
+The patch includes a rebuilt `test386.bin` BIOS payload and matching
+`images/cpu_tests.img`.  The R36SX `test386.asm` build now uses
+`VGA_DEBUG=1` and writes short top-left VGA text breadcrumbs during the early
+`POST 01` branch/loop diagnostics: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
+`LOOPNZ`.  These are direct writes to `B800:0000`; they do not depend on DOS or
+`INT 10h`.
+
+test386.bin size: 65536 bytes
+test386.bin SHA256: CD75263B4D856EF0AC03FC2B9718A0D2C51290DD98B080E8AC48B29F989E7F66
+
+images/cpu_tests.img size: 1474560 bytes
+images/cpu_tests.img SHA256: 1B3B5B663E7B7D03BCC24E002052A52B22573A5EB1D09F3EF229B0309106F81E
+
 ## 2026-05-31 experimental MIPS DSP framebuffer build
 
 The patch now includes a side-by-side `pico_286.dsp` binary built with

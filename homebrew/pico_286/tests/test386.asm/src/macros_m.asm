@@ -8,6 +8,44 @@
 %endmacro
 
 ;
+; Writes a single diagnostic breadcrumb directly to VGA text memory.
+; This macro intentionally emits only MOV instructions, so it does not depend on
+; CALL/RET, stack state, LOOP, or Jcc, and it does not change CPU flags. AX and
+; GS are clobbered. Use it before a tiny test step; if the ROM stops there, the
+; displayed breadcrumb is the current suspect.
+;
+VGA_TRACE_SEG    equ 0xb800
+VGA_TRACE_OFFSET equ 0
+VGA_TRACE_ATTR   equ 0x0f
+
+; Fine-grained traces inside the Jcc macro are intentionally compiled out:
+; inserting bytes between short-branch instructions and their labels changes
+; the rel8 distances being tested.
+%macro VGA_TRACE 1
+%endmacro
+
+%macro VGA_TRACE_LINE 1
+%if VGA_DEBUG
+	%strlen %%len %1
+	mov ax, VGA_TRACE_SEG
+	mov gs, ax
+	%assign %%i 1
+	%rep (%%len + 1) / 2
+		%substr %%ch1 %1 %%i 1
+		%if %%i < %%len
+			%substr %%ch2 %1 %%i + 1 1
+		%else
+			%define %%ch2 ' '
+		%endif
+		mov dword [gs:VGA_TRACE_OFFSET + ((%%i - 1) / 2) * 4], \
+			((VGA_TRACE_ATTR << 8) | %%ch1) | \
+			(((VGA_TRACE_ATTR << 8) | %%ch2) << 16)
+		%assign %%i %%i + 2
+	%endrep
+%endif
+%endmacro
+
+;
 ; Initializes an interrupt gate in system memory.
 ; This is the body of procedures used in 16 and 32-bit code segments.
 ;

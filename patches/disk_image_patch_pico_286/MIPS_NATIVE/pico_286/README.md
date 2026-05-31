@@ -223,6 +223,9 @@ then run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug
 build of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM,
 not a DOS `.COM` program; Pico-286 currently stores it as a payload/reference
 and logs its configured debug ports `80h`/`191h` when it is loaded as a ROM.
+The current R36SX build also writes short top-left VGA breadcrumbs during the
+early `POST 01` branch/loop tests: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
+`LOOPNZ`.
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 

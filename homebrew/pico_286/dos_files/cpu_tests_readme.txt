@@ -18,7 +18,8 @@ TEST386.BIN
   The source is in homebrew/pico_286/tests/test386.asm. This build enables
   DEBUG, writes ASCII output to port 0191h, and writes POST codes to the
   standard POST port 0080h. The Pico-286 port logs those ports to
-  pico_286.log.
+  pico_286.log. It also writes short VGA breadcrumbs at B800:0000 during
+  early POST 01 tests: JCC8, JCC16, LOOP, LOOPZ, and LOOPNZ.
 
 CPUID.ASM
 ID.ASM

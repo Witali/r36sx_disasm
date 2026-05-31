@@ -53,6 +53,10 @@ IBM_PS1 equ 0
 ; debugging).
 DEBUG equ 1
 
+; Enable direct text breadcrumbs in VGA text memory at B800:0000. This is useful
+; when the emulator stalls before the OUT_PORT debug log becomes informative.
+VGA_DEBUG equ 1
+
 ; Enable additional tests using a 128KB ROM.
 ROM128 equ 0
 

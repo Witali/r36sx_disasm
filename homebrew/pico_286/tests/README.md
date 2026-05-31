@@ -14,10 +14,15 @@ The R36SX copy is configured in `test386.asm/src/configuration.asm` with:
 - `POST_PORT equ 0x80`
 - `OUT_PORT equ 0x191`
 - `DEBUG equ 1`
+- `VGA_DEBUG equ 1`
 
 Pico-286 captures standard POST writes to `80h`, keeps legacy support for the
 older R36SX `190h` test port, and logs output-port text from `191h` as
 `test386:` lines in `pico_286.log`.
+
+With `VGA_DEBUG` enabled, the ROM also writes short breadcrumbs directly to
+VGA text memory at `B800:0000` during the early `POST 01` branch/loop tests:
+`JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and `LOOPNZ`.
 
 Build the ROM payload with:
 

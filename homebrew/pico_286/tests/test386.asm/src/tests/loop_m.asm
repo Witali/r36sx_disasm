@@ -5,6 +5,7 @@
 
 %macro testLoop 0
 
+	VGA_TRACE_LINE 'LOOP    '
 	mov ecx, 0x20000
 	mov eax, 0
 %%loop16:
@@ -15,6 +16,7 @@
 	cmp ecx, 0x20000
 	jne error
 
+	VGA_TRACE 'T386 01 LOOP a32 count 20000h       '
 	mov ecx, 0x20000
 	mov eax, 0
 %%loop32:
@@ -29,6 +31,7 @@
 
 %macro testLoopZ 0
 
+	VGA_TRACE_LINE 'LOOPZ   '
 	mov cx, 0xFFFF
 	mov ax, 0
 %%loop16a:
@@ -40,6 +43,7 @@
 	cmp cx, 0xFEFF
 	jne error
 
+	VGA_TRACE 'T386 01 LOOPZ a16 stop on CX=0      '
 	mov cx, 0x00FF
 	mov ax, 0
 %%loop16b:
@@ -51,6 +55,7 @@
 	cmp cx, 0
 	jne error
 
+	VGA_TRACE 'T386 01 LOOPZ a32 stop on ZF=0      '
 	mov ecx, 0x20000
 	mov eax, 0
 %%loop32:
@@ -66,6 +71,7 @@
 
 %macro testLoopNZ 0
 
+	VGA_TRACE_LINE 'LOOPNZ  '
 	mov cx, 0xFFFF
 	mov ax, 0
 %%loop16a:
@@ -77,6 +83,7 @@
 	cmp cx, 0xFEFF
 	jne error
 
+	VGA_TRACE 'T386 01 LOOPNZ a16 stop on CX=0     '
 	mov cx, 0x00FF
 	mov ax, 0
 %%loop16b:
@@ -88,6 +95,7 @@
 	cmp cx, 0
 	jne error
 
+	VGA_TRACE 'T386 01 LOOPNZ a32 stop on ZF=1     '
 	mov ecx, 0x10000
 	mov eax, 0
 %%loop32:
