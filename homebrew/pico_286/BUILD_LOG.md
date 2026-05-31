@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard left alignment
+
+Updated the shared on-screen keyboard layout to better match a physical PC
+keyboard:
+
+- Main rows are now left-aligned, so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and
+  left `CTRL` share the same left edge.
+- `SHIFT` is shown with its full label instead of `SHF`.
+- Added `WIN` between left `CTRL` and left `ALT`.
+- Added `MENU` between right `ALT` and `CLS`.
+- Stretched `SPC` across the remaining bottom-row space.
+- Nudged the function-key grouping so the `F10`/`F11` split aligns with the
+  `=`/Backspace split.
+- Added Pico-286 scancode emission for `WIN` (`E0 5B`) and context menu
+  (`E0 5D`).  These keys are also available in the key-preset picker.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `454012` bytes
+- `pico_286` SHA256:
+  `29EEEADB7F8722ED6D8093107154CF71C66A9875EEC87D14B5D78F5024992D0F`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 VBE 640x480 modes and BIOS services
 
 Expanded the minimal VBE implementation:

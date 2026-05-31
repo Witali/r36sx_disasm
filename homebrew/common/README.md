@@ -63,11 +63,16 @@ cluster to the right side of the keyboard.  The main keys are narrowed to keep
 the whole keyboard inside the same panel, and the cursor keys use a physical
 inverted-T layout with Up above Left/Down/Right.
 
+The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
+`CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row
+includes `WIN`, a stretched `SPC`, and a context `MENU` key; host applications
+can map these emitted Windows-like keycodes as needed.
+
 Current physical button bindings while the keyboard is visible:
 
 - D-pad moves the highlighted key.
 - Holding a D-pad direction repeats movement after a short delay.
-- L or R switches between the normal layout and the symbol layout.
+- L holds Shift and R holds Ctrl while the physical trigger is held.
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Y sends Enter immediately.
@@ -75,4 +80,4 @@ Current physical button bindings while the keyboard is visible:
 - Select closes the keyboard.
 
 Holding A, Start, B, X, or Y repeats the emitted key after a short delay.
-Shift is still available as the on-screen `SHF` key.
+Shift is still available as the on-screen `SHIFT` key.

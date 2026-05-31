@@ -1163,6 +1163,8 @@ static int r36sx_mfb_key_is_repeatable(uint16_t keycode)
     case R36SX_SCREEN_KEY_SHIFT:
     case R36SX_SCREEN_KEY_CONTROL:
     case R36SX_SCREEN_KEY_MENU:
+    case R36SX_SCREEN_KEY_LWIN:
+    case R36SX_SCREEN_KEY_APPS:
         return 0;
     default:
         return keycode > 0 && keycode < 256;

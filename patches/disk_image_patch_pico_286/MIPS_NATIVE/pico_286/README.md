@@ -69,8 +69,12 @@ The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
 DOS keyboard uses a PC-style layout with Esc/F1-F12 on the top row and a
 right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
-right-aligned, with grouped gaps in the function-key row and key widths limited
-to `1`, `1.5`, `2`, and `2.5` units.  Shift also changes the
+left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
+same left edge.  The bottom row includes `CTRL WIN ALT`, a wide `SPC`, then
+`ALT MENU CLS CTRL`; `WIN` and `MENU` send the PC extended scancodes `E0 5B`
+and `E0 5D`.  The function-key row keeps grouped gaps, with the late group
+nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
+also changes the
 visible labels: letters switch between lowercase and uppercase, while the
 number row switches to `!@#$%^&*()`.  Taller key rows scroll inside the fixed
 bottom panel, with a small scrollbar at the right edge.  The keyboard panel is

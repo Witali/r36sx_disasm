@@ -37,6 +37,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard left alignment
+
+The patch binary now draws the on-screen keyboard rows from a shared left edge:
+`ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` line up vertically.
+`SHIFT` uses its full label, the bottom row now includes `CTRL WIN ALT`,
+a much wider `SPC`, then `ALT MENU CLS CTRL`, and the late function-key group
+is nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.
+
+The new `WIN` and `MENU` keys emit PC extended scancodes `E0 5B` and `E0 5D`
+and are available in the key-preset picker.
+
+```text
+pico_286 size: 454012 bytes
+pico_286 SHA256: 29EEEADB7F8722ED6D8093107154CF71C66A9875EEC87D14B5D78F5024992D0F
+Defender scan: found no threats
+```
+
 ## 2026-06-01 VBE 640x480 modes and BIOS services
 
 The patch binary now supports native-size banked VBE modes:

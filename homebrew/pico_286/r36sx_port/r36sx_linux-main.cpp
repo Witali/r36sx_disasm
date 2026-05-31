@@ -1069,6 +1069,10 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // Alt
         case 20: scancode = 0x3A;
             break; // Caps Lock
+        case R36SX_SCREEN_KEY_LWIN: scancode = 0x5B; extended = 1;
+            break; // Left Windows
+        case R36SX_SCREEN_KEY_APPS: scancode = 0x5D; extended = 1;
+            break; // Context menu
         case 33: scancode = 0x49; extended = 1;
             break; // Page Up
         case 34: scancode = 0x51; extended = 1;

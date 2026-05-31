@@ -96,6 +96,8 @@ static const struct r36sx_key_choice g_choices[] = {
     { "CTRL", R36SX_SCREEN_KEY_CONTROL },
     { "ALT", R36SX_SCREEN_KEY_MENU },
     { "SHIFT", R36SX_SCREEN_KEY_SHIFT },
+    { "WIN", R36SX_SCREEN_KEY_LWIN },
+    { "MENU", R36SX_SCREEN_KEY_APPS },
     { "TAB", R36SX_SCREEN_KEY_TAB },
     { "BACK", R36SX_SCREEN_KEY_BACK },
     { "DEL", R36SX_SCREEN_KEY_DELETE },
