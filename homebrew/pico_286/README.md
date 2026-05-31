@@ -199,6 +199,9 @@ cpu_model=80386
 cpu_mode=real
 cpu_mhz=32.768
 
+[timing]
+target_fps=60
+
 [boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
@@ -258,6 +261,13 @@ not complete yet, so keep `cpu_mode=real` for normal DOS use.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
 millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
+
+`target_fps` controls the main-loop frame budget.  At the default `60`, the
+active part of each host frame targets about 16.7 ms.  Pico-286 now adapts the
+`exec86()` instruction quantum every frame: when the active frame is too slow,
+it estimates the quantum that would fit the target budget and steps down by at
+most one quarter; when there is spare time, it grows back by one quarter up to
+the `cpu_mhz` limit.  The quantum never drops below 100 instructions.
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
 maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,

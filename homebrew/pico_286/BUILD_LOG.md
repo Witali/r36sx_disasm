@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-05-31 adaptive exec86 quantum and target FPS
+
+Added adaptive main-loop CPU quantum control for the R36SX native build.
+
+- `pico_286.conf` now has a `[timing]` section with `target_fps=60`.
+- The main-loop frame budget is derived from `target_fps`, so the old 16.6 ms
+  frame time is no longer a hard-coded magic value.
+- The initial maximum quantum is still derived from `cpu_mhz`.
+- If an active frame exceeds the target budget, the loop estimates the quantum
+  that would fit and steps downward by at most one quarter of the current
+  value.
+- If an active frame has spare time, the loop grows the quantum by one quarter
+  back toward the `cpu_mhz`-derived limit.
+- The quantum is clamped to at least 100 `exec86()` instructions per frame.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.  The compiler emitted one pre-existing upstream
+warning from `#pragma GCC optimize("Ofast")` in `xms.c`.
+
+Result:
+
+- `pico_286` size: `1332016` bytes
+- `pico_286` SHA256:
+  `4D8F4D8C89C6E5BDA4831D375B2449A4C246FF0702CB3084C994F960F6F71604`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 disk image directory migration
 
 Moved Pico-286 disk images into an `images/` subdirectory so they no longer

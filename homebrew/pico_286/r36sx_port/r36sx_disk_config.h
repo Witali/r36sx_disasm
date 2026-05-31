@@ -60,6 +60,9 @@ int r36sx_pico286_save_config(void);
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 
+// Return the configured main loop target FPS.
+uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps);
+
 // Return the configured CPU compatibility model.
 r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void);
 

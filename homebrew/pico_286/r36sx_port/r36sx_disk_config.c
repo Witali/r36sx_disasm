@@ -20,6 +20,8 @@
 #define R36SX_PICO286_MAX_CACHE_FLUSH_MS 60000UL
 #define R36SX_PICO286_MIN_PROFILE_LOG_MS 500UL
 #define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
+#define R36SX_PICO286_MIN_TARGET_FPS 1UL
+#define R36SX_PICO286_MAX_TARGET_FPS 240UL
 #define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
 #define R36SX_PICO286_MAX_CONVENTIONAL_KB 640UL
 #define R36SX_PICO286_MIN_UPPER_KB 0UL
@@ -66,6 +68,7 @@ static char disk_cache_flush_ms_text[16] = "2000";
 static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char app_stats_enabled_text[8] = "1";
+static char target_fps_text[16] = "60";
 static char screenshot_format_text[8] = "png";
 static char conventional_memory_kb_text[16] = "640";
 static char upper_memory_kb_text[16] = "176";
@@ -82,6 +85,7 @@ static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int app_stats_enabled = 1;
+static uint32_t target_fps = 60u;
 static uint32_t conventional_memory_kb = 640u;
 static uint32_t upper_memory_kb = 176u;
 static uint32_t extended_memory_kb = 64u;
@@ -663,6 +667,26 @@ static int set_app_stats_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_timing_value(const char *key, const char *value, int line_no)
+{
+    if (key_equals(key, "target_fps") ||
+        key_equals(key, "main_loop_fps") ||
+        key_equals(key, "frame_rate") ||
+        key_equals(key, "fps")) {
+        return set_disk_cache_uint(
+            key, value,
+            R36SX_PICO286_MIN_TARGET_FPS,
+            R36SX_PICO286_MAX_TARGET_FPS,
+            &target_fps,
+            target_fps_text,
+            sizeof(target_fps_text),
+            1UL,
+            line_no);
+    }
+
+    return 0;
+}
+
 static int set_memory_value(const char *key, const char *value, int line_no)
 {
     if (key_equals(key, "conventional_kb") ||
@@ -907,6 +931,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
+    if (set_timing_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_memory_value(key, value, line_no)) {
         return 1;
     }
@@ -1095,6 +1122,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "cpu_mode=%s\n", cpu_mode_text);
     fprintf(fp, "cpu_mhz=%s\n\n", cpu_mhz_text);
 
+    fprintf(fp, "# Main loop timing. target_fps sets the frame budget used by\n");
+    fprintf(fp, "# adaptive exec86 quantum control and display pacing.\n");
+    fprintf(fp, "[timing]\n");
+    fprintf(fp, "target_fps=%s\n\n", target_fps_text);
+
     fprintf(fp, "# Boot behavior and boot-sector probe order.\n");
     fprintf(fp, "[boot]\n");
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
@@ -1172,6 +1204,13 @@ uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
     load_disk_config();
 
     return cpu_exec_loops ? cpu_exec_loops : fallback_loops;
+}
+
+uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps)
+{
+    load_disk_config();
+
+    return target_fps ? target_fps : fallback_fps;
 }
 
 r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void)

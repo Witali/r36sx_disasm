@@ -32,6 +32,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 adaptive exec86 quantum and target FPS
+
+The current `pico_286` binary adds adaptive main-loop CPU quantum control.
+
+- `pico_286.conf` now contains `[timing] target_fps=60`.
+- The target frame budget is derived from `target_fps` instead of a hard-coded
+  16 ms value.
+- The maximum `exec86()` quantum is still derived from `cpu_mhz`.
+- Slow active frames reduce the quantum toward the budget by at most one
+  quarter per frame.
+- Fast active frames grow the quantum back by one quarter per frame.
+- The minimum quantum is 100 instructions per frame.
+
+pico_286 size: 1332016 bytes
+pico_286 SHA256: 4D8F4D8C89C6E5BDA4831D375B2449A4C246FF0702CB3084C994F960F6F71604
+
 ## 2026-05-31 disk image directory migration
 
 All Pico-286 `.img` files in the patch are now stored under
