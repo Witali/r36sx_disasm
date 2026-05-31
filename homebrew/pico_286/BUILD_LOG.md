@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-05-31 configurable scaling filter
+
+Added a configurable scaling filter for cases where the DOS image is resized
+by the R36SX MiniFB layer.
+
+- `pico_286.conf` now has `[video] scaling_filter=nearest`.
+- Supported values are `nearest` and `bilinear`.
+- `nearest` is the default and keeps sharp pixel edges.
+- `bilinear` blends neighboring source rows when the DOS image is compressed
+  under large overlays such as the on-screen keyboard.
+- `r36sx_pico286_save_config()` preserves the setting when rewriting config.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1337836` bytes
+- `pico_286` SHA256:
+  `0006C7F8D02D7F726CCEDEB8D7D2D1AD7853032B78BDFA85110A2D884C5C39E3`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 CRTC stride for tweaked VGA modes
 
 Updated the R36SX renderer to respect VGA CRTC row layout for graphics modes.

@@ -183,11 +183,12 @@ and bottom screen borders.  The header/status text stays at the top of the
 panel, while the key rows use a one-pixel inner gap from the panel border on
 the left, right, and bottom edges.  A pressed virtual key shifts down-right and
 darkens until the physical button is released.
-The DOS screen is vertically compressed into the remaining top 384 pixels with
-a halftone-style area filter instead of being covered by the keyboard.  The
-compression uses the active height of the current emulated video mode rather
-than the whole 640x480 buffer, so normal DOS text mode compresses its 400 drawn
-rows and does not waste space scaling the black margin below the text area.
+The DOS screen is vertically compressed into the remaining top 384 pixels
+instead of being covered by the keyboard.  The compression uses the active
+height of the current emulated video mode rather than the whole 640x480 buffer,
+so normal DOS text mode compresses its 400 drawn rows and does not waste space
+scaling the black margin below the text area.  The scaling filter is
+configurable with `scaling_filter=nearest` or `scaling_filter=bilinear`.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
 `pico_286.conf` lives next to the executable and maps image files from the
@@ -201,6 +202,9 @@ cpu_mhz=32.768
 
 [timing]
 target_fps=60
+
+[video]
+scaling_filter=nearest
 
 [boot]
 boot_mode=normal
@@ -269,6 +273,11 @@ estimates the quantum that would fit the target budget and steps down by at
 most one quarter; when there is spare CPU time, it grows back by one quarter up
 to the `cpu_mhz` limit.  Rendering overlays such as the on-screen keyboard do
 not reduce the CPU quantum.  The quantum never drops below 1000 instructions.
+
+`scaling_filter` controls how the DOS image is resized when a large overlay,
+such as the on-screen keyboard, leaves less than the full display height for
+the emulated screen.  `nearest` keeps hard pixel edges and is the default.
+`bilinear` blends neighboring source rows for smoother scaled text/graphics.
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
 maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,

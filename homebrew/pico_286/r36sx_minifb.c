@@ -93,6 +93,7 @@ struct r36sx_mfb_driver {
     uint8_t fn_help_visible;
     int base_content_h;
     int base_source_h;
+    r36sx_pico286_scaling_filter_t base_scaling_filter;
     uint32_t base_generation;
     uint32_t presented_generation;
     uint32_t screenshot_counter;
@@ -1162,67 +1163,118 @@ static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
            r36sx_mfb_screenshot_toast_visible(now_ms);
 }
 
+static int r36sx_mfb_nearest_source_y(int dst_y, int dst_h, int src_h)
+{
+    int sy = (int)(((int64_t)(2 * dst_y + 1) * src_h) /
+                   ((int64_t)2 * dst_h));
+
+    if (sy < 0) {
+        return 0;
+    }
+    if (sy >= src_h) {
+        return src_h - 1;
+    }
+    return sy;
+}
+
+static void r36sx_mfb_copy_scaled_nearest(uint16_t *src, int content_h,
+                                          int source_h)
+{
+    for (int y = 0; y < content_h; y++) {
+        int sy = r36sx_mfb_nearest_source_y(y, content_h, source_h);
+        const uint16_t *src_row =
+            src + (size_t)sy * (size_t)g_mfb.width;
+        uint16_t *dst_row =
+            g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
+
+        memcpy(dst_row, src_row, (size_t)g_mfb.width * sizeof(dst_row[0]));
+    }
+}
+
+static void r36sx_mfb_copy_scaled_bilinear(uint16_t *src, int content_h,
+                                           int source_h)
+{
+    for (int y = 0; y < content_h; y++) {
+        int64_t pos_num =
+            ((int64_t)(2 * y + 1) * source_h) - content_h;
+        int sy0;
+        int sy1;
+        uint32_t frac;
+        const uint16_t *src_row0;
+        const uint16_t *src_row1;
+        uint16_t *dst_row =
+            g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
+
+        if (pos_num <= 0) {
+            sy0 = 0;
+            frac = 0;
+        } else {
+            uint64_t pos_fp =
+                ((uint64_t)pos_num << 16) /
+                ((uint64_t)2 * (uint64_t)content_h);
+            sy0 = (int)(pos_fp >> 16);
+            frac = (uint32_t)(pos_fp & 0xffffu);
+        }
+
+        if (sy0 >= source_h - 1) {
+            sy0 = source_h - 1;
+            memcpy(dst_row,
+                   src + (size_t)sy0 * (size_t)g_mfb.width,
+                   (size_t)g_mfb.width * sizeof(dst_row[0]));
+            continue;
+        }
+
+        sy1 = sy0 + 1;
+        src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
+        src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
+
+        if (frac == 0) {
+            memcpy(dst_row, src_row0,
+                   (size_t)g_mfb.width * sizeof(dst_row[0]));
+            continue;
+        }
+
+        for (int x = 0; x < g_mfb.width; x++) {
+            dst_row[x] = r36sx_mfb_blend_rgb565(
+                src_row0[x], src_row1[x],
+                0x10000u - frac, frac, 0x10000u);
+        }
+    }
+}
+
 static void r36sx_mfb_copy_source(uint16_t *src, int content_h,
-                                  int source_h)
+                                  int source_h,
+                                  r36sx_pico286_scaling_filter_t filter)
 {
     int keyboard_visible = r36sx_screen_keyboard_is_visible(&g_mfb.osk);
     int rows_to_copy = content_h;
+
+    if (content_h <= 0 || source_h <= 0) {
+        return;
+    }
 
     if (!keyboard_visible) {
         rows_to_copy = r36sx_pico286_video_active_height();
         if (rows_to_copy <= 0 || rows_to_copy > g_mfb.height) {
             rows_to_copy = g_mfb.height;
         }
-    }
-
-    for (int y = 0; y < rows_to_copy; y++) {
-        uint16_t *dst_row =
-            g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
-
-        if (keyboard_visible) {
-            int start = y * source_h;
-            int end = (y + 1) * source_h;
-            int sy0 = start / content_h;
-            int sy1 = (end - 1) / content_h;
-            int weight0;
-            int weight1;
-            const uint16_t *src_row0;
-            const uint16_t *src_row1;
-
-            if (sy1 >= source_h) {
-                sy1 = source_h - 1;
-            }
-            weight0 = (sy0 + 1) * content_h - start;
-            if (weight0 > source_h) {
-                weight0 = source_h;
-            }
-            if (sy0 == sy1) {
-                weight1 = 0;
-                weight0 = source_h;
-            } else {
-                weight1 = source_h - weight0;
-            }
-
-            src_row0 = src + (size_t)sy0 * (size_t)g_mfb.width;
-            src_row1 = src + (size_t)sy1 * (size_t)g_mfb.width;
-            if (source_h == 480 && content_h == 384) {
-                uint32_t w0 = (uint32_t)(weight0 / 96);
-                uint32_t w1 = (uint32_t)(weight1 / 96);
-                for (int x = 0; x < g_mfb.width; x++) {
-                    dst_row[x] = r36sx_mfb_blend_rgb565(src_row0[x],
-                                                        src_row1[x],
-                                                        w0, w1, 5u);
-                }
-            } else {
-                for (int x = 0; x < g_mfb.width; x++) {
-                    dst_row[x] = r36sx_mfb_blend_rgb565(
-                        src_row0[x], src_row1[x], (uint32_t)weight0,
-                        (uint32_t)weight1, (uint32_t)source_h);
-                }
-            }
-        } else {
+        for (int y = 0; y < rows_to_copy; y++) {
             const uint16_t *src_row = src + (size_t)y * (size_t)g_mfb.width;
+            uint16_t *dst_row =
+                g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width;
             memcpy(dst_row, src_row, (size_t)g_mfb.width * sizeof(dst_row[0]));
+        }
+    } else {
+        if (content_h == source_h) {
+            for (int y = 0; y < content_h; y++) {
+                memcpy(g_mfb.base_frame + (size_t)y * (size_t)g_mfb.width,
+                       src + (size_t)y * (size_t)g_mfb.width,
+                       (size_t)g_mfb.width * sizeof(g_mfb.base_frame[0]));
+            }
+        } else if (filter == R36SX_PICO286_SCALING_BILINEAR) {
+            r36sx_mfb_copy_scaled_bilinear(src, content_h, source_h);
+        } else {
+            r36sx_mfb_copy_scaled_nearest(src, content_h, source_h);
         }
     }
 
@@ -1557,6 +1609,7 @@ int mfb_update(void *buffer, int fps_limit)
     int disk_led_active;
     int screenshot_toast_visible;
     int need_present;
+    r36sx_pico286_scaling_filter_t scaling_filter;
     (void)fps_limit;
 
     if (!g_mfb.active || !g_mfb.disp_frame || !src) {
@@ -1579,12 +1632,14 @@ int mfb_update(void *buffer, int fps_limit)
     frame_generation = r36sx_mfb_frame_generation();
     content_h = r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
     source_h = r36sx_mfb_video_source_height();
+    scaling_filter = r36sx_pico286_scaling_filter();
     source_changed = frame_generation != g_mfb.presented_generation;
     source_dirty =
         !g_mfb.base_frame_valid ||
         frame_generation != g_mfb.base_generation ||
         content_h != g_mfb.base_content_h ||
-        source_h != g_mfb.base_source_h;
+        source_h != g_mfb.base_source_h ||
+        scaling_filter != g_mfb.base_scaling_filter;
     screenshot_toast_visible = r36sx_mfb_screenshot_toast_visible(now_ms);
     large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
@@ -1605,10 +1660,11 @@ int mfb_update(void *buffer, int fps_limit)
 
     if (large_overlay_active) {
         if (source_dirty) {
-            r36sx_mfb_copy_source(src, content_h, source_h);
+            r36sx_mfb_copy_source(src, content_h, source_h, scaling_filter);
             g_mfb.base_generation = frame_generation;
             g_mfb.base_content_h = content_h;
             g_mfb.base_source_h = source_h;
+            g_mfb.base_scaling_filter = scaling_filter;
             g_mfb.base_frame_valid = 1;
         }
         memcpy(g_mfb.frame, g_mfb.base_frame,

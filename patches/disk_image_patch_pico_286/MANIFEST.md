@@ -32,6 +32,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 configurable scaling filter
+
+The current `pico_286` binary reads `[video] scaling_filter` from
+`pico_286.conf`.
+
+- `nearest` is the default and keeps sharp pixel edges.
+- `bilinear` blends neighboring source rows when the DOS image is resized
+  under large overlays such as the on-screen keyboard.
+
+pico_286 size: 1337836 bytes
+pico_286 SHA256: 0006C7F8D02D7F726CCEDEB8D7D2D1AD7853032B78BDFA85110A2D884C5C39E3
+
 ## 2026-05-31 CRTC stride for tweaked VGA modes
 
 The current `pico_286` binary uses VGA CRTC Offset Register `13h` when

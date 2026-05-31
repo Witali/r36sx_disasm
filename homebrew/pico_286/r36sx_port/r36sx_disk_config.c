@@ -70,6 +70,7 @@ static char profiling_log_ms_text[16] = "5000";
 static char app_stats_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
 static char screenshot_format_text[8] = "png";
+static char scaling_filter_text[16] = "nearest";
 static char conventional_memory_kb_text[16] = "640";
 static char upper_memory_kb_text[16] = "176";
 static char extended_memory_kb_text[16] = "64";
@@ -92,6 +93,8 @@ static uint32_t extended_memory_kb = 64u;
 static uint32_t xms_memory_kb = 4096u;
 static r36sx_pico286_screenshot_format_t screenshot_format =
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
+static r36sx_pico286_scaling_filter_t scaling_filter =
+    R36SX_PICO286_SCALING_NEAREST;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -640,6 +643,41 @@ static int set_screenshot_format(const char *key, const char *value,
     return 1;
 }
 
+static int set_scaling_filter(const char *key, const char *value,
+                              int line_no)
+{
+    if (!(key_equals(key, "scaling_filter") ||
+          key_equals(key, "scale_filter") ||
+          key_equals(key, "video_scaling_filter") ||
+          key_equals(key, "screen_scaling_filter"))) {
+        return 0;
+    }
+
+    if (key_equals(value, "nearest") ||
+        key_equals(value, "nearest_pixel") ||
+        key_equals(value, "pixel")) {
+        scaling_filter = R36SX_PICO286_SCALING_NEAREST;
+        snprintf(scaling_filter_text, sizeof(scaling_filter_text),
+                 "nearest");
+        r36sx_pico286_debug_log("diskcfg: scaling_filter=nearest");
+        return 1;
+    }
+
+    if (key_equals(value, "bilinear") ||
+        key_equals(value, "linear")) {
+        scaling_filter = R36SX_PICO286_SCALING_BILINEAR;
+        snprintf(scaling_filter_text, sizeof(scaling_filter_text),
+                 "bilinear");
+        r36sx_pico286_debug_log("diskcfg: scaling_filter=bilinear");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid %s '%s' at line %d",
+        key, value, line_no);
+    return 1;
+}
+
 static int set_app_stats_value(const char *key, const char *value,
                                int line_no)
 {
@@ -940,6 +978,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_screenshot_format(key, value, line_no)) {
         return 1;
     }
+    if (set_scaling_filter(key, value, line_no)) {
+        return 1;
+    }
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
@@ -1126,6 +1167,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# adaptive exec86 quantum control and display pacing.\n");
     fprintf(fp, "[timing]\n");
     fprintf(fp, "target_fps=%s\n\n", target_fps_text);
+
+    fprintf(fp, "# Scaling filter used when the DOS image is resized.\n");
+    fprintf(fp, "# Supported values: nearest, bilinear.\n");
+    fprintf(fp, "[video]\n");
+    fprintf(fp, "scaling_filter=%s\n\n", scaling_filter_text);
 
     fprintf(fp, "# Boot behavior and boot-sector probe order.\n");
     fprintf(fp, "[boot]\n");
@@ -1428,4 +1474,18 @@ const char *r36sx_pico286_screenshot_format_name(void)
     load_disk_config();
 
     return screenshot_format_text;
+}
+
+r36sx_pico286_scaling_filter_t r36sx_pico286_scaling_filter(void)
+{
+    load_disk_config();
+
+    return scaling_filter;
+}
+
+const char *r36sx_pico286_scaling_filter_name(void)
+{
+    load_disk_config();
+
+    return scaling_filter_text;
 }

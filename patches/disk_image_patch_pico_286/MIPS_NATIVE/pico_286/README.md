@@ -99,6 +99,9 @@ cpu_mhz=32.768
 [timing]
 target_fps=60
 
+[video]
+scaling_filter=nearest
+
 [boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
@@ -159,6 +162,11 @@ about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
 spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 1000
 instructions per frame.  Rendering overlays such as the on-screen keyboard do
 not reduce the CPU quantum.
+
+`scaling_filter` controls how the DOS image is resized when a large overlay
+leaves less than the full display height for the emulated screen.  The default
+`nearest` keeps hard pixel edges.  `bilinear` blends neighboring source rows
+for smoother scaled text/graphics.
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
