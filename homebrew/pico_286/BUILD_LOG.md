@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-05-31 On-screen keyboard row alignment
+
+Updated the shared on-screen keyboard layout to use explicit key widths of
+`1`, `1.5`, `2`, and `2.5` units:
+
+- The function-key row now has a full gap between `ESC` and `F1`, plus smaller
+  group gaps between `F4`/`F5` and `F8`/`F9`.
+- Main keyboard rows are drawn right-aligned inside the keyboard block, so
+  `F12`, `BS`, `\`, `ENT`, right `SHF`, and right `CTRL` land on the same
+  right edge.
+- The close key was moved before the right `CTRL` key on the bottom row so
+  `CTRL` stays the rightmost key.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `453160` bytes
+- `pico_286` SHA256:
+  `05E30F223D37442D156F8172F0C016486DA9B269DEC1664B3EFAE47FC31AC584`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-05-31 Arial FreeType on-screen keyboard labels
 
 Updated the shared `r36sx_screen_keyboard` renderer so virtual key labels use

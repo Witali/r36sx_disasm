@@ -37,6 +37,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 On-screen keyboard row alignment
+
+The patch binary now uses explicit virtual key widths of `1`, `1.5`, `2`, and
+`2.5` units.  The function-key row has a larger `ESC`/`F1` gap and smaller
+`F4`/`F5` and `F8`/`F9` gaps.  Main rows are right-aligned so `F12`, `BS`, `\`,
+`ENT`, right `SHF`, and right `CTRL` share the same right edge.
+
+```text
+pico_286 size: 453160 bytes
+pico_286 SHA256: 05E30F223D37442D156F8172F0C016486DA9B269DEC1664B3EFAE47FC31AC584
+Defender scan: found no threats
+```
+
 ## 2026-05-31 Arial FreeType on-screen keyboard labels
 
 The patch binary now draws virtual on-screen keyboard labels through FreeType
