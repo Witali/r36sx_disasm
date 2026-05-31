@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-31 cached overlay keyboard
+
+Optimized `[video] keyboard_mode=overlay`.
+
+- The on-screen keyboard no longer makes MiniFB use the full large-overlay
+  composition path by itself.
+- The keyboard panel is rendered into a dedicated `640x96` RGB565 cache.
+- The cache is refreshed only when visible keyboard state changes: selection,
+  modifiers, symbol mode, press animation, cursor block, or visibility.
+- Present-time drawing saves the covered DOS pixels, blits the cached keyboard
+  panel over `SCREEN`, presents the frame, and restores the saved pixels.
+- If the keyboard cache buffers cannot be allocated, the old full composition
+  path is used as a fallback.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1389944` bytes
+- `pico_286` SHA256:
+  `A8C42591D887C254D37E212EDC64557E4E745B1F9DAE9CBB4247F351486A1620`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 configurable on-screen keyboard mode
 
 Added `[video] keyboard_mode` to `pico_286.conf`.

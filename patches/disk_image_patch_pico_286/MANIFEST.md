@@ -32,6 +32,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 cached overlay keyboard
+
+The current `pico_286` binary optimizes `[video] keyboard_mode=overlay`.
+The keyboard panel is rendered into a dedicated `640x96` RGB565 cache that is
+updated only when the visible keyboard state changes.  During present it saves
+the covered DOS pixels, blits the cached keyboard over `SCREEN`, presents the
+frame, and restores the saved pixels.  If the cache buffers cannot be
+allocated, the old full composition path remains as a fallback.
+
+pico_286 size: 1389944 bytes
+pico_286 SHA256: A8C42591D887C254D37E212EDC64557E4E745B1F9DAE9CBB4247F351486A1620
+
 ## 2026-05-31 configurable on-screen keyboard mode
 
 The current `pico_286` binary reads `[video] keyboard_mode` from

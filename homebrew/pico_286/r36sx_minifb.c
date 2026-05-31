@@ -70,6 +70,8 @@ struct r36sx_mfb_driver {
     cube_ioctl_fn cube_ioctl;
     uint16_t *frame;
     uint16_t *base_frame;
+    uint16_t *osk_overlay;
+    uint16_t *osk_underlay;
     uint16_t *stats_overlay;
     uint16_t *screenshot_preview;
     int width;
@@ -99,6 +101,7 @@ struct r36sx_mfb_driver {
     uint8_t screenshot_toast_success;
     uint8_t screenshot_preview_valid;
     uint8_t fn_help_visible;
+    uint8_t osk_overlay_valid;
     uint8_t stats_overlay_valid;
     int base_content_h;
     int base_source_h;
@@ -109,6 +112,7 @@ struct r36sx_mfb_driver {
     int stats_overlay_h;
     uint32_t base_generation;
     uint32_t presented_generation;
+    uint32_t osk_overlay_signature;
     uint32_t stats_overlay_last_ms;
     uint32_t screenshot_counter;
     uint32_t screenshot_toast_until_ms;
@@ -171,6 +175,26 @@ static uint16_t r36sx_mfb_rgb888_to_rgb565(uint32_t color)
 static int r36sx_osk_panel_y(void)
 {
     return r36sx_screen_keyboard_panel_y(g_mfb.height);
+}
+
+static size_t r36sx_osk_overlay_pixels(void)
+{
+    return (size_t)g_mfb.width *
+           (size_t)R36SX_SCREEN_KEYBOARD_PANEL_H;
+}
+
+static int r36sx_osk_overlay_buffers_ready(void)
+{
+    return g_mfb.osk_overlay && g_mfb.osk_underlay &&
+           g_mfb.width > 0 &&
+           g_mfb.height >= R36SX_SCREEN_KEYBOARD_PANEL_H;
+}
+
+static int r36sx_osk_direct_overlay_active(void)
+{
+    return r36sx_screen_keyboard_is_visible(&g_mfb.osk) &&
+           r36sx_pico286_keyboard_mode() == R36SX_PICO286_KEYBOARD_OVERLAY &&
+           r36sx_osk_overlay_buffers_ready();
 }
 
 static uint16_t r36sx_mfb_rgb565(uint8_t r, uint8_t g, uint8_t b)
@@ -1096,6 +1120,38 @@ static void r36sx_mfb_emit_osk_key(void *user, uint16_t keycode, int is_down)
     HandleInput(keycode, is_down);
 }
 
+static uint32_t r36sx_osk_mix_signature(uint32_t hash, uint32_t value)
+{
+    hash ^= value;
+    return hash * 16777619u;
+}
+
+static uint32_t r36sx_osk_draw_signature(void)
+{
+    const struct r36sx_screen_keyboard *keyboard = &g_mfb.osk;
+    uint32_t hash = 2166136261u;
+
+    hash = r36sx_osk_mix_signature(hash, keyboard->visible);
+    hash = r36sx_osk_mix_signature(hash, keyboard->zone);
+    hash = r36sx_osk_mix_signature(hash, keyboard->row);
+    hash = r36sx_osk_mix_signature(hash, keyboard->col);
+    hash = r36sx_osk_mix_signature(hash, keyboard->shift);
+    hash = r36sx_osk_mix_signature(hash, keyboard->ctrl);
+    hash = r36sx_osk_mix_signature(hash, keyboard->alt);
+    hash = r36sx_osk_mix_signature(hash, keyboard->symbol_mode);
+    hash = r36sx_osk_mix_signature(hash, keyboard->cursor_block);
+    hash = r36sx_osk_mix_signature(hash, keyboard->press_zone);
+    hash = r36sx_osk_mix_signature(hash, keyboard->press_row);
+    hash = r36sx_osk_mix_signature(hash, keyboard->press_col);
+    hash = r36sx_osk_mix_signature(hash, keyboard->press_buttons);
+    return hash ? hash : 1u;
+}
+
+static void r36sx_osk_invalidate_overlay(void)
+{
+    g_mfb.osk_overlay_valid = 0;
+}
+
 static void r36sx_osk_set_visible(int visible)
 {
     int old_visible = r36sx_screen_keyboard_is_visible(&g_mfb.osk);
@@ -1108,6 +1164,7 @@ static void r36sx_osk_set_visible(int visible)
     if (visible) {
         g_mfb.fn_help_visible = 0;
     }
+    r36sx_osk_invalidate_overlay();
     g_mfb.base_frame_valid = 0;
     g_mfb.stats_overlay_valid = 0;
     g_mfb.force_present = 1;
@@ -1117,8 +1174,15 @@ static void r36sx_osk_set_visible(int visible)
 
 static void r36sx_osk_handle_buttons(uint32_t pressed, uint32_t held)
 {
+    uint32_t old_signature = r36sx_osk_draw_signature();
     uint32_t result = r36sx_screen_keyboard_handle_buttons(
         &g_mfb.osk, pressed, held, r36sx_mfb_emit_osk_key, NULL);
+    uint32_t new_signature = r36sx_osk_draw_signature();
+
+    if (old_signature != new_signature) {
+        r36sx_osk_invalidate_overlay();
+        g_mfb.force_present = 1;
+    }
 
     if ((result & R36SX_SCREEN_KEYBOARD_RESULT_CLOSED) != 0) {
         g_mfb.stats_overlay_valid = 0;
@@ -1131,6 +1195,37 @@ static void r36sx_osk_draw(void)
 {
     r36sx_screen_keyboard_draw(&g_mfb.osk, g_mfb.frame, g_mfb.width,
                                g_mfb.height, g_mfb.width);
+}
+
+static int r36sx_mfb_refresh_osk_overlay(void)
+{
+    uint32_t signature;
+
+    if (!r36sx_osk_direct_overlay_active()) {
+        r36sx_osk_invalidate_overlay();
+        return 0;
+    }
+
+    signature = r36sx_osk_draw_signature();
+    if (g_mfb.osk_overlay_valid &&
+        g_mfb.osk_overlay_signature == signature) {
+        return 1;
+    }
+
+    memset(g_mfb.osk_overlay, 0,
+           r36sx_osk_overlay_pixels() * sizeof(g_mfb.osk_overlay[0]));
+    r36sx_screen_keyboard_draw(&g_mfb.osk, g_mfb.osk_overlay, g_mfb.width,
+                               R36SX_SCREEN_KEYBOARD_PANEL_H, g_mfb.width);
+    g_mfb.osk_overlay_signature = signature;
+    g_mfb.osk_overlay_valid = 1;
+    return 1;
+}
+
+static int r36sx_mfb_osk_overlay_cache_due(void)
+{
+    return r36sx_osk_direct_overlay_active() &&
+           (!g_mfb.osk_overlay_valid ||
+            g_mfb.osk_overlay_signature != r36sx_osk_draw_signature());
 }
 
 static void r36sx_mfb_disk_menu_set_visible(int visible)
@@ -1222,6 +1317,7 @@ static void r36sx_mfb_request_soft_reset(void)
 {
     r36sx_mfb_release_all_keys();
     r36sx_screen_keyboard_set_visible(&g_mfb.osk, 0);
+    r36sx_osk_invalidate_overlay();
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, 0);
     r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
     g_mfb.fn_help_visible = 0;
@@ -1418,6 +1514,65 @@ static int r36sx_mfb_draw_stats_saved(uint16_t *target, uint32_t now_ms,
     return 1;
 }
 
+static int r36sx_mfb_draw_osk_overlay_saved(uint16_t *target)
+{
+    int y;
+    int h = R36SX_SCREEN_KEYBOARD_PANEL_H;
+
+    if (!target || !r36sx_osk_direct_overlay_active() ||
+        !r36sx_mfb_refresh_osk_overlay()) {
+        return 0;
+    }
+
+    y = r36sx_osk_panel_y();
+    if (y < 0) {
+        return 0;
+    }
+    if (y + h > g_mfb.height) {
+        h = g_mfb.height - y;
+    }
+    if (h <= 0) {
+        return 0;
+    }
+
+    for (int row = 0; row < h; row++) {
+        memcpy(g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
+               target + (size_t)(y + row) * (size_t)g_mfb.width,
+               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
+        memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
+               g_mfb.osk_overlay + (size_t)row * (size_t)g_mfb.width,
+               (size_t)g_mfb.width * sizeof(g_mfb.osk_overlay[0]));
+    }
+    return 1;
+}
+
+static void r36sx_mfb_restore_osk_overlay(uint16_t *target)
+{
+    int y;
+    int h = R36SX_SCREEN_KEYBOARD_PANEL_H;
+
+    if (!target || !r36sx_osk_overlay_buffers_ready()) {
+        return;
+    }
+
+    y = r36sx_osk_panel_y();
+    if (y < 0) {
+        return;
+    }
+    if (y + h > g_mfb.height) {
+        h = g_mfb.height - y;
+    }
+    if (h <= 0) {
+        return;
+    }
+
+    for (int row = 0; row < h; row++) {
+        memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
+               g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
+               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
+    }
+}
+
 static void r36sx_mfb_restore_saved_rect(
     uint16_t *target, const struct r36sx_mfb_saved_rect *saved)
 {
@@ -1449,7 +1604,8 @@ static int r36sx_mfb_video_source_height(void)
 
 static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
 {
-    return r36sx_screen_keyboard_is_visible(&g_mfb.osk) ||
+    return (r36sx_screen_keyboard_is_visible(&g_mfb.osk) &&
+            !r36sx_osk_direct_overlay_active()) ||
            r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
            r36sx_key_presets_is_visible(&g_mfb.key_presets) ||
            g_mfb.fn_help_visible ||
@@ -1828,6 +1984,12 @@ int mfb_open(const char *name, int width, int height, int scale)
                                      sizeof(g_mfb.frame[0]));
     g_mfb.base_frame = (uint16_t *)calloc((size_t)width * (size_t)height,
                                           sizeof(g_mfb.base_frame[0]));
+    g_mfb.osk_overlay =
+        (uint16_t *)calloc(r36sx_osk_overlay_pixels(),
+                           sizeof(g_mfb.osk_overlay[0]));
+    g_mfb.osk_underlay =
+        (uint16_t *)calloc(r36sx_osk_overlay_pixels(),
+                           sizeof(g_mfb.osk_underlay[0]));
     g_mfb.stats_overlay =
         (uint16_t *)calloc(R36SX_PICO286_SAVED_RECT_MAX_PIXELS,
                            sizeof(g_mfb.stats_overlay[0]));
@@ -1842,6 +2004,9 @@ int mfb_open(const char *name, int width, int height, int scale)
     }
     if (!g_mfb.screenshot_preview) {
         r36sx_pico286_debug_log("minifb: screenshot preview allocation failed");
+    }
+    if (!g_mfb.osk_overlay || !g_mfb.osk_underlay) {
+        r36sx_pico286_debug_log("minifb: keyboard overlay cache allocation failed");
     }
     if (!g_mfb.stats_overlay) {
         r36sx_pico286_debug_log("minifb: stats overlay cache allocation failed");
@@ -1906,6 +2071,8 @@ int mfb_update(void *buffer, int fps_limit)
     int source_dirty;
     int source_changed;
     int large_overlay_active;
+    int osk_overlay_active;
+    int osk_overlay_refresh_due;
     int disk_led_active;
     int stats_overlay_visible;
     int stats_refresh_due;
@@ -1946,6 +2113,9 @@ int mfb_update(void *buffer, int fps_limit)
         source_h != g_mfb.base_source_h ||
         scaling_filter != g_mfb.base_scaling_filter;
     screenshot_toast_visible = r36sx_mfb_screenshot_toast_visible(now_ms);
+    osk_overlay_active = r36sx_osk_direct_overlay_active();
+    osk_overlay_refresh_due =
+        osk_overlay_active && r36sx_mfb_osk_overlay_cache_due();
     large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
     stats_overlay_visible = r36sx_app_stats_is_visible();
@@ -1954,6 +2124,7 @@ int mfb_update(void *buffer, int fps_limit)
         r36sx_mfb_stats_cache_due(now_ms);
     need_present =
         source_changed ||
+        osk_overlay_refresh_due ||
         large_overlay_active ||
         disk_led_active ||
         g_mfb.disk_led_was_active ||
@@ -1998,6 +2169,7 @@ int mfb_update(void *buffer, int fps_limit)
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
     } else {
+        int osk_saved = r36sx_mfb_draw_osk_overlay_saved(src);
         static struct r36sx_mfb_saved_rect saved_led;
         static struct r36sx_mfb_saved_rect saved_stats;
         int stats_saved =
@@ -2015,6 +2187,9 @@ int mfb_update(void *buffer, int fps_limit)
         }
         if (stats_saved) {
             r36sx_mfb_restore_saved_rect(src, &saved_stats);
+        }
+        if (osk_saved) {
+            r36sx_mfb_restore_osk_overlay(src);
         }
     }
 
@@ -2056,6 +2231,12 @@ void mfb_close(void)
     }
     if (g_mfb.base_frame) {
         free(g_mfb.base_frame);
+    }
+    if (g_mfb.osk_overlay) {
+        free(g_mfb.osk_overlay);
+    }
+    if (g_mfb.osk_underlay) {
+        free(g_mfb.osk_underlay);
     }
     if (g_mfb.stats_overlay) {
         free(g_mfb.stats_overlay);

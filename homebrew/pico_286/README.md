@@ -16,7 +16,9 @@ integration pieces:
   renderer runs only after visible emulated video state changes, while small
   overlays can still update through saved rectangles.  `[video] keyboard_mode`
   controls whether the on-screen keyboard resizes the DOS image (`normal`) or
-  covers it without scaling (`overlay`).
+  covers it without scaling (`overlay`).  In overlay mode, the keyboard panel
+  is cached in its own RGB565 buffer and refreshed only when the visible
+  keyboard state changes.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.
