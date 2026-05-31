@@ -388,6 +388,32 @@ static uint8_t glyph_row(unsigned char c, int row)
     static const uint8_t glyph_x[7] = {17, 17, 10, 4, 10, 17, 17};
     static const uint8_t glyph_y[7] = {17, 17, 10, 4, 4, 4, 4};
     static const uint8_t glyph_z[7] = {31, 1, 2, 4, 8, 16, 31};
+    static const uint8_t glyph_la[7] = {0, 0, 14, 1, 15, 17, 15};
+    static const uint8_t glyph_lb[7] = {16, 16, 22, 25, 17, 17, 30};
+    static const uint8_t glyph_lc[7] = {0, 0, 14, 16, 16, 17, 14};
+    static const uint8_t glyph_ld[7] = {1, 1, 13, 19, 17, 17, 15};
+    static const uint8_t glyph_le[7] = {0, 0, 14, 17, 31, 16, 14};
+    static const uint8_t glyph_lf[7] = {6, 8, 8, 30, 8, 8, 8};
+    static const uint8_t glyph_lg[7] = {0, 0, 15, 17, 15, 1, 14};
+    static const uint8_t glyph_lh[7] = {16, 16, 22, 25, 17, 17, 17};
+    static const uint8_t glyph_li[7] = {4, 0, 12, 4, 4, 4, 14};
+    static const uint8_t glyph_lj[7] = {2, 0, 6, 2, 2, 18, 12};
+    static const uint8_t glyph_lk[7] = {16, 16, 18, 20, 24, 20, 18};
+    static const uint8_t glyph_ll[7] = {12, 4, 4, 4, 4, 4, 14};
+    static const uint8_t glyph_lm[7] = {0, 0, 26, 21, 21, 21, 21};
+    static const uint8_t glyph_ln[7] = {0, 0, 22, 25, 17, 17, 17};
+    static const uint8_t glyph_lo[7] = {0, 0, 14, 17, 17, 17, 14};
+    static const uint8_t glyph_lp[7] = {0, 0, 30, 17, 30, 16, 16};
+    static const uint8_t glyph_lq[7] = {0, 0, 15, 17, 15, 1, 1};
+    static const uint8_t glyph_lr[7] = {0, 0, 22, 25, 16, 16, 16};
+    static const uint8_t glyph_ls[7] = {0, 0, 15, 16, 14, 1, 30};
+    static const uint8_t glyph_lt[7] = {8, 8, 30, 8, 8, 9, 6};
+    static const uint8_t glyph_lu[7] = {0, 0, 17, 17, 17, 19, 13};
+    static const uint8_t glyph_lv[7] = {0, 0, 17, 17, 17, 10, 4};
+    static const uint8_t glyph_lw[7] = {0, 0, 17, 17, 21, 21, 10};
+    static const uint8_t glyph_lx[7] = {0, 0, 17, 10, 4, 10, 17};
+    static const uint8_t glyph_ly[7] = {0, 0, 17, 17, 15, 1, 14};
+    static const uint8_t glyph_lz[7] = {0, 0, 31, 2, 4, 8, 31};
     static const uint8_t glyph_0[7] = {14, 17, 19, 21, 25, 17, 14};
     static const uint8_t glyph_1[7] = {4, 12, 4, 4, 4, 4, 14};
     static const uint8_t glyph_2[7] = {14, 17, 1, 2, 4, 8, 31};
@@ -435,10 +461,6 @@ static uint8_t glyph_row(unsigned char c, int row)
     static const uint8_t glyph_down[7] = {0, 4, 4, 21, 14, 4, 0};
     const uint8_t *glyph = blank;
 
-    if (c >= 'a' && c <= 'z') {
-        c = (unsigned char)(c - ('a' - 'A'));
-    }
-
     switch (c) {
     case 'A': glyph = glyph_a; break;
     case 'B': glyph = glyph_b; break;
@@ -466,6 +488,32 @@ static uint8_t glyph_row(unsigned char c, int row)
     case 'X': glyph = glyph_x; break;
     case 'Y': glyph = glyph_y; break;
     case 'Z': glyph = glyph_z; break;
+    case 'a': glyph = glyph_la; break;
+    case 'b': glyph = glyph_lb; break;
+    case 'c': glyph = glyph_lc; break;
+    case 'd': glyph = glyph_ld; break;
+    case 'e': glyph = glyph_le; break;
+    case 'f': glyph = glyph_lf; break;
+    case 'g': glyph = glyph_lg; break;
+    case 'h': glyph = glyph_lh; break;
+    case 'i': glyph = glyph_li; break;
+    case 'j': glyph = glyph_lj; break;
+    case 'k': glyph = glyph_lk; break;
+    case 'l': glyph = glyph_ll; break;
+    case 'm': glyph = glyph_lm; break;
+    case 'n': glyph = glyph_ln; break;
+    case 'o': glyph = glyph_lo; break;
+    case 'p': glyph = glyph_lp; break;
+    case 'q': glyph = glyph_lq; break;
+    case 'r': glyph = glyph_lr; break;
+    case 's': glyph = glyph_ls; break;
+    case 't': glyph = glyph_lt; break;
+    case 'u': glyph = glyph_lu; break;
+    case 'v': glyph = glyph_lv; break;
+    case 'w': glyph = glyph_lw; break;
+    case 'x': glyph = glyph_lx; break;
+    case 'y': glyph = glyph_ly; break;
+    case 'z': glyph = glyph_lz; break;
     case '0': glyph = glyph_0; break;
     case '1': glyph = glyph_1; break;
     case '2': glyph = glyph_2; break;
@@ -1186,6 +1234,59 @@ static int key_is_pressed(const struct r36sx_screen_keyboard *keyboard,
         keyboard->press_col == col;
 }
 
+static const char *shifted_label_for_key(uint16_t keycode)
+{
+    switch (keycode) {
+    case '1': return "!";
+    case '2': return "@";
+    case '3': return "#";
+    case '4': return "$";
+    case '5': return "%";
+    case '6': return "^";
+    case '7': return "&";
+    case '8': return "*";
+    case '9': return "(";
+    case '0': return ")";
+    case R36SX_SCREEN_KEY_OEM_3: return "~";
+    case R36SX_SCREEN_KEY_OEM_MINUS: return "_";
+    case R36SX_SCREEN_KEY_OEM_PLUS: return "+";
+    case R36SX_SCREEN_KEY_OEM_4: return "{";
+    case R36SX_SCREEN_KEY_OEM_6: return "}";
+    case R36SX_SCREEN_KEY_OEM_5: return "|";
+    case R36SX_SCREEN_KEY_OEM_1: return ":";
+    case R36SX_SCREEN_KEY_OEM_7: return "\"";
+    case R36SX_SCREEN_KEY_OEM_COMMA: return "<";
+    case R36SX_SCREEN_KEY_OEM_PERIOD: return ">";
+    case R36SX_SCREEN_KEY_OEM_2: return "?";
+    default: return NULL;
+    }
+}
+
+static const char *display_label_for_key(
+    const struct r36sx_screen_keyboard *keyboard,
+    const struct r36sx_osk_key *key,
+    char *scratch,
+    size_t scratch_size)
+{
+    if (!keyboard || !key) {
+        return "";
+    }
+    if ((key->flags & R36SX_OSK_FLAG_SHIFTED) == 0 &&
+        key->keycode >= 'A' && key->keycode <= 'Z' && scratch_size >= 2) {
+        scratch[0] = (char)((keyboard->shift ? 'A' : 'a') +
+                            (key->keycode - 'A'));
+        scratch[1] = '\0';
+        return scratch;
+    }
+    if (keyboard->shift && (key->flags & R36SX_OSK_FLAG_SHIFTED) == 0) {
+        const char *shifted = shifted_label_for_key(key->keycode);
+        if (shifted) {
+            return shifted;
+        }
+    }
+    return key->label;
+}
+
 static void draw_key(const struct r36sx_screen_keyboard *keyboard,
                      const struct r36sx_osk_key *key,
                      uint16_t *frame,
@@ -1235,11 +1336,15 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
     stroke_rect(frame, width, height, stride, x, y, key_w,
                 R36SX_OSK_KEY_H, border);
     {
-        int scale = key_text_scale(key->label, key_w);
-        int text_w = text_width(key->label, scale);
+        char label_buf[2];
+        const char *label =
+            display_label_for_key(keyboard, key, label_buf,
+                                  sizeof(label_buf));
+        int scale = key_text_scale(label, key_w);
+        int text_w = text_width(label, scale);
         int text_x = x + (key_w - text_w) / 2;
         int text_y = y + (R36SX_OSK_KEY_H - 7 * scale) / 2;
-        draw_text(frame, width, height, stride, text_x, text_y, key->label, fg,
+        draw_text(frame, width, height, stride, text_x, text_y, label, fg,
                   scale);
     }
 }

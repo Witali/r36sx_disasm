@@ -61,9 +61,9 @@ wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.
 
 Result:
 
-- `pico_286` size: `445388` bytes
+- `pico_286` size: `445420` bytes
 - `pico_286` SHA256:
-  `C4426FEC07448E5A9E9A7E623478C54A49131762705A0B51262BC97A20FFBC3B`
+  `09564384CDA4E216723AECB087D0891B23BEA63F2117C1DE6CF03BE28BB0FD7B`
 
 Verification: rebuilt only the normal WSL/GCC binary, copied it to
 `disk_image` and the Pico-286 patch, and scanned all three `pico_286` copies

@@ -67,8 +67,8 @@ keys show their shifted symbols when those are the scancodes that will be
 emitted.  The pixel font also includes real lowercase glyphs.
 
 ```text
-pico_286 size: 445388 bytes
-pico_286 SHA256: C4426FEC07448E5A9E9A7E623478C54A49131762705A0B51262BC97A20FFBC3B
+pico_286 size: 445420 bytes
+pico_286 SHA256: 09564384CDA4E216723AECB087D0891B23BEA63F2117C1DE6CF03BE28BB0FD7B
 Defender scan: found no threats
 ```
 
