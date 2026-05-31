@@ -1204,7 +1204,7 @@ static void r36sx_mfb_update_key_state(unsigned int keycode, int is_down,
 static void r36sx_mfb_emit_osk_key(void *user, uint16_t keycode, int is_down)
 {
     (void)user;
-    HandleInput(keycode, is_down);
+    r36sx_mfb_update_key_state(keycode, is_down, r36sx_mfb_now_us());
 }
 
 static uint32_t r36sx_osk_mix_signature(uint32_t hash, uint32_t value)
@@ -1225,6 +1225,8 @@ static uint32_t r36sx_osk_draw_signature(void)
     hash = r36sx_osk_mix_signature(hash, keyboard->shift);
     hash = r36sx_osk_mix_signature(hash, keyboard->ctrl);
     hash = r36sx_osk_mix_signature(hash, keyboard->alt);
+    hash = r36sx_osk_mix_signature(hash, keyboard->physical_shift);
+    hash = r36sx_osk_mix_signature(hash, keyboard->physical_ctrl);
     hash = r36sx_osk_mix_signature(hash, keyboard->symbol_mode);
     hash = r36sx_osk_mix_signature(hash, keyboard->cursor_block);
     hash = r36sx_osk_mix_signature(hash, keyboard->scroll_y);

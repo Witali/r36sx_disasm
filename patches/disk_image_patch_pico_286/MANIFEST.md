@@ -37,6 +37,26 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 On-screen keyboard L/R modifiers
+
+The patch binary now treats physical `L` and `R` as held PC modifiers while the
+normal DOS on-screen keyboard is visible:
+
+- `L`: hold PC `Shift`
+- `R`: hold PC `Ctrl`
+
+The overlay keyboard cache includes this physical modifier state, and OSK key
+events now pass through the same MiniFB key-state layer used by physical preset
+keys so global release paths can cleanly release held modifiers.  In the
+key-preset picker, physical `L` selects `SHIFT` and physical `R` selects
+`CTRL`.
+
+```text
+pico_286 size: 453160 bytes
+pico_286 SHA256: 7294ABCE3B440F27D2ADF13AE0049135966221D4B9A01F6DDB917FB360F78E5B
+Defender scan: found no threats
+```
+
 ## 2026-05-31 On-screen keyboard row alignment
 
 The patch binary now uses explicit virtual key widths of `1`, `1.5`, `2`, and

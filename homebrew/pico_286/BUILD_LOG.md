@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-05-31 On-screen keyboard L/R modifiers
+
+Changed the shared on-screen keyboard physical trigger behavior:
+
+- While the normal DOS on-screen keyboard is visible, holding physical `L`
+  now sends and holds PC `Shift`.
+- Holding physical `R` now sends and holds PC `Ctrl`.
+- The physical modifier state is included in the cached keyboard overlay
+  signature, so the key labels and modifier highlighting update immediately
+  when `L`/`R` are pressed or released.
+- OSK key events now pass through the MiniFB key-state layer instead of calling
+  `HandleInput()` directly, allowing global key release paths to release these
+  held modifiers safely when the keyboard or a menu is closed.
+- In the key-preset picker, pressing physical `L` selects `SHIFT`; pressing
+  physical `R` selects `CTRL`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `453160` bytes
+- `pico_286` SHA256:
+  `7294ABCE3B440F27D2ADF13AE0049135966221D4B9A01F6DDB917FB360F78E5B`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-05-31 On-screen keyboard row alignment
 
 Updated the shared on-screen keyboard layout to use explicit key widths of

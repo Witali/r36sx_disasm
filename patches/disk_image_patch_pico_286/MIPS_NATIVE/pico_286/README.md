@@ -55,7 +55,8 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 - D-pad: move between keys.
 - Hold D-pad: repeat movement after a short delay.
-- L or R: switch between the normal keyboard and symbol keyboard.
+- Hold L: hold PC Shift.
+- Hold R: hold PC Ctrl.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.
@@ -63,8 +64,9 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 - Select: close the keyboard.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
+The physical L/R modifiers are held only while the physical trigger is held.
 The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
-DOS keyboard now uses a PC-style layout with Esc/F1-F12 on the top row and a
+DOS keyboard uses a PC-style layout with Esc/F1-F12 on the top row and a
 right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
 right-aligned, with grouped gaps in the function-key row and key widths limited

@@ -1474,6 +1474,46 @@ static void start_key_repeat(struct r36sx_screen_keyboard *keyboard,
     keyboard->key_repeat_next_us = now_us() + R36SX_OSK_KEY_REPEAT_DELAY_US;
 }
 
+static void handle_physical_modifiers(
+    struct r36sx_screen_keyboard *keyboard,
+    uint32_t held,
+    r36sx_screen_keyboard_emit_fn emit,
+    void *emit_user)
+{
+    uint8_t shift_down = (held & R36SX_RKGAME_KEY_L) != 0;
+    uint8_t ctrl_down = (held & R36SX_RKGAME_KEY_R) != 0;
+
+    if (!keyboard || !emit) {
+        return;
+    }
+    if (shift_down != keyboard->physical_shift) {
+        emit(emit_user, R36SX_SCREEN_KEY_SHIFT, shift_down);
+        keyboard->physical_shift = shift_down;
+    }
+    if (ctrl_down != keyboard->physical_ctrl) {
+        emit(emit_user, R36SX_SCREEN_KEY_CONTROL, ctrl_down);
+        keyboard->physical_ctrl = ctrl_down;
+    }
+}
+
+static void release_physical_modifiers(
+    struct r36sx_screen_keyboard *keyboard,
+    r36sx_screen_keyboard_emit_fn emit,
+    void *emit_user)
+{
+    if (!keyboard || !emit) {
+        return;
+    }
+    if (keyboard->physical_shift) {
+        emit(emit_user, R36SX_SCREEN_KEY_SHIFT, 0);
+        keyboard->physical_shift = 0;
+    }
+    if (keyboard->physical_ctrl) {
+        emit(emit_user, R36SX_SCREEN_KEY_CONTROL, 0);
+        keyboard->physical_ctrl = 0;
+    }
+}
+
 static void handle_key_repeat(struct r36sx_screen_keyboard *keyboard,
                               uint32_t held,
                               r36sx_screen_keyboard_emit_fn emit,
@@ -1654,6 +1694,7 @@ static uint32_t activate_current(struct r36sx_screen_keyboard *keyboard,
 
     start_current_press_animation(keyboard, buttons);
     if ((key->flags & R36SX_OSK_FLAG_CLOSE) != 0) {
+        release_physical_modifiers(keyboard, emit, emit_user);
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
     }
@@ -1728,12 +1769,14 @@ static const char *display_label_for_key(
     }
     if ((key->flags & R36SX_OSK_FLAG_SHIFTED) == 0 &&
         key->keycode >= 'A' && key->keycode <= 'Z' && scratch_size >= 2) {
-        scratch[0] = (char)((keyboard->shift ? 'A' : 'a') +
+        scratch[0] = (char)(((keyboard->shift || keyboard->physical_shift) ?
+                             'A' : 'a') +
                             (key->keycode - 'A'));
         scratch[1] = '\0';
         return scratch;
     }
-    if (keyboard->shift && (key->flags & R36SX_OSK_FLAG_SHIFTED) == 0) {
+    if ((keyboard->shift || keyboard->physical_shift) &&
+        (key->flags & R36SX_OSK_FLAG_SHIFTED) == 0) {
         const char *shifted = shifted_label_for_key(key->keycode);
         if (shifted) {
             return shifted;
@@ -1758,8 +1801,10 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
     uint16_t fg = rgb565(235, 242, 232);
     uint16_t border = rgb565(110, 132, 150);
     int active_modifier =
-        ((key->flags & R36SX_OSK_FLAG_SHIFT_MOD) && keyboard->shift) ||
-        ((key->flags & R36SX_OSK_FLAG_CTRL_MOD) && keyboard->ctrl) ||
+        ((key->flags & R36SX_OSK_FLAG_SHIFT_MOD) &&
+         (keyboard->shift || keyboard->physical_shift)) ||
+        ((key->flags & R36SX_OSK_FLAG_CTRL_MOD) &&
+         (keyboard->ctrl || keyboard->physical_ctrl)) ||
         ((key->flags & R36SX_OSK_FLAG_ALT_MOD) && keyboard->alt);
 
     if (active_modifier) {
@@ -1818,6 +1863,8 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->shift = 0;
     keyboard->ctrl = 0;
     keyboard->alt = 0;
+    keyboard->physical_shift = 0;
+    keyboard->physical_ctrl = 0;
     keyboard->symbol_mode = 0;
     keyboard->cursor_block = 0;
     keyboard->scroll_y = 0;
@@ -1871,6 +1918,8 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->shift = 0;
         keyboard->ctrl = 0;
         keyboard->alt = 0;
+        keyboard->physical_shift = 0;
+        keyboard->physical_ctrl = 0;
         keyboard->symbol_mode = 0;
         keyboard->scroll_y = 0;
         keyboard->press_buttons = 0;
@@ -1947,12 +1996,11 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
         return 0;
     }
     update_press_animation(keyboard, held);
-    if ((pressed & (R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R)) != 0) {
-        toggle_symbol_mode(keyboard);
-    }
+    handle_physical_modifiers(keyboard, held, emit, emit_user);
     nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
     handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
+        release_physical_modifiers(keyboard, emit, emit_user);
         r36sx_screen_keyboard_set_visible(keyboard, 0);
         return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
     }
@@ -2000,8 +2048,21 @@ uint32_t r36sx_screen_keyboard_handle_picker_buttons(
         return 0;
     }
     update_press_animation(keyboard, held);
-    if ((pressed & (R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R)) != 0) {
-        toggle_symbol_mode(keyboard);
+    if ((pressed & R36SX_RKGAME_KEY_L) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_SHIFT,
+                                      pressed & R36SX_RKGAME_KEY_L);
+        if (keycode) {
+            *keycode = R36SX_SCREEN_KEY_SHIFT;
+        }
+        return R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_R) != 0) {
+        start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_CONTROL,
+                                      pressed & R36SX_RKGAME_KEY_R);
+        if (keycode) {
+            *keycode = R36SX_SCREEN_KEY_CONTROL;
+        }
+        return R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
     }
     nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
     handle_navigation(keyboard, nav_buttons);
