@@ -199,9 +199,8 @@ The `[audio]` switches mute emulated playback devices without disabling their
 I/O ports.  The built-in PC speaker/beeper always remains active.
 `audio_sample_rate` can be `44100` or `22050`; `22050` halves internal mixer
 work and is duplicated back to 44.1 kHz for the stock `driver.so` output path.
-Completed audio blocks are queued with their own frame count, copied into a
-private playback buffer before `sound_driver_playframe()`, and smoothed with a
-32-frame de-click ramp at block boundaries.
+Completed audio blocks are queued with their own frame count and copied into a
+private playback buffer before `sound_driver_playframe()`.
 Set any non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
 (`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
 (`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI

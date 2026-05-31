@@ -32,6 +32,15 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 disabled audio de-click ramp
+
+The current `pico_286` binary removes the experimental 32-frame audio de-click
+ramp.  The elapsed-time packet sizing, four-buffer producer queue, and private
+playback buffer remain enabled.
+
+pico_286 size: 1424544 bytes
+pico_286 SHA256: E87616ABAEEDF0473E92CFAE425BE5818411594787892D39D3E959AE2A69EFE9
+
 ## 2026-05-31 VBE 800x600 SVGA modes
 
 The current `pico_286` binary supports minimal banked VBE modes `103h`

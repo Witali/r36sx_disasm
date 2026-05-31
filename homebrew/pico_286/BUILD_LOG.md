@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-05-31 disabled audio de-click ramp
+
+Removed the experimental 32-frame audio de-click ramp from `r36sx_linux_audio.c`.
+The audio path still uses elapsed-time packet sizing, the four-buffer producer
+queue, and the private playback buffer before `sound_driver_playframe()`.  This
+build is intended to compare device behavior with raw packet boundaries while
+keeping the timing/buffering fixes.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1424544` bytes
+- `pico_286` SHA256:
+  `E87616ABAEEDF0473E92CFAE425BE5818411594787892D39D3E959AE2A69EFE9`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 VBE 800x600 SVGA modes
 
 Added minimal banked VBE/SVGA support for 800x600 output.
@@ -55,7 +87,7 @@ Changed Pico-286 audio packet sizing to follow real elapsed time.
   match the elapsed time since the previous audio packet, capped by the 100 ms
   buffer capacity.
 - `linux_audio_init()` now receives the full buffer capacity so the resampling
-  and de-click path can handle the largest packet.
+  and shutter-mix path can handle the largest packet.
 
 Rebuild command:
 

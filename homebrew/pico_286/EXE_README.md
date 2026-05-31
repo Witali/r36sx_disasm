@@ -174,8 +174,7 @@ instructions per frame.  Rendering overlays such as the on-screen keyboard do
 not reduce the CPU quantum.  The same target also sets the nominal audio packet
 cadence.  At 60 Hz this is about 735 stereo frames at 44.1 kHz, but delayed
 packets are sized from the actual elapsed time since the previous audio send,
-up to the 100 ms source buffer capacity.  Block boundaries are smoothed with a
-short de-click ramp.
+up to the 100 ms source buffer capacity.
 
 Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
 (800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`, and
