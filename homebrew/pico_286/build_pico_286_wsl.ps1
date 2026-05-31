@@ -2,6 +2,7 @@ param(
     [switch]$DebugLog,
     [switch]$DisableProfiling,
     [switch]$DisableComputedGoto,
+    [switch]$DisableFastMemory,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og", "Ofast")]
     [string]$OptLevel = "O2",
     [switch]$EnableMipsDsp,
@@ -22,6 +23,7 @@ $ArgsList = @()
 if ($DebugLog) { $ArgsList += "--debug-log" }
 if ($DisableProfiling) { $ArgsList += "--disable-profiling" }
 if ($DisableComputedGoto) { $ArgsList += "--disable-computed-goto" }
+if ($DisableFastMemory) { $ArgsList += "--disable-fast-memory" }
 if ($OptLevel) {
     $ArgsList += "--opt-level"
     $ArgsList += $OptLevel

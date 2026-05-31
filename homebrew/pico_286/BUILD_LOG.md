@@ -1779,6 +1779,44 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-31 native fast memory path
+
+Added `R36SX_NATIVE_FAST_MEMORY`, enabled by default in both Pico-286 build
+scripts.  In the R36SX native build, CPU `getmem*`/`putmem*` now use inline
+fast helpers for conventional RAM and fall back to the existing `*_ob` memory
+map for video RAM, EMS, BIOS ROM, UMB, HMA, and A20 wrapping.  The old
+function-pointer memory backend remains available with
+`--disable-fast-memory` in the WSL build wrapper.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `homebrew/pico_286/pico_286`
+  - Size: 428,896 bytes
+  - SHA256: `404C7D8D581EED25958640B34F06E3AFA333C08AB62FE55CABEBA9ABF7C248EF`
+- `homebrew/pico_286/pico_286.dsp`
+  - Size: 422,960 bytes
+  - SHA256: `28D85715B02BFC4D400DD2A29690C598FE56C3EF0D96C59D8D0287AC718AF354`
+- Defender scan: found no threats for the rebuilt binaries and their
+  `disk_image` / `patches` copies.
+
 ## 2026-05-30 PCjs CPU test floppy
 
 Downloaded the PCjs CPU test sources with a sparse Git checkout:

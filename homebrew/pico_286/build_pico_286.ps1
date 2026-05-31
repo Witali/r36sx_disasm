@@ -2,6 +2,7 @@ param(
     [switch]$DebugLog,
     [switch]$DisableProfiling,
     [switch]$DisableComputedGoto,
+    [switch]$DisableFastMemory,
     [switch]$TryStrip
 )
 
@@ -32,6 +33,7 @@ $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
 $DebugValue = if ($DebugLog) { "1" } else { "0" }
 $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 $ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
+$FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -81,6 +83,7 @@ $CommonArgs = @(
     "-DDEBUG=$DebugValue",
     "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
     "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
+    "-DR36SX_NATIVE_FAST_MEMORY=$FastMemoryValue",
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",
     "-DR36SX_VIDEO_DIRTY_TRACKING=1",

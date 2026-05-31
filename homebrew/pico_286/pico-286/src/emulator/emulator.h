@@ -299,6 +299,104 @@ uint8_t read86_sw(uint32_t address);
 uint16_t readw86_sw(uint32_t address);
 uint32_t readdw86_sw(uint32_t address);
 
+#ifndef R36SX_NATIVE_FAST_MEMORY
+#define R36SX_NATIVE_FAST_MEMORY 0
+#endif
+
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+static inline int r36sx_memory_fast_ram_range(uint32_t address,
+                                              uint32_t bytes)
+{
+    return bytes != 0u && address < RAM_SIZE && bytes <= RAM_SIZE - address;
+}
+
+static inline uint8_t r36sx_read86_fast(uint32_t address)
+{
+    if (address < RAM_SIZE) {
+        return RAM[address];
+    }
+    return read86_ob(address);
+}
+
+static inline uint16_t r36sx_readw86_fast(uint32_t address)
+{
+    if (address & 1u) {
+        return (uint16_t)r36sx_read86_fast(address) |
+               ((uint16_t)r36sx_read86_fast(address + 1u) << 8);
+    }
+    if (r36sx_memory_fast_ram_range(address, 2u)) {
+        return *(uint16_t *)&RAM[address];
+    }
+    return readw86_ob(address);
+}
+
+static inline uint32_t r36sx_readdw86_fast(uint32_t address)
+{
+    if (address & 3u) {
+        return (uint32_t)r36sx_read86_fast(address) |
+               ((uint32_t)r36sx_read86_fast(address + 1u) << 8) |
+               ((uint32_t)r36sx_read86_fast(address + 2u) << 16) |
+               ((uint32_t)r36sx_read86_fast(address + 3u) << 24);
+    }
+    if (r36sx_memory_fast_ram_range(address, 4u)) {
+        return *(uint32_t *)&RAM[address];
+    }
+    return readdw86_ob(address);
+}
+
+static inline void r36sx_write86_fast(uint32_t address, uint8_t value)
+{
+    if (address < RAM_SIZE) {
+        RAM[address] = value;
+        return;
+    }
+    write86_ob(address, value);
+}
+
+static inline void r36sx_writew86_fast(uint32_t address, uint16_t value)
+{
+    if (address & 1u) {
+        r36sx_write86_fast(address, (uint8_t)value);
+        r36sx_write86_fast(address + 1u, (uint8_t)(value >> 8));
+        return;
+    }
+    if (r36sx_memory_fast_ram_range(address, 2u)) {
+        *(uint16_t *)&RAM[address] = value;
+        return;
+    }
+    writew86_ob(address, value);
+}
+
+static inline void r36sx_writedw86_fast(uint32_t address, uint32_t value)
+{
+    if (address & 3u) {
+        r36sx_write86_fast(address, (uint8_t)value);
+        r36sx_write86_fast(address + 1u, (uint8_t)(value >> 8));
+        r36sx_write86_fast(address + 2u, (uint8_t)(value >> 16));
+        r36sx_write86_fast(address + 3u, (uint8_t)(value >> 24));
+        return;
+    }
+    if (r36sx_memory_fast_ram_range(address, 4u)) {
+        *(uint32_t *)&RAM[address] = value;
+        return;
+    }
+    writedw86_ob(address, value);
+}
+
+#undef getmem8
+#undef getmem16
+#undef getmem32
+#undef putmem8
+#undef putmem16
+#undef putmem32
+#define getmem8(x, y) r36sx_read86_fast(segbase(x) + (uint32_t)(y))
+#define getmem16(x, y) r36sx_readw86_fast(segbase(x) + (uint32_t)(y))
+#define getmem32(x, y) r36sx_readdw86_fast(segbase(x) + (uint32_t)(y))
+#define putmem8(x, y, z) r36sx_write86_fast(segbase(x) + (uint32_t)(y), (z))
+#define putmem16(x, y, z) r36sx_writew86_fast(segbase(x) + (uint32_t)(y), (z))
+#define putmem32(x, y, z) r36sx_writedw86_fast(segbase(x) + (uint32_t)(y), (z))
+#endif
+
 // Ports
 void vga_portout(uint16_t portnum, uint16_t value);
 uint16_t vga_portin(uint16_t portnum);

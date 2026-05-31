@@ -11,6 +11,7 @@ Options:
   --debug-log              Build with DEBUG=1.
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
+  --disable-fast-memory    Use indirect memory function pointers in CPU code.
   --opt-level LEVEL        GCC optimization level. Default: O2.
   --enable-mips-dsp        Experimental buffer helpers with MIPS DSP Rev2.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
@@ -44,6 +45,7 @@ CRTEND="$GCC_LIB/crtend.o"
 DEBUG_VALUE=0
 PROFILING_VALUE=1
 COMPUTED_GOTO_VALUE=1
+FAST_MEMORY_VALUE=1
 DO_STRIP=0
 OPT_LEVEL=O2
 MIPS_DSP_VALUE=0
@@ -60,6 +62,10 @@ while (($#)); do
             ;;
         --disable-computed-goto)
             COMPUTED_GOTO_VALUE=0
+            shift
+            ;;
+        --disable-fast-memory)
+            FAST_MEMORY_VALUE=0
             shift
             ;;
         --opt-level)
@@ -145,6 +151,7 @@ common_args=(
     "-DDEBUG=$DEBUG_VALUE"
     "-DR36SX_ENABLE_PROFILING=$PROFILING_VALUE"
     "-DR36SX_CPU_COMPUTED_GOTO=$COMPUTED_GOTO_VALUE"
+    "-DR36SX_NATIVE_FAST_MEMORY=$FAST_MEMORY_VALUE"
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
     "-DR36SX_VIDEO_DIRTY_TRACKING=1"

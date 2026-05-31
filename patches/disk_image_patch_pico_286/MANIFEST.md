@@ -1699,3 +1699,20 @@ pico_286 size: 8061088 bytes
 pico_286 SHA256: 7770B1BD818DA27E1E4F7B924ACABC95B193509314341B24B6CC769F690D78C9
 Defender scan: found no threats
 ```
+
+## 2026-05-31 native fast memory path
+
+The current `pico_286` and `pico_286.dsp` binaries were rebuilt with
+`R36SX_NATIVE_FAST_MEMORY=1`.  CPU memory macros now use inline direct access
+for conventional RAM and fall back to the existing on-board memory-map helpers
+for video RAM, EMS, BIOS ROM, UMB, HMA, and A20 wrapping.  The WSL build can be
+switched back to the old function-pointer path with `--disable-fast-memory` for
+A/B testing.
+
+```text
+pico_286 size: 428896 bytes
+pico_286 SHA256: 404C7D8D581EED25958640B34F06E3AFA333C08AB62FE55CABEBA9ABF7C248EF
+pico_286.dsp size: 422960 bytes
+pico_286.dsp SHA256: 28D85715B02BFC4D400DD2A29690C598FE56C3EF0D96C59D8D0287AC718AF354
+Defender scan: found no threats
+```
