@@ -177,3 +177,36 @@ size: 16652 bytes
 This path has not yet replaced the normal build scripts. Treat it as an
 experimental route for testing whether GCC 10.3.0 with `-mtune=74kc` produces
 better code than Zig/Clang for hot files.
+
+## Pico-286 WSL GCC build
+
+Pico-286 now has a direct WSL build path that uses the Linux
+Codescape/Buildroot SDK instead of the Windows bare-metal GCC experiment above.
+No extra Ubuntu packages were required on the tested WSL installation; the
+compiler runs directly from:
+
+```text
+tools/mipsel-buildroot-linux-gnu_sdk-buildroot/opt/ext-toolchain/bin/
+```
+
+Build from Windows PowerShell:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1
+```
+
+Or directly from WSL:
+
+```powershell
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_286_wsl.sh"
+```
+
+The script writes `homebrew/pico_286/pico_286.gcc` by default and passes:
+
+```text
+-EL -mips32r2 -mabi=32 -march=mips32r2 -mtune=74kc
+```
+
+The normal `build_pico_286.ps1` Zig/Clang path intentionally does not pass
+`-mtune=74kc`: Zig/LLVM 0.16 rejects that CPU name, while
+`mips-mti-linux-gnu-gcc` accepts it.

@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-05-31 WSL GCC build path
+
+Added an alternate Pico-286 build path for WSL using the Linux
+`mips-mti-linux-gnu-gcc` / `g++` toolchain already present in the SF3000 SDK.
+
+- New script: `homebrew/pico_286/build_pico_286_wsl.sh`.
+- New Windows wrapper: `homebrew/pico_286/build_pico_286_wsl.ps1`.
+- The WSL/GCC build uses `-march=mips32r2 -mtune=74kc`.
+- The default output is `homebrew/pico_286/pico_286.gcc`, so this experimental
+  build does not overwrite the normal deployed `pico_286` binary.
+- The normal Windows/Zig build remains `-march=mips32r2` only.  Zig/LLVM 0.16
+  rejects `-mtune=74kc` with `unknown CPU: '74kc'`, while the Codescape GCC
+  toolchain accepts it.
+
+Build command from repository root:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1
+```
+
+Equivalent direct WSL command:
+
+```powershell
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_286_wsl.sh"
+```
+
+Result:
+
+- `pico_286.gcc` size: `377660` bytes
+- `pico_286.gcc` SHA256:
+  `006265EEB65F26A76CCD250B66BFB990B908AEAA5F5EA8CB691124CFFDA04078`
+
+ELF check:
+
+```text
+ELF32, little-endian MIPS, executable, o32, mips32r2, hard-float
+interpreter: /lib/ld.so.1
+needed: libpthread.so.0, libdl.so.2, libm.so.6, libz.so.1,
+        libstdc++.so.6, libgcc_s.so.1, libc.so.6
+```
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.gcc
+```
+
+Microsoft Defender reported no threats.
+
 ## 2026-05-31 vendored inih config parser
 
 Replaced Pico-286's hand-written config readers with the vendored `inih`

@@ -477,6 +477,26 @@ emulated screen text is no longer copied into the log.
 MIPS ELF.  The script therefore leaves the executable unstripped by default.
 Pass `-TryStrip` only when testing a newer Zig that supports stripping it.
 
+Alternative WSL/GCC build:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1
+```
+
+This wrapper runs `build_pico_286_wsl.sh` inside WSL and uses the Linux
+`mips-mti-linux-gnu-gcc` / `g++` tools from the existing SF3000 SDK under
+`tools/mipsel-buildroot-linux-gnu_sdk-buildroot`.  It builds
+`homebrew/pico_286/pico_286.gcc` by default and passes
+`-march=mips32r2 -mtune=74kc` to GCC.  The normal Windows/Zig build does not use
+`-mtune=74kc`, because Zig/LLVM's MIPS backend does not recognize `74kc` as a
+CPU name.
+
+Equivalent direct WSL command:
+
+```powershell
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_286_wsl.sh"
+```
+
 Before replacing the vendored `homebrew/pico_286/pico-286` source snapshot,
 scan the downloaded checkout/archive first, then scan the copied vendored tree:
 
