@@ -12,7 +12,7 @@ TEST386.COM
   program or as a ROM image in PCjs. On Pico-286, run it from DOS after
   booting FreeDOS.
 
-T386ROM.BIN
+TEST386.BIN
   R36SX build of barotto/test386.asm. This is a 64KB BIOS replacement test
   ROM, not a DOS COM program. It is stored here as a test payload/reference.
   The source is in homebrew/pico_286/tests/test386.asm. This build enables
@@ -34,7 +34,7 @@ Suggested use:
    ID
    TEST386
 
-4. T386ROM.BIN is not launched from DOS. To execute it, the emulator must load
+4. TEST386.BIN is not launched from DOS. To execute it, the emulator must load
    it as the BIOS/test ROM at physical F0000h and reset into its reset vector.
 
 Notes:

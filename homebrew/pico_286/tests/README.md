@@ -30,7 +30,9 @@ Rebuild `cpu_tests.img` with:
 .\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
 ```
 
-The generated `test386-r36sx.bin` is a 64 KB BIOS replacement ROM. It is not a
+The generated `test386.bin` is a 64 KB BIOS replacement ROM. It is not a
 DOS `.COM` program, so it cannot be launched from the DOS prompt. The test disk
-stores it as `T386ROM.BIN` for reference and for future emulator BIOS-loading
-work.
+stores it as `TEST386.BIN` for reference and for future emulator BIOS-loading
+work.  `rebuild_cpu_tests_disk.ps1` also copies the same ROM to
+`homebrew/pico_286/test386.bin`, which is the default `test_bios_rom` used by
+the native executable.

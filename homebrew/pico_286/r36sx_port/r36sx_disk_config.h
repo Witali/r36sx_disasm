@@ -29,6 +29,11 @@ typedef enum {
     R36SX_PICO286_CPU_MODE_PROTECTED = 1,
 } r36sx_pico286_cpu_mode_t;
 
+typedef enum {
+    R36SX_PICO286_BIOS_NORMAL = 0,
+    R36SX_PICO286_BIOS_TEST386 = 1,
+} r36sx_pico286_bios_mode_t;
+
 // Return the configured host image path for a BIOS disk drive, or fallback_path.
 const char *r36sx_pico286_disk_path(uint8_t bios_drive,
                                     const char *fallback_path);
@@ -72,6 +77,21 @@ const char *r36sx_pico286_cpu_mode_name(void);
 
 // Return non-zero when boot should stop at the ROM BIOS boot prompt.
 int r36sx_pico286_boot_bios_prompt(void);
+
+// Return the selected BIOS ROM provider.
+r36sx_pico286_bios_mode_t r36sx_pico286_bios_mode(void);
+
+// Return the selected BIOS ROM provider text used when rewriting config.
+const char *r36sx_pico286_bios_mode_name(void);
+
+// Update the selected BIOS ROM provider. Call save_config to persist it.
+int r36sx_pico286_set_bios_mode(r36sx_pico286_bios_mode_t mode);
+
+// Return the configured test BIOS path resolved relative to pico_286.conf.
+const char *r36sx_pico286_test_bios_path(void);
+
+// Return the test BIOS path value as written to pico_286.conf.
+const char *r36sx_pico286_test_bios_value(void);
 
 // Return the configured boot drive order. Empty result means use ROM behavior.
 uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives);

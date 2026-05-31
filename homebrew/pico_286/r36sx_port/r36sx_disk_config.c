@@ -52,6 +52,9 @@ static char disk_config_path[R36SX_PICO286_MAX_DISK_PATH] =
 static char cpu_model_text[16] = "80386";
 static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
+static char bios_mode_text[16] = "normal";
+static char test_bios_value[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
+static char test_bios_path[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
 static char boot_mode_text[32] = "normal";
 static char boot_order_text[64] = "fdd0,hdd0";
 static char host_drive_value[R36SX_PICO286_MAX_DISK_PATH] = "host";
@@ -71,6 +74,7 @@ static char xms_memory_kb_text[16] = "4096";
 static uint32_t cpu_exec_loops = 0;
 static r36sx_pico286_cpu_model_t cpu_model = R36SX_PICO286_CPU_80386;
 static r36sx_pico286_cpu_mode_t cpu_mode = R36SX_PICO286_CPU_MODE_REAL;
+static r36sx_pico286_bios_mode_t bios_mode = R36SX_PICO286_BIOS_NORMAL;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
 static uint32_t disk_cache_flush_sectors = 4u;
@@ -245,6 +249,14 @@ static void set_host_drive_value(const char *value)
                                  host_drive_value);
 }
 
+static void set_test_bios_value(const char *value)
+{
+    snprintf(test_bios_value, sizeof(test_bios_value), "%s",
+             value && value[0] ? value : "test386.bin");
+    resolve_config_relative_path(test_bios_path, sizeof(test_bios_path),
+                                 test_bios_value);
+}
+
 static void ensure_host_drive_dir(void)
 {
     if (host_drive_path[0] == '\0') {
@@ -285,6 +297,7 @@ static void set_config_dir(const char *config_path)
         set_disk_entry_value(&disk_entries[i], disk_entries[i].value);
     }
     set_host_drive_value(host_drive_value);
+    set_test_bios_value(test_bios_value);
 }
 
 static int set_cpu_mhz(const char *value, int line_no)
@@ -401,6 +414,32 @@ static int set_boot_mode(const char *value, int line_no)
 
     r36sx_pico286_debug_log(
         "diskcfg: ignoring invalid boot_mode '%s' at line %d",
+        value, line_no);
+    return 0;
+}
+
+static int set_bios_mode_value(const char *value, int line_no)
+{
+    if (key_equals(value, "normal") ||
+        key_equals(value, "builtin") ||
+        key_equals(value, "default")) {
+        bios_mode = R36SX_PICO286_BIOS_NORMAL;
+        snprintf(bios_mode_text, sizeof(bios_mode_text), "normal");
+        r36sx_pico286_debug_log("diskcfg: bios=normal");
+        return 1;
+    }
+
+    if (key_equals(value, "test386") ||
+        key_equals(value, "test") ||
+        key_equals(value, "test_bios")) {
+        bios_mode = R36SX_PICO286_BIOS_TEST386;
+        snprintf(bios_mode_text, sizeof(bios_mode_text), "test386");
+        r36sx_pico286_debug_log("diskcfg: bios=test386");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid bios '%s' at line %d",
         value, line_no);
     return 0;
 }
@@ -811,6 +850,21 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
     }
+    if (key_equals(key, "bios") ||
+        key_equals(key, "bios_mode") ||
+        key_equals(key, "bios_rom")) {
+        return set_bios_mode_value(value, line_no);
+    }
+    if (key_equals(key, "test_bios_rom") ||
+        key_equals(key, "test_bios_path") ||
+        key_equals(key, "test386_bios_rom") ||
+        key_equals(key, "test386_bios_path") ||
+        key_equals(key, "bios_path")) {
+        set_test_bios_value(value);
+        r36sx_pico286_debug_log("diskcfg: test_bios_rom='%s'",
+                                test_bios_path);
+        return 1;
+    }
     if (key_equals(key, "host_drive_path") ||
         key_equals(key, "host_path") ||
         key_equals(key, "host_dir") ||
@@ -1024,6 +1078,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
 
+    fprintf(fp, "# BIOS ROM provider: normal or test386.\n");
+    fprintf(fp, "# test_bios_rom is resolved relative to this config file.\n");
+    fprintf(fp, "[bios]\n");
+    fprintf(fp, "bios=%s\n", bios_mode_text);
+    fprintf(fp, "test_bios_rom=%s\n\n", test_bios_value);
+
     fprintf(fp, "# Emulated memory sizes in KB, capped by the compiled buffers.\n");
     fprintf(fp, "# Allowed ranges:\n");
     fprintf(fp, "# conventional_kb: 64..640, reported through the BIOS Data Area.\n");
@@ -1132,6 +1192,44 @@ int r36sx_pico286_boot_bios_prompt(void)
     load_disk_config();
 
     return boot_bios_prompt;
+}
+
+r36sx_pico286_bios_mode_t r36sx_pico286_bios_mode(void)
+{
+    load_disk_config();
+
+    return bios_mode;
+}
+
+const char *r36sx_pico286_bios_mode_name(void)
+{
+    load_disk_config();
+
+    return bios_mode_text;
+}
+
+int r36sx_pico286_set_bios_mode(r36sx_pico286_bios_mode_t mode)
+{
+    load_disk_config();
+
+    if (mode == R36SX_PICO286_BIOS_TEST386) {
+        return set_bios_mode_value("test386", 0);
+    }
+    return set_bios_mode_value("normal", 0);
+}
+
+const char *r36sx_pico286_test_bios_path(void)
+{
+    load_disk_config();
+
+    return test_bios_path;
+}
+
+const char *r36sx_pico286_test_bios_value(void)
+{
+    load_disk_config();
+
+    return test_bios_value;
 }
 
 uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives)

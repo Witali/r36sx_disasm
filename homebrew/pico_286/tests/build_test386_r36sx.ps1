@@ -9,8 +9,8 @@ $SourceRoot = Join-Path $TestsRoot "test386.asm"
 $SourceFile = Join-Path $SourceRoot "src\test386.asm"
 $IncludeDir = Join-Path $SourceRoot "src"
 $BuildDir = Join-Path $SourceRoot "build"
-$OutputBin = Join-Path $BuildDir "test386-r36sx.bin"
-$OutputList = Join-Path $BuildDir "test386-r36sx.lst"
+$OutputBin = Join-Path $BuildDir "test386.bin"
+$OutputList = Join-Path $BuildDir "test386.lst"
 $Nasm = Join-Path $RepoRoot "tools\nasm-3.01-win64\nasm-3.01\nasm.exe"
 
 if (!(Test-Path -LiteralPath $Nasm)) {

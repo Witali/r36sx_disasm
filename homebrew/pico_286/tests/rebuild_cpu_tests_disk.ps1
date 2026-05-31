@@ -13,7 +13,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $CreateFat = Join-Path $RepoRoot "tools\create_fat12_floppy.py"
 $OutputImage = Join-Path $PicoRoot "cpu_tests.img"
-$Test386Bin = Join-Path $TestsRoot "test386.asm\build\test386-r36sx.bin"
+$Test386Bin = Join-Path $TestsRoot "test386.asm\build\test386.bin"
+$ExeSideTest386Bin = Join-Path $PicoRoot "test386.bin"
 $Readme = Join-Path $PicoRoot "dos_files\cpu_tests_readme.txt"
 $PcjsRoot = Join-Path $RepoRoot "internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu"
 
@@ -29,7 +30,7 @@ python $CreateFat `
     --label CPUTESTS `
     --file "ID.COM=$(Join-Path $PcjsRoot 'bin\id.com')" `
     --file "TEST386.COM=$(Join-Path $PcjsRoot 'bin\test386.com')" `
-    --file "T386ROM.BIN=$Test386Bin" `
+    --file "TEST386.BIN=$Test386Bin" `
     --file "CPUID.ASM=$(Join-Path $PcjsRoot 'cpuid.asm')" `
     --file "ID.ASM=$(Join-Path $PcjsRoot 'id.asm')" `
     --file "README.TXT=$Readme"
@@ -37,6 +38,9 @@ python $CreateFat `
 if ($LASTEXITCODE -ne 0) {
     throw "FAT12 image build failed with exit code $LASTEXITCODE."
 }
+
+Copy-Item -LiteralPath $Test386Bin -Destination $ExeSideTest386Bin -Force
+Write-Host "Copied $ExeSideTest386Bin"
 
 $Hash = Get-FileHash -Algorithm SHA256 -LiteralPath $OutputImage
 $Item = Get-Item -LiteralPath $OutputImage

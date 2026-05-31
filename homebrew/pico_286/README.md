@@ -202,6 +202,10 @@ cpu_mhz=32.768
 boot_mode=normal
 boot_order=fdd0,hdd0
 
+[bios]
+bios=normal
+test_bios_rom=test386.bin
+
 [memory]
 conventional_kb=640
 upper_kb=176
@@ -267,16 +271,18 @@ compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 `cpu_tests.img` is a 1.44 MB FAT12 floppy image stored next to the Pico-286
 executable.  It contains PCjs `ID.COM` and `TEST386.COM` CPU/protected-mode
-tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `T386ROM.BIN`.
-`T386ROM.BIN` is the R36SX debug build of
+tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `TEST386.BIN`.
+`TEST386.BIN` is the R36SX debug build of
 `homebrew/pico_286/tests/test386.asm`, configured with `DEBUG=1`, ASCII output
 port `191h`, and POST port `190h`.  Pico-286 logs those ports to
 `pico_286.log`.
 
 Boot FreeDOS from `FreeDOS1.img`, mount `cpu_tests.img` as `B:` from the disk
 menu or set `fdd1=cpu_tests.img`, then run `B:`, `ID`, and `TEST386`.
-`T386ROM.BIN` is not a DOS `.COM` program; it is a 64 KB BIOS replacement ROM
+`TEST386.BIN` is not a DOS `.COM` program; it is a 64 KB BIOS replacement ROM
 payload that must be loaded at physical `F0000h` by the emulator to execute.
+The native executable can also load `test386.bin` directly when the disk menu
+BIOS option is switched from `NORMAL` to `TEST386`.
 
 `screenshot_format=png` saves compressed screenshots through zlib.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
@@ -305,6 +311,11 @@ not contain a full interactive CMOS/BIOS setup utility.
 `boot_order` selects the boot sector probe order used by the R36SX `INT 19h`
 hook.  Supported drive names are `fdd0`, `fdd1`, `hdd0`, and `hdd1`; use
 `boot_order=rom` to chain to the embedded ROM BIOS boot path instead.
+
+`bios=normal` uses the embedded Turbo XT compatible BIOS.  `bios=test386`
+loads the external 64 KB BIOS ROM named by `test_bios_rom`, which defaults to
+`test386.bin` beside `pico_286.conf`.  The disk menu exposes this as
+`BIOS NORMAL/TEST386` and requests a soft reset after saving a BIOS change.
 
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
 `80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286

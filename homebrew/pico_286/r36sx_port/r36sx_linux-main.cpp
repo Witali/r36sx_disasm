@@ -1159,9 +1159,10 @@ int main() {
     const uint32_t cpu_exec_loops_per_frame =
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms);
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_mode=%s cpu_exec_loops_per_ms=%u main_loop_fps=%u cpu_exec_loops_per_frame=%u",
+        "main: cpu_model=%s cpu_mode=%s bios=%s cpu_exec_loops_per_ms=%u main_loop_fps=%u cpu_exec_loops_per_frame=%u",
                             r36sx_pico286_cpu_model_name(),
                             r36sx_pico286_cpu_mode_name(),
+                            r36sx_pico286_bios_mode_name(),
                             cpu_exec_loops_per_ms,
                             R36SX_MAIN_LOOP_FPS,
                             cpu_exec_loops_per_frame);

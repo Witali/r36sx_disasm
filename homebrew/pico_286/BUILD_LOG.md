@@ -1,5 +1,59 @@
 # pico-286 Build Log
 
+## 2026-05-31 BIOS mode menu switch
+
+Added a configurable BIOS ROM provider for the native R36SX Pico-286 build.
+
+- `pico_286.conf` now contains a `[bios]` section.
+- `bios=normal` uses the embedded Turbo XT compatible BIOS.
+- `bios=test386` loads the external 64 KB test BIOS from
+  `test_bios_rom=test386.bin`.
+- `test386.bin` is resolved relative to `pico_286.conf`.
+- The disk image menu now has a `BIOS  NORMAL/TEST386` row.  Saving after a
+  BIOS change requests a soft reset so the selected ROM starts immediately.
+- In `test386` mode, memory reads from `F0000h-FFFFFh` come from the external
+  ROM, and writes to that range are ignored like ROM.
+
+The external ROM file is copied next to the native executable:
+
+- `homebrew/pico_286/test386.bin`
+- `disk_image/MIPS_NATIVE/pico_286/test386.bin`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/test386.bin`
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.  The compiler emitted only pre-existing upstream
+warnings from `#pragma GCC optimize("Ofast")` and the EMS inline helper.
+
+Result:
+
+- `pico_286` size: `1322776` bytes
+- `pico_286` SHA256:
+  `18BDBBEF191F7A463EACF756B93F6F3A92D6EA5FEA7E2E31836159CE845A4016`
+- `test386.bin` size: `65536` bytes
+- `test386.bin` SHA256:
+  `7E91F03B910FE52508D28ADD2AC4CF4F73B3D23F5DB7B77A5315D6F0DD234497`
+- `cpu_tests.img` size: `1474560` bytes
+- `cpu_tests.img` SHA256:
+  `6FF84B315AF6235934DE90CB775C517CDB2909BF2C9DFB567625D86BFCBB2A06`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\test386.bin
+.\tools\scan-download.ps1 .\homebrew\pico_286\cpu_tests.img
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats for all three files.  The disk-image
+and patch copies are byte-identical by SHA256.
+
 ## 2026-05-31 test386.asm debug ROM payload
 
 Downloaded `barotto/test386.asm` into `homebrew/pico_286/tests/test386.asm`
@@ -35,16 +89,16 @@ Build command:
 Equivalent NASM command:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test386.asm\src\ -f bin .\homebrew\pico_286\tests\test386.asm\src\test386.asm -w-all -l .\homebrew\pico_286\tests\test386.asm\build\test386-r36sx.lst -o .\homebrew\pico_286\tests\test386.asm\build\test386-r36sx.bin
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test386.asm\src\ -f bin .\homebrew\pico_286\tests\test386.asm\src\test386.asm -w-all -l .\homebrew\pico_286\tests\test386.asm\build\test386.lst -o .\homebrew\pico_286\tests\test386.asm\build\test386.bin
 ```
 
 ROM payload:
 
-- `homebrew/pico_286/tests/test386.asm/build/test386-r36sx.bin`
+- `homebrew/pico_286/tests/test386.asm/build/test386.bin`
 - Size: `65536` bytes
 - SHA256: `7E91F03B910FE52508D28ADD2AC4CF4F73B3D23F5DB7B77A5315D6F0DD234497`
 
-`test386-r36sx.bin` was scanned with Microsoft Defender; no threats were
+`test386.bin` was scanned with Microsoft Defender; no threats were
 reported.
 
 Rebuilt the CPU test floppy:
@@ -57,12 +111,12 @@ The resulting `cpu_tests.img` contains:
 
 - `ID.COM`
 - `TEST386.COM`
-- `T386ROM.BIN`
+- `TEST386.BIN`
 - `CPUID.ASM`
 - `ID.ASM`
 - `README.TXT`
 
-`T386ROM.BIN` is the R36SX `test386.asm` build.  It is a 64 KB BIOS replacement
+`TEST386.BIN` is the R36SX `test386.asm` build.  It is a 64 KB BIOS replacement
 ROM, not a DOS `.COM` program, so the floppy stores it as a payload/reference;
 executing it requires an emulator path that maps it at physical `F0000h` and
 resets into its reset vector.
@@ -71,7 +125,7 @@ CPU test floppy:
 
 - `homebrew/pico_286/cpu_tests.img`
 - Size: `1474560` bytes
-- SHA256: `FA485FA653CD90D48836D1E201FA81D9D604F9F18CDF5D8C233FAE8149070C2A`
+- SHA256: `6FF84B315AF6235934DE90CB775C517CDB2909BF2C9DFB567625D86BFCBB2A06`
 
 The rebuilt floppy image was scanned with Microsoft Defender; no threats were
 reported.  The same image was copied to:

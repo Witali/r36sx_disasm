@@ -71,15 +71,17 @@ text mode uses its 400 drawn rows rather than the full 480-pixel framebuffer.
 Open it with Fn+Select.
 
 - D-pad Up/Down: select a row.
-- Left/Right: change the selected disk image or boot order.
+- Left/Right: change the selected disk image, boot order, or BIOS mode.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
+- A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
 - A or Y on `SAVE/APPLY`: write current bindings to `pico_286.conf` and apply them.
 - A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 - A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
 
-The menu searches for `.img` files next to `pico_286.conf`.
+The menu searches for `.img` files next to `pico_286.conf`.  If the BIOS mode
+changes, `SAVE/APPLY` also requests a soft reset so the selected ROM starts.
 
 ## Disk Image Cache
 
@@ -96,6 +98,10 @@ cpu_mhz=32.768
 [boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
+
+[bios]
+bios=normal
+test_bios_rom=test386.bin
 
 [memory]
 conventional_kb=640
@@ -149,10 +155,12 @@ application exits.
 
 `cpu_tests.img` is an optional FAT12 floppy image beside the executable.  It
 contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`, then
-run `ID` or `TEST386`.  It also contains `T386ROM.BIN`, the R36SX debug build
+run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug build
 of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM, not a
 DOS `.COM` program; Pico-286 currently stores it as a payload/reference and
 logs its configured debug ports `190h`/`191h` when it is loaded as a ROM.
+The disk image menu can switch the executable BIOS setting between `NORMAL`
+and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 
 The `[memory]` values are in KB.  `conventional_kb` is reported through the
 BIOS Data Area, `extended_kb` is returned by `INT 15h AH=88h`, `upper_kb`

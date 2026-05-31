@@ -12,14 +12,18 @@
 #define R36SX_DISK_MENU_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_DISK_MENU_DRIVE_COUNT 4
 #define R36SX_DISK_MENU_ROW_BOOT_ORDER 4
-#define R36SX_DISK_MENU_ROW_SAVE 5
-#define R36SX_DISK_MENU_ROW_EXIT 6
-#define R36SX_DISK_MENU_ROW_CANCEL 7
-#define R36SX_DISK_MENU_ROW_COUNT 8
+#define R36SX_DISK_MENU_ROW_BIOS 5
+#define R36SX_DISK_MENU_ROW_SAVE 6
+#define R36SX_DISK_MENU_ROW_EXIT 7
+#define R36SX_DISK_MENU_ROW_CANCEL 8
+#define R36SX_DISK_MENU_ROW_COUNT 9
 
 #define R36SX_DISK_BOOT_ORDER_AC 0u
 #define R36SX_DISK_BOOT_ORDER_CA 1u
 #define R36SX_DISK_BOOT_ORDER_ROM 2u
+
+#define R36SX_DISK_BIOS_NORMAL 0u
+#define R36SX_DISK_BIOS_TEST386 1u
 
 extern uint8_t insertdisk(uint8_t drivenum, const char *pathname);
 
@@ -344,6 +348,11 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
         menu->boot_order_choice = R36SX_DISK_BOOT_ORDER_AC;
     }
     menu->boot_order_changed = 0;
+
+    menu->bios_choice =
+        r36sx_pico286_bios_mode() == R36SX_PICO286_BIOS_TEST386 ?
+        R36SX_DISK_BIOS_TEST386 : R36SX_DISK_BIOS_NORMAL;
+    menu->bios_changed = 0;
 }
 
 static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
@@ -397,9 +406,31 @@ static const char *boot_order_config_value(uint8_t choice)
     return choice == R36SX_DISK_BOOT_ORDER_CA ? "hdd0,fdd0" : "fdd0,hdd0";
 }
 
-static int apply_disk_bindings(struct r36sx_disk_menu *menu)
+static void cycle_bios(struct r36sx_disk_menu *menu)
+{
+    if (!menu) {
+        return;
+    }
+    menu->bios_choice = menu->bios_choice == R36SX_DISK_BIOS_TEST386 ?
+        R36SX_DISK_BIOS_NORMAL : R36SX_DISK_BIOS_TEST386;
+    menu->bios_changed = 1;
+}
+
+static const char *bios_label(uint8_t choice)
+{
+    return choice == R36SX_DISK_BIOS_TEST386 ? "TEST386" : "NORMAL";
+}
+
+static r36sx_pico286_bios_mode_t bios_config_value(uint8_t choice)
+{
+    return choice == R36SX_DISK_BIOS_TEST386 ?
+        R36SX_PICO286_BIOS_TEST386 : R36SX_PICO286_BIOS_NORMAL;
+}
+
+static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
 {
     int failures = 0;
+    int bios_changed = menu->bios_changed;
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
         const char *image = menu->images[menu->selected_image[i]];
@@ -408,6 +439,9 @@ static int apply_disk_bindings(struct r36sx_disk_menu *menu)
     if (menu->boot_order_changed) {
         r36sx_pico286_set_boot_order_value(
             boot_order_config_value(menu->boot_order_choice));
+    }
+    if (bios_changed) {
+        r36sx_pico286_set_bios_mode(bios_config_value(menu->bios_choice));
     }
     if (!r36sx_pico286_save_config()) {
         snprintf(menu->message, sizeof(menu->message), "SAVE FAILED");
@@ -425,9 +459,12 @@ static int apply_disk_bindings(struct r36sx_disk_menu *menu)
         snprintf(menu->message, sizeof(menu->message),
                  "SAVED WITH %d ATTACH FAILS", failures);
     } else {
-        snprintf(menu->message, sizeof(menu->message), "SAVED AND APPLIED");
+        snprintf(menu->message, sizeof(menu->message),
+                 bios_changed ? "SAVED BIOS RESET" : "SAVED AND APPLIED");
     }
-    return failures == 0;
+    menu->boot_order_changed = 0;
+    menu->bios_changed = 0;
+    return bios_changed ? R36SX_DISK_MENU_RESULT_RESET_PC : 0;
 }
 
 void r36sx_disk_menu_init(struct r36sx_disk_menu *menu)
@@ -482,6 +519,9 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
                (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_boot_order(menu, -1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
+               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        cycle_bios(menu);
     }
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
         (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
@@ -489,14 +529,19 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
                (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_boot_order(menu, 1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
+               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        cycle_bios(menu);
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
         if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT) {
             cycle_image(menu, menu->selected_row, 1);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER) {
             cycle_boot_order(menu, 1);
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS) {
+            cycle_bios(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_SAVE) {
-            apply_disk_bindings(menu);
+            return apply_disk_bindings(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
             return R36SX_DISK_MENU_RESULT_EXIT_APP;
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
@@ -570,6 +615,11 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
              boot_order_label(menu->boot_order_choice));
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_BOOT_ORDER, x, y, full_w, row_h, line);
+    y += row_h + gap;
+    snprintf(line, sizeof(line), "BIOS  %s",
+             bios_label(menu->bios_choice));
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_BIOS, x, y, full_w, row_h, line);
     y += row_h + gap;
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_SAVE, x, y, full_w, row_h, "SAVE/APPLY");

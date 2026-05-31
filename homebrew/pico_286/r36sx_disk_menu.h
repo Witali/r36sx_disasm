@@ -5,6 +5,7 @@
 
 #define R36SX_DISK_MENU_RESULT_CLOSED 0x01u
 #define R36SX_DISK_MENU_RESULT_EXIT_APP 0x02u
+#define R36SX_DISK_MENU_RESULT_RESET_PC 0x04u
 
 #define R36SX_DISK_MENU_MAX_IMAGES 32
 #define R36SX_DISK_MENU_IMAGE_NAME_LEN 96
@@ -16,6 +17,8 @@ struct r36sx_disk_menu {
     uint8_t selected_image[4];
     uint8_t boot_order_choice;
     uint8_t boot_order_changed;
+    uint8_t bios_choice;
+    uint8_t bios_changed;
     char images[R36SX_DISK_MENU_MAX_IMAGES][R36SX_DISK_MENU_IMAGE_NAME_LEN];
     char message[96];
 };
