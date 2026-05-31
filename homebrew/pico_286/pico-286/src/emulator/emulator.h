@@ -142,6 +142,48 @@ typedef union {
 extern x86_flags_t x86_flags;
 extern uint32_t segregs32[6];
 
+#ifndef R36SX_SEGMENT_BASE_CACHE
+#define R36SX_SEGMENT_BASE_CACHE 0
+#endif
+
+#if R36SX_SEGMENT_BASE_CACHE
+extern uint16_t segselector16[6];
+extern uint32_t segbase32[6];
+
+static inline uint32_t r36sx_cpu_segbase_cached(uint16_t selector)
+{
+    if (selector == segselector16[reges]) {
+        return segbase32[reges];
+    }
+    if (selector == segselector16[regcs]) {
+        return segbase32[regcs];
+    }
+    if (selector == segselector16[regss]) {
+        return segbase32[regss];
+    }
+    if (selector == segselector16[regds]) {
+        return segbase32[regds];
+    }
+    if (selector == segselector16[regfs]) {
+        return segbase32[regfs];
+    }
+    if (selector == segselector16[reggs]) {
+        return segbase32[reggs];
+    }
+    return r36sx_cpu_segbase(selector);
+}
+
+#define CPU_ES_BASE segbase32[reges]
+#define CPU_CS_BASE segbase32[regcs]
+#define CPU_SS_BASE segbase32[regss]
+#define CPU_DS_BASE segbase32[regds]
+#define CPU_FS_BASE segbase32[regfs]
+#define CPU_GS_BASE segbase32[reggs]
+
+#undef segbase
+#define segbase(x) r36sx_cpu_segbase_cached((uint16_t)(x))
+#endif
+
 // i8259
 extern struct i8259_s {
     uint8_t interrupt_mask_register; //mask register

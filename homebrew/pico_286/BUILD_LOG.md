@@ -1858,6 +1858,47 @@ Result:
 - Defender scan: found no threats for the rebuilt binaries and their
   `disk_image` / `patches` copies.
 
+## 2026-05-31 segment base cache
+
+Added `R36SX_SEGMENT_BASE_CACHE=1` to both Pico-286 build scripts.  The R36SX
+CPU now keeps a parallel selector/base cache for `ES`, `CS`, `SS`, `DS`, `FS`,
+and `GS`.  `segbase(selector)` resolves current segment selectors through this
+cache before falling back to the protected-mode descriptor lookup helper.
+
+The effective-address hot path also tracks `useseg_base` next to `useseg`, so
+default segments and segment override prefixes update both selector and base.
+`getea()` and `LEA` no longer need to call `segbase(useseg)` on their common
+paths.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `homebrew/pico_286/pico_286`
+  - Size: 435,548 bytes
+  - SHA256: `DCF5FE101B11F4FF09FA1DE6492A434FA1F32F415C197845A12EFC68ACF74CC8`
+- `homebrew/pico_286/pico_286.dsp`
+  - Size: 427,724 bytes
+  - SHA256: `6C68272A6461B994D18970A93279D89D597157CDB67D7159F9862761A34B59D1`
+- Defender scan: found no threats for the rebuilt binaries and their
+  `disk_image` / `patches` copies.
+
 ## 2026-05-30 PCjs CPU test floppy
 
 Downloaded the PCjs CPU test sources with a sparse Git checkout:

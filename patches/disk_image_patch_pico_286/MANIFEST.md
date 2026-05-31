@@ -1732,3 +1732,19 @@ pico_286.dsp size: 424224 bytes
 pico_286.dsp SHA256: 6792F3E53E786690776A18CD61D37FB45022DFE02E1A933A6BCFDED8022A70F7
 Defender scan: found no threats
 ```
+
+## 2026-05-31 segment base cache
+
+The current `pico_286` and `pico_286.dsp` binaries include
+`R36SX_SEGMENT_BASE_CACHE=1`.  The CPU keeps cached selectors and base
+addresses for `ES`, `CS`, `SS`, `DS`, `FS`, and `GS`, and the effective-address
+path tracks `useseg_base` next to `useseg` so `getea()` and `LEA` avoid repeated
+segment-base lookup on the common path.
+
+```text
+pico_286 size: 435548 bytes
+pico_286 SHA256: DCF5FE101B11F4FF09FA1DE6492A434FA1F32F415C197845A12EFC68ACF74CC8
+pico_286.dsp size: 427724 bytes
+pico_286.dsp SHA256: 6C68272A6461B994D18970A93279D89D597157CDB67D7159F9862761A34B59D1
+Defender scan: found no threats
+```

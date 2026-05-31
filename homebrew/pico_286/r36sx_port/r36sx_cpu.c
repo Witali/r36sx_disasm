@@ -44,7 +44,10 @@ static inline void r36sx_app_stats_record_x86(uint32_t instructions)
 int videomode = 3;
 uint8_t segoverride, reptype;
 uint32_t segregs32[6];
+uint16_t segselector16[6];
+uint32_t segbase32[6];
 uint16_t useseg, oldsp;
+uint32_t useseg_base;
 uint32_t ip32;
 uint8_t tempcf, oldcf, mode, reg, rm, sib;
 x86_flags_t x86_flags;
@@ -107,14 +110,17 @@ static inline uint8_t r36sx_cpu_protected_enabled(void)
 static inline void r36sx_cpu_real_cache_segment(uint8_t segid)
 {
     uint16_t selector = getsegreg(segid);
+    uint32_t base = (uint32_t)selector << 4;
+    segselector16[segid] = selector;
     r36sx_seg_cache[segid].selector = selector;
-    r36sx_seg_cache[segid].base = (uint32_t)selector << 4;
+    r36sx_seg_cache[segid].base = base;
     r36sx_seg_cache[segid].limit = 0xffffu;
     r36sx_seg_cache[segid].access =
         R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
         R36SX_DESCRIPTOR_READABLE | R36SX_DESCRIPTOR_WRITABLE;
     r36sx_seg_cache[segid].flags = 0;
     r36sx_seg_cache[segid].valid = 1;
+    segbase32[segid] = base;
 }
 
 static inline void r36sx_cpu_real_cache_all_segments(void)
@@ -133,11 +139,17 @@ uint32_t r36sx_cpu_segbase(uint16_t selector)
     for (uint8_t segid = reges; segid <= reggs; segid++) {
         if (r36sx_seg_cache[segid].valid &&
             r36sx_seg_cache[segid].selector == selector) {
-            return r36sx_seg_cache[segid].base;
+            return segbase32[segid];
         }
     }
 
     return (uint32_t)selector << 4;
+}
+
+static inline void r36sx_cpu_use_segment(uint8_t segid)
+{
+    useseg = segselector16[segid];
+    useseg_base = segbase32[segid];
 }
 
 void r36sx_cpu_step_ip(uint32_t delta)
@@ -147,7 +159,7 @@ void r36sx_cpu_step_ip(uint32_t delta)
 
 static inline uint32_t r36sx_cpu_linear_ea(uint32_t offset)
 {
-    return segbase(useseg) + offset;
+    return useseg_base + offset;
 }
 
 static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
@@ -228,6 +240,8 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
     }
 
     r36sx_seg_cache[segid] = cache;
+    segselector16[segid] = selector;
+    segbase32[segid] = cache.base;
     return cache.valid;
 }
 
@@ -768,21 +782,21 @@ __not_in_flash() void modregrm() {
                 disp16 = 0;
             }
             if (((rm == 2) || (rm == 3)) && !segoverride) {
-                useseg = CPU_SS;
+                r36sx_cpu_use_segment(regss);
             }
             break;
         case 1:
             disp16 = signext(getmem8(CPU_CS, CPU_IP));
             StepIP(1);
             if (((rm == 2) || (rm == 3) || (rm == 6)) && !segoverride) {
-                useseg = CPU_SS;
+                r36sx_cpu_use_segment(regss);
             }
             break;
         case 2:
             disp16 = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (((rm == 2) || (rm == 3) || (rm == 6)) && !segoverride) {
-                useseg = CPU_SS;
+                r36sx_cpu_use_segment(regss);
             }
             break;
         default:
@@ -1131,7 +1145,7 @@ static inline uint32_t r36sx_cpu_ea32(uint8_t rmval)
     }
 
     if (base_uses_ss && !segoverride) {
-        useseg = CPU_SS;
+        r36sx_cpu_use_segment(regss);
     }
 
     return tempea;
@@ -3266,7 +3280,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         case 0x8D:
             modregrm();
             getea(rm);
-            putreg32(reg, ea - segbase(useseg));
+            putreg32(reg, ea - useseg_base);
             return true;
 
         case 0x8F:
@@ -4016,7 +4030,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
         segoverride = 0;
         operandSizeOverride = false;
         addressSizeOverride = false;
-        useseg = CPU_DS;
+        r36sx_cpu_use_segment(regds);
         uint8_t docontinue = 0;
         uint8_t prefix_exception = 0;
         firstip = CPU_IP;
@@ -4040,22 +4054,22 @@ void __not_in_flash() exec86(uint32_t execloops) {
             switch (opcode) {
                 /* segment prefix check */
                 case 0x2E: /* segment CPU_CS */
-                    useseg = CPU_CS;
+                    r36sx_cpu_use_segment(regcs);
                     segoverride = 1;
                     break;
 
                 case 0x3E: /* segment CPU_DS */
-                    useseg = CPU_DS;
+                    r36sx_cpu_use_segment(regds);
                     segoverride = 1;
                     break;
 
                 case 0x26: /* segment CPU_ES */
-                    useseg = CPU_ES;
+                    r36sx_cpu_use_segment(reges);
                     segoverride = 1;
                     break;
 
                 case 0x36: /* segment CPU_SS */
-                    useseg = CPU_SS;
+                    r36sx_cpu_use_segment(regss);
                     segoverride = 1;
                     break;
 
@@ -4068,7 +4082,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                         docontinue = 1;
                         break;
                     }
-                    useseg = CPU_FS;
+                    r36sx_cpu_use_segment(regfs);
                     segoverride = 1;
                     break;
 
@@ -4080,7 +4094,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                         docontinue = 1;
                         break;
                     }
-                    useseg = CPU_GS;
+                    r36sx_cpu_use_segment(reggs);
                     segoverride = 1;
                     break;
 #else
@@ -6068,7 +6082,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 getea(rm);
                 putreg16(reg, ea
                          -
-                         segbase(useseg)
+                         useseg_base
                 );
                 break;
 
