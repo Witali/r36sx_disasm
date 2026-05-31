@@ -42,6 +42,13 @@
 #define RELEASE_UMB 0x11
 
 #define XMS_HANDLES 64
+#define HMA_SIZE_BYTES (HMA_END - HMA_START)
+#define HMA_RESERVED_KB 64u
+
+#define XMS_ERR_HMA_NOT_EXIST 0x90
+#define XMS_ERR_HMA_IN_USE 0x91
+#define XMS_ERR_HMA_NOT_ALLOCATED 0x93
+
 // FIXME: Calculate with EMS offset
 #define XMS_PSRAM_OFFSET (4096*1024)
 
@@ -99,6 +106,7 @@ uint32_t xms_available = XMS_MEMORY_SIZE;
 uint8_t xms_handles = 0;
 static uint16_t xms_handle_kb[XMS_HANDLES] = {0};
 static uint32_t xms_allocated_kb = 0;
+static int hma_allocated = 0;
 
 int a20_enabled = 0;
 
@@ -136,8 +144,15 @@ uint32_t xms_configured_memory_bytes(void)
 static uint32_t xms_free_kb(void)
 {
     uint32_t limit_kb = configured_xms_memory_kb();
+    uint32_t reserved_kb = hma_allocated ? HMA_RESERVED_KB : 0u;
+    uint32_t used_kb = xms_allocated_kb + reserved_kb;
 
-    return xms_allocated_kb < limit_kb ? limit_kb - xms_allocated_kb : 0;
+    return used_kb < limit_kb ? limit_kb - used_kb : 0;
+}
+
+static int hma_available(void)
+{
+    return xms_configured_memory_bytes() >= HMA_SIZE_BYTES;
 }
 
 static int xms_range_valid(uint32_t offset, uint32_t length)
@@ -153,6 +168,7 @@ static void reset_xms_allocations(void)
     xms_allocated_kb = 0;
     xms_available = xms_configured_memory_bytes();
     xms_handles = 0;
+    hma_allocated = 0;
 }
 
 void init_umb() {
@@ -307,19 +323,35 @@ uint8_t __not_in_flash() xms_handler() {
             // Get XMS Version
             CPU_AX = 0x0200; // We are himem 2.06
             CPU_BX = 0x0206; // driver version
-            CPU_DX = 0x0001; // HMA Exist
+            CPU_DX = hma_available() ? 0x0001 : 0x0000; // HMA exists
             break;
         }
         case REQUEST_HMA: {
-            // Request HMA
-            // Stub: Implement HMA request functionality
-            CPU_AX = 1; // Success
+            if (!hma_available()) {
+                CPU_AX = 0;
+                CPU_BL = XMS_ERR_HMA_NOT_EXIST;
+                break;
+            }
+            if (hma_allocated) {
+                CPU_AX = 0;
+                CPU_BL = XMS_ERR_HMA_IN_USE;
+                break;
+            }
+            hma_allocated = 1;
+            a20_enabled = 1;
+            CPU_AX = 1;
+            CPU_BL = 0;
             break;
         }
         case RELEASE_HMA: {
-            // Release HMA
-            // Stub: Implement HMA release functionality
-            CPU_AX = 1; // Success
+            if (!hma_allocated) {
+                CPU_AX = 0;
+                CPU_BL = XMS_ERR_HMA_NOT_ALLOCATED;
+                break;
+            }
+            hma_allocated = 0;
+            CPU_AX = 1;
+            CPU_BL = 0;
             break;
         }
         case GLOBAL_ENABLE_A20:

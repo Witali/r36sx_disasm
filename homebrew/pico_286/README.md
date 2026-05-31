@@ -349,6 +349,10 @@ is 15568 KB.  `conventional_kb` is reported through the BIOS Data Area,
 backs both the built-in XMS handler and linear physical RAM above 1 MB, and
 `extended_kb` is returned by `INT 15h AH=88h`.
 
+The first 64 KB minus 16 bytes above 1 MB is exposed as the XMS High Memory
+Area.  `REQUEST_HMA` reserves that area, enables A20, and reduces reported
+free XMS memory by 64 KB until `RELEASE_HMA`.
+
 `profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
 `profiling_log_ms` controls the reporting interval.  Profiling can also be
 compiled out completely with `build_pico_286.ps1 -DisableProfiling`.

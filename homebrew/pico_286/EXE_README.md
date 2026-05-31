@@ -221,7 +221,8 @@ individual `conventional_kb`, `upper_kb`, `xms_kb`, and `extended_kb` keys are
 optional overrides.  The total-memory limit is 16 MB; with full conventional
 and upper memory enabled, `xms_kb`/`extended_kb` can reach 15568 KB.  `xms_kb`
 also backs linear physical RAM above 1 MB, while `extended_kb` is the value
-returned by `INT 15h AH=88h`.
+returned by `INT 15h AH=88h`.  The XMS High Memory Area is backed by the first
+64 KB minus 16 bytes above 1 MB; `REQUEST_HMA` reserves it and enables A20.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be

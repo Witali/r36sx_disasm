@@ -36,6 +36,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 HMA request/release support
+
+The patch binaries now implement XMS High Memory Area ownership instead of
+always reporting success.  `REQUEST_HMA` allocates HMA, enables A20, and
+reserves 64 KB from reported free XMS memory.  A repeated request returns
+"HMA in use"; `RELEASE_HMA` frees the reservation and returns an error if HMA
+was not allocated.
+
+```text
+pico_286 size: 440048 bytes
+pico_286 SHA256: E5AE18EA8706D342362819F3860008E433659F7B54B2D5C4513C72226ACFFDA4
+pico_286.dsp size: 432928 bytes
+pico_286.dsp SHA256: 24D28BDE0836A412C82DFC24A56BB12136F66F6D6A9856F513C367CA404B2CF0
+Defender scan: found no threats
+```
+
 ## 2026-05-31 16 MB memory limit
 
 The patch binaries now allow up to 16 MB of usable emulated RAM.  The compiled

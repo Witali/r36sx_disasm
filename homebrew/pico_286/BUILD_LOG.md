@@ -1,5 +1,39 @@
 # pico-286 Build Log
 
+## 2026-05-31 HMA request/release support
+
+Implemented real High Memory Area state in the XMS handler.  `REQUEST_HMA`
+now checks whether configured XMS memory is large enough to expose HMA,
+rejects a second request with the XMS "HMA in use" error, marks HMA allocated,
+and enables A20 so `FFFF:0010..FFFF:FFFF` reaches the physical area above
+1 MB.  `RELEASE_HMA` now rejects release without a prior allocation and frees
+the reservation.  While HMA is allocated, XMS free-memory queries reserve
+64 KB for it.
+
+The physical HMA bytes are the first part of the XMS-backed extended memory
+range introduced earlier; this change makes the XMS API ownership semantics
+match that mapping.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `440048` bytes
+- `pico_286` SHA256:
+  `E5AE18EA8706D342362819F3860008E433659F7B54B2D5C4513C72226ACFFDA4`
+- `pico_286.dsp` size: `432928` bytes
+- `pico_286.dsp` SHA256:
+  `24D28BDE0836A412C82DFC24A56BB12136F66F6D6A9856F513C367CA404B2CF0`
+
+Verification: rebuilt both WSL/GCC binaries and scanned the homebrew,
+`disk_image`, and patch copies with `tools/scan-download.ps1`; Defender found
+no threats.
+
 ## 2026-05-31 16 MB memory limit
 
 Raised the R36SX Pico-286 memory ceiling to 16 MB of usable emulated RAM.  The
