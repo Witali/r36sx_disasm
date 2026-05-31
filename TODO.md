@@ -1,5 +1,11 @@
 # TODO
 
+## Project Build Rules
+
+- [x] Pause Pico-286 DSP side builds.  Normal rebuilds should update only
+  `pico_286`; do not rebuild, copy, refresh, or scan `pico_286.dsp` together
+  with the regular executable unless DSP testing is explicitly requested.
+
 ## Pico-286 Protected Mode
 
 - [x] Add diagnostic logging for protected-mode startup paths before deeper

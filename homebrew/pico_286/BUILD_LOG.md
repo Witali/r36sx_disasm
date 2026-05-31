@@ -1,5 +1,14 @@
 # pico-286 Build Log
 
+## 2026-05-31 DSP side build paused
+
+The experimental MIPS DSP Rev2 side build is paused.  From this point, normal
+Pico-286 rebuilds should update only `pico_286`; do not rebuild, copy, refresh,
+or scan `pico_286.dsp` together with the regular executable unless DSP testing
+is explicitly requested.
+
+No binaries were rebuilt for this policy update.
+
 ## 2026-05-31 HMA request/release support
 
 Implemented real High Memory Area state in the XMS handler.  `REQUEST_HMA`

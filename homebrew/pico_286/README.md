@@ -520,13 +520,13 @@ test build that leaves the normal executable untouched:
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
 ```
 
-There is also an experimental MIPS DSP Rev2 build.  It enables `-mdspr2`,
-defines `R36SX_MIPS_DSP=1`, and routes hot RGB565 framebuffer and audio buffer
-copies through shared helpers with portable fallbacks.  The helper path uses
-the packed-halfword `addu.ph` instruction as a first hardware-compatibility
-probe.  It also uses DSP halfword shifts for screenshot `RGB565 -> RGB24/BGR24`
-row conversion and emits `addu.qb` from the probe so packed-byte DSP support is
-easy to verify.  Keep it side-by-side until it has been tested on the device:
+The experimental MIPS DSP Rev2 build is currently paused.  Normal Pico-286
+rebuilds should update only `pico_286`; do not rebuild, copy, refresh, or scan
+`pico_286.dsp` together with the regular executable.  The DSP path remains in
+the source tree for explicit hardware experiments only.  When it is explicitly
+requested, it enables `-mdspr2`, defines `R36SX_MIPS_DSP=1`, and routes hot
+RGB565 framebuffer and audio buffer copies through shared helpers with
+portable fallbacks:
 
 ```powershell
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -EnableMipsDsp -Strip -Out .\homebrew\pico_286\pico_286.dsp

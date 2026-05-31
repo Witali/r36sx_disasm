@@ -2,11 +2,11 @@
 
 This file documents the `pico_286` native executable for TinyMC.
 
-The normal `pico_286` binary is the WSL/GCC `-O3` build.  `pico_286.dsp` is an
-experimental side-by-side build compiled with MIPS DSP ASE Rev2
-(`-EnableMipsDsp` / `-mdspr2`).  It may fail with an illegal-instruction fault
-on hardware without DSP support; test it separately before replacing the
-normal executable.
+The normal `pico_286` binary is the WSL/GCC `-O3` build.  The experimental
+`pico_286.dsp` build is paused and must not be rebuilt or refreshed together
+with the normal executable.  Treat it as a manual hardware experiment only,
+because it may fail with an illegal-instruction fault on hardware without MIPS
+DSP ASE Rev2 support.
 
 ## Main DOS Controls
 

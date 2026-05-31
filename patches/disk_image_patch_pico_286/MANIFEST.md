@@ -23,9 +23,10 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/images/hdd2.hdd`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
-The `pico_286.dsp` binary is an experimental MIPS DSP Rev2 build for side-by-
-side testing; if it works on the device, it can be temporarily renamed to
-`pico_286` for direct comparison.
+The `pico_286.dsp` binary is an older experimental MIPS DSP Rev2 build kept
+only for manual side-by-side testing.  DSP rebuilds are currently paused; do
+not refresh this file together with the normal `pico_286` binary unless DSP
+testing is explicitly requested.
 
 The default binary is built with `DEBUG=0`.  Builds made with
 `build_pico_286.ps1 -DebugLog` write a startup/runtime log to:
