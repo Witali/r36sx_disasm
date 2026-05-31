@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-05-31 configurable image directory
+
+Moved the Pico-286 disk image directory into `pico_286.conf`.
+
+- Added `[disk_images] image_dir=images`.
+- Drive bindings now store only file names such as `FreeDOS1.img`,
+  `sopwith.img`, `hdd.img`, and `hdd2.img`.
+- The disk menu scans only the configured `image_dir`; it no longer lists
+  root-level legacy `.img` files.
+- Short drive values are resolved through `image_dir`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.  The build also printed the existing upstream
+audio/pragma warnings in `r36sx_ports.c` and included `.inl` sources.
+
+Result:
+
+- `pico_286` size: `1398776` bytes
+- `pico_286` SHA256:
+  `E5BE7E33C4858A223C1A89E3CCDD63376E94A6C069C462EAB5390DF25407F20C`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 delayed direct-overlay restore
 
 Optimized the small-overlay present path to avoid full-frame copies.

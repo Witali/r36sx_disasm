@@ -85,9 +85,9 @@ Open it with Fn+Select.
 - A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
 
-The menu searches for `.img` files in `images/` next to `pico_286.conf`, and
-also accepts legacy root-level `.img` files.  If the BIOS mode changes,
-`SAVE/APPLY` also requests a soft reset so the selected ROM starts.
+The menu searches for `.img` files in the configured `image_dir`.  If the BIOS
+mode changes, `SAVE/APPLY` also requests a soft reset so the selected ROM
+starts.
 
 ## Disk Image Cache
 
@@ -131,6 +131,9 @@ app_stats_enabled=1
 [host_drive]
 host_drive_path=host
 
+[disk_images]
+image_dir=images
+
 [disk_cache]
 disk_cache_buffer_kb=64
 disk_cache_flush_sectors=4
@@ -141,13 +144,13 @@ profiling_enabled=0
 profiling_log_ms=5000
 
 [floppy_drives]
-fdd0=images/FreeDOS1.img
-fdd1=images/sopwith.img
+fdd0=FreeDOS1.img
+fdd1=sopwith.img
 
 [hard_drives]
-hdd0=images/hdd.img
+hdd0=hdd.img
 hdd0_geometry=65,16,63
-hdd1=images/hdd2.img
+hdd1=hdd2.img
 hdd1_geometry=65,16,63
 ```
 
@@ -173,7 +176,7 @@ Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.
 
-`images/cpu_tests.img` is an optional FAT12 floppy image beside the executable.
+`cpu_tests.img` is an optional FAT12 floppy image stored under `image_dir`.
 It contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`,
 then run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug
 build of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM,

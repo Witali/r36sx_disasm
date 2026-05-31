@@ -32,6 +32,16 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 configurable image directory
+
+The current `pico_286` binary reads `[disk_images] image_dir=images` from
+`pico_286.conf`.  Drive bindings now store only file names, for example
+`fdd0=FreeDOS1.img` and `hdd0=hdd.img`; those names are resolved inside
+`image_dir`.  The disk menu scans only that configured image directory.
+
+pico_286 size: 1398776 bytes
+pico_286 SHA256: E5BE7E33C4858A223C1A89E3CCDD63376E94A6C069C462EAB5390DF25407F20C
+
 ## 2026-05-31 delayed direct-overlay restore
 
 The current `pico_286` binary avoids full-frame copies for small overlays.  App

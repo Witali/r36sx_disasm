@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define R36SX_PICO286_IMAGES_DIR "images"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,6 +56,12 @@ const char *r36sx_pico286_disk_value(uint8_t bios_drive,
 
 // Update the configured image value in memory. Call save_config to persist it.
 void r36sx_pico286_set_disk_value(uint8_t bios_drive, const char *value);
+
+// Return the directory that contains short-named disk image files.
+const char *r36sx_pico286_image_dir_path(void);
+
+// Return the image directory value as written to pico_286.conf.
+const char *r36sx_pico286_image_dir_value(void);
 
 // Return the directory that contains pico_286.conf, or an empty string.
 const char *r36sx_pico286_config_dir(void);

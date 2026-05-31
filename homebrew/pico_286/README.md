@@ -159,8 +159,8 @@ means B deletes a character and X closes the picker.
 
 Holding Fn and pressing Select opens the disk image binding menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
-or A/Y on a drive row cycles through `.img` files found in `images/` next to
-`pico_286.conf`.  Legacy root-level images are also listed for compatibility.
+or A/Y on a drive row cycles through `.img` files found in the configured
+`image_dir`.
 The
 `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try the
 floppy or hard disk first.  The `SAVE/APPLY` row writes current bindings to
@@ -202,8 +202,8 @@ scaling the black margin below the text area.  The scaling filter is
 configurable with `scaling_filter=nearest` or `scaling_filter=bilinear`.
 
 The upstream PC disk images are still expected by the emulator.  In this port,
-`pico_286.conf` lives next to the executable and maps image files from the
-`images/` subdirectory to emulated devices:
+`pico_286.conf` lives next to the executable, `image_dir` points at the
+subdirectory with `.img` files, and drive bindings use short file names:
 
 ```ini
 [cpu]
@@ -250,18 +250,21 @@ app_stats_enabled=1
 [host_drive]
 host_drive_path=host
 
+[disk_images]
+image_dir=images
+
 [profiling]
 profiling_enabled=0
 profiling_log_ms=5000
 
 [floppy_drives]
-fdd0=images/FreeDOS1.img
-fdd1=images/sopwith.img
+fdd0=FreeDOS1.img
+fdd1=sopwith.img
 
 [hard_drives]
-hdd0=images/hdd.img
+hdd0=hdd.img
 hdd0_geometry=65,16,63
-hdd1=images/hdd2.img
+hdd1=hdd2.img
 hdd1_geometry=65,16,63
 ```
 
@@ -321,8 +324,8 @@ compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
 
 ### CPU Test Floppy
 
-`images/cpu_tests.img` is a 1.44 MB FAT12 floppy image stored under
-`images/` next to the Pico-286
+`cpu_tests.img` is a 1.44 MB FAT12 floppy image stored under `image_dir`
+next to the Pico-286
 executable.  It contains PCjs `ID.COM` and `TEST386.COM` CPU/protected-mode
 tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `TEST386.BIN`.
 `TEST386.BIN` is the R36SX debug build of
@@ -331,8 +334,8 @@ port `191h`, and standard POST port `80h`.  Pico-286 also still accepts the
 legacy R36SX test POST port `190h`.  Pico-286 logs those ports to
 `pico_286.log`.
 
-Boot FreeDOS from `images/FreeDOS1.img`, mount `images/cpu_tests.img` as `B:`
-from the disk menu or set `fdd1=images/cpu_tests.img`, then run `B:`, `ID`,
+Boot FreeDOS from `FreeDOS1.img`, mount `cpu_tests.img` as `B:` from the disk
+menu or set `fdd1=cpu_tests.img`, then run `B:`, `ID`,
 and `TEST386`.
 `TEST386.BIN` is not a DOS `.COM` program; it is a 64 KB BIOS replacement ROM
 payload that must be loaded at physical `F0000h` by the emulator to execute.
@@ -380,13 +383,13 @@ loads the external 64 KB BIOS ROM named by `test_bios_rom`, which defaults to
 `test386.bin` beside `pico_286.conf`.  The disk menu exposes this as
 `BIOS NORMAL/TEST386` and requests a soft reset after saving a BIOS change.
 
+`image_dir` is resolved relative to `pico_286.conf` unless it is absolute.
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
-`80h` / `C:`, and `hdd1` is `81h` / `D:`.  Paths are relative to the Pico-286
-directory unless absolute paths are used.  Leaving a value empty disables that
-drive.  If `pico_286.conf` is missing, the default image paths are under
-`images/`.  Legacy root-level names such as `FreeDOS1.img` are still resolved
-from `images/` when the root file is missing.  Additional images should be
-placed in `images/` and selected through the disk image menu.
+`80h` / `C:`, and `hdd1` is `81h` / `D:`.  Drive values are file names loaded
+from `image_dir`; leaving a value empty disables that drive.  If
+`pico_286.conf` is missing, `image_dir` defaults to `images`.  Additional
+images should be placed in `image_dir` and selected through the disk image
+menu.
 
 `hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
 `cylinders,heads,sectors` order.  The current bundled hard disk images are

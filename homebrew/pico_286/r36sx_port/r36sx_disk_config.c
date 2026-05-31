@@ -41,16 +41,24 @@ typedef struct {
 } r36sx_pico286_disk_entry_t;
 
 static r36sx_pico286_disk_entry_t disk_entries[] = {
-    { 0, "fdd0", "drive0", "images/FreeDOS1.img", "images/FreeDOS1.img", 1 },
-    { 1, "fdd1", "drive1", "images/sopwith.img", "images/sopwith.img", 1 },
-    { 128, "hdd0", "drive128", "images/hdd.img", "images/hdd.img", 1 },
-    { 129, "hdd1", "drive129", "images/hdd2.img", "images/hdd2.img", 1 },
+    { 0, "fdd0", "drive0", "FreeDOS1.img",
+      R36SX_PICO286_IMAGES_DIR "/FreeDOS1.img", 1 },
+    { 1, "fdd1", "drive1", "sopwith.img",
+      R36SX_PICO286_IMAGES_DIR "/sopwith.img", 1 },
+    { 128, "hdd0", "drive128", "hdd.img",
+      R36SX_PICO286_IMAGES_DIR "/hdd.img", 1 },
+    { 129, "hdd1", "drive129", "hdd2.img",
+      R36SX_PICO286_IMAGES_DIR "/hdd2.img", 1 },
 };
 
 static int disk_config_loaded = 0;
 static char disk_config_dir[R36SX_PICO286_MAX_DISK_PATH] = "";
 static char disk_config_path[R36SX_PICO286_MAX_DISK_PATH] =
     R36SX_PICO286_CONFIG_PATH;
+static char image_dir_value[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_IMAGES_DIR;
+static char image_dir_path[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_IMAGES_DIR;
 static char cpu_model_text[16] = "80386";
 static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
@@ -244,13 +252,6 @@ static int path_has_separator(const char *path)
     return path && (strchr(path, '/') || strchr(path, '\\'));
 }
 
-static int file_exists(const char *path)
-{
-    struct stat st;
-
-    return path && path[0] && stat(path, &st) == 0;
-}
-
 static void resolve_config_relative_path(char *dest, size_t dest_size,
                                          const char *value)
 {
@@ -266,6 +267,23 @@ static void resolve_config_relative_path(char *dest, size_t dest_size,
     }
 }
 
+static void resolve_image_dir_file_path(char *dest, size_t dest_size,
+                                        const char *filename)
+{
+    if (!dest || dest_size == 0) {
+        return;
+    }
+    if (!filename || filename[0] == '\0') {
+        dest[0] = '\0';
+        return;
+    }
+    if (image_dir_path[0]) {
+        snprintf(dest, dest_size, "%s/%s", image_dir_path, filename);
+    } else {
+        resolve_config_relative_path(dest, dest_size, filename);
+    }
+}
+
 static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
                                  const char *value)
 {
@@ -274,19 +292,27 @@ static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
     }
 
     snprintf(entry->value, sizeof(entry->value), "%s", value ? value : "");
-    resolve_config_relative_path(entry->path, sizeof(entry->path),
-                                 entry->value);
     if (entry->value[0] &&
         !is_absolute_path(entry->value) &&
-        !path_has_separator(entry->value) &&
-        disk_config_dir[0] &&
-        !file_exists(entry->path)) {
-        char migrated[R36SX_PICO286_MAX_DISK_PATH];
-        snprintf(migrated, sizeof(migrated), "images/%s", entry->value);
+        !path_has_separator(entry->value)) {
+        resolve_image_dir_file_path(entry->path, sizeof(entry->path),
+                                    entry->value);
+    } else {
         resolve_config_relative_path(entry->path, sizeof(entry->path),
-                                     migrated);
+                                     entry->value);
     }
     entry->configured = 1;
+}
+
+static void set_image_dir_value(const char *value)
+{
+    snprintf(image_dir_value, sizeof(image_dir_value), "%s",
+             value && value[0] ? value : R36SX_PICO286_IMAGES_DIR);
+    resolve_config_relative_path(image_dir_path, sizeof(image_dir_path),
+                                 image_dir_value);
+    for (size_t i = 0; i < sizeof(disk_entries) / sizeof(disk_entries[0]); i++) {
+        set_disk_entry_value(&disk_entries[i], disk_entries[i].value);
+    }
 }
 
 static void set_host_drive_value(const char *value)
@@ -346,6 +372,7 @@ static void set_config_dir(const char *config_path)
     }
     set_host_drive_value(host_drive_value);
     set_test_bios_value(test_bios_value);
+    set_image_dir_value(image_dir_value);
 }
 
 static int set_cpu_mhz(const char *value, int line_no)
@@ -1153,6 +1180,17 @@ static int set_config_value(const char *key, const char *value, int line_no)
                                 host_drive_path);
         return 1;
     }
+    if (key_equals(key, "image_dir") ||
+        key_equals(key, "images_dir") ||
+        key_equals(key, "image_path") ||
+        key_equals(key, "images_path") ||
+        key_equals(key, "disk_image_dir") ||
+        key_equals(key, "disk_images_dir")) {
+        set_image_dir_value(value);
+        r36sx_pico286_debug_log("diskcfg: image_dir='%s'",
+                                image_dir_path);
+        return 1;
+    }
     if (set_disk_cache_value(key, value, line_no)) {
         return 1;
     }
@@ -1314,6 +1352,20 @@ void r36sx_pico286_set_disk_value(uint8_t bios_drive, const char *value)
     }
 }
 
+const char *r36sx_pico286_image_dir_path(void)
+{
+    load_disk_config();
+
+    return image_dir_path;
+}
+
+const char *r36sx_pico286_image_dir_value(void)
+{
+    load_disk_config();
+
+    return image_dir_value;
+}
+
 const char *r36sx_pico286_config_dir(void)
 {
     load_disk_config();
@@ -1348,8 +1400,9 @@ int r36sx_pico286_save_config(void)
         return 0;
     }
 
-    fprintf(fp, "# Pico-286 disk image bindings for the R36SX native port.\n");
-    fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n\n");
+    fprintf(fp, "# Pico-286 configuration for the R36SX native port.\n");
+    fprintf(fp, "# Paths are relative to this directory unless an absolute path is used.\n");
+    fprintf(fp, "# Disk drive values are file names loaded from image_dir.\n\n");
 
     fprintf(fp, "# CPU compatibility model: 8086, 80286, or 80386.\n");
     fprintf(fp, "# Higher-generation instructions are accepted only when the selected\n");
@@ -1437,6 +1490,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# DOS must run MAPDRIVE.COM after boot; CONFIG.SYS needs LASTDRIVE=H or higher.\n");
     fprintf(fp, "[host_drive]\n");
     fprintf(fp, "host_drive_path=%s\n\n", host_drive_value);
+
+    fprintf(fp, "# Directory that contains .img files used by short file names below.\n");
+    fprintf(fp, "# Relative paths are resolved next to pico_286.conf.\n");
+    fprintf(fp, "[disk_images]\n");
+    fprintf(fp, "image_dir=%s\n\n", image_dir_value);
 
     fprintf(fp, "# BIOS floppy drives 00h and 01h, DOS A: and B:.\n");
     fprintf(fp, "[floppy_drives]\n");

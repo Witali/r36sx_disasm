@@ -35,10 +35,10 @@ struct r36sx_disk_drive_info {
 };
 
 static const struct r36sx_disk_drive_info g_drives[] = {
-    { 0, "fdd0", "FDD0 A:", "images/FreeDOS1.img" },
-    { 1, "fdd1", "FDD1 B:", "images/sopwith.img" },
-    { 128, "hdd0", "HDD0 C:", "images/hdd.img" },
-    { 129, "hdd1", "HDD1 D:", "images/hdd2.img" },
+    { 0, "fdd0", "FDD0 A:", "FreeDOS1.img" },
+    { 1, "fdd1", "FDD1 B:", "sopwith.img" },
+    { 128, "hdd0", "HDD0 C:", "hdd.img" },
+    { 129, "hdd1", "HDD1 D:", "hdd2.img" },
 };
 
 static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
@@ -295,21 +295,16 @@ static void scan_image_dir(struct r36sx_disk_menu *menu, const char *dir,
 
 static void scan_images(struct r36sx_disk_menu *menu)
 {
-    const char *dir = r36sx_pico286_config_dir();
-    char images_dir[256];
-
-    if (!dir || !dir[0]) {
-        dir = ".";
-    }
+    const char *images_dir = r36sx_pico286_image_dir_path();
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
         add_image(menu, r36sx_pico286_disk_value(
                        g_drives[i].bios_drive, g_drives[i].fallback));
     }
 
-    snprintf(images_dir, sizeof(images_dir), "%s/%s", dir, "images");
-    scan_image_dir(menu, images_dir, "images/");
-    scan_image_dir(menu, dir, "");
+    if (images_dir && images_dir[0]) {
+        scan_image_dir(menu, images_dir, "");
+    }
 }
 
 static void refresh_menu(struct r36sx_disk_menu *menu)
@@ -332,7 +327,7 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
     }
 
     if (menu->image_count == 0) {
-        add_image(menu, "images/hdd.img");
+        add_image(menu, "hdd.img");
     }
 
     count = r36sx_pico286_boot_order(order, (uint8_t)sizeof(order));
