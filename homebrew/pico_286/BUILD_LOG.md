@@ -1,5 +1,39 @@
 # pico-286 Build Log
 
+## 2026-05-31 configurable on-screen keyboard mode
+
+Added `[video] keyboard_mode` to `pico_286.conf`.
+
+- `normal` keeps the previous behavior: when the on-screen keyboard is open,
+  the DOS image is resized into the area above the keyboard.
+- `overlay` draws the on-screen keyboard over the DOS image without resizing
+  the underlying framebuffer.
+- `scaling_filter` is still used only when resizing is needed.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1381244` bytes
+- `pico_286` SHA256:
+  `74B49EADAB77E66333D07D7E058FFDFE5514DB24E18A235B2546D81888922CB3`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 dirty video rendering
 
 Added R36SX video dirty tracking so the expensive `VIDEORAM`/register/palette

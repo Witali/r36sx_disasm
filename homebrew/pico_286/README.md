@@ -14,7 +14,9 @@ integration pieces:
   presented directly from `SCREEN`; separate composition buffers are only used
   for the on-screen keyboard and full-screen menus.  The expensive DOS-video
   renderer runs only after visible emulated video state changes, while small
-  overlays can still update through saved rectangles.
+  overlays can still update through saved rectangles.  `[video] keyboard_mode`
+  controls whether the on-screen keyboard resizes the DOS image (`normal`) or
+  covers it without scaling (`overlay`).
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.

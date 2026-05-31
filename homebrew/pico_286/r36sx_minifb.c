@@ -1437,7 +1437,8 @@ static int r36sx_mfb_video_source_height(void)
 {
     int source_h = g_mfb.height;
 
-    if (r36sx_screen_keyboard_is_visible(&g_mfb.osk)) {
+    if (r36sx_screen_keyboard_is_visible(&g_mfb.osk) &&
+        r36sx_pico286_keyboard_mode() != R36SX_PICO286_KEYBOARD_OVERLAY) {
         source_h = r36sx_pico286_video_active_height();
         if (source_h <= 0 || source_h > g_mfb.height) {
             source_h = g_mfb.height;
@@ -1931,7 +1932,10 @@ int mfb_update(void *buffer, int fps_limit)
 
     now_ms = (uint32_t)(now / 1000ull);
     frame_generation = r36sx_mfb_frame_generation();
-    content_h = r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
+    content_h =
+        r36sx_pico286_keyboard_mode() == R36SX_PICO286_KEYBOARD_OVERLAY ?
+        g_mfb.height :
+        r36sx_screen_keyboard_content_height(&g_mfb.osk, g_mfb.height);
     source_h = r36sx_mfb_video_source_height();
     scaling_filter = r36sx_pico286_scaling_filter();
     source_changed = frame_generation != g_mfb.presented_generation;

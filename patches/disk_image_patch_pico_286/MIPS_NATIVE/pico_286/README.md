@@ -65,6 +65,8 @@ virtual key shifts down-right and darkens until the physical button is
 released.  While the keyboard is visible, Pico-286 compresses only the active
 height of the emulated video mode into the remaining screen area; normal DOS
 text mode uses its 400 drawn rows rather than the full 480-pixel framebuffer.
+Set `[video] keyboard_mode=overlay` to draw the keyboard over the DOS image
+without resizing it; `keyboard_mode=normal` keeps the compressed layout.
 
 ## Disk Image Menu
 
@@ -101,6 +103,7 @@ target_fps=60
 
 [video]
 scaling_filter=nearest
+keyboard_mode=normal
 
 [audio]
 audio_sample_rate=44100
@@ -228,10 +231,12 @@ after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 The separate composition buffer is still used for the on-screen keyboard,
-disk menu, and key preset editor.  The small disk activity LED is drawn into
-`SCREEN` only for the present call, then its saved rectangle is restored.  The
-statistics overlay uses the same saved-rectangle path when no large menu or
-keyboard overlay is active.
+disk menu, and key preset editor.  `keyboard_mode=normal` resizes the DOS
+image above the on-screen keyboard; `keyboard_mode=overlay` keeps the DOS
+image unscaled and draws the keyboard over it.  The small disk activity LED is
+drawn into `SCREEN` only for the present call, then its saved rectangle is
+restored.  The statistics overlay uses the same saved-rectangle path when no
+large menu or keyboard overlay is active.
 
 This build also enables the computed-goto CPU opcode dispatcher, so the main
 `exec86()` loop jumps directly to opcode handlers instead of entering the large

@@ -24,6 +24,11 @@ typedef enum {
 } r36sx_pico286_scaling_filter_t;
 
 typedef enum {
+    R36SX_PICO286_KEYBOARD_NORMAL = 0,
+    R36SX_PICO286_KEYBOARD_OVERLAY = 1,
+} r36sx_pico286_keyboard_mode_t;
+
+typedef enum {
     R36SX_PICO286_CPU_8086 = 0,
     R36SX_PICO286_CPU_80286 = 1,
     R36SX_PICO286_CPU_80386 = 2,
@@ -176,6 +181,12 @@ r36sx_pico286_scaling_filter_t r36sx_pico286_scaling_filter(void);
 
 // Return the configured scaling filter text used when rewriting config.
 const char *r36sx_pico286_scaling_filter_name(void);
+
+// Return how the on-screen keyboard affects the DOS image.
+r36sx_pico286_keyboard_mode_t r36sx_pico286_keyboard_mode(void);
+
+// Return the configured keyboard mode text used when rewriting config.
+const char *r36sx_pico286_keyboard_mode_name(void);
 
 #ifdef __cplusplus
 }

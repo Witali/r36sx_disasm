@@ -71,6 +71,7 @@ static char app_stats_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
 static char screenshot_format_text[8] = "png";
 static char scaling_filter_text[16] = "nearest";
+static char keyboard_mode_text[16] = "normal";
 static char audio_adlib_enabled_text[8] = "1";
 static char audio_sound_blaster_enabled_text[8] = "1";
 static char audio_cms_enabled_text[8] = "1";
@@ -111,6 +112,8 @@ static r36sx_pico286_screenshot_format_t screenshot_format =
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG;
 static r36sx_pico286_scaling_filter_t scaling_filter =
     R36SX_PICO286_SCALING_NEAREST;
+static r36sx_pico286_keyboard_mode_t keyboard_mode =
+    R36SX_PICO286_KEYBOARD_NORMAL;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -694,6 +697,39 @@ static int set_scaling_filter(const char *key, const char *value,
     return 1;
 }
 
+static int set_keyboard_mode(const char *key, const char *value,
+                             int line_no)
+{
+    if (!(key_equals(key, "keyboard_mode") ||
+          key_equals(key, "osk_mode") ||
+          key_equals(key, "screen_keyboard_mode"))) {
+        return 0;
+    }
+
+    if (key_equals(value, "normal") ||
+        key_equals(value, "resize") ||
+        key_equals(value, "scaled")) {
+        keyboard_mode = R36SX_PICO286_KEYBOARD_NORMAL;
+        snprintf(keyboard_mode_text, sizeof(keyboard_mode_text), "normal");
+        r36sx_pico286_debug_log("diskcfg: keyboard_mode=normal");
+        return 1;
+    }
+
+    if (key_equals(value, "overlay") ||
+        key_equals(value, "overlap") ||
+        key_equals(value, "over")) {
+        keyboard_mode = R36SX_PICO286_KEYBOARD_OVERLAY;
+        snprintf(keyboard_mode_text, sizeof(keyboard_mode_text), "overlay");
+        r36sx_pico286_debug_log("diskcfg: keyboard_mode=overlay");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid %s '%s' at line %d",
+        key, value, line_no);
+    return 1;
+}
+
 static int set_app_stats_value(const char *key, const char *value,
                                int line_no)
 {
@@ -1141,6 +1177,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_scaling_filter(key, value, line_no)) {
         return 1;
     }
+    if (set_keyboard_mode(key, value, line_no)) {
+        return 1;
+    }
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
@@ -1329,9 +1368,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "target_fps=%s\n\n", target_fps_text);
 
     fprintf(fp, "# Scaling filter used when the DOS image is resized.\n");
-    fprintf(fp, "# Supported values: nearest, bilinear.\n");
+    fprintf(fp, "# Supported scaling_filter values: nearest, bilinear.\n");
+    fprintf(fp, "# keyboard_mode=normal resizes the DOS image above the keyboard.\n");
+    fprintf(fp, "# keyboard_mode=overlay draws the keyboard over the DOS image.\n");
     fprintf(fp, "[video]\n");
-    fprintf(fp, "scaling_filter=%s\n\n", scaling_filter_text);
+    fprintf(fp, "scaling_filter=%s\n", scaling_filter_text);
+    fprintf(fp, "keyboard_mode=%s\n\n", keyboard_mode_text);
 
     fprintf(fp, "# Emulated audio devices mixed into the output stream.\n");
     fprintf(fp, "# The built-in PC speaker/beeper is always enabled.\n");
@@ -1717,4 +1759,18 @@ const char *r36sx_pico286_scaling_filter_name(void)
     load_disk_config();
 
     return scaling_filter_text;
+}
+
+r36sx_pico286_keyboard_mode_t r36sx_pico286_keyboard_mode(void)
+{
+    load_disk_config();
+
+    return keyboard_mode;
+}
+
+const char *r36sx_pico286_keyboard_mode_name(void)
+{
+    load_disk_config();
+
+    return keyboard_mode_text;
 }

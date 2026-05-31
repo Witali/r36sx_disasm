@@ -32,6 +32,19 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 configurable on-screen keyboard mode
+
+The current `pico_286` binary reads `[video] keyboard_mode` from
+`pico_286.conf`.
+
+- `normal` keeps the previous behavior: the DOS image is resized above the
+  on-screen keyboard.
+- `overlay` draws the on-screen keyboard over the DOS image without resizing
+  the underlying framebuffer.
+
+pico_286 size: 1381244 bytes
+pico_286 SHA256: 74B49EADAB77E66333D07D7E058FFDFE5514DB24E18A235B2546D81888922CB3
+
 ## 2026-05-31 dirty video rendering
 
 The current `pico_286` binary tracks visible video changes and only rerenders
