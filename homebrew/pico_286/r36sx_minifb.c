@@ -71,7 +71,6 @@ struct r36sx_mfb_driver {
     uint16_t *frame;
     uint16_t *base_frame;
     uint16_t *osk_overlay;
-    uint16_t *osk_underlay;
     uint16_t *stats_overlay;
     uint16_t *screenshot_preview;
     int width;
@@ -116,14 +115,6 @@ struct r36sx_mfb_driver {
     uint32_t stats_overlay_last_ms;
     uint32_t screenshot_counter;
     uint32_t screenshot_toast_until_ms;
-};
-
-struct r36sx_mfb_saved_rect {
-    int x;
-    int y;
-    int w;
-    int h;
-    uint16_t pixels[R36SX_PICO286_SAVED_RECT_MAX_PIXELS];
 };
 
 static struct r36sx_mfb_driver g_mfb;
@@ -185,8 +176,7 @@ static size_t r36sx_osk_overlay_pixels(void)
 
 static int r36sx_osk_overlay_buffers_ready(void)
 {
-    return g_mfb.osk_overlay && g_mfb.osk_underlay &&
-           g_mfb.width > 0 &&
+    return g_mfb.osk_overlay && g_mfb.width > 0 &&
            g_mfb.height >= R36SX_SCREEN_KEYBOARD_PANEL_H;
 }
 
@@ -1415,176 +1405,31 @@ static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms)
     }
 }
 
-static int r36sx_mfb_save_rect(uint16_t *target, int x0, int y0, int x1,
-                               int y1, struct r36sx_mfb_saved_rect *saved)
-{
-    size_t pixels;
-
-    if (!target || !saved) {
-        return 0;
-    }
-    if (x0 < 0) {
-        x0 = 0;
-    }
-    if (y0 < 0) {
-        y0 = 0;
-    }
-    if (x1 >= g_mfb.width) {
-        x1 = g_mfb.width - 1;
-    }
-    if (y1 >= g_mfb.height) {
-        y1 = g_mfb.height - 1;
-    }
-    if (x1 < x0 || y1 < y0) {
-        return 0;
-    }
-
-    saved->x = x0;
-    saved->y = y0;
-    saved->w = x1 - x0 + 1;
-    saved->h = y1 - y0 + 1;
-    pixels = (size_t)saved->w * (size_t)saved->h;
-    if (pixels > R36SX_PICO286_SAVED_RECT_MAX_PIXELS) {
-        saved->w = 0;
-        saved->h = 0;
-        return 0;
-    }
-
-    for (int row = 0; row < saved->h; row++) {
-        memcpy(&saved->pixels[(size_t)row * (size_t)saved->w],
-               &target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
-                       (size_t)saved->x],
-               (size_t)saved->w * sizeof(saved->pixels[0]));
-    }
-    return 1;
-}
-
-static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
-                                         struct r36sx_mfb_saved_rect *saved)
-{
-    int cx;
-    int cy;
-    int x0;
-    int y0;
-    int x1;
-    int y1;
-    const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
-
-    if (!target || !saved || !r36sx_mfb_disk_led_visible(now_ms)) {
-        return 0;
-    }
-
-    r36sx_mfb_disk_led_center(&cx, &cy);
-    x0 = cx - outer_radius;
-    y0 = cy - outer_radius;
-    x1 = cx + outer_radius;
-    y1 = cy + outer_radius;
-    if (!r36sx_mfb_save_rect(target, x0, y0, x1, y1, saved)) {
-        return 0;
-    }
-
-    r36sx_mfb_draw_disk_led_on(target, now_ms);
-    return 1;
-}
-
-static int r36sx_mfb_draw_stats_saved(uint16_t *target, uint32_t now_ms,
-                                      struct r36sx_mfb_saved_rect *saved)
-{
-    int x0;
-    int y0;
-    int x1;
-    int y1;
-
-    if (!target || !saved || !r36sx_app_stats_is_visible()) {
-        return 0;
-    }
-    if (!r36sx_mfb_refresh_stats_overlay(now_ms)) {
-        return 0;
-    }
-
-    x0 = g_mfb.stats_overlay_x;
-    y0 = g_mfb.stats_overlay_y;
-    x1 = x0 + g_mfb.stats_overlay_w - 1;
-    y1 = y0 + g_mfb.stats_overlay_h - 1;
-    if (!r36sx_mfb_save_rect(target, x0, y0, x1, y1, saved)) {
-        return 0;
-    }
-
-    r36sx_mfb_blit_stats_overlay(target);
-    return 1;
-}
-
-static int r36sx_mfb_draw_osk_overlay_saved(uint16_t *target)
+static void r36sx_mfb_draw_osk_overlay_direct(uint16_t *target)
 {
     int y;
     int h = R36SX_SCREEN_KEYBOARD_PANEL_H;
 
     if (!target || !r36sx_osk_direct_overlay_active() ||
         !r36sx_mfb_refresh_osk_overlay()) {
-        return 0;
+        return;
     }
 
     y = r36sx_osk_panel_y();
     if (y < 0) {
-        return 0;
+        return;
     }
     if (y + h > g_mfb.height) {
         h = g_mfb.height - y;
     }
     if (h <= 0) {
-        return 0;
+        return;
     }
 
     for (int row = 0; row < h; row++) {
-        memcpy(g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
-               target + (size_t)(y + row) * (size_t)g_mfb.width,
-               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
         memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
                g_mfb.osk_overlay + (size_t)row * (size_t)g_mfb.width,
                (size_t)g_mfb.width * sizeof(g_mfb.osk_overlay[0]));
-    }
-    return 1;
-}
-
-static void r36sx_mfb_restore_osk_overlay(uint16_t *target)
-{
-    int y;
-    int h = R36SX_SCREEN_KEYBOARD_PANEL_H;
-
-    if (!target || !r36sx_osk_overlay_buffers_ready()) {
-        return;
-    }
-
-    y = r36sx_osk_panel_y();
-    if (y < 0) {
-        return;
-    }
-    if (y + h > g_mfb.height) {
-        h = g_mfb.height - y;
-    }
-    if (h <= 0) {
-        return;
-    }
-
-    for (int row = 0; row < h; row++) {
-        memcpy(target + (size_t)(y + row) * (size_t)g_mfb.width,
-               g_mfb.osk_underlay + (size_t)row * (size_t)g_mfb.width,
-               (size_t)g_mfb.width * sizeof(g_mfb.osk_underlay[0]));
-    }
-}
-
-static void r36sx_mfb_restore_saved_rect(
-    uint16_t *target, const struct r36sx_mfb_saved_rect *saved)
-{
-    if (!target || !saved || saved->w <= 0 || saved->h <= 0) {
-        return;
-    }
-
-    for (int row = 0; row < saved->h; row++) {
-        memcpy(&target[(size_t)(saved->y + row) * (size_t)g_mfb.width +
-                       (size_t)saved->x],
-               &saved->pixels[(size_t)row * (size_t)saved->w],
-               (size_t)saved->w * sizeof(saved->pixels[0]));
     }
 }
 
@@ -1993,9 +1838,6 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_mfb.osk_overlay =
         (uint16_t *)calloc(r36sx_osk_overlay_pixels(),
                            sizeof(g_mfb.osk_overlay[0]));
-    g_mfb.osk_underlay =
-        (uint16_t *)calloc(r36sx_osk_overlay_pixels(),
-                           sizeof(g_mfb.osk_underlay[0]));
     g_mfb.stats_overlay =
         (uint16_t *)calloc(R36SX_PICO286_SAVED_RECT_MAX_PIXELS,
                            sizeof(g_mfb.stats_overlay[0]));
@@ -2011,7 +1853,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     if (!g_mfb.screenshot_preview) {
         r36sx_pico286_debug_log("minifb: screenshot preview allocation failed");
     }
-    if (!g_mfb.osk_overlay || !g_mfb.osk_underlay) {
+    if (!g_mfb.osk_overlay) {
         r36sx_pico286_debug_log("minifb: keyboard overlay cache allocation failed");
     }
     if (!g_mfb.stats_overlay) {
@@ -2183,28 +2025,28 @@ int mfb_update(void *buffer, int fps_limit)
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
     } else {
-        int osk_saved = r36sx_mfb_draw_osk_overlay_saved(src);
-        static struct r36sx_mfb_saved_rect saved_led;
-        static struct r36sx_mfb_saved_rect saved_stats;
-        int stats_saved =
-            r36sx_mfb_draw_stats_saved(src, now_ms, &saved_stats);
-        int led_saved =
-            r36sx_mfb_draw_disk_led_saved(src, now_ms, &saved_led);
+        int direct_overlay_active =
+            osk_overlay_active ||
+            r36sx_mfb_disk_led_visible(now_ms) ||
+            stats_overlay_visible;
+        uint16_t *present_frame = src;
+
+        if (direct_overlay_active) {
+            memcpy(g_mfb.frame, src,
+                   (size_t)g_mfb.width * (size_t)g_mfb.height *
+                       sizeof(g_mfb.frame[0]));
+            r36sx_mfb_draw_osk_overlay_direct(g_mfb.frame);
+            r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
+            r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
+            present_frame = g_mfb.frame;
+        }
 
         if (g_mfb.screenshot_requested) {
-            r36sx_mfb_finish_screenshot(src);
+            r36sx_mfb_finish_screenshot(present_frame);
         }
-        g_mfb.disp_frame(src, g_mfb.width, g_mfb.height, g_mfb.stride);
+        g_mfb.disp_frame(present_frame, g_mfb.width, g_mfb.height,
+                         g_mfb.stride);
         r36sx_app_stats_record_frame();
-        if (led_saved) {
-            r36sx_mfb_restore_saved_rect(src, &saved_led);
-        }
-        if (stats_saved) {
-            r36sx_mfb_restore_saved_rect(src, &saved_stats);
-        }
-        if (osk_saved) {
-            r36sx_mfb_restore_osk_overlay(src);
-        }
     }
 
     g_mfb.disk_led_was_active = disk_led_active;
@@ -2248,9 +2090,6 @@ void mfb_close(void)
     }
     if (g_mfb.osk_overlay) {
         free(g_mfb.osk_overlay);
-    }
-    if (g_mfb.osk_underlay) {
-        free(g_mfb.osk_underlay);
     }
     if (g_mfb.stats_overlay) {
         free(g_mfb.stats_overlay);

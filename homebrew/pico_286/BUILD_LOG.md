@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-31 stable direct-overlay present buffer
+
+Fixed flicker in the direct-present overlay path.
+
+- Small overlays no longer draw into `SCREEN` and restore it immediately after
+  `video_driver_disp_frame()`.
+- When the app statistics overlay, disk LED, or overlay keyboard is visible,
+  MiniFB copies the current `SCREEN` into the stable output frame, draws the
+  overlay there, and passes that stable frame to `driver.so`.
+- Plain DOS frames still present `SCREEN` directly when no overlay is active.
+- The overlay keyboard still uses its cached `640x96` panel, but no longer
+  needs a separate underlay restore buffer.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1386804` bytes
+- `pico_286` SHA256:
+  `37CB2FD6156F8EE3E6270E6AE3BF0202D09D3484CC717C20CD5F78876A8DD9A5`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 fullscreen menu direct draw
 
 Optimized the full-screen MiniFB menu path.
@@ -10,8 +47,9 @@ Optimized the full-screen MiniFB menu path.
   back into the output frame.
 - The small overlay layers are not mixed over these menus; the menu draw owns
   the full frame for that present.
-- Normal DOS frames, saved-rectangle overlays, and the cached overlay keyboard
-  path keep their previous direct-present behavior.
+- Normal DOS frames and the cached overlay keyboard path keep their previous
+  direct-present behavior.  Small overlays later changed to use a stable output
+  buffer instead of save/restore inside `SCREEN`.
 
 Rebuild command:
 
@@ -46,8 +84,8 @@ Optimized `[video] keyboard_mode=overlay`.
 - The keyboard panel is rendered into a dedicated `640x96` RGB565 cache.
 - The cache is refreshed only when visible keyboard state changes: selection,
   modifiers, symbol mode, press animation, cursor block, or visibility.
-- Present-time drawing saves the covered DOS pixels, blits the cached keyboard
-  panel over `SCREEN`, presents the frame, and restores the saved pixels.
+- Present-time drawing blits the cached keyboard panel through the direct
+  overlay path.
 - If the keyboard cache buffers cannot be allocated, the old full composition
   path is used as a fallback.
 
@@ -1861,11 +1899,11 @@ Optimized the R36SX MiniFB present path for the normal no-menu case.
 not visible.  This removes the extra full-frame `SCREEN` -> `base_frame` copy
 from ordinary DOS/game frames.
 
-The red disk activity LED now uses a small save/restore rectangle in direct
-mode: the LED is drawn into `SCREEN` for the `video_driver_disp_frame()` call,
-then the original pixels are restored immediately.  Full-screen menus later
-changed to draw directly into the output frame without precomposing a DOS frame
-underneath them.
+The red disk activity LED originally used a small save/restore rectangle in
+direct mode: the LED was drawn into `SCREEN` for the
+`video_driver_disp_frame()` call, then the original pixels were restored
+immediately.  Small overlays later changed to use a stable output frame instead
+of restoring `SCREEN` right after handing the frame pointer to `driver.so`.
 
 ## 2026-05-30 runtime profiling option
 
