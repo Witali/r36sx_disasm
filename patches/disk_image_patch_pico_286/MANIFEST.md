@@ -37,6 +37,27 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 VBE 640x480 modes and BIOS services
+
+The patch binary now supports native-size banked VBE modes:
+
+- `101h`: 640x480x8 packed pixel
+- `111h`: 640x480x16 RGB565
+- `103h`: 800x600x8 packed pixel, downsampled to 640x480
+- `114h`: 800x600x16 RGB565, downsampled to 640x480
+
+VBE mode info blocks now report mode-specific resolution, pitch, bank count,
+image pages, memory model, RGB565 masks, 64 KiB bank granularity, and DAC
+capability.  The BIOS also implements `4F06h` logical scanline length, `4F08h`
+DAC width, and `4F09h` palette data services.  Linear framebuffer requests are
+still rejected; software should use the banked `A000:0000` window.
+
+```text
+pico_286 size: 454156 bytes
+pico_286 SHA256: A6AAF2096D7229E4DD752FBFC62D8278C3FBEA568733A51B0DD2CD3A83CB4E7B
+Defender scan: found no threats
+```
+
 ## 2026-05-31 On-screen keyboard L/R modifiers
 
 The patch binary now treats physical `L` and `R` as held PC modifiers while the

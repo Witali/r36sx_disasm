@@ -13,10 +13,14 @@
 #define PICO286_PSRAM_ATTR __attribute__((aligned (4)))
 #endif
 
+#define SVGA_NATIVE_WIDTH 640
+#define SVGA_NATIVE_HEIGHT 480
 #define SVGA_WIDTH 800
 #define SVGA_HEIGHT 600
 #define SVGA_MAX_BPP 16
 #define SVGA_VRAM_SIZE (SVGA_WIDTH * SVGA_HEIGHT * (SVGA_MAX_BPP / 8))
+#define VBE_MODE_640X480X8 0x0101
+#define VBE_MODE_640X480X16 0x0111
 #define VBE_MODE_800X600X8 0x0103
 #define VBE_MODE_800X600X16 0x0114
 
@@ -231,6 +235,8 @@ uint8_t vga_dac_8_to_6(uint8_t value);
 uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6);
 void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6);
 void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6);
+void vga_set_dac_color8(uint8_t index, uint8_t red8, uint8_t green8, uint8_t blue8);
+void vga_get_dac_color8(uint8_t index, uint8_t *red8, uint8_t *green8, uint8_t *blue8);
 
 /*
  * Shadow Palette hooks for the Linux/R36SX renderer.
@@ -294,13 +300,25 @@ extern uint8_t vga_planar_mode;
 extern uint32_t vga_svga_bank;
 extern uint16_t vga_svga_width;
 extern uint16_t vga_svga_height;
+extern uint16_t vga_svga_pitch;
 extern uint8_t vga_svga_bpp;
 int vga_svga_mode_active(void);
 int vga_svga_mode_supported(uint16_t mode);
+uint16_t vga_svga_mode_width(uint16_t mode);
+uint16_t vga_svga_mode_height(uint16_t mode);
+uint8_t vga_svga_mode_bpp(uint16_t mode);
+uint16_t vga_svga_mode_pitch(uint16_t mode);
 int vga_svga_set_mode(uint16_t mode, int clear_memory);
 void vga_svga_disable(void);
 void vga_svga_set_bank(uint16_t bank);
 uint16_t vga_svga_get_bank(void);
+uint16_t vga_svga_bytes_per_scanline(void);
+uint16_t vga_svga_pixels_per_scanline(void);
+uint16_t vga_svga_max_scanline_bytes(void);
+uint16_t vga_svga_max_scanline_pixels(void);
+uint16_t vga_svga_max_scanlines(void);
+int vga_svga_set_scanline_bytes(uint16_t bytes_per_scanline);
+int vga_svga_set_scanline_pixels(uint16_t pixels_per_scanline);
 void vga_set_standard_mode(uint8_t mode);
 
 #if PICO_ON_DEVICE

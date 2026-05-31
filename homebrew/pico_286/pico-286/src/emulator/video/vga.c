@@ -23,6 +23,7 @@ uint8_t vga_planar_mode = 0;
 uint32_t vga_svga_bank = 0;
 uint16_t vga_svga_width = 0;
 uint16_t vga_svga_height = 0;
+uint16_t vga_svga_pitch = 0;
 uint8_t vga_svga_bpp = 0;
 
 // Latches (32-bit).
@@ -91,16 +92,67 @@ uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6) {
                vga_dac_6_to_8(blue6));
 }
 
+uint16_t vga_svga_mode_width(uint16_t mode)
+{
+    switch (mode & 0x01FFu) {
+        case VBE_MODE_640X480X8:
+        case VBE_MODE_640X480X16:
+            return SVGA_NATIVE_WIDTH;
+        case VBE_MODE_800X600X8:
+        case VBE_MODE_800X600X16:
+            return SVGA_WIDTH;
+        default:
+            return 0;
+    }
+}
+
+uint16_t vga_svga_mode_height(uint16_t mode)
+{
+    switch (mode & 0x01FFu) {
+        case VBE_MODE_640X480X8:
+        case VBE_MODE_640X480X16:
+            return SVGA_NATIVE_HEIGHT;
+        case VBE_MODE_800X600X8:
+        case VBE_MODE_800X600X16:
+            return SVGA_HEIGHT;
+        default:
+            return 0;
+    }
+}
+
+uint8_t vga_svga_mode_bpp(uint16_t mode)
+{
+    switch (mode & 0x01FFu) {
+        case VBE_MODE_640X480X8:
+        case VBE_MODE_800X600X8:
+            return 8;
+        case VBE_MODE_640X480X16:
+        case VBE_MODE_800X600X16:
+            return 16;
+        default:
+            return 0;
+    }
+}
+
+uint16_t vga_svga_mode_pitch(uint16_t mode)
+{
+    uint16_t width = vga_svga_mode_width(mode);
+    uint8_t bpp = vga_svga_mode_bpp(mode);
+
+    return (uint16_t)(width * (bpp == 16 ? 2u : 1u));
+}
+
 int vga_svga_mode_supported(uint16_t mode)
 {
-    return mode == VBE_MODE_800X600X8 ||
-           mode == VBE_MODE_800X600X16;
+    return vga_svga_mode_width(mode) != 0 &&
+           vga_svga_mode_height(mode) != 0 &&
+           vga_svga_mode_bpp(mode) != 0;
 }
 
 int vga_svga_mode_active(void)
 {
-    return vga_svga_width == SVGA_WIDTH &&
-           vga_svga_height == SVGA_HEIGHT &&
+    return vga_svga_width != 0 &&
+           vga_svga_height != 0 &&
            (vga_svga_bpp == 8 || vga_svga_bpp == 16);
 }
 
@@ -108,6 +160,7 @@ void vga_svga_disable(void)
 {
     vga_svga_width = 0;
     vga_svga_height = 0;
+    vga_svga_pitch = 0;
     vga_svga_bpp = 0;
     vga_svga_bank = 0;
 }
@@ -118,9 +171,10 @@ int vga_svga_set_mode(uint16_t mode, int clear_memory)
         return 0;
     }
 
-    vga_svga_width = SVGA_WIDTH;
-    vga_svga_height = SVGA_HEIGHT;
-    vga_svga_bpp = mode == VBE_MODE_800X600X16 ? 16 : 8;
+    vga_svga_width = vga_svga_mode_width(mode);
+    vga_svga_height = vga_svga_mode_height(mode);
+    vga_svga_bpp = vga_svga_mode_bpp(mode);
+    vga_svga_pitch = vga_svga_mode_pitch(mode);
     vga_svga_bank = 0;
     if (clear_memory) {
         memset(SVGA_VRAM, 0, sizeof(SVGA_VRAM));
@@ -149,8 +203,83 @@ uint16_t vga_svga_get_bank(void)
     return (uint16_t)vga_svga_bank;
 }
 
-void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6) {
-    uint32_t color = vga_dac_color(red6, green6, blue6);
+uint16_t vga_svga_bytes_per_scanline(void)
+{
+    return vga_svga_mode_active() ? vga_svga_pitch : 0;
+}
+
+uint16_t vga_svga_pixels_per_scanline(void)
+{
+    if (!vga_svga_mode_active()) {
+        return 0;
+    }
+    return (uint16_t)(vga_svga_pitch / (vga_svga_bpp == 16 ? 2u : 1u));
+}
+
+uint16_t vga_svga_max_scanline_bytes(void)
+{
+    uint32_t max_bytes;
+
+    if (!vga_svga_mode_active() || vga_svga_height == 0) {
+        return 0;
+    }
+    max_bytes = SVGA_VRAM_SIZE / vga_svga_height;
+    return (uint16_t)(max_bytes > 0xFFFFu ? 0xFFFFu : max_bytes);
+}
+
+uint16_t vga_svga_max_scanline_pixels(void)
+{
+    uint16_t max_bytes = vga_svga_max_scanline_bytes();
+
+    return (uint16_t)(max_bytes / (vga_svga_bpp == 16 ? 2u : 1u));
+}
+
+uint16_t vga_svga_max_scanlines(void)
+{
+    if (!vga_svga_mode_active() || vga_svga_pitch == 0) {
+        return 0;
+    }
+    return (uint16_t)(SVGA_VRAM_SIZE / vga_svga_pitch);
+}
+
+int vga_svga_set_scanline_bytes(uint16_t bytes_per_scanline)
+{
+    uint16_t min_pitch;
+    uint16_t max_pitch;
+
+    if (!vga_svga_mode_active()) {
+        return 0;
+    }
+    min_pitch = vga_svga_mode_pitch((uint16_t)videomode);
+    max_pitch = vga_svga_max_scanline_bytes();
+    if (bytes_per_scanline < min_pitch || bytes_per_scanline > max_pitch) {
+        return 0;
+    }
+    if (vga_svga_bpp == 16 && (bytes_per_scanline & 1u) != 0) {
+        return 0;
+    }
+    vga_svga_pitch = bytes_per_scanline;
+    r36sx_pico286_video_mark_dirty();
+    return 1;
+}
+
+int vga_svga_set_scanline_pixels(uint16_t pixels_per_scanline)
+{
+    uint8_t bytes_per_pixel;
+
+    if (!vga_svga_mode_active()) {
+        return 0;
+    }
+    bytes_per_pixel = vga_svga_bpp == 16 ? 2u : 1u;
+    if (pixels_per_scanline > 0xFFFFu / bytes_per_pixel) {
+        return 0;
+    }
+    return vga_svga_set_scanline_bytes(
+        (uint16_t)(pixels_per_scanline * bytes_per_pixel));
+}
+
+void vga_set_dac_color8(uint8_t index, uint8_t red8, uint8_t green8, uint8_t blue8) {
+    uint32_t color = rgb(red8, green8, blue8);
     if (vga_palette[index] != color) {
         vga_palette[index] = color;
         r36sx_pico286_vga_palette565_set(index, color);
@@ -161,11 +290,26 @@ void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue
 #endif
 }
 
-void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6) {
+void vga_get_dac_color8(uint8_t index, uint8_t *red8, uint8_t *green8, uint8_t *blue8) {
     uint32_t color = vga_palette[index];
-    *red6 = vga_dac_8_to_6((uint8_t)(color >> 16));
-    *green6 = vga_dac_8_to_6((uint8_t)(color >> 8));
-    *blue6 = vga_dac_8_to_6((uint8_t)color);
+    *red8 = (uint8_t)(color >> 16);
+    *green8 = (uint8_t)(color >> 8);
+    *blue8 = (uint8_t)color;
+}
+
+void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6) {
+    vga_set_dac_color8(index,
+                       vga_dac_6_to_8(red6),
+                       vga_dac_6_to_8(green6),
+                       vga_dac_6_to_8(blue6));
+}
+
+void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6) {
+    uint8_t red8, green8, blue8;
+    vga_get_dac_color8(index, &red8, &green8, &blue8);
+    *red6 = vga_dac_8_to_6(red8);
+    *green6 = vga_dac_8_to_6(green8);
+    *blue6 = vga_dac_8_to_6(blue8);
 }
 
 // Utility: replicate an 8-bit value into all four bytes of a 32-bit word

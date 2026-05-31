@@ -210,9 +210,14 @@ cadence.  At 60 Hz this is about 735 stereo frames at 44.1 kHz, but delayed
 packets are sized from the actual elapsed time since the previous audio send,
 up to the 100 ms source buffer capacity.
 
-Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
-(800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`, and
-the 800x600 image is downsampled to the native 640x480 screen.  Linear
+Minimal banked VBE modes `101h` (640x480x8 packed pixel), `111h`
+(640x480x16 RGB565), `103h` (800x600x8 packed pixel), and `114h`
+(800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`;
+640x480 modes render 1:1 on the console screen, while 800x600 modes are
+downsampled to the native 640x480 panel.  Mode info blocks include
+mode-specific pitch, bank count, image pages, memory model, DAC capability,
+and RGB565 masks for 16-bit modes.  The BIOS also implements `4F06h` logical
+scanline length, `4F08h` DAC width, and `4F09h` palette data.  Linear
 framebuffer requests are rejected.
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another

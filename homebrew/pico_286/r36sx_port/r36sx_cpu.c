@@ -1684,6 +1684,9 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
 #define R36SX_VBE_STATUS_OK 0x004Fu
 #define R36SX_VBE_STATUS_FAIL 0x014Fu
 #define R36SX_VBE_WINDOW_KB 64u
+#define R36SX_VBE_WINDOW_BYTES (R36SX_VBE_WINDOW_KB * 1024u)
+
+static uint8_t r36sx_vbe_dac_width = 6;
 
 static void r36sx_vbe_write8(uint32_t base, uint16_t offset, uint8_t value)
 {
@@ -1722,8 +1725,28 @@ static uint16_t r36sx_vbe_mode_base(uint16_t mode)
 
 static uint16_t r36sx_vbe_bytes_per_scanline(uint16_t mode)
 {
-    return (uint16_t)(SVGA_WIDTH *
-        (r36sx_vbe_mode_base(mode) == VBE_MODE_800X600X16 ? 2u : 1u));
+    return vga_svga_mode_pitch(r36sx_vbe_mode_base(mode));
+}
+
+static uint32_t r36sx_vbe_mode_bytes(uint16_t mode)
+{
+    mode = r36sx_vbe_mode_base(mode);
+    return (uint32_t)r36sx_vbe_bytes_per_scanline(mode) *
+           vga_svga_mode_height(mode);
+}
+
+static uint8_t r36sx_vbe_mode_banks(uint16_t mode)
+{
+    uint32_t mode_bytes = r36sx_vbe_mode_bytes(mode);
+    uint32_t banks = (mode_bytes + R36SX_VBE_WINDOW_BYTES - 1u) /
+                     R36SX_VBE_WINDOW_BYTES;
+
+    if (banks == 0) {
+        banks = 1;
+    } else if (banks > 0xFFu) {
+        banks = 0xFFu;
+    }
+    return (uint8_t)banks;
 }
 
 static void r36sx_vbe_write_info_block(void)
@@ -1737,14 +1760,16 @@ static void r36sx_vbe_write_info_block(void)
     r36sx_vbe_write8(base, 0x02, 'S');
     r36sx_vbe_write8(base, 0x03, 'A');
     r36sx_vbe_write16(base, 0x04, 0x0200u);
-    r36sx_vbe_write32(base, 0x0A, 0u);
+    r36sx_vbe_write32(base, 0x0A, 0x00000001u);
     r36sx_vbe_write32(base, 0x0E, r36sx_vbe_far_ptr(modes));
     r36sx_vbe_write16(base, 0x12,
                       (uint16_t)((SVGA_VRAM_SIZE + 0xFFFFu) >> 16));
 
-    r36sx_vbe_write16(modes, 0x00, VBE_MODE_800X600X8);
-    r36sx_vbe_write16(modes, 0x02, VBE_MODE_800X600X16);
-    r36sx_vbe_write16(modes, 0x04, 0xFFFFu);
+    r36sx_vbe_write16(modes, 0x00, VBE_MODE_640X480X8);
+    r36sx_vbe_write16(modes, 0x02, VBE_MODE_640X480X16);
+    r36sx_vbe_write16(modes, 0x04, VBE_MODE_800X600X8);
+    r36sx_vbe_write16(modes, 0x06, VBE_MODE_800X600X16);
+    r36sx_vbe_write16(modes, 0x08, 0xFFFFu);
     CPU_AX = R36SX_VBE_STATUS_OK;
 }
 
@@ -1752,6 +1777,8 @@ static void r36sx_vbe_write_mode_info(uint16_t mode)
 {
     uint32_t base = (uint32_t)CPU_ES * 16u + CPU_DI;
     uint16_t bytes_per_scanline;
+    uint16_t width;
+    uint16_t height;
     uint32_t mode_bytes;
     uint8_t bpp;
     uint8_t pages;
@@ -1763,13 +1790,15 @@ static void r36sx_vbe_write_mode_info(uint16_t mode)
     }
 
     bytes_per_scanline = r36sx_vbe_bytes_per_scanline(mode);
-    mode_bytes = (uint32_t)bytes_per_scanline * SVGA_HEIGHT;
-    bpp = mode == VBE_MODE_800X600X16 ? 16 : 8;
+    width = vga_svga_mode_width(mode);
+    height = vga_svga_mode_height(mode);
+    mode_bytes = (uint32_t)bytes_per_scanline * height;
+    bpp = vga_svga_mode_bpp(mode);
     pages = (uint8_t)((SVGA_VRAM_SIZE / mode_bytes) > 0 ?
                       (SVGA_VRAM_SIZE / mode_bytes) - 1u : 0u);
 
     r36sx_vbe_clear(base, 256);
-    r36sx_vbe_write16(base, 0x00, 0x0019u);
+    r36sx_vbe_write16(base, 0x00, 0x005Bu);
     r36sx_vbe_write8(base, 0x02, 0x07u);
     r36sx_vbe_write8(base, 0x03, 0x07u);
     r36sx_vbe_write16(base, 0x04, R36SX_VBE_WINDOW_KB);
@@ -1778,13 +1807,13 @@ static void r36sx_vbe_write_mode_info(uint16_t mode)
     r36sx_vbe_write16(base, 0x0A, 0xA000u);
     r36sx_vbe_write32(base, 0x0C, 0u);
     r36sx_vbe_write16(base, 0x10, bytes_per_scanline);
-    r36sx_vbe_write16(base, 0x12, SVGA_WIDTH);
-    r36sx_vbe_write16(base, 0x14, SVGA_HEIGHT);
+    r36sx_vbe_write16(base, 0x12, width);
+    r36sx_vbe_write16(base, 0x14, height);
     r36sx_vbe_write8(base, 0x16, 8u);
     r36sx_vbe_write8(base, 0x17, 16u);
     r36sx_vbe_write8(base, 0x18, 1u);
     r36sx_vbe_write8(base, 0x19, bpp);
-    r36sx_vbe_write8(base, 0x1A, (uint8_t)((mode_bytes + 0xFFFFu) >> 16));
+    r36sx_vbe_write8(base, 0x1A, r36sx_vbe_mode_banks(mode));
     r36sx_vbe_write8(base, 0x1B, bpp == 16 ? 6u : 4u);
     r36sx_vbe_write8(base, 0x1C, R36SX_VBE_WINDOW_KB);
     r36sx_vbe_write8(base, 0x1D, pages);
@@ -1798,6 +1827,8 @@ static void r36sx_vbe_write_mode_info(uint16_t mode)
         r36sx_vbe_write8(base, 0x25, 0u);
         r36sx_vbe_write8(base, 0x26, 0u);
     }
+    r36sx_vbe_write16(base, 0x32, bytes_per_scanline);
+    r36sx_vbe_write8(base, 0x34, pages);
     CPU_AX = R36SX_VBE_STATUS_OK;
 }
 
@@ -1850,6 +1881,124 @@ static void r36sx_vbe_banked_window(void)
     }
 }
 
+static void r36sx_vbe_scanline_length(void)
+{
+    if (!vga_svga_mode_active()) {
+        CPU_AX = R36SX_VBE_STATUS_FAIL;
+        return;
+    }
+
+    switch (CPU_BL) {
+        case 0x00:
+            if (!vga_svga_set_scanline_pixels(CPU_CX)) {
+                CPU_AX = R36SX_VBE_STATUS_FAIL;
+                return;
+            }
+            break;
+        case 0x02:
+            if (!vga_svga_set_scanline_bytes(CPU_CX)) {
+                CPU_AX = R36SX_VBE_STATUS_FAIL;
+                return;
+            }
+            break;
+        case 0x01:
+            break;
+        case 0x03:
+            CPU_BX = vga_svga_max_scanline_bytes();
+            CPU_CX = vga_svga_max_scanline_pixels();
+            CPU_DX = vga_svga_max_scanlines();
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        default:
+            CPU_AX = R36SX_VBE_STATUS_FAIL;
+            return;
+    }
+
+    CPU_BX = vga_svga_bytes_per_scanline();
+    CPU_CX = vga_svga_pixels_per_scanline();
+    CPU_DX = vga_svga_max_scanlines();
+    CPU_AX = R36SX_VBE_STATUS_OK;
+}
+
+static void r36sx_vbe_dac_format(void)
+{
+    switch (CPU_BL) {
+        case 0x00:
+            if (CPU_BH != 6 && CPU_BH != 8) {
+                CPU_AX = R36SX_VBE_STATUS_FAIL;
+                return;
+            }
+            r36sx_vbe_dac_width = CPU_BH;
+            CPU_BH = r36sx_vbe_dac_width;
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        case 0x01:
+            CPU_BH = r36sx_vbe_dac_width;
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        default:
+            CPU_AX = R36SX_VBE_STATUS_FAIL;
+            return;
+    }
+}
+
+static void r36sx_vbe_palette_data(void)
+{
+    uint8_t subfunction = CPU_BL & 0x7Fu;
+    uint32_t memloc = (uint32_t)CPU_ES * 16u + CPU_DI;
+
+    switch (subfunction) {
+        case 0x00:
+            for (uint16_t i = 0; i < CPU_CX; i++) {
+                uint16_t color_index = CPU_DX + i;
+                uint8_t blue = read86(memloc++);
+                uint8_t green = read86(memloc++);
+                uint8_t red = read86(memloc++);
+                memloc++;
+
+                if (color_index < 256u) {
+                    if (r36sx_vbe_dac_width == 8) {
+                        vga_set_dac_color8((uint8_t)color_index,
+                                           red, green, blue);
+                    } else {
+                        vga_set_dac_color((uint8_t)color_index,
+                                          red & 0x3Fu,
+                                          green & 0x3Fu,
+                                          blue & 0x3Fu);
+                    }
+                }
+            }
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        case 0x01:
+            for (uint16_t i = 0; i < CPU_CX; i++) {
+                uint16_t color_index = CPU_DX + i;
+                uint8_t red = 0;
+                uint8_t green = 0;
+                uint8_t blue = 0;
+
+                if (color_index < 256u) {
+                    if (r36sx_vbe_dac_width == 8) {
+                        vga_get_dac_color8((uint8_t)color_index,
+                                           &red, &green, &blue);
+                    } else {
+                        vga_get_dac_color((uint8_t)color_index,
+                                          &red, &green, &blue);
+                    }
+                }
+                write86(memloc++, blue);
+                write86(memloc++, green);
+                write86(memloc++, red);
+                write86(memloc++, 0);
+            }
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        default:
+            CPU_AX = R36SX_VBE_STATUS_FAIL;
+            return;
+    }
+}
+
 static void r36sx_bios_vesa(void)
 {
     switch (CPU_AL) {
@@ -1869,6 +2018,15 @@ static void r36sx_bios_vesa(void)
             return;
         case 0x05:
             r36sx_vbe_banked_window();
+            return;
+        case 0x06:
+            r36sx_vbe_scanline_length();
+            return;
+        case 0x08:
+            r36sx_vbe_dac_format();
+            return;
+        case 0x09:
+            r36sx_vbe_palette_data();
             return;
         default:
             CPU_AX = R36SX_VBE_STATUS_FAIL;

@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-06-01 VBE 640x480 modes and BIOS services
+
+Expanded the minimal VBE implementation:
+
+- Added banked VBE modes `101h` (640x480x8 packed pixel) and `111h`
+  (640x480x16 RGB565), matching the console's native 640x480 panel.
+- Kept `103h` (800x600x8) and `114h` (800x600x16) as downsampled modes.
+- Mode info blocks now report the actual width, height, pitch, bank count,
+  image pages, memory model, RGB565 masks, and 64 KiB bank granularity.
+- `4F00h` reports the full mode list and the 8-bit DAC capability flag.
+- Added `4F06h` logical scanline length, `4F08h` DAC width, and `4F09h`
+  palette data services.
+- The SVGA renderer now uses the active mode width, height, and pitch, so
+  640x480 modes render 1:1 without downsampling.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `454156` bytes
+- `pico_286` SHA256:
+  `A6AAF2096D7229E4DD752FBFC62D8278C3FBEA568733A51B0DD2CD3A83CB4E7B`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-05-31 On-screen keyboard L/R modifiers
 
 Changed the shared on-screen keyboard physical trigger behavior:
