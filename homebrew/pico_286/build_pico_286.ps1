@@ -16,6 +16,7 @@ $Zig = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\zig.exe"
 $ZigInclude = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\lib\include"
 $Sysroot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\mipsel-buildroot-linux-gnu\sysroot"
 $SysrootInclude = Join-Path $Sysroot "usr\include"
+$SysrootFreetypeInclude = Join-Path $SysrootInclude "freetype2"
 $SysrootLib = Join-Path $Sysroot "lib"
 $SysrootUsrLib = Join-Path $Sysroot "usr\lib"
 $ToolchainRoot = Join-Path $Root "tools\mipsel-buildroot-linux-gnu_sdk-buildroot\opt\ext-toolchain"
@@ -70,7 +71,8 @@ $IncludeArgs = @(
     "-I$(Join-Path $PicoRoot "src\printf")",
     "-I$(Join-Path $PicoRoot "findfirst")",
     "-isystem$ZigInclude",
-    "-isystem$SysrootInclude"
+    "-isystem$SysrootInclude",
+    "-isystem$SysrootFreetypeInclude"
 )
 $CppIncludeArgs = $IncludeArgs + @(
     "-isystem$CppInclude",

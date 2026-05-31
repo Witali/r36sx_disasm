@@ -37,6 +37,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 Arial FreeType on-screen keyboard labels
+
+The patch binary now draws virtual on-screen keyboard labels through FreeType
+using the firmware Arial font.  The runtime tries
+`/mnt/sdcard/cubegm/Arial_en.ttf` first, then falls back to `Arial_kr.ttf`,
+`font.ttf`, and `Tahoma.ttf`; if FreeType or the fonts are unavailable, the
+previous built-in 5x7 bitmap labels are still used.  Cursor-key labels are
+mapped to Unicode arrows before loading glyphs.
+
+```text
+pico_286 size: 449560 bytes
+pico_286 SHA256: 2CDA4DE1D09ED6A0E505DEB541C9A05E379804F4512FD96593029203F7D1CDEA
+readelf -d: no hard NEEDED dependency on libfreetype
+Defender scan: found no threats
+```
+
 ## 2026-05-31 INT 13h EDD/LBA hard-disk support
 
 The patch binary now implements the basic Enhanced Disk Drive / LBA BIOS

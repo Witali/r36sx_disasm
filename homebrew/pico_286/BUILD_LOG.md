@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-05-31 Arial FreeType on-screen keyboard labels
+
+Updated the shared `r36sx_screen_keyboard` renderer so virtual key labels use
+FreeType and the firmware Arial font when available:
+
+- FreeType is loaded lazily through `dlopen()` from the firmware paths under
+  `/mnt/sdcard/cubegm`.
+- The preferred font is `/mnt/sdcard/cubegm/Arial_en.ttf`, with `Arial_kr.ttf`,
+  `font.ttf`, and `Tahoma.ttf` as fallbacks.
+- Glyph bitmaps are cached by codepoint and pixel size; the old 5x7 bitmap font
+  remains the fallback when FreeType or Arial cannot be opened.
+- Internal cursor labels `0x11..0x14` are rendered as Unicode arrows
+  `U+2190..U+2193` through the TrueType path.
+- The WSL/GCC and legacy Windows/Zig build scripts now include
+  `usr/include/freetype2` so `ft2build.h` is available at compile time.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `449560` bytes
+- `pico_286` SHA256:
+  `2CDA4DE1D09ED6A0E505DEB541C9A05E379804F4512FD96593029203F7D1CDEA`
+- `readelf -d` still shows no `NEEDED` dependency on `libfreetype`; the font
+  path is optional at runtime through `dlopen()`.
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-05-31 CPU interpreter source split
 
 Split the R36SX CPU interpreter helpers out of the large `r36sx_cpu.c`

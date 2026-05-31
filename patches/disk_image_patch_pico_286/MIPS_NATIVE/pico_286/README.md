@@ -72,6 +72,8 @@ number row switches to `!@#$%^&*()`.  Taller key rows scroll inside the fixed
 bottom panel, with a small scrollbar at the right edge.  The keyboard panel is
 drawn edge-to-edge along the bottom of the screen, keeps the header/status
 text, and uses a one-pixel inner gap around the key rows at the panel border.
+Key labels are rendered with FreeType through the firmware Arial font when
+available, with the older bitmap font kept as a fallback.
 A pressed virtual key shifts down-right and darkens until the physical button
 is released.  While the keyboard is visible, Pico-286
 compresses only the active

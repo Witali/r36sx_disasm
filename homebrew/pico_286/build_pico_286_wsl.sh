@@ -144,6 +144,7 @@ include_args=(
     "-I$PICO_ROOT/src/printf"
     "-I$PICO_ROOT/findfirst"
     "-isystem" "$SYSROOT/usr/include"
+    "-isystem" "$SYSROOT/usr/include/freetype2"
 )
 
 common_args=(

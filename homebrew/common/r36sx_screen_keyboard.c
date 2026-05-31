@@ -1,7 +1,14 @@
 #include "r36sx_screen_keyboard.h"
 
+#include <dlfcn.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #define R36SX_OSK_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_OSK_KEY_H 18
@@ -30,6 +37,9 @@
     (R36SX_OSK_CURSOR_BLOCK_COLS * R36SX_OSK_SIDE_KEY_W + \
      (R36SX_OSK_CURSOR_BLOCK_COLS - 1) * R36SX_OSK_CURSOR_GAP)
 #define R36SX_OSK_ROW_STEP (R36SX_OSK_KEY_H + R36SX_OSK_KEY_GAP)
+#define R36SX_OSK_FONT_PX 13
+#define R36SX_OSK_FONT_SMALL_PX 10
+#define R36SX_OSK_FONT_CACHE_SLOTS 128
 
 #define R36SX_OSK_FLAG_SHIFTED 0x01u
 #define R36SX_OSK_FLAG_SHIFT_MOD 0x02u
@@ -50,6 +60,46 @@ struct r36sx_osk_key {
     uint16_t keycode;
     uint8_t flags;
     uint8_t units;
+};
+
+typedef FT_Error (*r36sx_ft_init_free_type_fn)(FT_Library *);
+typedef FT_Error (*r36sx_ft_new_face_fn)(
+    FT_Library, const char *, FT_Long, FT_Face *);
+typedef FT_Error (*r36sx_ft_done_face_fn)(FT_Face);
+typedef FT_Error (*r36sx_ft_done_free_type_fn)(FT_Library);
+typedef FT_Error (*r36sx_ft_select_charmap_fn)(FT_Face, FT_Encoding);
+typedef FT_Error (*r36sx_ft_set_pixel_sizes_fn)(FT_Face, FT_UInt, FT_UInt);
+typedef FT_Error (*r36sx_ft_load_char_fn)(FT_Face, FT_ULong, FT_Int32);
+
+struct r36sx_osk_glyph_cache_entry {
+    uint32_t codepoint;
+    uint16_t pixel_height;
+    uint8_t valid;
+    int width;
+    int rows;
+    int pitch;
+    int bitmap_left;
+    int bitmap_top;
+    int advance;
+    uint32_t age;
+    uint8_t *buffer;
+};
+
+struct r36sx_osk_font_state {
+    void *handle;
+    FT_Library library;
+    FT_Face face;
+    r36sx_ft_init_free_type_fn init_free_type;
+    r36sx_ft_new_face_fn new_face;
+    r36sx_ft_done_face_fn done_face;
+    r36sx_ft_done_free_type_fn done_free_type;
+    r36sx_ft_select_charmap_fn select_charmap;
+    r36sx_ft_set_pixel_sizes_fn set_pixel_sizes;
+    r36sx_ft_load_char_fn load_char;
+    struct r36sx_osk_glyph_cache_entry cache[R36SX_OSK_FONT_CACHE_SLOTS];
+    uint32_t cache_age;
+    uint8_t attempted;
+    uint8_t active;
 };
 
 #define R36SX_OSK_KEY(label, keycode, flags) \
@@ -290,6 +340,8 @@ static const uint8_t g_osk_symbol_row_counts[] = {
     R36SX_OSK_ARRAY_COUNT(g_osk_symbol_row5)
 };
 
+static struct r36sx_osk_font_state g_osk_font;
+
 static const uint8_t *active_row_counts(
     const struct r36sx_screen_keyboard *keyboard)
 {
@@ -357,6 +409,354 @@ static void stroke_rect(uint16_t *frame, int width, int height, int stride,
     fill_rect(frame, width, height, stride, x, y + h - 1, w, 1, color);
     fill_rect(frame, width, height, stride, x, y, 1, h, color);
     fill_rect(frame, width, height, stride, x + w - 1, y, 1, h, color);
+}
+
+static void put_pixel_alpha(uint16_t *frame, int width, int height, int stride,
+                            int x, int y, uint16_t color, unsigned alpha)
+{
+    if (!frame || x < 0 || y < 0 || x >= width || y >= height ||
+        alpha == 0) {
+        return;
+    }
+    if (alpha >= 255u) {
+        frame[(size_t)y * (size_t)stride + (size_t)x] = color;
+        return;
+    }
+
+    uint16_t dst = frame[(size_t)y * (size_t)stride + (size_t)x];
+    unsigned inv = 255u - alpha;
+    unsigned sr = (color >> 11) & 0x1fu;
+    unsigned sg = (color >> 5) & 0x3fu;
+    unsigned sb = color & 0x1fu;
+    unsigned dr = (dst >> 11) & 0x1fu;
+    unsigned dg = (dst >> 5) & 0x3fu;
+    unsigned db = dst & 0x1fu;
+    unsigned r = (sr * alpha + dr * inv) / 255u;
+    unsigned g = (sg * alpha + dg * inv) / 255u;
+    unsigned b = (sb * alpha + db * inv) / 255u;
+
+    frame[(size_t)y * (size_t)stride + (size_t)x] =
+        (uint16_t)((r << 11) | (g << 5) | b);
+}
+
+static int osk_font_px_for_scale(int scale)
+{
+    return scale > 1 ? R36SX_OSK_FONT_PX : R36SX_OSK_FONT_SMALL_PX;
+}
+
+static void osk_font_cache_clear(void)
+{
+    for (int i = 0; i < R36SX_OSK_FONT_CACHE_SLOTS; i++) {
+        free(g_osk_font.cache[i].buffer);
+        memset(&g_osk_font.cache[i], 0, sizeof(g_osk_font.cache[i]));
+    }
+}
+
+static void osk_font_close(void)
+{
+    osk_font_cache_clear();
+    if (g_osk_font.face && g_osk_font.done_face) {
+        g_osk_font.done_face(g_osk_font.face);
+    }
+    if (g_osk_font.library && g_osk_font.done_free_type) {
+        g_osk_font.done_free_type(g_osk_font.library);
+    }
+    if (g_osk_font.handle) {
+        dlclose(g_osk_font.handle);
+    }
+    memset(&g_osk_font, 0, sizeof(g_osk_font));
+    g_osk_font.attempted = 1;
+}
+
+static int osk_font_bind_symbols(void)
+{
+    g_osk_font.init_free_type =
+        (r36sx_ft_init_free_type_fn)dlsym(g_osk_font.handle,
+                                          "FT_Init_FreeType");
+    g_osk_font.new_face =
+        (r36sx_ft_new_face_fn)dlsym(g_osk_font.handle, "FT_New_Face");
+    g_osk_font.done_face =
+        (r36sx_ft_done_face_fn)dlsym(g_osk_font.handle, "FT_Done_Face");
+    g_osk_font.done_free_type =
+        (r36sx_ft_done_free_type_fn)dlsym(g_osk_font.handle,
+                                          "FT_Done_FreeType");
+    g_osk_font.select_charmap =
+        (r36sx_ft_select_charmap_fn)dlsym(g_osk_font.handle,
+                                          "FT_Select_Charmap");
+    g_osk_font.set_pixel_sizes =
+        (r36sx_ft_set_pixel_sizes_fn)dlsym(g_osk_font.handle,
+                                           "FT_Set_Pixel_Sizes");
+    g_osk_font.load_char =
+        (r36sx_ft_load_char_fn)dlsym(g_osk_font.handle, "FT_Load_Char");
+    return g_osk_font.init_free_type && g_osk_font.new_face &&
+           g_osk_font.done_face && g_osk_font.done_free_type &&
+           g_osk_font.set_pixel_sizes && g_osk_font.load_char;
+}
+
+static int osk_font_open(void)
+{
+    static const char *library_paths[] = {
+        R36SX_CUBEGM_DIR "/lib/libfreetype.so.6",
+        R36SX_CUBEGM_DIR "/usr/lib/libfreetype.so.6",
+        R36SX_CUBEGM_DIR "/lib/libfreetype.so",
+        "libfreetype.so.6"
+    };
+    static const char *font_paths[] = {
+        R36SX_CUBEGM_DIR "/Arial_en.ttf",
+        R36SX_CUBEGM_DIR "/Arial_kr.ttf",
+        R36SX_CUBEGM_DIR "/font.ttf",
+        R36SX_CUBEGM_DIR "/Tahoma.ttf"
+    };
+
+    if (g_osk_font.active) {
+        return 0;
+    }
+    if (g_osk_font.attempted) {
+        return -1;
+    }
+
+    memset(&g_osk_font, 0, sizeof(g_osk_font));
+    g_osk_font.attempted = 1;
+    for (size_t i = 0; i < R36SX_OSK_ARRAY_COUNT(library_paths); i++) {
+        g_osk_font.handle = dlopen(library_paths[i], RTLD_NOW);
+        if (g_osk_font.handle) {
+            break;
+        }
+    }
+    if (!g_osk_font.handle || !osk_font_bind_symbols()) {
+        osk_font_close();
+        return -1;
+    }
+    if (g_osk_font.init_free_type(&g_osk_font.library) != 0) {
+        osk_font_close();
+        return -1;
+    }
+    for (size_t i = 0; i < R36SX_OSK_ARRAY_COUNT(font_paths); i++) {
+        if (access(font_paths[i], R_OK) != 0) {
+            continue;
+        }
+        if (g_osk_font.new_face(
+                g_osk_font.library, font_paths[i], 0,
+                &g_osk_font.face) == 0) {
+            break;
+        }
+    }
+    if (!g_osk_font.face) {
+        osk_font_close();
+        return -1;
+    }
+    if (g_osk_font.select_charmap) {
+        g_osk_font.select_charmap(g_osk_font.face, FT_ENCODING_UNICODE);
+    }
+
+    g_osk_font.active = 1;
+    return 0;
+}
+
+static uint32_t osk_next_codepoint(const unsigned char **text)
+{
+    uint8_t c = *(*text)++;
+
+    switch (c) {
+    case 0x11: return 0x2190u;
+    case 0x12: return 0x2191u;
+    case 0x13: return 0x2192u;
+    case 0x14: return 0x2193u;
+    default: break;
+    }
+    if (c < 0x80u) {
+        return c;
+    }
+    if ((c & 0xe0u) == 0xc0u && ((*text)[0] & 0xc0u) == 0x80u) {
+        uint32_t cp = ((uint32_t)(c & 0x1fu) << 6) |
+                      (uint32_t)((*text)[0] & 0x3fu);
+        (*text)++;
+        return cp;
+    }
+    if ((c & 0xf0u) == 0xe0u &&
+        ((*text)[0] & 0xc0u) == 0x80u &&
+        ((*text)[1] & 0xc0u) == 0x80u) {
+        uint32_t cp = ((uint32_t)(c & 0x0fu) << 12) |
+                      ((uint32_t)((*text)[0] & 0x3fu) << 6) |
+                      (uint32_t)((*text)[1] & 0x3fu);
+        *text += 2;
+        return cp;
+    }
+    return '?';
+}
+
+static struct r36sx_osk_glyph_cache_entry *osk_font_cache_lookup(
+    uint32_t codepoint,
+    int pixel_height)
+{
+    for (int i = 0; i < R36SX_OSK_FONT_CACHE_SLOTS; i++) {
+        if (g_osk_font.cache[i].valid &&
+            g_osk_font.cache[i].codepoint == codepoint &&
+            g_osk_font.cache[i].pixel_height == (uint16_t)pixel_height) {
+            g_osk_font.cache[i].age = ++g_osk_font.cache_age;
+            return &g_osk_font.cache[i];
+        }
+    }
+    return NULL;
+}
+
+static struct r36sx_osk_glyph_cache_entry *osk_font_cache_alloc_slot(void)
+{
+    int slot = 0;
+    uint32_t oldest = UINT32_MAX;
+
+    for (int i = 0; i < R36SX_OSK_FONT_CACHE_SLOTS; i++) {
+        if (!g_osk_font.cache[i].valid) {
+            slot = i;
+            break;
+        }
+        if (g_osk_font.cache[i].age < oldest) {
+            oldest = g_osk_font.cache[i].age;
+            slot = i;
+        }
+    }
+
+    free(g_osk_font.cache[slot].buffer);
+    memset(&g_osk_font.cache[slot], 0, sizeof(g_osk_font.cache[slot]));
+    return &g_osk_font.cache[slot];
+}
+
+static struct r36sx_osk_glyph_cache_entry *osk_font_load_glyph(
+    uint32_t codepoint,
+    int pixel_height)
+{
+    struct r36sx_osk_glyph_cache_entry *entry =
+        osk_font_cache_lookup(codepoint, pixel_height);
+    if (entry) {
+        return entry;
+    }
+    if (!g_osk_font.active || !g_osk_font.face) {
+        return NULL;
+    }
+    if (g_osk_font.set_pixel_sizes(
+            g_osk_font.face, 0, (FT_UInt)pixel_height) != 0) {
+        return NULL;
+    }
+    if (g_osk_font.load_char(g_osk_font.face, (FT_ULong)codepoint,
+                             FT_LOAD_RENDER | FT_LOAD_TARGET_LIGHT) != 0) {
+        if (codepoint != '?') {
+            return osk_font_load_glyph('?', pixel_height);
+        }
+        return NULL;
+    }
+
+    FT_GlyphSlot slot = g_osk_font.face->glyph;
+    FT_Bitmap *bitmap = &slot->bitmap;
+    if (bitmap->pixel_mode != FT_PIXEL_MODE_GRAY) {
+        return NULL;
+    }
+
+    entry = osk_font_cache_alloc_slot();
+    entry->codepoint = codepoint;
+    entry->pixel_height = (uint16_t)pixel_height;
+    entry->bitmap_left = slot->bitmap_left;
+    entry->bitmap_top = slot->bitmap_top;
+    entry->width = (int)bitmap->width;
+    entry->rows = (int)bitmap->rows;
+    entry->pitch = entry->width;
+    entry->advance = (int)(slot->advance.x >> 6);
+    if (entry->advance <= 0) {
+        entry->advance = entry->width + 1;
+    }
+
+    if (entry->width > 0 && entry->rows > 0) {
+        size_t bytes = (size_t)entry->width * (size_t)entry->rows;
+        int pitch = bitmap->pitch < 0 ? -bitmap->pitch : bitmap->pitch;
+
+        entry->buffer = (uint8_t *)malloc(bytes);
+        if (!entry->buffer) {
+            memset(entry, 0, sizeof(*entry));
+            return NULL;
+        }
+        for (int row = 0; row < entry->rows; row++) {
+            const uint8_t *src = bitmap->pitch >= 0
+                ? bitmap->buffer + (size_t)row * (size_t)pitch
+                : bitmap->buffer +
+                  (size_t)(entry->rows - 1 - row) * (size_t)pitch;
+            memcpy(entry->buffer + (size_t)row * (size_t)entry->pitch,
+                   src, (size_t)entry->width);
+        }
+    }
+
+    entry->valid = 1;
+    entry->age = ++g_osk_font.cache_age;
+    return entry;
+}
+
+static int osk_font_text_width(const char *text, int scale)
+{
+    if (!text || osk_font_open() != 0) {
+        return -1;
+    }
+
+    const unsigned char *p = (const unsigned char *)text;
+    int pixel_height = osk_font_px_for_scale(scale);
+    int width = 0;
+    while (*p != '\0') {
+        uint32_t cp = osk_next_codepoint(&p);
+        struct r36sx_osk_glyph_cache_entry *glyph =
+            osk_font_load_glyph(cp, pixel_height);
+        if (!glyph) {
+            return -1;
+        }
+        width += glyph->advance;
+    }
+    return width;
+}
+
+static void osk_font_draw_glyph(
+    uint16_t *frame,
+    int width,
+    int height,
+    int stride,
+    const struct r36sx_osk_glyph_cache_entry *glyph,
+    int x,
+    int y,
+    uint16_t color)
+{
+    for (int row = 0; row < glyph->rows; row++) {
+        for (int col = 0; col < glyph->width; col++) {
+            unsigned alpha =
+                glyph->buffer[(size_t)row * (size_t)glyph->pitch +
+                              (size_t)col];
+            put_pixel_alpha(frame, width, height, stride,
+                            x + col, y + row, color, alpha);
+        }
+    }
+}
+
+static int osk_font_draw_text(uint16_t *frame, int width, int height,
+                              int stride, int x, int y, const char *text,
+                              uint16_t color, int scale)
+{
+    if (!text || osk_font_open() != 0) {
+        return 0;
+    }
+
+    const unsigned char *p = (const unsigned char *)text;
+    int pixel_height = osk_font_px_for_scale(scale);
+    int baseline = y + pixel_height - 2;
+    while (*p != '\0') {
+        uint32_t cp = osk_next_codepoint(&p);
+        struct r36sx_osk_glyph_cache_entry *glyph =
+            osk_font_load_glyph(cp, pixel_height);
+        if (!glyph) {
+            return 0;
+        }
+        if (glyph->buffer) {
+            int gx = x + glyph->bitmap_left;
+            int gy = baseline - glyph->bitmap_top;
+            osk_font_draw_glyph(frame, width, height, stride, glyph,
+                                gx, gy, color);
+        }
+        x += glyph->advance;
+    }
+    return 1;
 }
 
 static uint8_t glyph_row(unsigned char c, int row)
@@ -566,6 +966,11 @@ static uint8_t glyph_row(unsigned char c, int row)
 
 static int text_width(const char *text, int scale)
 {
+    int ft_width = osk_font_text_width(text, scale);
+    if (ft_width >= 0) {
+        return ft_width;
+    }
+
     int len = 0;
     while (text && text[len] != '\0') {
         len++;
@@ -592,6 +997,11 @@ static void draw_text(uint16_t *frame, int width, int height, int stride,
                       int x, int y, const char *text, uint16_t color,
                       int scale)
 {
+    if (osk_font_draw_text(frame, width, height, stride, x, y, text, color,
+                           scale)) {
+        return;
+    }
+
     for (int i = 0; text && text[i] != '\0'; i++) {
         draw_char(frame, width, height, stride, x + i * 6 * scale, y,
                   text[i], color, scale);
@@ -714,7 +1124,8 @@ static int key_pixel_w(const struct r36sx_osk_key *key, int unit_w)
 static int key_text_scale(const char *label, int key_w)
 {
     if (text_width(label, R36SX_OSK_TEXT_SCALE) <= key_w - 4 &&
-        7 * R36SX_OSK_TEXT_SCALE <= R36SX_OSK_KEY_H - 2) {
+        osk_font_px_for_scale(R36SX_OSK_TEXT_SCALE) <=
+            R36SX_OSK_KEY_H - 2) {
         return R36SX_OSK_TEXT_SCALE;
     }
     return 1;
@@ -1342,8 +1753,10 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
                                   sizeof(label_buf));
         int scale = key_text_scale(label, key_w);
         int text_w = text_width(label, scale);
+        int text_h = osk_font_open() == 0 ?
+            osk_font_px_for_scale(scale) : 7 * scale;
         int text_x = x + (key_w - text_w) / 2;
-        int text_y = y + (R36SX_OSK_KEY_H - 7 * scale) / 2;
+        int text_y = y + (R36SX_OSK_KEY_H - text_h) / 2;
         draw_text(frame, width, height, stride, text_x, text_y, label, fg,
                   scale);
     }
