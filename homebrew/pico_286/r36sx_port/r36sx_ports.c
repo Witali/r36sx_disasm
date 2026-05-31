@@ -470,7 +470,8 @@ if (sound_chips_clock) {
         case 0x3D1:
         case 0x3D3:
         case 0x3D5:
-        case 0x3D7:
+        case 0x3D7: {
+            uint8_t old_value = crt_controller[crt_controller_idx];
             switch (crt_controller_idx) {
                 case 0x4: {
                     if (value == 0x3e/* && videomode == 1*/) {
@@ -521,8 +522,12 @@ if (sound_chips_clock) {
 //                printf("CRT %x %x\n", crt_controller_idx, value);
 
             crt_controller[crt_controller_idx] = value;
+            if (old_value != (uint8_t)value) {
+                r36sx_pico286_video_mark_dirty();
+            }
 
             break;
+        }
         case 0x3B8:
         case 0x3BF:
         case 0x3D8:

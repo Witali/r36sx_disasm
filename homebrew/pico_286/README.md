@@ -12,7 +12,9 @@ integration pieces:
   `/mnt/sdcard/cubegm/driver.so` video and joypad input.  The R36SX renderer
   now uses a 16-bit RGB565 `SCREEN` buffer end-to-end.  Normal DOS frames are
   presented directly from `SCREEN`; separate composition buffers are only used
-  for the on-screen keyboard and full-screen menus.
+  for the on-screen keyboard and full-screen menus.  The expensive DOS-video
+  renderer runs only after visible emulated video state changes, while small
+  overlays can still update through saved rectangles.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.

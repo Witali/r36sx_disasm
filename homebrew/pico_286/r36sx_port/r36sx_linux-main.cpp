@@ -43,6 +43,9 @@ static int16_t audio_buffer[R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
 static int sample_index = 0;
 static volatile int soft_reset_requested = 0;
 static volatile int soft_reset_in_progress = 0;
+#if defined(R36SX_VIDEO_DIRTY_TRACKING) && R36SX_VIDEO_DIRTY_TRACKING
+static volatile uint32_t g_video_dirty = 1;
+#endif
 static uint32_t g_main_loop_frame_us = 1000000u / R36SX_MAIN_LOOP_DEFAULT_FPS;
 static uint32_t g_audio_buffer_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
 
@@ -55,6 +58,23 @@ extern "C" void adlib_getsample(int16_t *sndptr, intptr_t numsamples);
 extern "C" void r36sx_pico286_request_soft_reset(void) {
     soft_reset_requested = 1;
 }
+
+#if defined(R36SX_VIDEO_DIRTY_TRACKING) && R36SX_VIDEO_DIRTY_TRACKING
+extern "C" void r36sx_pico286_video_mark_dirty(void)
+{
+    __sync_lock_test_and_set(&g_video_dirty, 1u);
+}
+
+static int r36sx_pico286_video_take_dirty(void)
+{
+    return __sync_lock_test_and_set(&g_video_dirty, 0u) != 0u;
+}
+#else
+static int r36sx_pico286_video_take_dirty(void)
+{
+    return 1;
+}
+#endif
 
 static void r36sx_pico286_soft_reset(void);
 
@@ -1012,6 +1032,7 @@ static void r36sx_pico286_soft_reset(void) {
         OPL_reset(emu8950_opl);
     }
     reset86();
+    r36sx_pico286_video_mark_dirty();
 
     pthread_mutex_lock(&update_mutex);
     memset(audio_buffer, 0, sizeof(audio_buffer));
@@ -1188,14 +1209,17 @@ void *ticks_thread(void *arg) {
         if (elapsedTime - elapsed_blink_tics >= blink_period) {
             // ~3Hz
             cursor_blink_state ^= 1;
+            r36sx_pico286_video_mark_dirty();
             elapsed_blink_tics = elapsedTime;
         }
 
         // Frame rendering follows the configured main-loop frame budget.
         if (elapsedTime - elapsed_frame_tics >= frame_period) {
-            R36SX_PROFILE_BEGIN(profile_renderer);
-            renderer();
-            R36SX_PROFILE_END(R36SX_PROFILE_RENDERER, profile_renderer);
+            if (r36sx_pico286_video_take_dirty()) {
+                R36SX_PROFILE_BEGIN(profile_renderer);
+                renderer();
+                R36SX_PROFILE_END(R36SX_PROFILE_RENDERER, profile_renderer);
+            }
             elapsed_frame_tics = elapsedTime;
         }
 

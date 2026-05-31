@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-31 dirty video rendering
+
+Added R36SX video dirty tracking so the expensive `VIDEORAM`/register/palette
+to `SCREEN` renderer runs only after visible emulated video state changes.
+
+- Visible video memory writes mark the frame dirty.
+- VGA/CGA/Tandy port writes, DAC/palette updates, CRTC register writes, active
+  page changes, cursor position/shape changes, BIOS text writes, and cursor
+  blink toggles also mark the frame dirty.
+- `ticks_thread` still follows the configured target FPS, but it only calls
+  `renderer()` when the dirty flag was set since the last rendered frame.
+- MiniFB overlays such as disk LED, screenshot toast, stats, keyboard, disk
+  menu, and key presets still present through their existing overlay paths.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1374052` bytes
+- `pico_286` SHA256:
+  `27B016E967771004E0D489E9977A17B262A6E90CF718BBC60613E64004857D8D`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 configurable audio sample rate
 
 Added runtime audio mixer rate selection to `pico_286.conf`.

@@ -86,7 +86,11 @@ uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6) {
 }
 
 void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6) {
-    vga_palette[index] = vga_dac_color(red6, green6, blue6);
+    uint32_t color = vga_dac_color(red6, green6, blue6);
+    if (vga_palette[index] != color) {
+        vga_palette[index] = color;
+        r36sx_pico286_video_mark_dirty();
+    }
 #if PICO_ON_DEVICE
     graphics_set_palette(index, vga_palette[index]);
 #endif
@@ -288,6 +292,14 @@ uint16_t __not_in_flash() vga_mem_read16(uint32_t address) {
     return (uint16_t)r0 | (uint16_t)r1 << 8;
 }
 
+static inline void vga_store_dirty(uint32_t *cell, uint32_t value)
+{
+    if (*cell != value) {
+        *cell = value;
+        r36sx_pico286_video_mark_dirty();
+    }
+}
+
 #if VGA_DEBUGGING
 // ---------------------- Write path ----------------------
 void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
@@ -298,7 +310,9 @@ void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
 
     switch (vga.write_mode) {
         case 1: // Mode 1: Write latch directly to enabled planes
-            VIDEORAM[address] = (previous_data & ~vga.map_mask32) | (vga_latch32 & vga.map_mask32);
+            vga_store_dirty(&VIDEORAM[address],
+                            (previous_data & ~vga.map_mask32) |
+                                (vga_latch32 & vga.map_mask32));
             return;
 
         case 0: {
@@ -341,7 +355,9 @@ void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
             const uint32_t selector =
                 expand_to_u32(ror8(cpu_data, vga.data_rotate_counter)) & vga.bit_mask32;
             new_data = masked_merge_xor(vga_latch32, vga.set_reset32, selector);
-            VIDEORAM[address] = masked_merge_xor(previous_data, new_data, vga.map_mask32);
+            vga_store_dirty(&VIDEORAM[address],
+                            masked_merge_xor(previous_data, new_data,
+                                             vga.map_mask32));
             return;
         }
 
@@ -363,7 +379,9 @@ void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
     new_data = (vga.bit_mask32 & new_data) | (~vga.bit_mask32 & vga_latch32);
 
     // Смешивание всех изменившихся планов с не изменившимися
-    VIDEORAM[address] = (~vga.map_mask32 & previous_data) | (vga.map_mask32 & new_data);
+    vga_store_dirty(&VIDEORAM[address],
+                    (~vga.map_mask32 & previous_data) |
+                        (vga.map_mask32 & new_data));
 }
 #endif
 // Core write implementation (CPU writes a byte to VGA memory)
@@ -376,7 +394,7 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
     uint32_t *videoram_data = &VIDEORAM[address & 0xFFFF]; // current data pointer
 
     if (videomode == 0x13 && !vga_planar_mode) {
-        *videoram_data = cpu_data;
+        vga_store_dirty(videoram_data, cpu_data);
         return;
     }
 
@@ -400,7 +418,9 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
         }
 
         case 1: // Mode 1: Write latch directly to enabled planes
-            *videoram_data = masked_merge_xor(*videoram_data, vga_latch32, map_mask32);
+            vga_store_dirty(videoram_data,
+                            masked_merge_xor(*videoram_data, vga_latch32,
+                                             map_mask32));
             return;
 
         case 3: {
@@ -408,7 +428,9 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
             const uint32_t selector =
                 expand_to_u32(ror8(cpu_data, vga.data_rotate_counter)) & vga.bit_mask32;
             new_data = masked_merge_xor(vga_latch32, set_reset32, selector);
-            *videoram_data = masked_merge_xor(*videoram_data, new_data, map_mask32);
+            vga_store_dirty(videoram_data,
+                            masked_merge_xor(*videoram_data, new_data,
+                                             map_mask32));
             return;
         }
     }
@@ -425,7 +447,8 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
 
     new_data = masked_merge_xor(vga_latch32, new_data, vga.bit_mask32);
 
-    *videoram_data = masked_merge_xor(*videoram_data, new_data, map_mask32);
+    vga_store_dirty(videoram_data,
+                    masked_merge_xor(*videoram_data, new_data, map_mask32));
 }
 
 // 16-bit fast path: write two consecutive addresses (address, address+1) with one setup
@@ -444,16 +467,16 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
     uint32_t *p1 = &VIDEORAM[(index0 + 1u) & 0xFFFFu];
 
     if (videomode == 0x13 && !vga_planar_mode) {
-        *p0 = (uint8_t)(cpu_data_x2 & 0xFFu);
-        *p1 = (uint8_t)(cpu_data_x2 >> 8);
+        vga_store_dirty(p0, (uint8_t)(cpu_data_x2 & 0xFFu));
+        vga_store_dirty(p1, (uint8_t)(cpu_data_x2 >> 8));
         return;
     }
 
     if (wmode == 1) {
         // Mode 1: latch -> enabled planes
         const uint32_t lat = latch32;
-        *p0 = masked_merge_xor(*p0, lat, map_mask32);
-        *p1 = masked_merge_xor(*p1, lat, map_mask32);
+        vga_store_dirty(p0, masked_merge_xor(*p0, lat, map_mask32));
+        vga_store_dirty(p1, masked_merge_xor(*p1, lat, map_mask32));
         return;
     }
 
@@ -465,8 +488,8 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
         const uint32_t new0 = masked_merge_xor(latch32, set_reset32, rot0 & bit_mask32);
         const uint32_t new1 = masked_merge_xor(latch32, set_reset32, rot1 & bit_mask32);
 
-        *p0 = masked_merge_xor(*p0, new0, map_mask32);
-        *p1 = masked_merge_xor(*p1, new1, map_mask32);
+        vga_store_dirty(p0, masked_merge_xor(*p0, new0, map_mask32));
+        vga_store_dirty(p1, masked_merge_xor(*p1, new1, map_mask32));
         return;
     }
 
@@ -507,8 +530,8 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
     new0 = masked_merge_xor(latch32, new0, bit_mask32);
     new1 = masked_merge_xor(latch32, new1, bit_mask32);
 
-    *p0 = masked_merge_xor(*p0, new0, map_mask32);
-    *p1 = masked_merge_xor(*p1, new1, map_mask32);
+    vga_store_dirty(p0, masked_merge_xor(*p0, new0, map_mask32));
+    vga_store_dirty(p1, masked_merge_xor(*p1, new1, map_mask32));
 }
 
 // ---------------------- Initialization ----------------------
@@ -641,6 +664,7 @@ void vga_portout(uint16_t portnum, uint16_t value) {
             // }
             break;
     }
+    r36sx_pico286_video_mark_dirty();
 }
 
 uint16_t vga_portin(uint16_t portnum) {

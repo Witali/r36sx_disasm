@@ -234,6 +234,7 @@ void cga_portout(uint16_t portnum, uint16_t value) {
 #endif
             break;
     }
+    r36sx_pico286_video_mark_dirty();
 }
 
 uint16_t cga_portin(uint16_t portnum) {

@@ -51,6 +51,7 @@ void tga_portout(uint16_t portnum, uint16_t value) {
                         videomode = 0x8; // 640x200x4
                     }
 
+                    r36sx_pico286_video_mark_dirty();
                     return;
             }
             // Palette Registers 0x10-0x1F
@@ -136,6 +137,7 @@ void tga_portout(uint16_t portnum, uint16_t value) {
 
             break;
     }
+    r36sx_pico286_video_mark_dirty();
 }
 
 void tga_draw_char(uint8_t ch, int x, int y, uint8_t color) {
@@ -154,13 +156,18 @@ void tga_draw_char(uint8_t ch, int x, int y, uint8_t color) {
 
         if (row == 3) base_offset += 160;
     }
+    r36sx_pico286_video_mark_dirty();
 }
 
 void tga_draw_pixel(int x, int y, uint8_t color) {
     uint32_t * pixel = &VIDEORAM[tga_offset + (x >> 1) + ((y >> 2) << 13)];
+    uint32_t old_pixel = *pixel;
     if (x & 1) {
         *pixel = (*pixel & 0xF0) | (color & 0x0F);
     } else {
         *pixel = (*pixel & 0x0F) | (color << 4);
+    }
+    if (*pixel != old_pixel) {
+        r36sx_pico286_video_mark_dirty();
     }
 }

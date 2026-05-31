@@ -1108,8 +1108,13 @@ static void r36sx_bios_set_cursor(uint8_t page, uint8_t col, uint8_t row)
     FIRST_RAM_PAGE[0x450 + page * 2u] = col;
     FIRST_RAM_PAGE[0x451 + page * 2u] = row;
     if (page == r36sx_bios_active_page()) {
+        uint8_t old_x = CURSOR_X;
+        uint8_t old_y = CURSOR_Y;
         CURSOR_X = col;
         CURSOR_Y = row;
+        if (old_x != CURSOR_X || old_y != CURSOR_Y) {
+            r36sx_pico286_video_mark_dirty();
+        }
     }
 }
 
@@ -1140,8 +1145,11 @@ static void r36sx_bios_write_text_cell(uint8_t page, uint8_t col, uint8_t row,
     if (index + 1u >= VIDEORAM_SIZE) {
         return;
     }
-    VIDEORAM[index] = ch;
-    VIDEORAM[index + 1u] = attr;
+    if (VIDEORAM[index] != ch || VIDEORAM[index + 1u] != attr) {
+        VIDEORAM[index] = ch;
+        VIDEORAM[index + 1u] = attr;
+        r36sx_pico286_video_mark_dirty();
+    }
 }
 
 static void r36sx_bios_clear_text_window(uint8_t page, uint8_t top,
@@ -1182,6 +1190,7 @@ static void r36sx_bios_scroll_text_window(uint8_t page, uint8_t top,
         return;
     }
 
+    int changed = 0;
     uint8_t height = (uint8_t)(bottom - top + 1u);
     if (lines == 0 || lines >= height) {
         r36sx_bios_clear_text_window(page, top, left, bottom, right, attr);
@@ -1194,6 +1203,8 @@ static void r36sx_bios_scroll_text_window(uint8_t page, uint8_t top,
                 uint32_t src = r36sx_bios_text_index(page, col, row + lines);
                 uint32_t dst = r36sx_bios_text_index(page, col, row);
                 if (src + 1u < VIDEORAM_SIZE && dst + 1u < VIDEORAM_SIZE) {
+                    changed |= VIDEORAM[dst] != VIDEORAM[src] ||
+                               VIDEORAM[dst + 1u] != VIDEORAM[src + 1u];
                     VIDEORAM[dst] = VIDEORAM[src];
                     VIDEORAM[dst + 1u] = VIDEORAM[src + 1u];
                 }
@@ -1208,6 +1219,8 @@ static void r36sx_bios_scroll_text_window(uint8_t page, uint8_t top,
                                                      (uint8_t)(row - lines));
                 uint32_t dst = r36sx_bios_text_index(page, col, (uint8_t)row);
                 if (src + 1u < VIDEORAM_SIZE && dst + 1u < VIDEORAM_SIZE) {
+                    changed |= VIDEORAM[dst] != VIDEORAM[src] ||
+                               VIDEORAM[dst + 1u] != VIDEORAM[src + 1u];
                     VIDEORAM[dst] = VIDEORAM[src];
                     VIDEORAM[dst + 1u] = VIDEORAM[src + 1u];
                 }
@@ -1215,6 +1228,9 @@ static void r36sx_bios_scroll_text_window(uint8_t page, uint8_t top,
         }
         r36sx_bios_clear_text_window(page, top, left, (uint8_t)(top + lines - 1u),
                                      right, attr);
+    }
+    if (changed) {
+        r36sx_pico286_video_mark_dirty();
     }
 }
 
@@ -1404,8 +1420,11 @@ void intcall86(uint8_t intnum) {
         case 0x10: {
             switch (CPU_AH) {
                 case 0x01:
-                    cursor_start = CPU_CH;
-                    cursor_end = CPU_CL;
+                    if (cursor_start != CPU_CH || cursor_end != CPU_CL) {
+                        cursor_start = CPU_CH;
+                        cursor_end = CPU_CL;
+                        r36sx_pico286_video_mark_dirty();
+                    }
                     FIRST_RAM_PAGE[0x460] = CPU_CH;
                     FIRST_RAM_PAGE[0x461] = CPU_CL;
                     return;
@@ -1510,6 +1529,7 @@ void intcall86(uint8_t intnum) {
                     tga_offset = 0x8000;
                     FIRST_RAM_PAGE[0x462] = 0;
                     r36sx_bios_set_cursor(0, 0, 0);
+                    r36sx_pico286_video_mark_dirty();
                     break;
                 case 0x05: /* Select Active Page */ {
                     if (CPU_AL >= 0x80) {
@@ -1538,6 +1558,7 @@ void intcall86(uint8_t intnum) {
                     r36sx_bios_set_cursor(FIRST_RAM_PAGE[0x462],
                                           FIRST_RAM_PAGE[0x450 + FIRST_RAM_PAGE[0x462] * 2u],
                                           FIRST_RAM_PAGE[0x451 + FIRST_RAM_PAGE[0x462] * 2u]);
+                    r36sx_pico286_video_mark_dirty();
                     return;
                 }
                 case 0x10:
@@ -1551,9 +1572,16 @@ void intcall86(uint8_t intnum) {
                             const uint16_t b = (((color_byte >> 0) & 1) << 1) + (color_byte >> 3 & 1);
 
                             if (videomode <= 0xa) {
-                                tga_palette_map[color_index] = color_byte;
+                                if (tga_palette_map[color_index] != color_byte) {
+                                    tga_palette_map[color_index] = color_byte;
+                                    r36sx_pico286_video_mark_dirty();
+                                }
                             } else {
-                                vga_palette[color_index] = rgb((r * 85), (g * 85), (b * 85));
+                                uint32_t color = rgb((r * 85), (g * 85), (b * 85));
+                                if (vga_palette[color_index] != color) {
+                                    vga_palette[color_index] = color;
+                                    r36sx_pico286_video_mark_dirty();
+                                }
 #if PICO_ON_DEVICE
                                 graphics_set_palette(color_index, vga_palette[color_index]);
 #endif
@@ -1568,7 +1596,11 @@ void intcall86(uint8_t intnum) {
                                 const uint8_t g = (((color_byte >> 1) & 1) << 1) + (color_byte >> 4 & 1);
                                 const uint8_t b = (((color_byte >> 0) & 1) << 1) + (color_byte >> 3 & 1);
 
-                                vga_palette[color_index] = rgb((r * 85), (g * 85), (b * 85));
+                                uint32_t color = rgb((r * 85), (g * 85), (b * 85));
+                                if (vga_palette[color_index] != color) {
+                                    vga_palette[color_index] = color;
+                                    r36sx_pico286_video_mark_dirty();
+                                }
 #if PICO_ON_DEVICE
                                 graphics_set_palette(color_index, vga_palette[color_index]);
 #endif
@@ -1577,8 +1609,12 @@ void intcall86(uint8_t intnum) {
                             return;
                         }
                         case 0x03: {
+                            uint8_t old_blinking = cga_blinking;
                             cga_blinking = CPU_BL ? 0x7F : 0xFF;
                             cga_blinking_lock = !CPU_BL;
+                            if (old_blinking != cga_blinking) {
+                                r36sx_pico286_video_mark_dirty();
+                            }
                             //printf("[CPU] INT BL 0x%02x\r\n", CPU_BL);
                             return;
                         }
@@ -3496,6 +3532,7 @@ void reset86() {
     r36sx_cpu_real_cache_all_segments();
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));
+    r36sx_pico286_video_mark_dirty();
     if (butter_psram_size) {
         memset(RAM, 0, sizeof(RAM));
         memset(UMB, 0, sizeof(UMB));

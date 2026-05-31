@@ -55,6 +55,12 @@ extern uint32_t r36sx_sound_frequency;
 #define SOUND_FREQUENCY (44100)
 #endif
 #endif
+
+#if defined(R36SX_VIDEO_DIRTY_TRACKING) && R36SX_VIDEO_DIRTY_TRACKING
+void r36sx_pico286_video_mark_dirty(void);
+#else
+static inline void r36sx_pico286_video_mark_dirty(void) {}
+#endif
 #define rgb(r, g, b) (((r)<<16) | ((g) << 8 ) | (b) )
 
 #define VIDEORAM_START (0xA0000)

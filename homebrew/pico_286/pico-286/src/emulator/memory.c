@@ -79,7 +79,11 @@ static inline int videoram_uses_vga_path(void)
 
 static inline void videoram_write8_raw(const uint32_t address, const uint8_t value)
 {
-    VIDEORAM[videoram_index(address)] = value;
+    uint32_t *cell = &VIDEORAM[videoram_index(address)];
+    if (*cell != value) {
+        *cell = value;
+        r36sx_pico286_video_mark_dirty();
+    }
 }
 
 static inline uint8_t videoram_read8_raw(const uint32_t address)

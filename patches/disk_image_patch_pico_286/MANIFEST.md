@@ -32,6 +32,17 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 dirty video rendering
+
+The current `pico_286` binary tracks visible video changes and only rerenders
+the DOS framebuffer after emulated VRAM, video registers, palette state,
+active page, or cursor/blink state changes.  Small overlays such as disk LED
+and app statistics continue to use their saved-rectangle paths without forcing
+a full DOS-screen render.
+
+pico_286 size: 1374052 bytes
+pico_286 SHA256: 27B016E967771004E0D489E9977A17B262A6E90CF718BBC60613E64004857D8D
+
 ## 2026-05-31 configurable audio sample rate
 
 The current `pico_286` binary reads `[audio] audio_sample_rate` from
