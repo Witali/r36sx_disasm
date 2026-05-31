@@ -1748,3 +1748,21 @@ pico_286.dsp size: 427724 bytes
 pico_286.dsp SHA256: 6C68272A6461B994D18970A93279D89D597157CDB67D7159F9862761A34B59D1
 Defender scan: found no threats
 ```
+
+## 2026-05-31 protected-mode descriptor checks
+
+The current `pico_286` and `pico_286.dsp` binaries include
+`R36SX_ENABLE_PROTECTED_MODE=1` by default.  The CPU port now supports
+LDT-backed selectors after `LLDT`, loads `TR` through a TSS descriptor,
+validates code/data/stack descriptor types on segment-register loads, and
+validates protected interrupt/trap gate target CS descriptors before entering
+the gate.  The WSL and PowerShell build scripts can compile the experimental
+path out with `--disable-protected-mode` / `-DisableProtectedMode`.
+
+```text
+pico_286 size: 435612 bytes
+pico_286 SHA256: AEE2FAD17D650E032FD6DAD60FDFFD2F7604C2E1081B1A7C3B7B9403F6969908
+pico_286.dsp size: 427564 bytes
+pico_286.dsp SHA256: 2F1EE781BAF4E3DAD76569658524861566FE22CC8528FB9D021CA5DE33D05657
+Defender scan: found no threats
+```

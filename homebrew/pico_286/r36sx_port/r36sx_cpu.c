@@ -12,6 +12,9 @@
 #ifndef R36SX_CPU_COMPUTED_GOTO
 #define R36SX_CPU_COMPUTED_GOTO 0
 #endif
+#ifndef R36SX_ENABLE_PROTECTED_MODE
+#define R36SX_ENABLE_PROTECTED_MODE 1
+#endif
 #if R36SX_CPU_COMPUTED_GOTO && !defined(__GNUC__) && !defined(__clang__)
 #error R36SX_CPU_COMPUTED_GOTO requires GNU labels-as-values support.
 #endif
@@ -81,6 +84,12 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_READABLE 0x02u
 #define R36SX_DESCRIPTOR_FLAG_DB 0x04u
 #define R36SX_DESCRIPTOR_FLAG_GRANULAR 0x08u
+#define R36SX_SELECTOR_TABLE_INDICATOR 0x0004u
+#define R36SX_SELECTOR_INDEX_MASK 0xfff8u
+#define R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK 0x0fu
+#define R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE 0x01u
+#define R36SX_DESCRIPTOR_TYPE_LDT 0x02u
+#define R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE 0x09u
 
 typedef struct {
     uint16_t selector;
@@ -101,10 +110,16 @@ static uint16_t r36sx_gdtr_limit;
 static uint16_t r36sx_idtr_limit = 0x03ffu;
 static uint16_t r36sx_ldtr_selector;
 static uint16_t r36sx_tr_selector;
+static r36sx_segment_cache_t r36sx_ldtr_cache;
+static r36sx_segment_cache_t r36sx_tr_cache;
 
 static inline uint8_t r36sx_cpu_protected_enabled(void)
 {
+#if R36SX_ENABLE_PROTECTED_MODE
     return (r36sx_cr0 & R36SX_CR0_PE) != 0;
+#else
+    return 0;
+#endif
 }
 
 static inline void r36sx_cpu_real_cache_segment(uint8_t segid)
@@ -128,6 +143,85 @@ static inline void r36sx_cpu_real_cache_all_segments(void)
     for (uint8_t segid = reges; segid <= reggs; segid++) {
         r36sx_cpu_real_cache_segment(segid);
     }
+}
+
+static inline uint8_t r36sx_descriptor_type(
+    const r36sx_segment_cache_t *cache)
+{
+    return cache->access & R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK;
+}
+
+static inline uint8_t r36sx_descriptor_is_code_data(
+    const r36sx_segment_cache_t *cache)
+{
+    return (cache->access & R36SX_DESCRIPTOR_CODE_DATA) != 0;
+}
+
+static inline uint8_t r36sx_descriptor_is_code(
+    const r36sx_segment_cache_t *cache)
+{
+    return r36sx_descriptor_is_code_data(cache) &&
+           (cache->access & R36SX_DESCRIPTOR_EXECUTABLE);
+}
+
+static inline uint8_t r36sx_descriptor_is_data(
+    const r36sx_segment_cache_t *cache)
+{
+    return r36sx_descriptor_is_code_data(cache) &&
+           ((cache->access & R36SX_DESCRIPTOR_EXECUTABLE) == 0);
+}
+
+static inline uint8_t r36sx_descriptor_is_readable_code(
+    const r36sx_segment_cache_t *cache)
+{
+    return r36sx_descriptor_is_code(cache) &&
+           (cache->access & R36SX_DESCRIPTOR_READABLE);
+}
+
+static inline uint8_t r36sx_descriptor_is_writable_data(
+    const r36sx_segment_cache_t *cache)
+{
+    return r36sx_descriptor_is_data(cache) &&
+           (cache->access & R36SX_DESCRIPTOR_WRITABLE);
+}
+
+static inline uint8_t r36sx_descriptor_is_usable_data_segment(
+    const r36sx_segment_cache_t *cache)
+{
+    return r36sx_descriptor_is_data(cache) ||
+           r36sx_descriptor_is_readable_code(cache);
+}
+
+static inline uint8_t r36sx_descriptor_is_tss(
+    const r36sx_segment_cache_t *cache)
+{
+    uint8_t type = r36sx_descriptor_type(cache);
+    return !r36sx_descriptor_is_code_data(cache) &&
+           (type == R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE ||
+            type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE);
+}
+
+static void r36sx_cpu_clear_segment_cache(uint8_t segid, uint16_t selector)
+{
+    putsegreg(segid, selector);
+    segselector16[segid] = selector;
+    r36sx_seg_cache[segid].selector = selector;
+    r36sx_seg_cache[segid].base = 0;
+    r36sx_seg_cache[segid].limit = 0;
+    r36sx_seg_cache[segid].access = 0;
+    r36sx_seg_cache[segid].flags = 0;
+    r36sx_seg_cache[segid].valid = 0;
+    segbase32[segid] = 0;
+}
+
+static void r36sx_cpu_commit_segment_cache(uint8_t segid,
+                                           uint16_t selector,
+                                           const r36sx_segment_cache_t *cache)
+{
+    putsegreg(segid, selector);
+    r36sx_seg_cache[segid] = *cache;
+    segselector16[segid] = selector;
+    segbase32[segid] = cache->base;
 }
 
 uint32_t r36sx_cpu_segbase(uint16_t selector)
@@ -162,8 +256,12 @@ static inline uint32_t r36sx_cpu_linear_ea(uint32_t offset)
     return useseg_base + offset;
 }
 
-static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
-                                           r36sx_segment_cache_t *cache)
+static uint8_t r36sx_cpu_decode_descriptor_from_table(
+    uint16_t selector,
+    uint32_t table_base,
+    uint32_t table_limit,
+    r36sx_segment_cache_t *cache,
+    const char *table_name)
 {
     if ((selector & 0xfffcu) == 0) {
         cache->selector = selector;
@@ -171,30 +269,22 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
         cache->limit = 0;
         cache->access = 0;
         cache->flags = 0;
-        cache->valid = 1;
+        cache->valid = 0;
         return 1;
     }
 
-    if (selector & 0x0004u) {
+    uint32_t descriptor_offset = selector & R36SX_SELECTOR_INDEX_MASK;
+    if (descriptor_offset + 7u > table_limit) {
 #if DEBUG && !PICO_ON_DEVICE
         r36sx_pico286_debug_log(
-            "[CPU] protected mode LDT selector not implemented selector=%04x",
-            selector);
+            "[CPU] protected mode %s limit fault selector=%04x table=%08lx:%08lx",
+            table_name, selector, (unsigned long)table_base,
+            (unsigned long)table_limit);
 #endif
         return 0;
     }
 
-    uint32_t descriptor_offset = selector & 0xfff8u;
-    if (descriptor_offset + 7u > r36sx_gdtr_limit) {
-#if DEBUG && !PICO_ON_DEVICE
-        r36sx_pico286_debug_log(
-            "[CPU] protected mode GDT limit fault selector=%04x gdtr=%08lx:%04x",
-            selector, (unsigned long)r36sx_gdtr_base, r36sx_gdtr_limit);
-#endif
-        return 0;
-    }
-
-    uint32_t addr = r36sx_gdtr_base + descriptor_offset;
+    uint32_t addr = table_base + descriptor_offset;
     uint32_t lo = readdw86(addr);
     uint32_t hi = readdw86(addr + 4u);
     uint32_t limit = (lo & 0xffffu) | (hi & 0x000f0000u);
@@ -215,40 +305,159 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
     return cache->valid;
 }
 
+static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
+                                           r36sx_segment_cache_t *cache)
+{
+    if ((selector & 0xfffcu) == 0) {
+        return r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT");
+    }
+
+    if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
+        if (!r36sx_ldtr_cache.valid) {
+#if DEBUG && !PICO_ON_DEVICE
+            r36sx_pico286_debug_log(
+                "[CPU] protected mode LDT selector without loaded LDTR selector=%04x",
+                selector);
+#endif
+            return 0;
+        }
+        return r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_ldtr_cache.base, r36sx_ldtr_cache.limit, cache,
+            "LDT");
+    }
+
+    return r36sx_cpu_decode_descriptor_from_table(
+        selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT");
+}
+
+static uint8_t r36sx_cpu_segment_valid_for_load(
+    uint8_t segid,
+    const r36sx_segment_cache_t *cache)
+{
+    if (!cache->valid) {
+        return 0;
+    }
+
+    if (segid == regcs) {
+        return r36sx_descriptor_is_code(cache);
+    }
+    if (segid == regss) {
+        return r36sx_descriptor_is_writable_data(cache);
+    }
+    return r36sx_descriptor_is_usable_data_segment(cache);
+}
+
 static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
 {
-    putsegreg(segid, selector);
-
     if (!r36sx_cpu_protected_enabled()) {
+        putsegreg(segid, selector);
         r36sx_cpu_real_cache_segment(segid);
         return 1;
     }
 
-    r36sx_segment_cache_t cache;
-    if (!r36sx_cpu_decode_descriptor(selector, &cache)) {
+    if ((selector & 0xfffcu) == 0) {
+        if (segid == regcs || segid == regss) {
 #if DEBUG && !PICO_ON_DEVICE
-        r36sx_pico286_debug_log(
-            "[CPU] protected mode failed to load segment seg=%u selector=%04x",
-            segid, selector);
+            r36sx_pico286_debug_log(
+                "[CPU] protected mode null selector rejected seg=%u selector=%04x",
+                segid, selector);
 #endif
-        cache.selector = selector;
-        cache.base = 0;
-        cache.limit = 0;
-        cache.access = 0;
-        cache.flags = 0;
-        cache.valid = 0;
+            return 0;
+        }
+        r36sx_cpu_clear_segment_cache(segid, selector);
+        return 1;
     }
 
-    r36sx_seg_cache[segid] = cache;
-    segselector16[segid] = selector;
-    segbase32[segid] = cache.base;
-    return cache.valid;
+    r36sx_segment_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    if (!r36sx_cpu_decode_descriptor(selector, &cache) ||
+        !r36sx_cpu_segment_valid_for_load(segid, &cache)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode failed to load segment seg=%u selector=%04x access=%02x flags=%02x",
+            segid, selector, cache.access, cache.flags);
+#endif
+        return 0;
+    }
+
+    r36sx_cpu_commit_segment_cache(segid, selector, &cache);
+    return 1;
+}
+
+static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
+{
+    if ((selector & 0xfffcu) == 0) {
+        r36sx_ldtr_selector = selector;
+        memset(&r36sx_ldtr_cache, 0, sizeof(r36sx_ldtr_cache));
+        return 1;
+    }
+
+    if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode LLDT selector must be in GDT selector=%04x",
+            selector);
+#endif
+        return 0;
+    }
+
+    r36sx_segment_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    if (!r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT") ||
+        r36sx_descriptor_is_code_data(&cache) ||
+        r36sx_descriptor_type(&cache) != R36SX_DESCRIPTOR_TYPE_LDT) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode LLDT rejected selector=%04x access=%02x flags=%02x",
+            selector, cache.access, cache.flags);
+#endif
+        return 0;
+    }
+
+    r36sx_ldtr_selector = selector;
+    r36sx_ldtr_cache = cache;
+    return 1;
+}
+
+static uint8_t r36sx_cpu_load_tr(uint16_t selector)
+{
+    if ((selector & 0xfffcu) == 0 ||
+        (selector & R36SX_SELECTOR_TABLE_INDICATOR)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode LTR rejected selector=%04x", selector);
+#endif
+        return 0;
+    }
+
+    r36sx_segment_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    if (!r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT") ||
+        !r36sx_descriptor_is_tss(&cache)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected mode LTR rejected selector=%04x access=%02x flags=%02x",
+            selector, cache.access, cache.flags);
+#endif
+        return 0;
+    }
+
+    r36sx_tr_selector = selector;
+    r36sx_tr_cache = cache;
+    return 1;
 }
 
 static void r36sx_cpu_set_cr0(uint32_t value)
 {
     uint8_t old_pe = r36sx_cpu_protected_enabled();
+#if R36SX_ENABLE_PROTECTED_MODE
     r36sx_cr0 = value | R36SX_CR0_ET;
+#else
+    r36sx_cr0 = (value & ~R36SX_CR0_PE) | R36SX_CR0_ET;
+#endif
     uint8_t new_pe = r36sx_cpu_protected_enabled();
 
     if (old_pe != new_pe) {
@@ -1831,6 +2040,18 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
     uint32_t offset = (lo & 0xffffu) |
                       ((type >= 0x0eu) ? (hi & 0xffff0000u) : 0u);
 
+    r36sx_segment_cache_t target_cs;
+    memset(&target_cs, 0, sizeof(target_cs));
+    if (!r36sx_cpu_decode_descriptor(selector, &target_cs) ||
+        !r36sx_descriptor_is_code(&target_cs)) {
+#if DEBUG && !PICO_ON_DEVICE
+        r36sx_pico286_debug_log(
+            "[CPU] protected interrupt invalid target CS int=%02x selector=%04x access=%02x",
+            intnum, selector, target_cs.access);
+#endif
+        return 0;
+    }
+
     if (type >= 0x0eu) {
         push32(makeflagsdword());
         push32(CPU_CS);
@@ -1841,7 +2062,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
         push(CPU_IP);
     }
 
-    r36sx_cpu_load_segment(regcs, selector);
+    r36sx_cpu_commit_segment_cache(regcs, selector, &target_cs);
     CPU_IP = (uint16_t)offset;
     if (type == 0x06u || type == 0x0eu) {
         ifl = 0;
@@ -3671,10 +3892,14 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint16_t fault_ip)
                     writerm16(rm, r36sx_tr_selector);
                     return;
                 case 2: /* LLDT Ew */
-                    r36sx_ldtr_selector = readrm16(rm);
+                    if (!r36sx_cpu_load_ldtr(readrm16(rm))) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                    }
                     return;
                 case 3: /* LTR Ew */
-                    r36sx_tr_selector = readrm16(rm);
+                    if (!r36sx_cpu_load_tr(readrm16(rm))) {
+                        r36sx_cpu_invalid_opcode(fault_ip);
+                    }
                     return;
                 case 4: /* VERR Ew */
                 case 5: { /* VERW Ew */

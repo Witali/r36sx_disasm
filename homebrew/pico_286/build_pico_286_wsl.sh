@@ -12,6 +12,7 @@ Options:
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
   --disable-fast-memory    Use indirect memory function pointers in CPU code.
+  --disable-protected-mode Compile out CR0.PE protected-mode switching.
   --opt-level LEVEL        GCC optimization level. Default: O2.
   --enable-mips-dsp        Experimental buffer helpers with MIPS DSP Rev2.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
@@ -46,6 +47,7 @@ DEBUG_VALUE=0
 PROFILING_VALUE=1
 COMPUTED_GOTO_VALUE=1
 FAST_MEMORY_VALUE=1
+PROTECTED_MODE_VALUE=1
 DO_STRIP=0
 OPT_LEVEL=O2
 MIPS_DSP_VALUE=0
@@ -66,6 +68,10 @@ while (($#)); do
             ;;
         --disable-fast-memory)
             FAST_MEMORY_VALUE=0
+            shift
+            ;;
+        --disable-protected-mode)
+            PROTECTED_MODE_VALUE=0
             shift
             ;;
         --opt-level)
@@ -152,6 +158,7 @@ common_args=(
     "-DR36SX_ENABLE_PROFILING=$PROFILING_VALUE"
     "-DR36SX_CPU_COMPUTED_GOTO=$COMPUTED_GOTO_VALUE"
     "-DR36SX_NATIVE_FAST_MEMORY=$FAST_MEMORY_VALUE"
+    "-DR36SX_ENABLE_PROTECTED_MODE=$PROTECTED_MODE_VALUE"
     "-DR36SX_SEGMENT_BASE_CACHE=1"
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"

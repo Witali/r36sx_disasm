@@ -3,6 +3,7 @@ param(
     [switch]$DisableProfiling,
     [switch]$DisableComputedGoto,
     [switch]$DisableFastMemory,
+    [switch]$DisableProtectedMode,
     [switch]$TryStrip
 )
 
@@ -34,6 +35,7 @@ $DebugValue = if ($DebugLog) { "1" } else { "0" }
 $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 $ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
 $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
+$ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -84,6 +86,7 @@ $CommonArgs = @(
     "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
     "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
     "-DR36SX_NATIVE_FAST_MEMORY=$FastMemoryValue",
+    "-DR36SX_ENABLE_PROTECTED_MODE=$ProtectedModeValue",
     "-DR36SX_SEGMENT_BASE_CACHE=1",
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",

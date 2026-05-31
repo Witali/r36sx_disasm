@@ -1779,6 +1779,61 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-31 protected-mode descriptor checks
+
+Reviewed Intel 80386 protected-mode descriptor behavior and DOSBox-X CPU
+source before updating the port.  The current `pico_286` and `pico_286.dsp`
+binaries add `R36SX_ENABLE_PROTECTED_MODE=1` as a compile-time switch; passing
+`-DisableProtectedMode` to the PowerShell build scripts or
+`--disable-protected-mode` to the WSL shell script forces `CR0.PE` off.
+
+The protected-mode path now supports LDT-backed selectors after `LLDT`, loads
+`TR` through a TSS descriptor, validates code/data/stack descriptor types when
+loading segment registers, and validates the target CS descriptor before
+entering a protected-mode interrupt/trap gate.  This is still not a complete
+386 protected-mode implementation: paging, privilege checks, task switching,
+call gates, and full 32-bit `EIP` execution remain open.
+
+References:
+
+- Intel 80386 protected-mode descriptor tables:
+  `https://www.ardent-tool.com/CPU/docs/Intel/386/manuals/prref386/s06_03.htm`
+- DOSBox-X CPU source:
+  `https://dosbox-x.com/doxygen/html/cpu_8cpp_source.html`
+
+Build commands:
+
+```powershell
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: 435,612 bytes
+- `pico_286` SHA256:
+  `AEE2FAD17D650E032FD6DAD60FDFFD2F7604C2E1081B1A7C3B7B9403F6969908`
+- `pico_286.dsp` size: 427,564 bytes
+- `pico_286.dsp` SHA256:
+  `2F1EE781BAF4E3DAD76569658524861566FE22CC8528FB9D021CA5DE33D05657`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.dsp`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.dsp`
+
 ## 2026-05-31 native fast memory path
 
 Added `R36SX_NATIVE_FAST_MEMORY`, enabled by default in both Pico-286 build

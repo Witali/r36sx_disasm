@@ -287,11 +287,13 @@ operand-size forms used by DOS extenders/probes (`MOV`, ALU, stack, shifts,
 Protected mode is experimental: the guest still boots like a real PC in real
 mode, then may enter protected mode with `LMSW` or `MOV CR0`.  The port now
 emulates `CR0`, `CR2`, `CR3`, `GDTR`, `IDTR`, `LDTR`/`TR` selectors, basic
-GDT-backed segment descriptor caches, far `CALL`/`JMP`/`RET`/`IRET` segment
-reloads, protected-mode interrupt/trap gates, and the 386 system instructions
-`0F 00`, `0F 01`, `0F 20`, and `0F 22`.  Paging, privilege checks, task
-switching/TSS stack switching, call gates, and full 32-bit `EIP` execution are
-not complete yet, so keep `cpu_mode=real` for normal DOS use.
+GDT/LDT-backed segment descriptor caches, code/data/stack descriptor type
+checks, far `CALL`/`JMP`/`RET`/`IRET` segment reloads, protected-mode
+interrupt/trap gates, and the 386 system instructions `0F 00`, `0F 01`,
+`0F 20`, and `0F 22`.  Paging, privilege checks, task switching/TSS stack
+switching, call gates, and full 32-bit `EIP` execution are not complete yet,
+so keep `cpu_mode=real` for normal DOS use.  Protected-mode support can be
+compiled out with `R36SX_ENABLE_PROTECTED_MODE=0`.
 
 `cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
 `32.768` preserves the old hard-coded behavior (`exec86(32768)` per
@@ -494,8 +496,10 @@ This wrapper runs `build_pico_286_wsl.sh` inside WSL and uses the Linux
 `mips-mti-linux-gnu-strip`.
 
 The WSL wrapper also accepts `-OptLevel O0|O1|O2|O3|Os|Og|Ofast`; the shell
-script uses the equivalent `--opt-level`.  To make a side-by-side test build
-that leaves the normal executable untouched:
+script uses the equivalent `--opt-level`.  Both WSL and Windows fallback
+scripts also support disabling the experimental protected-mode entry path with
+`-DisableProtectedMode` or `--disable-protected-mode`.  To make a side-by-side
+test build that leaves the normal executable untouched:
 
 ```powershell
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
