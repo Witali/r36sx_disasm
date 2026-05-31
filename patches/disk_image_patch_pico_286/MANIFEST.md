@@ -37,6 +37,41 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 INT 13h EDD/LBA hard-disk support
+
+The patch binary now implements the basic Enhanced Disk Drive / LBA BIOS
+functions for hard disks:
+
+- `INT 13h AH=41h`: check extensions present;
+- `INT 13h AH=42h`: extended read through a Disk Address Packet;
+- `INT 13h AH=43h`: extended write through a Disk Address Packet;
+- `INT 13h AH=48h`: get extended drive parameters.
+
+CHS access remains available for legacy DOS software.  The LBA path addresses
+raw 512-byte sectors in the mounted image file, so hard-disk reads and writes no
+longer depend on the configured CHS translation once software uses EDD packet
+calls.
+
+```text
+pico_286 size: 445420 bytes
+pico_286 SHA256: 09564384CDA4E216723AECB087D0891B23BEA63F2117C1DE6CF03BE28BB0FD7B
+Defender scan: found no threats
+```
+
+## 2026-05-31 shift-aware on-screen key labels
+
+The patch binary now changes the on-screen key labels when the latched Shift
+modifier is active.  Letter keys show lowercase labels by default and uppercase
+labels with Shift; the number row shows `!@#$%^&*()` with Shift; punctuation
+keys show their shifted symbols when those are the scancodes that will be
+emitted.  The pixel font also includes real lowercase glyphs.
+
+```text
+pico_286 size: 445388 bytes
+pico_286 SHA256: C4426FEC07448E5A9E9A7E623478C54A49131762705A0B51262BC97A20FFBC3B
+Defender scan: found no threats
+```
+
 ## 2026-05-31 PC-style on-screen keyboard layout
 
 The patch binary now uses a compact PC-style on-screen keyboard.  The top row

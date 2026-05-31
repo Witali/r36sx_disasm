@@ -172,6 +172,66 @@ static inline int disk_memory_range_is_plain_ram(uint32_t address,
            bytecount <= (size_t)(RAM_SIZE - address);
 }
 
+static inline uint32_t disk_real_mode_linear(uint16_t segment,
+                                             uint16_t offset) {
+    return ((uint32_t)segment << 4) + (uint32_t)offset;
+}
+
+static inline uint16_t disk_mem_read16(uint32_t address) {
+    return (uint16_t)read86(address) |
+           ((uint16_t)read86(address + 1u) << 8);
+}
+
+static inline uint32_t disk_mem_read32(uint32_t address) {
+    return (uint32_t)disk_mem_read16(address) |
+           ((uint32_t)disk_mem_read16(address + 2u) << 16);
+}
+
+static inline uint64_t disk_mem_read64(uint32_t address) {
+    return (uint64_t)disk_mem_read32(address) |
+           ((uint64_t)disk_mem_read32(address + 4u) << 32);
+}
+
+static inline void disk_mem_write16(uint32_t address, uint16_t value) {
+    write86(address, (uint8_t)value);
+    write86(address + 1u, (uint8_t)(value >> 8));
+}
+
+static inline void disk_mem_write32(uint32_t address, uint32_t value) {
+    disk_mem_write16(address, (uint16_t)value);
+    disk_mem_write16(address + 2u, (uint16_t)(value >> 16));
+}
+
+static inline void disk_mem_write64(uint32_t address, uint64_t value) {
+    disk_mem_write32(address, (uint32_t)value);
+    disk_mem_write32(address + 4u, (uint32_t)(value >> 32));
+}
+
+static inline uint64_t disk_total_sectors(uint8_t drivenum) {
+    return (uint64_t)(disk[drivenum].filesize / 512UL);
+}
+
+static inline int disk_lba_to_fileoffset(uint8_t drivenum, uint64_t lba,
+                                         uint16_t sectcount,
+                                         size_t *fileoffset) {
+    uint64_t total_sectors = disk_total_sectors(drivenum);
+    uint64_t offset64 = lba * 512ULL;
+
+    if (sectcount == 0) {
+        *fileoffset = 0;
+        return lba <= total_sectors;
+    }
+    if (lba >= total_sectors || (uint64_t)sectcount > total_sectors - lba) {
+        return 0;
+    }
+    if (offset64 > (uint64_t)((size_t)-1)) {
+        return 0;
+    }
+
+    *fileoffset = (size_t)offset64;
+    return 1;
+}
+
 static int disk_flush_drive(uint8_t drivenum, const char *reason) {
     if (drivenum & 0x80) drivenum -= 126;
     if (drivenum >= 4 || !disk[drivenum].inserted) {
@@ -201,7 +261,7 @@ static void readdisk(uint8_t drivenum,
               uint16_t cyl, uint16_t sect, uint16_t head,
               uint16_t sectcount, int is_verify
 ) {
-    uint32_t memdest = ((uint32_t) dstseg << 4) + (uint32_t) dstoff;
+    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -325,7 +385,7 @@ static void writedisk(uint8_t drivenum,
                uint16_t cyl, uint16_t sect, uint16_t head,
                uint16_t sectcount
 ) {
-    uint32_t memdest = ((uint32_t) dstseg << 4) + (uint32_t) dstoff;
+    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -432,6 +492,249 @@ static void writedisk(uint8_t drivenum,
     CPU_AL = cursect;
     CPU_FL_CF = 0;
     CPU_AH = 0;
+}
+
+static void readdisk_lba(uint8_t drivenum,
+                         uint64_t lba,
+                         uint32_t memdest,
+                         uint16_t sectcount) {
+    size_t fileoffset = 0;
+    size_t bytecount = (size_t)sectcount * 512UL;
+    uint16_t cursect = 0;
+
+    if (!disk[drivenum].inserted) {
+        r36sx_pico286_debug_log("disk: lba read fail drive=%u no media",
+                                drivenum);
+        CPU_AH = 0x31;    // no media in drive
+        CPU_AL = 0;
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    if (!disk_lba_to_fileoffset(drivenum, lba, sectcount, &fileoffset)) {
+        r36sx_pico286_debug_log(
+            "disk: lba read fail drive=%u lba=%lu count=%u size=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)disk[drivenum].filesize);
+        CPU_AH = 0x04;    // sector not found
+        CPU_AL = 0;
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    if (sectcount == 0) {
+        CPU_AH = 0;
+        CPU_AL = 0;
+        CPU_FL_CF = 0;
+        return;
+    }
+
+    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
+                                    &RAM[memdest], bytecount) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: lba read fail drive=%u bulk lba=%lu bytes=%lu",
+                drivenum, (unsigned long)lba, (unsigned long)bytecount);
+            CPU_AH = 0x04;    // sector not found
+            CPU_AL = 0;
+            CPU_FL_CF = 1;
+            return;
+        }
+        CPU_AH = 0;
+        CPU_AL = (uint8_t)sectcount;
+        CPU_FL_CF = 0;
+        return;
+    }
+
+    for (cursect = 0; cursect < sectcount; cursect++) {
+        size_t sector_offset = fileoffset + (size_t)cursect * 512UL;
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_read_at(disk[drivenum].diskfile, sector_offset,
+                                    &sectorbuffer[0], 512) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: lba read fail drive=%u sector=%u offset=%lu",
+                drivenum, cursect, (unsigned long)sector_offset);
+            CPU_AH = 0x04;    // sector not found
+            CPU_AL = (uint8_t)cursect;
+            CPU_FL_CF = 1;
+            return;
+        }
+
+        for (int sectoffset = 0; sectoffset < 512; sectoffset++) {
+            write86(memdest++, sectorbuffer[sectoffset]);
+        }
+    }
+
+    CPU_AH = 0;
+    CPU_AL = (uint8_t)cursect;
+    CPU_FL_CF = 0;
+}
+
+static void writedisk_lba(uint8_t drivenum,
+                          uint64_t lba,
+                          uint32_t memdest,
+                          uint16_t sectcount) {
+    size_t fileoffset = 0;
+    size_t bytecount = (size_t)sectcount * 512UL;
+    uint16_t cursect = 0;
+
+    if (!disk[drivenum].inserted) {
+        r36sx_pico286_debug_log("disk: lba write fail drive=%u no media",
+                                drivenum);
+        CPU_AH = 0x31;    // no media in drive
+        CPU_AL = 0;
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    if (!disk_lba_to_fileoffset(drivenum, lba, sectcount, &fileoffset)) {
+        r36sx_pico286_debug_log(
+            "disk: lba write fail drive=%u lba=%lu count=%u size=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)disk[drivenum].filesize);
+        CPU_AH = 0x04;    // sector not found
+        CPU_AL = 0;
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    if (sectcount == 0) {
+        CPU_AH = 0;
+        CPU_AL = 0;
+        CPU_FL_CF = 0;
+        return;
+    }
+
+    if (disk[drivenum].readonly) {
+        r36sx_pico286_debug_log("disk: lba write fail drive=%u read only",
+                                drivenum);
+        CPU_AH = 0x03;    // drive is read-only
+        CPU_AL = 0;
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                     &disk[drivenum].cache, drivenum,
+                                     fileoffset, &RAM[memdest], bytecount,
+                                     sectcount) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: lba write fail drive=%u bulk lba=%lu bytes=%lu",
+                drivenum, (unsigned long)lba, (unsigned long)bytecount);
+            CPU_AH = 0xCC;    // write fault
+            CPU_AL = 0;
+            CPU_FL_CF = 1;
+            return;
+        }
+        CPU_AH = 0;
+        CPU_AL = (uint8_t)sectcount;
+        CPU_FL_CF = 0;
+        return;
+    }
+
+    for (cursect = 0; cursect < sectcount; cursect++) {
+        size_t sector_offset = fileoffset + (size_t)cursect * 512UL;
+        for (int sectoffset = 0; sectoffset < 512; sectoffset++) {
+            sectorbuffer[sectoffset] = read86(memdest++);
+        }
+
+        r36sx_pico286_disk_activity();
+        if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                     &disk[drivenum].cache, drivenum,
+                                     sector_offset, sectorbuffer, 512, 1) != 0) {
+            r36sx_pico286_debug_log(
+                "disk: lba write fail drive=%u sector=%u offset=%lu",
+                drivenum, cursect, (unsigned long)sector_offset);
+            CPU_AH = 0xCC;    // write fault
+            CPU_AL = (uint8_t)cursect;
+            CPU_FL_CF = 1;
+            return;
+        }
+    }
+
+    CPU_AH = 0;
+    CPU_AL = (uint8_t)cursect;
+    CPU_FL_CF = 0;
+}
+
+typedef struct disk_address_packet_s {
+    uint16_t sector_count;
+    uint32_t buffer;
+    uint64_t lba;
+} disk_address_packet_t;
+
+static int disk_read_address_packet(uint32_t dap,
+                                    disk_address_packet_t *packet) {
+    uint8_t packet_size = read86(dap);
+    uint8_t reserved = read86(dap + 1u);
+    uint16_t sector_count = disk_mem_read16(dap + 2u);
+    uint16_t buffer_offset = disk_mem_read16(dap + 4u);
+    uint16_t buffer_segment = disk_mem_read16(dap + 6u);
+    uint64_t lba = disk_mem_read64(dap + 8u);
+
+    if (packet_size < 0x10u || reserved != 0 || sector_count > 127u) {
+        return 0;
+    }
+
+    if (buffer_offset == 0xffffu && buffer_segment == 0xffffu) {
+        uint64_t flat_buffer;
+        if (packet_size < 0x18u) {
+            return 0;
+        }
+        flat_buffer = disk_mem_read64(dap + 16u);
+        if (flat_buffer > 0xffffffffULL) {
+            return 0;
+        }
+        packet->buffer = (uint32_t)flat_buffer;
+    } else {
+        packet->buffer = disk_real_mode_linear(buffer_segment, buffer_offset);
+    }
+
+    packet->sector_count = sector_count;
+    packet->lba = lba;
+    return 1;
+}
+
+static inline void disk_set_extended_count(uint32_t dap, uint16_t count) {
+    disk_mem_write16(dap + 2u, count);
+}
+
+static void disk_get_extended_parameters(uint8_t drivenum) {
+    uint32_t result = disk_real_mode_linear(CPU_DS, CPU_SI);
+    uint16_t requested_size = disk_mem_read16(result);
+    uint16_t returned_size;
+    uint64_t total_sectors;
+
+    if (!disk[drivenum].inserted || drivenum < 2) {
+        CPU_AH = 0x31;    // no media in drive
+        CPU_FL_CF = 1;
+        return;
+    }
+    if (requested_size < 26u) {
+        CPU_AH = 0x01;    // invalid command or parameter
+        CPU_FL_CF = 1;
+        return;
+    }
+
+    returned_size = requested_size >= 30u ? 30u : 26u;
+    total_sectors = disk_total_sectors(drivenum);
+
+    disk_mem_write16(result + 0u, returned_size);
+    disk_mem_write16(result + 2u, 0x0003u);  // DMA boundary handled; geometry valid.
+    disk_mem_write32(result + 4u, disk[drivenum].cyls);
+    disk_mem_write32(result + 8u, disk[drivenum].heads);
+    disk_mem_write32(result + 12u, disk[drivenum].sects);
+    disk_mem_write64(result + 16u, total_sectors);
+    disk_mem_write16(result + 24u, 512u);
+    if (returned_size >= 30u) {
+        disk_mem_write32(result + 26u, 0xffffffffUL);
+    }
+
+    CPU_AH = 0;
+    CPU_FL_CF = 0;
 }
 
 
@@ -551,6 +854,57 @@ static INLINE void diskhandler() {
                 CPU_FL_CF = 1;
                 CPU_AH = 0x00;
             }
+            break;
+
+        case 0x41:  // Check extensions present
+            if (drivenum >= 2 && disk[drivenum].inserted && CPU_BX == 0x55aa) {
+                CPU_AH = 0x30;      // EDD 3.0 style version reporting.
+                CPU_AL = 0;
+                CPU_BX = 0xaa55;
+                CPU_CX = 0x0005;    // Packet access + enhanced drive parameters.
+                CPU_FL_CF = 0;
+            } else {
+                CPU_AH = 0x01;      // Invalid command or unsupported drive.
+                CPU_FL_CF = 1;
+            }
+            break;
+
+        case 0x42:  // Extended read using a Disk Address Packet at DS:SI
+        {
+            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            disk_address_packet_t packet;
+            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+                CPU_AH = 0x01;      // Invalid command or parameter.
+                CPU_AL = 0;
+                CPU_FL_CF = 1;
+                break;
+            }
+            readdisk_lba(drivenum, packet.lba, packet.buffer,
+                         packet.sector_count);
+            disk_set_extended_count(dap, CPU_FL_CF ? CPU_AL
+                                                   : packet.sector_count);
+            break;
+        }
+
+        case 0x43:  // Extended write using a Disk Address Packet at DS:SI
+        {
+            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            disk_address_packet_t packet;
+            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+                CPU_AH = 0x01;      // Invalid command or parameter.
+                CPU_AL = 0;
+                CPU_FL_CF = 1;
+                break;
+            }
+            writedisk_lba(drivenum, packet.lba, packet.buffer,
+                          packet.sector_count);
+            disk_set_extended_count(dap, CPU_FL_CF ? CPU_AL
+                                                   : packet.sector_count);
+            break;
+        }
+
+        case 0x48:  // Get extended drive parameters
+            disk_get_extended_parameters(drivenum);
             break;
 
         default:  // Unknown function requested

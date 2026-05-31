@@ -1,5 +1,75 @@
 # pico-286 Build Log
 
+## 2026-05-31 INT 13h EDD/LBA hard-disk support
+
+Implemented basic Enhanced Disk Drive services in the R36SX native disk backend:
+
+- `INT 13h AH=41h` reports packet-access and enhanced-parameter support for
+  mounted hard disks.
+- `INT 13h AH=42h` reads sectors by LBA from a Disk Address Packet at `DS:SI`.
+- `INT 13h AH=43h` writes sectors by LBA from a Disk Address Packet at `DS:SI`.
+- `INT 13h AH=48h` fills the extended drive parameter buffer with geometry,
+  total sector count, and 512-byte sector size.
+
+The legacy CHS path is still used for `AH=02h`, `AH=03h`, and `AH=08h`.  LBA
+transfers go directly from the packet LBA to the raw image file offset and use
+the existing bulk host-image I/O path when the guest buffer is ordinary RAM.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out homebrew\pico_286\pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- `pico_286` size: `445420` bytes
+- `pico_286` SHA256:
+  `09564384CDA4E216723AECB087D0891B23BEA63F2117C1DE6CF03BE28BB0FD7B`
+- Defender scan: found no threats
+
+## 2026-05-31 shift-aware on-screen key labels
+
+Updated the shared on-screen keyboard rendering so the visible key labels match
+the latched Shift state:
+
+- normal letter keys draw lowercase labels by default and uppercase labels
+  when the on-screen Shift key is active;
+- the number row changes from `1234567890` to `!@#$%^&*()` when Shift is
+  active;
+- shifted punctuation labels such as `_`, `+`, `{`, `}`, `|`, `:`, `"`, `<`,
+  `>`, and `?` are shown when Shift changes the key that will be emitted;
+- the tiny pixel font now has real lowercase glyphs instead of silently drawing
+  all lowercase text as uppercase.
+
+The input path is unchanged: the keyboard still emits the same PC scancodes and
+uses the existing latched Shift modifier around the selected key.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+Result:
+
+- `pico_286` size: `445388` bytes
+- `pico_286` SHA256:
+  `C4426FEC07448E5A9E9A7E623478C54A49131762705A0B51262BC97A20FFBC3B`
+
+Verification: rebuilt only the normal WSL/GCC binary, copied it to
+`disk_image` and the Pico-286 patch, and scanned all three `pico_286` copies
+with `tools/scan-download.ps1`; Defender found no threats.  DSP side builds
+remain paused and were not rebuilt.
+
 ## 2026-05-31 PC-style on-screen keyboard layout
 
 Reworked the shared on-screen keyboard module toward a compact PC keyboard

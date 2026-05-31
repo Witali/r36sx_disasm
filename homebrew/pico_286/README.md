@@ -432,6 +432,14 @@ diskettes keep their original names; hard disks use `.hdd` by default.
 `cylinders,heads,sectors` order.  The current bundled hard disk images are
 33,546,240 bytes, which matches `65,16,63`.
 
+The R36SX hard-disk BIOS path also exposes basic Enhanced Disk Drive / LBA
+services through `INT 13h`: `AH=41h` checks extension presence, `AH=42h` reads
+LBA sectors from a Disk Address Packet, `AH=43h` writes LBA sectors, and
+`AH=48h` returns extended drive parameters.  CHS remains available for older
+DOS software through `AH=02h`, `AH=03h`, and `AH=08h`; LBA uses the raw image
+sector number and no longer depends on a chosen CHS translation for reads and
+writes.
+
 The local test image set uses official FreeDOS 1.4 Floppy Edition images plus
 a separate Sopwith game floppy:
 
