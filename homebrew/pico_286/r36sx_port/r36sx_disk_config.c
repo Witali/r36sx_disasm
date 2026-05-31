@@ -28,15 +28,16 @@
 #define R36SX_PICO286_MAX_CONVENTIONAL_KB 640UL
 #define R36SX_PICO286_MIN_UPPER_KB 0UL
 #define R36SX_PICO286_MAX_UPPER_KB 176UL
-#define R36SX_PICO286_MIN_EXTENDED_KB 0UL
-#define R36SX_PICO286_MAX_EXTENDED_KB 4096UL
-#define R36SX_PICO286_MIN_XMS_KB 0UL
-#define R36SX_PICO286_MAX_XMS_KB 4096UL
 #define R36SX_PICO286_MIN_TOTAL_MEMORY_KB R36SX_PICO286_MIN_CONVENTIONAL_KB
-#define R36SX_PICO286_MAX_TOTAL_MEMORY_KB \
-    (R36SX_PICO286_MAX_CONVENTIONAL_KB + \
-     R36SX_PICO286_MAX_UPPER_KB + \
-     R36SX_PICO286_MAX_XMS_KB)
+#define R36SX_PICO286_MAX_TOTAL_MEMORY_KB 16384UL
+#define R36SX_PICO286_MAX_LINEAR_EXTENDED_KB \
+    (R36SX_PICO286_MAX_TOTAL_MEMORY_KB - \
+     R36SX_PICO286_MAX_CONVENTIONAL_KB - \
+     R36SX_PICO286_MAX_UPPER_KB)
+#define R36SX_PICO286_MIN_EXTENDED_KB 0UL
+#define R36SX_PICO286_MAX_EXTENDED_KB R36SX_PICO286_MAX_LINEAR_EXTENDED_KB
+#define R36SX_PICO286_MIN_XMS_KB 0UL
+#define R36SX_PICO286_MAX_XMS_KB R36SX_PICO286_MAX_LINEAR_EXTENDED_KB
 
 typedef struct {
     uint8_t bios_drive;
@@ -1601,11 +1602,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# is explicitly written without a leading '#'.  Automatic layout uses\n");
     fprintf(fp, "# conventional first, then upper/UMB, then XMS/extended memory.\n");
     fprintf(fp, "# Allowed ranges:\n");
-    fprintf(fp, "# total_memory_kb: 64..4912.\n");
+    fprintf(fp, "# total_memory_kb: 64..16384.\n");
     fprintf(fp, "# conventional_kb: 64..640, reported through the BIOS Data Area.\n");
     fprintf(fp, "# upper_kb: 0..176, limits XMS UMB allocations from D000:0000 upward.\n");
-    fprintf(fp, "# xms_kb: 0..4096, also backs linear physical RAM above 1 MB.\n");
-    fprintf(fp, "# extended_kb: 0..4096, reported by INT 15h AH=88h; defaults to xms_kb.\n");
+    fprintf(fp, "# xms_kb: 0..15568, also backs linear physical RAM above 1 MB.\n");
+    fprintf(fp, "# extended_kb: 0..15568, reported by INT 15h AH=88h; defaults to xms_kb.\n");
     fprintf(fp, "[memory]\n");
     fprintf(fp, "total_memory_kb=%s\n", total_memory_kb_text);
     fprintf(fp, "%sconventional_kb=%s\n",

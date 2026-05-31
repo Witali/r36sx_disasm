@@ -36,6 +36,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 16 MB memory limit
+
+The patch binaries now allow up to 16 MB of usable emulated RAM.  The compiled
+XMS backing buffer is 15568 KB, so `total_memory_kb=16384` can be split into
+640 KB conventional RAM, 176 KB upper/UMB RAM, and 15568 KB XMS/extended RAM.
+The default config still ships with `total_memory_kb=4912`; edit
+`pico_286.conf` to opt into the larger memory size.
+
+```text
+pico_286 size: 440048 bytes
+pico_286 SHA256: 89F6B4BC77469D3943BE714399612E351E59AC5A74414100B9FFBC07ABEEE375
+pico_286.dsp size: 432704 bytes
+pico_286.dsp SHA256: 3CD0DC8CD56EBC46919A898EE62D72D6B111F8D315C406D45CE83D068D9EC158
+Defender scan: found no threats
+```
+
 ## 2026-05-31 total memory auto layout and flat extended RAM
 
 The patch binaries now support `total_memory_kb` in `pico_286.conf`.  The

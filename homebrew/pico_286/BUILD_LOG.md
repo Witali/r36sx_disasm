@@ -1,5 +1,39 @@
 # pico-286 Build Log
 
+## 2026-05-31 16 MB memory limit
+
+Raised the R36SX Pico-286 memory ceiling to 16 MB of usable emulated RAM.  The
+compiled XMS backing buffer is now 15568 KB, so `total_memory_kb=16384` can be
+split into 640 KB conventional RAM, 176 KB upper/UMB RAM, and 15568 KB
+XMS/extended RAM.  The default config still uses `total_memory_kb=4912` until
+the user explicitly increases it.
+
+Updated `pico_286.conf` comments and config save output to allow:
+
+- `total_memory_kb`: `64..16384`
+- `xms_kb`: `0..15568`
+- `extended_kb`: `0..15568`
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `440048` bytes
+- `pico_286` SHA256:
+  `89F6B4BC77469D3943BE714399612E351E59AC5A74414100B9FFBC07ABEEE375`
+- `pico_286.dsp` size: `432704` bytes
+- `pico_286.dsp` SHA256:
+  `3CD0DC8CD56EBC46919A898EE62D72D6B111F8D315C406D45CE83D068D9EC158`
+
+Verification: rebuilt both WSL/GCC binaries and scanned the homebrew,
+`disk_image`, and patch copies with `tools/scan-download.ps1`; Defender found
+no threats.
+
 ## 2026-05-31 total memory auto layout and flat extended RAM
 
 Added `total_memory_kb` to `pico_286.conf`.  When only the total is set, the

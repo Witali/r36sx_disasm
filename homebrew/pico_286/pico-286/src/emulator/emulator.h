@@ -88,7 +88,8 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 #define BIOS_START (0xFE000)
 
 #define EMS_MEMORY_SIZE (2048 << 10) // 2 MB
-#define XMS_MEMORY_SIZE (4096 << 10) // 4 MB
+#define XMS_MEMORY_KB 15568u // Keeps total usable RAM at 16 MB.
+#define XMS_MEMORY_SIZE (XMS_MEMORY_KB << 10)
 #define EXTENDED_MEMORY_START HMA_START
 #define EXTENDED_MEMORY_END (EXTENDED_MEMORY_START + XMS_MEMORY_SIZE)
 

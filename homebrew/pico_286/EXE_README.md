@@ -218,8 +218,10 @@ and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 The `[memory]` values are in KB.  `total_memory_kb` is split automatically:
 conventional memory first, then upper/UMB memory, then XMS/extended RAM.  The
 individual `conventional_kb`, `upper_kb`, `xms_kb`, and `extended_kb` keys are
-optional overrides.  `xms_kb` also backs linear physical RAM above 1 MB, while
-`extended_kb` is the value returned by `INT 15h AH=88h`.
+optional overrides.  The total-memory limit is 16 MB; with full conventional
+and upper memory enabled, `xms_kb`/`extended_kb` can reach 15568 KB.  `xms_kb`
+also backs linear physical RAM above 1 MB, while `extended_kb` is the value
+returned by `INT 15h AH=88h`.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
