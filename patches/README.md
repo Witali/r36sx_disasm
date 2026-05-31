@@ -23,3 +23,6 @@ Make a backup of the original disk before applying patches. Numbered patch
 directories are the experiment history; `disk_image_patch_tiny_mc` is the
 current consolidated Tiny MC launcher overlay, and
 `disk_image_patch_pico_286` is the current consolidated Pico-286 overlay.
+`disk_image_patch_boot_time` adds early boot scripts for devices without a
+real-time clock: it restores the Linux software clock from the last saved
+timestamp and provides a helper to save that timestamp.
