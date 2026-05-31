@@ -13,6 +13,13 @@
 #define PICO286_PSRAM_ATTR __attribute__((aligned (4)))
 #endif
 
+#define SVGA_WIDTH 800
+#define SVGA_HEIGHT 600
+#define SVGA_MAX_BPP 16
+#define SVGA_VRAM_SIZE (SVGA_WIDTH * SVGA_HEIGHT * (SVGA_MAX_BPP / 8))
+#define VBE_MODE_800X600X8 0x0103
+#define VBE_MODE_800X600X16 0x0114
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -91,6 +98,7 @@ extern uint8_t log_debug;
 
 extern uint8_t RAM[RAM_SIZE];
 extern uint32_t VIDEORAM[VIDEORAM_SIZE];
+extern uint8_t SVGA_VRAM[SVGA_VRAM_SIZE];
 extern uint8_t UMB[UMB_END - UMB_START];
 extern uint8_t HMA[HMA_END - HMA_START];
 // for non-butter-psram modes
@@ -201,6 +209,16 @@ uint16_t cga_portin(uint16_t portnum);
 #define vga_plane_size (16000)
 extern uint32_t vga_plane_offset;
 extern uint8_t vga_planar_mode;
+extern uint32_t vga_svga_bank;
+extern uint16_t vga_svga_width;
+extern uint16_t vga_svga_height;
+extern uint8_t vga_svga_bpp;
+int vga_svga_mode_active(void);
+int vga_svga_mode_supported(uint16_t mode);
+int vga_svga_set_mode(uint16_t mode, int clear_memory);
+void vga_svga_disable(void);
+void vga_svga_set_bank(uint16_t bank);
+uint16_t vga_svga_get_bank(void);
 
 #if PICO_ON_DEVICE
     extern bool ega_vga_enabled;

@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-31 VBE 800x600 SVGA modes
+
+Added minimal banked VBE/SVGA support for 800x600 output.
+
+- `INT 10h AX=4F00h` now reports a VBE 2.0 info block with modes `103h` and
+  `114h`.
+- `INT 10h AX=4F01h` returns mode info for `103h` (800x600x8 packed pixel)
+  and `114h` (800x600x16 RGB565 direct color).
+- `INT 10h AX=4F02h` can set those two modes.  Linear framebuffer requests
+  (`BX bit 14`) are rejected because this port currently implements the banked
+  VGA window path only.
+- `INT 10h AX=4F05h` switches/queries the 64 KB bank mapped at `A000:0000`.
+- Added a 960 KB SVGA framebuffer and downsampled 800x600 rendering into the
+  native 640x480 RGB565 output.  Mode `103h` uses the VGA DAC palette; mode
+  `114h` reads RGB565 pixels directly.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.  A clean rebuild still emits existing upstream
+warnings from FPU/audio helper sources; the final incremental rebuild after the
+SVGA changes only reported the known objcopy failure.
+
+Result:
+
+- `pico_286` size: `1425620` bytes
+- `pico_286` SHA256:
+  `B34BDB7284498B790937B1D8C6526CE743F04833E2392AE422BE9C40239BE50B`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 elapsed-time audio packets
 
 Changed Pico-286 audio packet sizing to follow real elapsed time.

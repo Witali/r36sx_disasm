@@ -1280,6 +1280,201 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
     r36sx_bios_set_cursor(page, col, row);
 }
 
+#define R36SX_VBE_STATUS_OK 0x004Fu
+#define R36SX_VBE_STATUS_FAIL 0x014Fu
+#define R36SX_VBE_WINDOW_KB 64u
+
+static void r36sx_vbe_write8(uint32_t base, uint16_t offset, uint8_t value)
+{
+    write86(base + offset, value);
+}
+
+static void r36sx_vbe_write16(uint32_t base, uint16_t offset, uint16_t value)
+{
+    writew86(base + offset, value);
+}
+
+static void r36sx_vbe_write32(uint32_t base, uint16_t offset, uint32_t value)
+{
+    write86(base + offset, (uint8_t)(value & 0xFFu));
+    write86(base + offset + 1u, (uint8_t)((value >> 8) & 0xFFu));
+    write86(base + offset + 2u, (uint8_t)((value >> 16) & 0xFFu));
+    write86(base + offset + 3u, (uint8_t)((value >> 24) & 0xFFu));
+}
+
+static void r36sx_vbe_clear(uint32_t base, uint16_t bytes)
+{
+    for (uint16_t i = 0; i < bytes; i++) {
+        write86(base + i, 0);
+    }
+}
+
+static uint32_t r36sx_vbe_far_ptr(uint32_t linear)
+{
+    return ((linear >> 4) << 16) | (linear & 0x0Fu);
+}
+
+static uint16_t r36sx_vbe_mode_base(uint16_t mode)
+{
+    return mode & 0x01FFu;
+}
+
+static uint16_t r36sx_vbe_bytes_per_scanline(uint16_t mode)
+{
+    return (uint16_t)(SVGA_WIDTH *
+        (r36sx_vbe_mode_base(mode) == VBE_MODE_800X600X16 ? 2u : 1u));
+}
+
+static void r36sx_vbe_write_info_block(void)
+{
+    uint32_t base = (uint32_t)CPU_ES * 16u + CPU_DI;
+    uint32_t modes = base + 0x100u;
+
+    r36sx_vbe_clear(base, 512);
+    r36sx_vbe_write8(base, 0x00, 'V');
+    r36sx_vbe_write8(base, 0x01, 'E');
+    r36sx_vbe_write8(base, 0x02, 'S');
+    r36sx_vbe_write8(base, 0x03, 'A');
+    r36sx_vbe_write16(base, 0x04, 0x0200u);
+    r36sx_vbe_write32(base, 0x0A, 0u);
+    r36sx_vbe_write32(base, 0x0E, r36sx_vbe_far_ptr(modes));
+    r36sx_vbe_write16(base, 0x12,
+                      (uint16_t)((SVGA_VRAM_SIZE + 0xFFFFu) >> 16));
+
+    r36sx_vbe_write16(modes, 0x00, VBE_MODE_800X600X8);
+    r36sx_vbe_write16(modes, 0x02, VBE_MODE_800X600X16);
+    r36sx_vbe_write16(modes, 0x04, 0xFFFFu);
+    CPU_AX = R36SX_VBE_STATUS_OK;
+}
+
+static void r36sx_vbe_write_mode_info(uint16_t mode)
+{
+    uint32_t base = (uint32_t)CPU_ES * 16u + CPU_DI;
+    uint16_t bytes_per_scanline;
+    uint32_t mode_bytes;
+    uint8_t bpp;
+    uint8_t pages;
+
+    mode = r36sx_vbe_mode_base(mode);
+    if (!vga_svga_mode_supported(mode)) {
+        CPU_AX = R36SX_VBE_STATUS_FAIL;
+        return;
+    }
+
+    bytes_per_scanline = r36sx_vbe_bytes_per_scanline(mode);
+    mode_bytes = (uint32_t)bytes_per_scanline * SVGA_HEIGHT;
+    bpp = mode == VBE_MODE_800X600X16 ? 16 : 8;
+    pages = (uint8_t)((SVGA_VRAM_SIZE / mode_bytes) > 0 ?
+                      (SVGA_VRAM_SIZE / mode_bytes) - 1u : 0u);
+
+    r36sx_vbe_clear(base, 256);
+    r36sx_vbe_write16(base, 0x00, 0x0019u);
+    r36sx_vbe_write8(base, 0x02, 0x07u);
+    r36sx_vbe_write8(base, 0x03, 0x07u);
+    r36sx_vbe_write16(base, 0x04, R36SX_VBE_WINDOW_KB);
+    r36sx_vbe_write16(base, 0x06, R36SX_VBE_WINDOW_KB);
+    r36sx_vbe_write16(base, 0x08, 0xA000u);
+    r36sx_vbe_write16(base, 0x0A, 0xA000u);
+    r36sx_vbe_write32(base, 0x0C, 0u);
+    r36sx_vbe_write16(base, 0x10, bytes_per_scanline);
+    r36sx_vbe_write16(base, 0x12, SVGA_WIDTH);
+    r36sx_vbe_write16(base, 0x14, SVGA_HEIGHT);
+    r36sx_vbe_write8(base, 0x16, 8u);
+    r36sx_vbe_write8(base, 0x17, 16u);
+    r36sx_vbe_write8(base, 0x18, 1u);
+    r36sx_vbe_write8(base, 0x19, bpp);
+    r36sx_vbe_write8(base, 0x1A, (uint8_t)((mode_bytes + 0xFFFFu) >> 16));
+    r36sx_vbe_write8(base, 0x1B, bpp == 16 ? 6u : 4u);
+    r36sx_vbe_write8(base, 0x1C, R36SX_VBE_WINDOW_KB);
+    r36sx_vbe_write8(base, 0x1D, pages);
+    if (bpp == 16) {
+        r36sx_vbe_write8(base, 0x1F, 5u);
+        r36sx_vbe_write8(base, 0x20, 11u);
+        r36sx_vbe_write8(base, 0x21, 6u);
+        r36sx_vbe_write8(base, 0x22, 5u);
+        r36sx_vbe_write8(base, 0x23, 5u);
+        r36sx_vbe_write8(base, 0x24, 0u);
+        r36sx_vbe_write8(base, 0x25, 0u);
+        r36sx_vbe_write8(base, 0x26, 0u);
+    }
+    CPU_AX = R36SX_VBE_STATUS_OK;
+}
+
+static void r36sx_vbe_set_mode(uint16_t mode)
+{
+    uint16_t base_mode = r36sx_vbe_mode_base(mode);
+    int clear_memory = (mode & 0x8000u) == 0;
+
+    if ((mode & 0x4000u) != 0) {
+        CPU_AX = R36SX_VBE_STATUS_FAIL;
+        return;
+    }
+    if (!vga_svga_set_mode(base_mode, clear_memory)) {
+        CPU_AX = R36SX_VBE_STATUS_FAIL;
+        return;
+    }
+
+    videomode = base_mode;
+    vga_planar_mode = 0;
+    vga_plane_offset = 0;
+    vram_offset = 0;
+    FIRST_RAM_PAGE[0x449] = 0x7Fu;
+    FIRST_RAM_PAGE[0x44A] = 80;
+    FIRST_RAM_PAGE[0x44B] = 0;
+    FIRST_RAM_PAGE[0x484] = 24;
+    FIRST_RAM_PAGE[0x462] = 0;
+    r36sx_bios_set_cursor(0, 0, 0);
+    r36sx_pico286_video_mark_dirty();
+    CPU_AX = R36SX_VBE_STATUS_OK;
+}
+
+static void r36sx_vbe_banked_window(void)
+{
+    switch (CPU_BH) {
+        case 0x00:
+            if ((CPU_BL & 1u) == 0) {
+                vga_svga_set_bank(CPU_DX);
+                CPU_AX = R36SX_VBE_STATUS_OK;
+            } else {
+                CPU_AX = R36SX_VBE_STATUS_FAIL;
+            }
+            return;
+        case 0x01:
+            CPU_DX = vga_svga_get_bank();
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        default:
+            CPU_AX = R36SX_VBE_STATUS_FAIL;
+            return;
+    }
+}
+
+static void r36sx_bios_vesa(void)
+{
+    switch (CPU_AL) {
+        case 0x00:
+            r36sx_vbe_write_info_block();
+            return;
+        case 0x01:
+            r36sx_vbe_write_mode_info(CPU_CX);
+            return;
+        case 0x02:
+            r36sx_vbe_set_mode(CPU_BX);
+            return;
+        case 0x03:
+            CPU_BX = vga_svga_mode_active() ? (uint16_t)videomode
+                                            : (uint16_t)(videomode & 0xFFu);
+            CPU_AX = R36SX_VBE_STATUS_OK;
+            return;
+        case 0x05:
+            r36sx_vbe_banked_window();
+            return;
+        default:
+            CPU_AX = R36SX_VBE_STATUS_FAIL;
+            return;
+    }
+}
+
 #if !PICO_ON_DEVICE
 static uint8_t r36sx_bios_drive_to_slot(uint8_t bios_drive)
 {
@@ -1419,6 +1614,9 @@ void intcall86(uint8_t intnum) {
     switch (intnum) {
         case 0x10: {
             switch (CPU_AH) {
+                case 0x4F:
+                    r36sx_bios_vesa();
+                    return;
                 case 0x01:
                     if (cursor_start != CPU_CH || cursor_end != CPU_CL) {
                         cursor_start = CPU_CH;
@@ -1526,6 +1724,7 @@ void intcall86(uint8_t intnum) {
                     }
                     vga_plane_offset = 0;
                     vga_planar_mode = 0;
+                    vga_svga_disable();
                     tga_offset = 0x8000;
                     FIRST_RAM_PAGE[0x462] = 0;
                     r36sx_bios_set_cursor(0, 0, 0);

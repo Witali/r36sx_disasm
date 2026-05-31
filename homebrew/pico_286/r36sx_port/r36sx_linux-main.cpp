@@ -222,6 +222,11 @@ extern "C" int r36sx_pico286_video_active_height(void) {
      * first 400 rows of the 640x480 buffer, with the rest kept black.
      */
     switch (videomode) {
+        case VBE_MODE_800X600X8:
+        case VBE_MODE_800X600X16:
+        case 0x11:
+        case 0x12:
+            return 480;
         case 0x07:
         case 0x0f:
         case 0x10:
@@ -402,6 +407,34 @@ static inline void vga_render_planar_4bpp(uint16_t **out_pixels,
     *out_pixels = pixels;
 }
 
+static inline uint16_t svga_read_rgb565(uint32_t offset)
+{
+    if (offset + 1u >= SVGA_VRAM_SIZE) {
+        return 0;
+    }
+    return (uint16_t)SVGA_VRAM[offset] |
+           ((uint16_t)SVGA_VRAM[offset + 1u] << 8);
+}
+
+static inline void svga_render_800x600_row(uint16_t *pixels, int y)
+{
+    uint32_t src_y = ((uint32_t)y * 5u + 2u) >> 2;
+    uint32_t row = src_y * SVGA_WIDTH;
+
+    if (vga_svga_bpp == 16) {
+        for (uint32_t x = 0; x < 640u; x++) {
+            uint32_t src_x = (x * 5u + 2u) >> 2;
+            *pixels++ = svga_read_rgb565((row + src_x) * 2u);
+        }
+    } else {
+        for (uint32_t x = 0; x < 640u; x++) {
+            uint32_t src_x = (x * 5u + 2u) >> 2;
+            uint8_t color = SVGA_VRAM[row + src_x];
+            *pixels++ = vga_palette565[color];
+        }
+    }
+}
+
 static inline uint32_t cga_graphics_base(void)
 {
     return 0x8000u + ((uint32_t)(vram_offset & 0xffffu) << 1);
@@ -414,7 +447,7 @@ static inline uint32_t cga_graphics_row_offset(int screen_y)
 }
 
 static inline void renderer() {
-    static uint8_t v = 0;
+    static int v = -1;
     refresh_palettes565();
 
     if (v != videomode) {
@@ -425,6 +458,11 @@ static inline void renderer() {
     uint8_t cols = 80;
     for (int y = 0; y < 480; y++) {
         uint16_t *pixels = SCREEN + y * 640;
+
+        if (vga_svga_mode_active()) {
+            svga_render_800x600_row(pixels, y);
+            continue;
+        }
 
         if (y < 400)
             switch (videomode) {

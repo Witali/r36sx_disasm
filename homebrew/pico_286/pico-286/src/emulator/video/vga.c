@@ -3,6 +3,7 @@
 // Each vram entry: 0xP3P2P1P0 (plane0 in lowest byte).
 
 #pragma GCC optimize("Ofast")
+#include <string.h>
 #include "emulator/emulator.h"
 #if PICO_ON_DEVICE
 #include "graphics.h"
@@ -19,6 +20,10 @@ static uint8_t dac_mask = 0xFF;
 static uint8_t misc_output_register = 0x63;
 uint32_t vga_plane_offset = 0;
 uint8_t vga_planar_mode = 0;
+uint32_t vga_svga_bank = 0;
+uint16_t vga_svga_width = 0;
+uint16_t vga_svga_height = 0;
+uint8_t vga_svga_bpp = 0;
 
 // Latches (32-bit).
 static uint32_t vga_latch32 = 0;
@@ -83,6 +88,64 @@ uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6) {
     return rgb(vga_dac_6_to_8(red6),
                vga_dac_6_to_8(green6),
                vga_dac_6_to_8(blue6));
+}
+
+int vga_svga_mode_supported(uint16_t mode)
+{
+    return mode == VBE_MODE_800X600X8 ||
+           mode == VBE_MODE_800X600X16;
+}
+
+int vga_svga_mode_active(void)
+{
+    return vga_svga_width == SVGA_WIDTH &&
+           vga_svga_height == SVGA_HEIGHT &&
+           (vga_svga_bpp == 8 || vga_svga_bpp == 16);
+}
+
+void vga_svga_disable(void)
+{
+    vga_svga_width = 0;
+    vga_svga_height = 0;
+    vga_svga_bpp = 0;
+    vga_svga_bank = 0;
+}
+
+int vga_svga_set_mode(uint16_t mode, int clear_memory)
+{
+    if (!vga_svga_mode_supported(mode)) {
+        return 0;
+    }
+
+    vga_svga_width = SVGA_WIDTH;
+    vga_svga_height = SVGA_HEIGHT;
+    vga_svga_bpp = mode == VBE_MODE_800X600X16 ? 16 : 8;
+    vga_svga_bank = 0;
+    if (clear_memory) {
+        memset(SVGA_VRAM, 0, sizeof(SVGA_VRAM));
+    }
+    r36sx_pico286_video_mark_dirty();
+    return 1;
+}
+
+void vga_svga_set_bank(uint16_t bank)
+{
+    uint32_t max_bank =
+        (SVGA_VRAM_SIZE + 0xFFFFu) >> 16;
+
+    if (max_bank == 0) {
+        vga_svga_bank = 0;
+        return;
+    }
+    if (bank >= max_bank) {
+        bank = (uint16_t)(max_bank - 1u);
+    }
+    vga_svga_bank = (uint32_t)bank;
+}
+
+uint16_t vga_svga_get_bank(void)
+{
+    return (uint16_t)vga_svga_bank;
 }
 
 void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6) {
@@ -199,6 +262,10 @@ static inline void vga_update_gc_cache(void) {
 }
 
 int vga_memory_address_visible(const uint32_t address) {
+    if (vga_svga_mode_active()) {
+        return address >= 0xA0000u && address < 0xB0000u;
+    }
+
     switch ((vga.graphics_controller[6] >> 2) & 0x03u) {
         case 0:
             return address >= 0xA0000u && address < 0xC0000u;
@@ -213,6 +280,10 @@ int vga_memory_address_visible(const uint32_t address) {
 }
 
 uint32_t vga_memory_address_offset(const uint32_t address) {
+    if (vga_svga_mode_active()) {
+        return address & 0xFFFFu;
+    }
+
     switch ((vga.graphics_controller[6] >> 2) & 0x03u) {
         case 2:
             return (address - 0xB0000u) & 0x7FFFu;
@@ -223,11 +294,28 @@ uint32_t vga_memory_address_offset(const uint32_t address) {
     }
 }
 
+static inline uint32_t vga_svga_vram_offset(uint32_t address)
+{
+    return (vga_svga_bank << 16) + (address & 0xFFFFu);
+}
+
+static inline int vga_svga_vram_contains(uint32_t offset, uint32_t bytes)
+{
+    return bytes != 0u && offset < SVGA_VRAM_SIZE &&
+           bytes <= SVGA_VRAM_SIZE - offset;
+}
+
 // ---------------------- Read path ----------------------
 
 // Read a byte from VGA memory (emulates CPU byte read from VGA window).
 // Performs latch update on read.
 uint8_t __not_in_flash() vga_mem_read(const uint32_t address) {
+    if (vga_svga_mode_active()) {
+        uint32_t offset = vga_svga_vram_offset(address);
+        return vga_svga_vram_contains(offset, 1u) ?
+               SVGA_VRAM[offset] : 0xFFu;
+    }
+
     vga_latch32 = VIDEORAM[address & 0xFFFF];
 
     if (videomode == 0x13 && !vga_planar_mode) {
@@ -250,6 +338,21 @@ uint8_t __not_in_flash() vga_mem_read(const uint32_t address) {
 }
 
 uint16_t __not_in_flash() vga_mem_read16(uint32_t address) {
+    if (vga_svga_mode_active()) {
+        uint32_t offset = vga_svga_vram_offset(address);
+        uint16_t value = 0xFFFFu;
+
+        if (vga_svga_vram_contains(offset, 1u)) {
+            value = SVGA_VRAM[offset];
+            if (vga_svga_vram_contains(offset + 1u, 1u)) {
+                value |= (uint16_t)SVGA_VRAM[offset + 1u] << 8;
+            } else {
+                value |= 0xFF00u;
+            }
+        }
+        return value;
+    }
+
     address &= 0xFFFF;
 
     if (videomode == 0x13 && !vga_planar_mode) {
@@ -386,6 +489,17 @@ void vga_mem_write_loop(uint32_t address, const uint8_t cpu_data) {
 #endif
 // Core write implementation (CPU writes a byte to VGA memory)
 void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_data) {
+    if (vga_svga_mode_active()) {
+        uint32_t offset = vga_svga_vram_offset(address);
+
+        if (vga_svga_vram_contains(offset, 1u) &&
+            SVGA_VRAM[offset] != cpu_data) {
+            SVGA_VRAM[offset] = cpu_data;
+            r36sx_pico286_video_mark_dirty();
+        }
+        return;
+    }
+
     uint32_t new_data;
 
     const uint32_t map_mask32 = vga.map_mask32;
@@ -453,6 +567,27 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
 
 // 16-bit fast path: write two consecutive addresses (address, address+1) with one setup
 void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu_data_x2) {
+    if (vga_svga_mode_active()) {
+        uint32_t offset = vga_svga_vram_offset(address);
+        uint8_t lo = (uint8_t)(cpu_data_x2 & 0xFFu);
+        uint8_t hi = (uint8_t)(cpu_data_x2 >> 8);
+        int changed = 0;
+
+        if (vga_svga_vram_contains(offset, 1u) && SVGA_VRAM[offset] != lo) {
+            SVGA_VRAM[offset] = lo;
+            changed = 1;
+        }
+        if (vga_svga_vram_contains(offset + 1u, 1u) &&
+            SVGA_VRAM[offset + 1u] != hi) {
+            SVGA_VRAM[offset + 1u] = hi;
+            changed = 1;
+        }
+        if (changed) {
+            r36sx_pico286_video_mark_dirty();
+        }
+        return;
+    }
+
     const uint32_t map_mask32 = vga.map_mask32;
     const uint32_t enable_set_reset32 = vga.enable_set_reset32;
     const uint32_t set_reset32 = vga.set_reset32;
@@ -567,6 +702,7 @@ void vga_init(void) {
     dac_state = 0;
     dac_mask = 0xFF;
     misc_output_register = 0x63;
+    vga_svga_disable();
     for (uint8_t i = 0; i < 0x10; i++) {
         attribute_controller[i] = i;
     }

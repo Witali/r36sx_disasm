@@ -9,6 +9,7 @@
 #include "swap.h"
 #endif
 uint32_t __attribute__((aligned (4)))  VIDEORAM[VIDEORAM_SIZE] = {0};
+uint8_t __attribute__((aligned (4))) SVGA_VRAM[SVGA_VRAM_SIZE] = {0};
 uint8_t PICO286_PSRAM_ATTR RAM[RAM_SIZE] = {0};
 uint8_t PICO286_PSRAM_ATTR UMB[UMB_END - UMB_START] = {0};
 uint8_t PICO286_PSRAM_ATTR HMA[HMA_END - HMA_START] = {0};
@@ -74,7 +75,9 @@ static inline int r36sx_external_bios_read32(uint32_t address,
 
 static inline int videoram_uses_vga_path(void)
 {
-    return ega_vga_enabled && videomode >= 0x0D && videomode <= 0x13;
+    return ega_vga_enabled &&
+           ((videomode >= 0x0D && videomode <= 0x13) ||
+            vga_svga_mode_active());
 }
 
 static inline void videoram_write8_raw(const uint32_t address, const uint8_t value)

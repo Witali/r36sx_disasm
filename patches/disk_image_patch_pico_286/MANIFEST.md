@@ -32,6 +32,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 VBE 800x600 SVGA modes
+
+The current `pico_286` binary supports minimal banked VBE modes `103h`
+(800x600x8 packed pixel) and `114h` (800x600x16 RGB565 direct color).
+`INT 10h AX=4F00h/4F01h/4F02h/4F03h/4F05h` are implemented for those modes.
+The 64 KB banked VGA window is mapped at `A000:0000`; linear framebuffer mode
+requests are rejected.  The renderer downscales 800x600 into the native
+640x480 output.
+
+pico_286 size: 1425620 bytes
+pico_286 SHA256: B34BDB7284498B790937B1D8C6526CE743F04833E2392AE422BE9C40239BE50B
+
 ## 2026-05-31 elapsed-time audio packets
 
 The current `pico_286` binary sizes audio packets from real elapsed time.

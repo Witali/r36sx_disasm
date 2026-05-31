@@ -177,6 +177,11 @@ packets are sized from the actual elapsed time since the previous audio send,
 up to the 100 ms source buffer capacity.  Block boundaries are smoothed with a
 short de-click ramp.
 
+Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
+(800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`, and
+the 800x600 image is downsampled to the native 640x480 screen.  Linear
+framebuffer requests are rejected.
+
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the
 application exits.

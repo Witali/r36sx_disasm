@@ -190,6 +190,10 @@ up to the 100 ms source buffer capacity.
 leaves less than the full display height for the emulated screen.  The default
 `nearest` keeps hard pixel edges.  `bilinear` blends neighboring source rows
 for smoother scaled text/graphics.
+Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
+(800x600x16 RGB565) are rendered through a 960 KB SVGA framebuffer and
+downsampled to 640x480.  The banked VGA window is `A000:0000`; linear
+framebuffer requests are rejected.
 
 The `[audio]` switches mute emulated playback devices without disabling their
 I/O ports.  The built-in PC speaker/beeper always remains active.

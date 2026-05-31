@@ -20,7 +20,8 @@ integration pieces:
   controls whether the on-screen keyboard resizes the DOS image (`normal`) or
   covers it without scaling (`overlay`).  In overlay mode, the keyboard panel
   is cached in its own RGB565 buffer and refreshed only when the visible
-  keyboard state changes.
+  keyboard state changes.  Minimal banked VBE modes `103h` (800x600x8) and
+  `114h` (800x600x16 RGB565) are downsampled into the native 640x480 output.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.  The sound path queues completed blocks with per-packet
@@ -309,6 +310,10 @@ buffer capacity.
 such as the on-screen keyboard, leaves less than the full display height for
 the emulated screen.  `nearest` keeps hard pixel edges and is the default.
 `bilinear` blends neighboring source rows for smoother scaled text/graphics.
+The VBE 800x600 modes are rendered through a separate 960 KB SVGA framebuffer
+and downsampled to 640x480.  Only banked access through `A000:0000` is
+implemented; linear framebuffer mode requests are rejected so DOS software can
+fall back to banked VBE.
 
 The `[audio]` switches mute emulated playback devices without disabling their
 I/O ports.  The built-in PC speaker/beeper always remains active.
