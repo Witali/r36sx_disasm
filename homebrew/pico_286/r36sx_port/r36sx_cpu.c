@@ -58,6 +58,12 @@ bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
 
+#if DEBUG
+#define R36SX_PM_DIAG_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_PM_DIAG_LOG(...) ((void)0)
+#endif
+
 static const uint8_t __not_in_flash("cpu.regt") byteregtable[8] = {
     regal, regcl, regdl, regbl, regah, regch, regdh, regbh
 };
@@ -276,6 +282,101 @@ static inline void r36sx_cpu_add_ip(int32_t delta)
     r36sx_cpu_set_ip(ip32 + (uint32_t)delta);
 }
 
+#if DEBUG
+static uint8_t r36sx_pm_diag_first_fault_logged;
+static uint32_t r36sx_pm_diag_int31_logs;
+static uint32_t r36sx_pm_diag_int67_logs;
+
+static void r36sx_pm_diag_log_state(const char *event)
+{
+    r36sx_pico286_debug_log(
+        "[PM] %s cs:eip=%04X:%08lX ss:sp=%04X:%04X esp=%08lX "
+        "cr0=%08lX cr2=%08lX cr3=%08lX gdtr=%08lX:%04X "
+        "idtr=%08lX:%04X ldtr=%04X tr=%04X flags=%04X",
+        event,
+        CPU_CS, (unsigned long)CPU_IP,
+        CPU_SS, CPU_SP, (unsigned long)CPU_ESP,
+        (unsigned long)r36sx_cr0,
+        (unsigned long)r36sx_cr2,
+        (unsigned long)r36sx_cr3,
+        (unsigned long)r36sx_gdtr_base, r36sx_gdtr_limit,
+        (unsigned long)r36sx_idtr_base, r36sx_idtr_limit,
+        r36sx_ldtr_selector, r36sx_tr_selector,
+        (uint16_t)(2u | x86_flags.value));
+}
+
+static void r36sx_pm_diag_log_first_fault(const char *reason,
+                                          uint32_t fault_ip)
+{
+    if (!r36sx_cpu_protected_enabled() || r36sx_pm_diag_first_fault_logged) {
+        return;
+    }
+    r36sx_pm_diag_first_fault_logged = 1;
+    r36sx_pico286_debug_log(
+        "[PM] first fault reason=%s cs:eip=%04X:%08lX "
+        "bytes=%02X %02X %02X %02X %02X %02X %02X %02X",
+        reason, CPU_CS, (unsigned long)fault_ip,
+        getmem8(CPU_CS, fault_ip),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 1u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 2u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 3u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 4u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 5u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 6u)),
+        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 7u)));
+    r36sx_pm_diag_log_state("first fault state");
+}
+
+static void r36sx_pm_diag_log_interrupt(uint8_t intnum)
+{
+    if (intnum == 0x2Fu && (CPU_AX == 0x1686u || CPU_AX == 0x1687u)) {
+        r36sx_pico286_debug_log(
+            "[PM] DPMI probe INT 2Fh AX=%04X protected=%u "
+            "cs:eip=%04X:%08lX",
+            CPU_AX, r36sx_cpu_protected_enabled(),
+            CPU_CS, (unsigned long)CPU_IP);
+        return;
+    }
+
+    if (intnum == 0x31u) {
+        if (r36sx_pm_diag_int31_logs < 32u) {
+            r36sx_pico286_debug_log(
+                "[PM] DPMI service INT 31h AX=%04X BX=%04X CX=%04X "
+                "DX=%04X protected=%u cs:eip=%04X:%08lX",
+                CPU_AX, CPU_BX, CPU_CX, CPU_DX,
+                r36sx_cpu_protected_enabled(),
+                CPU_CS, (unsigned long)CPU_IP);
+            r36sx_pm_diag_int31_logs++;
+        }
+        return;
+    }
+
+    if (intnum == 0x67u && (CPU_AX & 0xFF00u) == 0xDE00u) {
+        if (r36sx_pm_diag_int67_logs < 32u) {
+            r36sx_pico286_debug_log(
+                "[PM] VCPI probe/service INT 67h AX=%04X BX=%04X CX=%04X "
+                "DX=%04X protected=%u cs:eip=%04X:%08lX",
+                CPU_AX, CPU_BX, CPU_CX, CPU_DX,
+                r36sx_cpu_protected_enabled(),
+                CPU_CS, (unsigned long)CPU_IP);
+            r36sx_pm_diag_int67_logs++;
+        }
+    }
+}
+#else
+static inline void r36sx_pm_diag_log_first_fault(const char *reason,
+                                                 uint32_t fault_ip)
+{
+    (void)reason;
+    (void)fault_ip;
+}
+
+static inline void r36sx_pm_diag_log_interrupt(uint8_t intnum)
+{
+    (void)intnum;
+}
+#endif
+
 void r36sx_cpu_step_ip(uint32_t delta)
 {
     r36sx_cpu_set_ip(ip32 + delta);
@@ -311,6 +412,7 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
             table_name, selector, (unsigned long)table_base,
             (unsigned long)table_limit);
 #endif
+        r36sx_pm_diag_log_first_fault("descriptor table limit", CPU_IP);
         return 0;
     }
 
@@ -393,6 +495,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
                 "[CPU] protected mode null selector rejected seg=%u selector=%04x",
                 segid, selector);
 #endif
+            r36sx_pm_diag_log_first_fault("null CS/SS selector load", CPU_IP);
             return 0;
         }
         r36sx_cpu_clear_segment_cache(segid, selector);
@@ -408,6 +511,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
             "[CPU] protected mode failed to load segment seg=%u selector=%04x access=%02x flags=%02x",
             segid, selector, cache.access, cache.flags);
 #endif
+        r36sx_pm_diag_log_first_fault("segment load failed", CPU_IP);
         return 0;
     }
 
@@ -484,11 +588,20 @@ static void r36sx_cpu_set_cr0(uint32_t value)
 {
     uint8_t old_pe = r36sx_cpu_protected_enabled();
 #if R36SX_ENABLE_PROTECTED_MODE
+    uint32_t old_cr0 = r36sx_cr0;
     r36sx_cr0 = value | R36SX_CR0_ET;
 #else
+    uint32_t old_cr0 = r36sx_cr0;
     r36sx_cr0 = (value & ~R36SX_CR0_PE) | R36SX_CR0_ET;
 #endif
     uint8_t new_pe = r36sx_cpu_protected_enabled();
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] CR0 write old=%08lX requested=%08lX new=%08lX pe=%u->%u "
+        "cs:eip=%04X:%08lX",
+        (unsigned long)old_cr0, (unsigned long)value,
+        (unsigned long)r36sx_cr0, old_pe, new_pe,
+        CPU_CS, (unsigned long)CPU_IP);
 
     if (old_pe != new_pe) {
 #if DEBUG && !PICO_ON_DEVICE
@@ -513,6 +626,9 @@ static inline uint32_t r36sx_cpu_read_cr0(void)
 
 static void r36sx_cpu_lmsw(uint16_t value)
 {
+    R36SX_PM_DIAG_LOG(
+        "[PM] LMSW value=%04X old_cr0=%08lX cs:eip=%04X:%08lX",
+        value, (unsigned long)r36sx_cr0, CPU_CS, (unsigned long)CPU_IP);
     uint32_t low = value & 0x000fu;
     if (r36sx_cr0 & R36SX_CR0_PE) {
         low |= R36SX_CR0_PE;
@@ -2084,6 +2200,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
             "[CPU] protected interrupt IDT limit fault int=%02x idtr=%08lx:%04x",
             intnum, (unsigned long)r36sx_idtr_base, r36sx_idtr_limit);
 #endif
+        r36sx_pm_diag_log_first_fault("protected interrupt IDT limit", CPU_IP);
         return 0;
     }
 
@@ -2101,6 +2218,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
             "[CPU] protected interrupt unsupported gate int=%02x access=%02x",
             intnum, access);
 #endif
+        r36sx_pm_diag_log_first_fault("protected interrupt gate unsupported",
+                                      CPU_IP);
         return 0;
     }
 
@@ -2117,6 +2236,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
             "[CPU] protected interrupt invalid target CS int=%02x selector=%04x access=%02x",
             intnum, selector, target_cs.access);
 #endif
+        r36sx_pm_diag_log_first_fault("protected interrupt target CS invalid",
+                                      CPU_IP);
         return 0;
     }
 
@@ -2140,6 +2261,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
 }
 
 void intcall86(uint8_t intnum) {
+    r36sx_pm_diag_log_interrupt(intnum);
+
     if (r36sx_cpu_protected_enabled() &&
         r36sx_cpu_protected_interrupt(intnum)) {
         return;
@@ -2520,6 +2643,7 @@ void intcall86(uint8_t intnum) {
 
 static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
 {
+    r36sx_pm_diag_log_first_fault("invalid opcode", fault_ip);
 #if DEBUG
     r36sx_pico286_debug_log(
         "[CPU] INT6 invalid opcode at %04X:%08lX bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
@@ -3960,16 +4084,28 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                 case 1: /* STR Ew */
                     writerm16(rm, r36sx_tr_selector);
                     return;
-                case 2: /* LLDT Ew */
-                    if (!r36sx_cpu_load_ldtr(readrm16(rm))) {
+                case 2: { /* LLDT Ew */
+                    uint16_t selector = readrm16(rm);
+                    R36SX_PM_DIAG_LOG(
+                        "[PM] LLDT selector=%04X cs:eip=%04X:%08lX",
+                        selector, CPU_CS, (unsigned long)CPU_IP);
+                    if (!r36sx_cpu_load_ldtr(selector)) {
+                        r36sx_pm_diag_log_first_fault("LLDT failed", fault_ip);
                         r36sx_cpu_invalid_opcode(fault_ip);
                     }
                     return;
-                case 3: /* LTR Ew */
-                    if (!r36sx_cpu_load_tr(readrm16(rm))) {
+                }
+                case 3: { /* LTR Ew */
+                    uint16_t selector = readrm16(rm);
+                    R36SX_PM_DIAG_LOG(
+                        "[PM] LTR selector=%04X cs:eip=%04X:%08lX",
+                        selector, CPU_CS, (unsigned long)CPU_IP);
+                    if (!r36sx_cpu_load_tr(selector)) {
+                        r36sx_pm_diag_log_first_fault("LTR failed", fault_ip);
                         r36sx_cpu_invalid_opcode(fault_ip);
                     }
                     return;
+                }
                 case 4: /* VERR Ew */
                 case 5: { /* VERW Ew */
                     r36sx_segment_cache_t cache;
@@ -4021,6 +4157,12 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     r36sx_cpu_load_descriptor_table(
                         ea, &r36sx_gdtr_limit, &r36sx_gdtr_base,
                         operandSizeOverride ? 0xffffffffu : 0x00ffffffu);
+                    R36SX_PM_DIAG_LOG(
+                        "[PM] LGDT ea=%08lX gdtr=%08lX:%04X op32=%u "
+                        "cs:eip=%04X:%08lX",
+                        (unsigned long)ea,
+                        (unsigned long)r36sx_gdtr_base, r36sx_gdtr_limit,
+                        operandSizeOverride, CPU_CS, (unsigned long)CPU_IP);
                     return;
                 case 3: /* LIDT Ms */
                     if (mode == 3) {
@@ -4031,6 +4173,12 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     r36sx_cpu_load_descriptor_table(
                         ea, &r36sx_idtr_limit, &r36sx_idtr_base,
                         operandSizeOverride ? 0xffffffffu : 0x00ffffffu);
+                    R36SX_PM_DIAG_LOG(
+                        "[PM] LIDT ea=%08lX idtr=%08lX:%04X op32=%u "
+                        "cs:eip=%04X:%08lX",
+                        (unsigned long)ea,
+                        (unsigned long)r36sx_idtr_base, r36sx_idtr_limit,
+                        operandSizeOverride, CPU_CS, (unsigned long)CPU_IP);
                     return;
                 case 4: /* SMSW Ew */
                     writerm16(rm, (uint16_t)r36sx_cr0);
@@ -4269,6 +4417,11 @@ void reset86() {
     r36sx_idtr_limit = 0x03ffu;
     r36sx_ldtr_selector = 0;
     r36sx_tr_selector = 0;
+#if DEBUG
+    r36sx_pm_diag_first_fault_logged = 0;
+    r36sx_pm_diag_int31_logs = 0;
+    r36sx_pm_diag_int67_logs = 0;
+#endif
     r36sx_cpu_real_cache_all_segments();
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));

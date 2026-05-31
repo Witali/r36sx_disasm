@@ -1890,6 +1890,38 @@ Result:
   - `disk_image/MIPS_NATIVE/pico_286/pico_286`
   - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 
+## 2026-05-31 protected-mode diagnostics
+
+Implemented the first protected-mode TODO item: debug builds now log the main
+startup probes used by 386 DOS extenders.  With `DEBUG=1`, the CPU core logs:
+
+- DPMI detection probes through `INT 2Fh AX=1686h/1687h`.
+- The first 32 `INT 31h` DPMI service calls.
+- The first 32 VCPI-style `INT 67h AX=DE00h..DEFFh` calls.
+- `LMSW`, `MOV CR0`, `LGDT`, `LIDT`, `LLDT`, and `LTR`.
+- The first protected-mode fault/unsupported opcode, including bytes at
+  `CS:EIP`, CR0/CR2/CR3, GDTR/IDTR, LDTR/TR, stack registers, and flags.
+
+This is diagnostic-only: it does not add DPMI, VCPI, paging, privilege checks,
+or missing protected-mode semantics yet.
+
+Build command:
+
+```powershell
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --debug-log --opt-level O3 --strip --out homebrew/pico_286/pico_286.debug
+```
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.debug
+```
+
+Result:
+
+- `pico_286.debug` built successfully.
+- Defender scan: found no threats.
+
 ## 2026-05-31 protected-mode descriptor checks
 
 Reviewed Intel 80386 protected-mode descriptor behavior and DOSBox-X CPU

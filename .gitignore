@@ -32,6 +32,7 @@ tools/*
 homebrew/*/obj/
 homebrew/*/obj-gcc/
 homebrew/pico_286/pico_286.gcc*
+homebrew/pico_286/pico_286.debug
 __pycache__/
 *.py[cod]
 .pytest_cache/

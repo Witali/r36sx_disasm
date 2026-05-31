@@ -1,5 +1,53 @@
 # TODO
 
+## Pico-286 Protected Mode
+
+- [x] Add diagnostic logging for protected-mode startup paths before deeper
+  changes.  Log `INT 2Fh AX=1687h`, `INT 31h`, `INT 67h` VCPI probes,
+  `LGDT`/`LIDT`, `LLDT`/`LTR`, `MOV CR0`/`LMSW`, and the first protected-mode
+  fault or unsupported opcode.  This should distinguish "DPMI host missing"
+  from "raw 386 protected-mode switch failed".
+- [ ] Implement enough DPMI detection for DOS extenders.  `INT 2Fh AX=1687h`
+  should report a DPMI entry point when a host is enabled, including 32-bit
+  support, processor type, DPMI version, private data size, and the real-mode
+  entry address used to enter protected mode.
+- [ ] Add a minimal DPMI `INT 31h` host.  First target services should include LDT
+  descriptor allocation/free, selector increment, segment-to-descriptor,
+  get/set descriptor base, limit, access rights, code-alias descriptor, get/set
+  descriptor, DOS memory allocation/free, get/set real-mode vectors,
+  get/set protected-mode vectors, simulate real-mode interrupt, call real-mode
+  procedure, and protected-mode termination through `INT 21h AH=4Ch`.
+- [ ] Decide whether to emulate VCPI.  Some 386 DOS extenders probe `INT 67h`
+  VCPI services when DPMI is absent; if Doom/DOS4GW does not need it, logging a
+  clean unsupported response may be enough initially.
+- [ ] Complete protected-mode privilege semantics.  Track CPL and enforce selector
+  RPL/DPL rules for segment loads, stack loads, gates, `CLI`/`STI`, I/O
+  privilege level, and protected `IRET`.
+- [ ] Implement proper protected-mode exceptions.  Generate and deliver `#GP`,
+  `#SS`, `#NP`, `#TS`, `#PF`, `#UD`, and double fault with the correct error
+  codes instead of using invalid-opcode fallbacks for most failures.
+- [ ] Add descriptor limit checks to memory accesses.  Current hot-path memory
+  macros add segment base plus offset; protected-mode data/code/stack accesses
+  still need limit/type checks, including expand-down stack/data semantics.
+- [ ] Add `LAR`, `LSL`, and `ARPL`.  DPMI clients use `LAR` and `LSL` to inspect
+  descriptor access rights and limits, and 286/386 protected-mode tests cover
+  `ARPL`.
+- [ ] Add call gates, task gates, and full TSS/task switching.  `LTR` currently
+  validates a TSS descriptor, but hardware task switches, busy bits, task gates,
+  nested task returns, and TSS stack switching are still missing.
+- [ ] Implement protected 32-bit far control transfers completely.  Far
+  `CALL`/`JMP`/`RET`/`IRET` need descriptor privilege checks, conforming-code
+  behavior, ring transitions, stack switching, and correct error handling.
+- [ ] Implement paging when `CR0.PG` is set.  `CR3` is stored, but page-directory
+  and page-table translation, user/supervisor and write-protect checks, `CR2`,
+  and page-fault delivery are not implemented yet.
+- [ ] Consider v86 mode only after protected mode and DPMI are stable.  It is not
+  the first Doom blocker, but a fuller DPMI host may eventually need v86-style
+  interrupt reflection behavior.
+- [ ] Build a repeatable DOS test disk for protected mode.  Include `test386`,
+  small hand-written DPMI probes, and at least one DOS/4GW or DOS/32A sample
+  that logs which API/fault fails first.
+
 ## Pico-286 Performance Optimizations
 
 - Use the new Pico-286 profiling log before deeper rewrites.  Enable
