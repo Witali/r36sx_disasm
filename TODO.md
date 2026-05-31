@@ -46,7 +46,7 @@
 - [ ] Add descriptor limit checks to memory accesses.  Current hot-path memory
   macros add segment base plus offset; protected-mode data/code/stack accesses
   still need limit/type checks, including expand-down stack/data semantics.
-- [ ] Add `LAR`, `LSL`, and `ARPL`.  DPMI clients use `LAR` and `LSL` to inspect
+- [x] Add `LAR`, `LSL`, and `ARPL`.  DPMI clients use `LAR` and `LSL` to inspect
   descriptor access rights and limits, and 286/386 protected-mode tests cover
   `ARPL`.
 - [ ] Add call gates, task gates, and full TSS/task switching.  `LTR` currently

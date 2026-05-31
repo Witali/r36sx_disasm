@@ -37,6 +37,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 protected-mode selector instructions
+
+The patch binary now includes the 286/386 selector-validation opcodes used by
+protected-mode software and DPMI clients: `ARPL Ew,Gw` (`63 /r`), `LAR Gv,Ew`
+(`0F 02 /r`), and `LSL Gv,Ew` (`0F 03 /r`).  Failed `LAR`/`LSL` probes clear
+ZF and leave the destination unchanged; `ARPL` is invalid in real mode and in
+the configured 8086 CPU model.  `VERR`/`VERW` share the same visibility check.
+
+```text
+pico_286 size: 436284 bytes
+pico_286 SHA256: FEF529EA1CBD1DEFD09332FB1E02B53FFE3E61040EF1E03B1DC195E5B61E6109
+Defender scan: found no threats
+```
+
 ## 2026-05-31 protected-mode paging and exception groundwork
 
 The patch binary now includes the next protected-mode CPU layer: protected

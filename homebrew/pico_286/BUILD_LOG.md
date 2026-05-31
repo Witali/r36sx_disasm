@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-05-31 protected-mode selector instructions
+
+Added the missing 286/386 selector-validation instructions used by protected
+mode software and DPMI clients:
+
+- `ARPL Ew,Gw` (`63 /r`) adjusts the destination selector RPL in protected
+  mode and updates ZF; it is rejected as invalid opcode in real mode and in
+  the configured 8086 CPU model.
+- `LAR Gv,Ew` (`0F 02 /r`) validates selector visibility/type and loads the
+  descriptor access-rights mask when allowed; on failure it clears ZF and
+  leaves the destination register unchanged.
+- `LSL Gv,Ew` (`0F 03 /r`) validates selector visibility/type and loads the
+  decoded segment limit when allowed; on failure it clears ZF and leaves the
+  destination register unchanged.
+
+`VERR`/`VERW` now use the same CPL/RPL/DPL visibility check so descriptor
+probing is consistent across the selector-validation family.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+Result:
+
+- `pico_286` size: `436284` bytes
+- `pico_286` SHA256:
+  `FEF529EA1CBD1DEFD09332FB1E02B53FFE3E61040EF1E03B1DC195E5B61E6109`
+
+Verification: rebuilt only the normal WSL/GCC binary, copied it to
+`disk_image` and the Pico-286 patch, and scanned all three `pico_286` copies
+with `tools/scan-download.ps1`; Defender found no threats.  DSP side builds
+remain paused and were not rebuilt.
+
 ## 2026-05-31 protected-mode paging and exception groundwork
 
 Added the next protected-mode CPU layer against the Intel 80386 protected-mode

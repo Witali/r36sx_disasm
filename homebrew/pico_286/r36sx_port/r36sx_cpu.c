@@ -104,7 +104,10 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK 0x0fu
 #define R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE 0x01u
 #define R36SX_DESCRIPTOR_TYPE_LDT 0x02u
+#define R36SX_DESCRIPTOR_TYPE_TSS16_BUSY 0x03u
+#define R36SX_DESCRIPTOR_TYPE_TASK_GATE 0x05u
 #define R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE 0x09u
+#define R36SX_DESCRIPTOR_TYPE_TSS32_BUSY 0x0bu
 #define R36SX_EXCEPTION_INVALID_TSS 10u
 #define R36SX_EXCEPTION_NOT_PRESENT 11u
 #define R36SX_EXCEPTION_STACK 12u
@@ -485,7 +488,8 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
     uint32_t table_base,
     uint32_t table_limit,
     r36sx_segment_cache_t *cache,
-    const char *table_name)
+    const char *table_name,
+    uint8_t require_present)
 {
     if ((selector & 0xfffcu) == 0) {
         cache->selector = selector;
@@ -527,7 +531,7 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
     cache->access = (uint8_t)((hi >> 8) & 0xffu);
     cache->flags = flags;
     cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
-    return cache->valid;
+    return require_present ? cache->valid : 1u;
 }
 
 static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
@@ -535,7 +539,7 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
 {
     if ((selector & 0xfffcu) == 0) {
         return r36sx_cpu_decode_descriptor_from_table(
-            selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT");
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 1);
     }
 
     if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
@@ -549,11 +553,96 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
         }
         return r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_ldtr_cache.base, r36sx_ldtr_cache.limit, cache,
-            "LDT");
+            "LDT", 1);
     }
 
     return r36sx_cpu_decode_descriptor_from_table(
-        selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT");
+        selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 1);
+}
+
+static uint8_t r36sx_cpu_decode_descriptor_any(uint16_t selector,
+                                               r36sx_segment_cache_t *cache)
+{
+    if ((selector & 0xfffcu) == 0) {
+        return r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 0);
+    }
+
+    if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
+        if (!r36sx_ldtr_cache.valid) {
+            return 0;
+        }
+        return r36sx_cpu_decode_descriptor_from_table(
+            selector, r36sx_ldtr_cache.base, r36sx_ldtr_cache.limit, cache,
+            "LDT", 0);
+    }
+
+    return r36sx_cpu_decode_descriptor_from_table(
+        selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 0);
+}
+
+static uint8_t r36sx_cpu_descriptor_visible_for_validation(
+    uint16_t selector,
+    const r36sx_segment_cache_t *cache)
+{
+    if ((selector & 0xfffcu) == 0) {
+        return 0;
+    }
+    if (r36sx_descriptor_is_conforming_code(cache)) {
+        return 1;
+    }
+    return r36sx_descriptor_dpl(cache) >=
+           r36sx_priv_max(r36sx_cpu_cpl(), r36sx_selector_rpl(selector));
+}
+
+static uint8_t r36sx_cpu_descriptor_type_valid_for_lar(
+    const r36sx_segment_cache_t *cache)
+{
+    if (r36sx_descriptor_is_code_data(cache)) {
+        return 1;
+    }
+
+    switch (r36sx_descriptor_type(cache)) {
+        case R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE:
+        case R36SX_DESCRIPTOR_TYPE_LDT:
+        case R36SX_DESCRIPTOR_TYPE_TSS16_BUSY:
+        case 0x04u: /* 80286 call gate */
+        case R36SX_DESCRIPTOR_TYPE_TASK_GATE:
+        case 0x06u: /* 80286 interrupt gate */
+        case 0x07u: /* 80286 trap gate */
+        case R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE:
+        case R36SX_DESCRIPTOR_TYPE_TSS32_BUSY:
+        case 0x0cu: /* 80386 call gate */
+        case 0x0eu: /* 80386 interrupt gate */
+        case 0x0fu: /* 80386 trap gate */
+            return 1;
+    }
+    return 0;
+}
+
+static uint8_t r36sx_cpu_descriptor_type_valid_for_lsl(
+    const r36sx_segment_cache_t *cache)
+{
+    if (r36sx_descriptor_is_code_data(cache)) {
+        return 1;
+    }
+
+    switch (r36sx_descriptor_type(cache)) {
+        case R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE:
+        case R36SX_DESCRIPTOR_TYPE_LDT:
+        case R36SX_DESCRIPTOR_TYPE_TSS16_BUSY:
+        case R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE:
+        case R36SX_DESCRIPTOR_TYPE_TSS32_BUSY:
+            return 1;
+    }
+    return 0;
+}
+
+static uint32_t r36sx_cpu_descriptor_access_rights(
+    const r36sx_segment_cache_t *cache)
+{
+    return (((uint32_t)cache->access) << 8) |
+           (((uint32_t)(cache->flags & 0x0fu)) << 20);
 }
 
 static uint8_t r36sx_cpu_segment_valid_for_load(
@@ -654,7 +743,7 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
     r36sx_segment_cache_t cache;
     memset(&cache, 0, sizeof(cache));
     if (!r36sx_cpu_decode_descriptor_from_table(
-            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT") ||
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
         r36sx_descriptor_is_code_data(&cache) ||
         r36sx_descriptor_type(&cache) != R36SX_DESCRIPTOR_TYPE_LDT) {
 #if DEBUG && !PICO_ON_DEVICE
@@ -684,7 +773,7 @@ static uint8_t r36sx_cpu_load_tr(uint16_t selector)
     r36sx_segment_cache_t cache;
     memset(&cache, 0, sizeof(cache));
     if (!r36sx_cpu_decode_descriptor_from_table(
-            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT") ||
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
         !r36sx_descriptor_is_tss(&cache)) {
 #if DEBUG && !PICO_ON_DEVICE
         r36sx_pico286_debug_log(
@@ -4515,7 +4604,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
     StepIP(1);
 
     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
-        op2 != 0x00 && op2 != 0x01 && op2 != 0x06) {
+        op2 != 0x00 && op2 != 0x01 && op2 != 0x02 &&
+        op2 != 0x03 && op2 != 0x06) {
         r36sx_cpu_invalid_opcode(fault_ip);
         return;
     }
@@ -4585,6 +4675,8 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     r36sx_segment_cache_t cache;
                     uint16_t selector = readrm16(rm);
                     uint8_t ok = r36sx_cpu_decode_descriptor(selector, &cache) &&
+                                 r36sx_cpu_descriptor_visible_for_validation(
+                                     selector, &cache) &&
                                  (cache.access & R36SX_DESCRIPTOR_CODE_DATA);
                     if (ok && reg == 4) {
                         ok = ((cache.access & R36SX_DESCRIPTOR_EXECUTABLE) == 0) ||
@@ -4662,6 +4754,42 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     return;
             }
             r36sx_cpu_invalid_opcode(fault_ip);
+            return;
+        }
+
+        case 0x02: /* LAR Gv,Ew */
+        case 0x03: { /* LSL Gv,Ew */
+            if (!r36sx_cpu_protected_enabled() ||
+                r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            modregrm();
+            r36sx_segment_cache_t cache;
+            uint16_t selector = readrm16(rm);
+            uint8_t ok = r36sx_cpu_decode_descriptor_any(selector, &cache) &&
+                         r36sx_cpu_descriptor_visible_for_validation(
+                             selector, &cache);
+            if (ok && op2 == 0x02u) {
+                ok = r36sx_cpu_descriptor_type_valid_for_lar(&cache);
+            } else if (ok) {
+                ok = r36sx_cpu_descriptor_type_valid_for_lsl(&cache);
+            }
+
+            if (!ok) {
+                zf = 0;
+                return;
+            }
+
+            uint32_t value = op2 == 0x02u
+                ? r36sx_cpu_descriptor_access_rights(&cache)
+                : cache.limit;
+            if (operandSizeOverride) {
+                putreg32(reg, value);
+            } else {
+                putreg16(reg, (uint16_t)value);
+            }
+            zf = 1;
             return;
         }
 
@@ -5100,7 +5228,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             &&r36sx_opcode_48, &&r36sx_opcode_49, &&r36sx_opcode_4A, &&r36sx_opcode_4B, &&r36sx_opcode_4C, &&r36sx_opcode_4D, &&r36sx_opcode_4E, &&r36sx_opcode_4F,
             &&r36sx_opcode_50, &&r36sx_opcode_51, &&r36sx_opcode_52, &&r36sx_opcode_53, &&r36sx_opcode_54, &&r36sx_opcode_55, &&r36sx_opcode_56, &&r36sx_opcode_57,
             &&r36sx_opcode_58, &&r36sx_opcode_59, &&r36sx_opcode_5A, &&r36sx_opcode_5B, &&r36sx_opcode_5C, &&r36sx_opcode_5D, &&r36sx_opcode_5E, &&r36sx_opcode_5F,
-            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_66, &&r36sx_opcode_67,
+            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_63, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_66, &&r36sx_opcode_67,
             &&r36sx_opcode_68, &&r36sx_opcode_69, &&r36sx_opcode_6A, &&r36sx_opcode_6B, &&r36sx_opcode_6C, &&r36sx_opcode_6D, &&r36sx_opcode_6E, &&r36sx_opcode_6F,
             &&r36sx_opcode_70, &&r36sx_opcode_71, &&r36sx_opcode_72, &&r36sx_opcode_73, &&r36sx_opcode_74, &&r36sx_opcode_75, &&r36sx_opcode_76, &&r36sx_opcode_77,
             &&r36sx_opcode_78, &&r36sx_opcode_79, &&r36sx_opcode_7A, &&r36sx_opcode_7B, &&r36sx_opcode_7C, &&r36sx_opcode_7D, &&r36sx_opcode_7E, &&r36sx_opcode_7F,
@@ -6349,6 +6477,29 @@ void __not_in_flash() exec86(uint32_t execloops) {
                         signext32(getmem16(ea >> 4, ea & 15)
                         )) {
                         intcall86(5); //bounds check exception
+                    }
+                }
+                break;
+            case 0x63:
+#if R36SX_CPU_COMPUTED_GOTO
+            r36sx_opcode_63: ;
+#endif
+                /* 63 ARPL Ew,Gw (80286+ protected mode) */
+                if (!r36sx_cpu_protected_enabled() ||
+                    r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
+                modregrm();
+                {
+                    uint16_t dest = readrm16(rm);
+                    uint8_t src_rpl = getreg16(reg) & 3u;
+                    if ((dest & 3u) < src_rpl) {
+                        dest = (uint16_t)((dest & 0xfffcu) | src_rpl);
+                        writerm16(rm, dest);
+                        zf = 1;
+                    } else {
+                        zf = 0;
                     }
                 }
                 break;
