@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-31 keep overlay cost out of adaptive exec86 quantum
+
+Changed adaptive quantum timing to measure only the `exec86()` call.
+
+- The previous implementation measured the whole active host frame, including
+  `mfb_update()` overlay composition.
+- Opening the on-screen keyboard made the frame more expensive and caused the
+  adaptive controller to reduce emulated x86 instructions even though the CPU
+  core itself was not slower.
+- The controller now compares `exec86()` elapsed time against the configured
+  `target_fps` frame budget.  Keyboard, menu, screenshot, and other overlay
+  rendering costs no longer reduce the CPU quantum.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1332176` bytes
+- `pico_286` SHA256:
+  `A4B62760CA64B10D8171D39A91EB64F8E97735731FD87B5CA8D2319941D89194`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 adaptive exec86 quantum and target FPS
 
 Added adaptive main-loop CPU quantum control for the R36SX native build.

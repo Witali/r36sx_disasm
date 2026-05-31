@@ -32,6 +32,15 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 adaptive quantum ignores overlay rendering cost
+
+The current `pico_286` binary adjusts the `exec86()` quantum from the elapsed
+time of the `exec86()` call itself.  Rendering overlays, including the
+on-screen keyboard, no longer cause the x86 instruction quantum to drop.
+
+pico_286 size: 1332176 bytes
+pico_286 SHA256: A4B62760CA64B10D8171D39A91EB64F8E97735731FD87B5CA8D2319941D89194
+
 ## 2026-05-31 adaptive exec86 quantum and target FPS
 
 The current `pico_286` binary adds adaptive main-loop CPU quantum control.

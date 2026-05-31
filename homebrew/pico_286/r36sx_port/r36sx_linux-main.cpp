@@ -90,7 +90,7 @@ static uint32_t r36sx_pico286_frame_exec_loops(uint32_t loops_per_ms,
 
 static uint32_t r36sx_pico286_adjust_exec_loops(uint32_t current_loops,
                                                 uint32_t max_loops,
-                                                uint64_t active_us,
+                                                uint64_t exec_us,
                                                 uint32_t target_us)
 {
     if (max_loops < R36SX_EXEC86_MIN_LOOPS) {
@@ -106,8 +106,8 @@ static uint32_t r36sx_pico286_adjust_exec_loops(uint32_t current_loops,
         return current_loops;
     }
 
-    if (active_us > target_us) {
-        uint64_t scaled = (uint64_t)current_loops * target_us / active_us;
+    if (exec_us > target_us) {
+        uint64_t scaled = (uint64_t)current_loops * target_us / exec_us;
         uint32_t target_loops;
         uint32_t step;
         uint32_t stepped;
@@ -1251,7 +1251,7 @@ int main() {
     uint64_t next_main_loop_us =
         r36sx_pico286_now_us() + main_loop_frame_us;
     while (running) {
-        uint64_t main_loop_start_us = r36sx_pico286_now_us();
+        uint64_t exec_elapsed_us;
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
@@ -1265,7 +1265,9 @@ int main() {
                                     main_loop_count, videomode);
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
+        uint64_t exec_start_us = r36sx_pico286_now_us();
         exec86(cpu_exec_loops_per_frame);
+        exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
                                 cpu_exec_loops_per_frame);
         R36SX_PROFILE_BEGIN(profile_disk_flush);
@@ -1299,21 +1301,20 @@ int main() {
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_3);
         {
-            uint64_t active_us = r36sx_pico286_now_us() - main_loop_start_us;
             uint32_t adjusted_exec_loops =
                 r36sx_pico286_adjust_exec_loops(
                     cpu_exec_loops_per_frame,
                     cpu_exec_loops_per_frame_max,
-                    active_us,
+                    exec_elapsed_us,
                     main_loop_frame_us);
 
             if (adjusted_exec_loops != cpu_exec_loops_per_frame) {
                 if (main_loop_count <= 8u || (main_loop_count % 300u) == 0u) {
                     r36sx_pico286_debug_log(
-                        "main: adjust exec_loops %u->%u active_us=%llu target_us=%u",
+                        "main: adjust exec_loops %u->%u exec_us=%llu target_us=%u",
                         cpu_exec_loops_per_frame,
                         adjusted_exec_loops,
-                        (unsigned long long)active_us,
+                        (unsigned long long)exec_elapsed_us,
                         main_loop_frame_us);
                 }
                 cpu_exec_loops_per_frame = adjusted_exec_loops;

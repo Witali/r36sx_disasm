@@ -154,9 +154,11 @@ gates, and full 32-bit `EIP` execution are still incomplete, so keep
 `cpu_mode=real` for normal DOS use.
 
 `target_fps` controls the main-loop frame budget.  The default `60` targets
-about 16.7 ms per frame.  Pico-286 automatically reduces the `exec86()` quantum
-when a frame overruns, grows it back when there is spare time, caps it at the
-`cpu_mhz` limit, and never drops below 100 instructions per frame.
+about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
+`exec86()` quantum when emulation itself overruns, grows it back when there is
+spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 100
+instructions per frame.  Rendering overlays such as the on-screen keyboard do
+not reduce the CPU quantum.
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the

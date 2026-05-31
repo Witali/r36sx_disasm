@@ -263,11 +263,12 @@ millisecond-like host loop).  This is a practical speed knob for this port,
 not a cycle-exact 80286 timing model.
 
 `target_fps` controls the main-loop frame budget.  At the default `60`, the
-active part of each host frame targets about 16.7 ms.  Pico-286 now adapts the
-`exec86()` instruction quantum every frame: when the active frame is too slow,
-it estimates the quantum that would fit the target budget and steps down by at
-most one quarter; when there is spare time, it grows back by one quarter up to
-the `cpu_mhz` limit.  The quantum never drops below 100 instructions.
+`exec86()` pass targets about 16.7 ms.  Pico-286 adapts the `exec86()`
+instruction quantum every frame: when emulation itself is too slow, it
+estimates the quantum that would fit the target budget and steps down by at
+most one quarter; when there is spare CPU time, it grows back by one quarter up
+to the `cpu_mhz` limit.  Rendering overlays such as the on-screen keyboard do
+not reduce the CPU quantum.  The quantum never drops below 100 instructions.
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
 maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,
