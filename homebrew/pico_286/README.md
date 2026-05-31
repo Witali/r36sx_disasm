@@ -208,6 +208,15 @@ target_fps=60
 [video]
 scaling_filter=nearest
 
+[audio]
+audio_adlib=1
+audio_sound_blaster=1
+audio_cms=1
+audio_sn76489=1
+audio_mpu401=1
+audio_disney=1
+audio_covox=1
+
 [boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
@@ -280,6 +289,14 @@ not reduce the CPU quantum.  The quantum never drops below 1000 instructions.
 such as the on-screen keyboard, leaves less than the full display height for
 the emulated screen.  `nearest` keeps hard pixel edges and is the default.
 `bilinear` blends neighboring source rows for smoother scaled text/graphics.
+
+The `[audio]` switches mute emulated playback devices without disabling their
+I/O ports.  The built-in PC speaker/beeper always remains active.  Set any
+non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
+(`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
+(`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI
+(`audio_mpu401`), Disney Sound Source (`audio_disney`), or Covox Speech
+Thing (`audio_covox`).
 
 The `[memory]` values are in KB and are runtime limits over the compiled-in
 maximum buffers.  `conventional_kb` is reported through the BIOS Data Area,

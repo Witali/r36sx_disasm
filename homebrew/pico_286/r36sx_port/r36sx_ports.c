@@ -1,6 +1,7 @@
 #pragma GCC optimize("Ofast")
 #include <time.h>
 #include "emulator.h"
+#include "r36sx_disk_config.h"
 #if PICO_ON_DEVICE
 #include <74hc595.h>
 #include <hardware/pwm.h>
@@ -23,6 +24,13 @@ uint8_t cursor_start = 12, cursor_end = 13;
 uint32_t vram_offset = 0x0;
 
 int sound_chips_clock = 0;
+
+static int audio_flags_loaded;
+static int audio_adlib_enabled = 1;
+static int audio_cms_enabled = 1;
+static int audio_sn76489_enabled = 1;
+static int audio_mpu401_enabled = 1;
+static int audio_covox_enabled = 1;
 
 #define R36SX_KEYBOARD_QUEUE_CAPACITY 8u
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
@@ -59,6 +67,24 @@ static void r36sx_test386_ascii_out(uint8_t value) {
 
 static void r36sx_test386_post_out(uint8_t value) {
     r36sx_pico286_debug_log("test386: POST=0x%02x", value);
+}
+
+static void r36sx_audio_ensure_flags(void)
+{
+    if (audio_flags_loaded) {
+        return;
+    }
+
+    audio_adlib_enabled = r36sx_pico286_audio_adlib_enabled();
+    audio_cms_enabled = r36sx_pico286_audio_cms_enabled();
+    audio_sn76489_enabled = r36sx_pico286_audio_sn76489_enabled();
+    audio_mpu401_enabled = r36sx_pico286_audio_mpu401_enabled();
+    audio_covox_enabled = r36sx_pico286_audio_covox_enabled();
+    audio_flags_loaded = 1;
+    r36sx_pico286_debug_log(
+        "audio devices: adlib=%d cms=%d sn76489=%d mpu401=%d covox=%d",
+        audio_adlib_enabled, audio_cms_enabled, audio_sn76489_enabled,
+        audio_mpu401_enabled, audio_covox_enabled);
 }
 
 static INLINE uint64_t r36sx_keyboard_now_us(void) {
@@ -701,23 +727,31 @@ static int16_t r36sx_clamp_i16(int32_t sample)
 }
 
 void get_sound_sample(const int16_t other_sample, int16_t *samples) {
+    r36sx_audio_ensure_flags();
+
 #if HARDWARE_SOUND
-    const int32_t sample = (speaker_sample() + other_sample + covox_sample + midi_sample());
+    const int32_t sample = speaker_sample() + other_sample +
+        (audio_covox_enabled ? covox_sample : 0) +
+        (audio_mpu401_enabled ? midi_sample() : 0);
     pwm_set_gpio_level(PCM_PIN, (uint16_t) ((int32_t) sample + 0x8000L) >> 4);
 #else
     int32_t opl_sample[1] = {0};
     int16_t cms_mix[2] = {0, 0};
     int32_t mixed;
 
-    if (emu8950_opl) {
+    if (audio_adlib_enabled && emu8950_opl) {
         OPL_calc_buffer_linear(emu8950_opl, opl_sample, 1);
     }
 
     mixed = opl_sample[0] + (int32_t)(speaker_sample() + other_sample +
-            covox_sample + sn76489_sample() + midi_sample());
+            (audio_covox_enabled ? covox_sample : 0) +
+            (audio_sn76489_enabled ? sn76489_sample() : 0) +
+            (audio_mpu401_enabled ? midi_sample() : 0));
     cms_mix[0] = r36sx_clamp_i16(mixed);
     cms_mix[1] = cms_mix[0];
-    cms_samples(cms_mix);
+    if (audio_cms_enabled) {
+        cms_samples(cms_mix);
+    }
     samples[0] = cms_mix[0];
     samples[1] = cms_mix[1];
 #endif

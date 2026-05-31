@@ -102,6 +102,15 @@ target_fps=60
 [video]
 scaling_filter=nearest
 
+[audio]
+audio_adlib=1
+audio_sound_blaster=1
+audio_cms=1
+audio_sn76489=1
+audio_mpu401=1
+audio_disney=1
+audio_covox=1
+
 [boot]
 boot_mode=normal
 boot_order=fdd0,hdd0
@@ -167,6 +176,14 @@ not reduce the CPU quantum.
 leaves less than the full display height for the emulated screen.  The default
 `nearest` keeps hard pixel edges.  `bilinear` blends neighboring source rows
 for smoother scaled text/graphics.
+
+The `[audio]` switches mute emulated playback devices without disabling their
+I/O ports.  The built-in PC speaker/beeper always remains active.  Set any
+non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
+(`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
+(`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI
+(`audio_mpu401`), Disney Sound Source (`audio_disney`), or Covox Speech
+Thing (`audio_covox`).
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the

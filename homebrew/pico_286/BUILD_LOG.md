@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-05-31 configurable audio device mix
+
+Added `[audio]` switches to `pico_286.conf` so non-PC-speaker playback
+devices can be muted independently while keeping their emulated I/O ports
+visible to DOS software.
+
+- The built-in PC speaker/beeper remains always enabled.
+- Configurable devices: AdLib/OPL2, Sound Blaster, CMS/GameBlaster,
+  SN76489/Tandy PSG, MPU-401/MIDI, Disney Sound Source, and Covox Speech
+  Thing.
+- Disabled Sound Blaster and Disney Sound Source devices still tick their
+  sample clocks for DMA/FIFO side effects, but contribute silence to the
+  mixer.
+- Other disabled devices are skipped in the mixer so they do not contribute to
+  the final stereo stream.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1363884` bytes
+- `pico_286` SHA256:
+  `558284BB5DBC900280A412071ACE7049069C3AC1BAB8686D0560DE52B0019CFE`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 cached pixel-font stats overlay
 
 Changed the `Fn` + D-pad `Down` statistics overlay to avoid full-frame

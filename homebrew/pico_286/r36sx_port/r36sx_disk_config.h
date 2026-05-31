@@ -129,6 +129,27 @@ uint32_t r36sx_pico286_profiling_log_ms(void);
 // Return non-zero when the on-screen app statistics overlay can be toggled.
 int r36sx_pico286_app_stats_enabled(void);
 
+// Return non-zero when AdLib/OPL2 audio is mixed into the output stream.
+int r36sx_pico286_audio_adlib_enabled(void);
+
+// Return non-zero when Sound Blaster audio is mixed into the output stream.
+int r36sx_pico286_audio_sound_blaster_enabled(void);
+
+// Return non-zero when CMS/GameBlaster audio is mixed into the output stream.
+int r36sx_pico286_audio_cms_enabled(void);
+
+// Return non-zero when Tandy SN76489 PSG audio is mixed into the output stream.
+int r36sx_pico286_audio_sn76489_enabled(void);
+
+// Return non-zero when MPU-401/MIDI audio is mixed into the output stream.
+int r36sx_pico286_audio_mpu401_enabled(void);
+
+// Return non-zero when Disney Sound Source audio is mixed into the stream.
+int r36sx_pico286_audio_disney_enabled(void);
+
+// Return non-zero when Covox Speech Thing audio is mixed into the stream.
+int r36sx_pico286_audio_covox_enabled(void);
+
 // Return conventional DOS memory reported through the BIOS Data Area.
 uint32_t r36sx_pico286_conventional_memory_kb(void);
 

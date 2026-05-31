@@ -71,6 +71,13 @@ static char app_stats_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
 static char screenshot_format_text[8] = "png";
 static char scaling_filter_text[16] = "nearest";
+static char audio_adlib_enabled_text[8] = "1";
+static char audio_sound_blaster_enabled_text[8] = "1";
+static char audio_cms_enabled_text[8] = "1";
+static char audio_sn76489_enabled_text[8] = "1";
+static char audio_mpu401_enabled_text[8] = "1";
+static char audio_disney_enabled_text[8] = "1";
+static char audio_covox_enabled_text[8] = "1";
 static char conventional_memory_kb_text[16] = "640";
 static char upper_memory_kb_text[16] = "176";
 static char extended_memory_kb_text[16] = "64";
@@ -87,6 +94,13 @@ static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int app_stats_enabled = 1;
 static uint32_t target_fps = 60u;
+static int audio_adlib_enabled = 1;
+static int audio_sound_blaster_enabled = 1;
+static int audio_cms_enabled = 1;
+static int audio_sn76489_enabled = 1;
+static int audio_mpu401_enabled = 1;
+static int audio_disney_enabled = 1;
+static int audio_covox_enabled = 1;
 static uint32_t conventional_memory_kb = 640u;
 static uint32_t upper_memory_kb = 176u;
 static uint32_t extended_memory_kb = 64u;
@@ -705,6 +719,115 @@ static int set_app_stats_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_audio_bool_value(const char *key, const char *value,
+                                int line_no, const char *canonical_key,
+                                int *target, char *text, size_t text_size)
+{
+    int enabled;
+
+    if (!parse_bool_value(value, &enabled)) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    *target = enabled;
+    snprintf(text, text_size, "%d", enabled ? 1 : 0);
+    r36sx_pico286_debug_log("diskcfg: %s=%d", canonical_key, enabled);
+    return 1;
+}
+
+static int set_audio_value(const char *key, const char *value, int line_no)
+{
+    if (key_equals(key, "audio_adlib") ||
+        key_equals(key, "audio_opl2") ||
+        key_equals(key, "adlib") ||
+        key_equals(key, "opl2")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_adlib",
+            &audio_adlib_enabled,
+            audio_adlib_enabled_text,
+            sizeof(audio_adlib_enabled_text));
+    }
+
+    if (key_equals(key, "audio_sound_blaster") ||
+        key_equals(key, "audio_soundblaster") ||
+        key_equals(key, "audio_sb") ||
+        key_equals(key, "sound_blaster") ||
+        key_equals(key, "soundblaster") ||
+        key_equals(key, "sb")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_sound_blaster",
+            &audio_sound_blaster_enabled,
+            audio_sound_blaster_enabled_text,
+            sizeof(audio_sound_blaster_enabled_text));
+    }
+
+    if (key_equals(key, "audio_cms") ||
+        key_equals(key, "audio_game_blaster") ||
+        key_equals(key, "audio_gameblaster") ||
+        key_equals(key, "cms") ||
+        key_equals(key, "game_blaster") ||
+        key_equals(key, "gameblaster")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_cms",
+            &audio_cms_enabled,
+            audio_cms_enabled_text,
+            sizeof(audio_cms_enabled_text));
+    }
+
+    if (key_equals(key, "audio_sn76489") ||
+        key_equals(key, "audio_tandy") ||
+        key_equals(key, "audio_tandy_psg") ||
+        key_equals(key, "sn76489") ||
+        key_equals(key, "tandy_sound") ||
+        key_equals(key, "tandy_psg")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_sn76489",
+            &audio_sn76489_enabled,
+            audio_sn76489_enabled_text,
+            sizeof(audio_sn76489_enabled_text));
+    }
+
+    if (key_equals(key, "audio_mpu401") ||
+        key_equals(key, "audio_midi") ||
+        key_equals(key, "mpu401") ||
+        key_equals(key, "midi")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_mpu401",
+            &audio_mpu401_enabled,
+            audio_mpu401_enabled_text,
+            sizeof(audio_mpu401_enabled_text));
+    }
+
+    if (key_equals(key, "audio_disney") ||
+        key_equals(key, "audio_disney_sound_source") ||
+        key_equals(key, "audio_dss") ||
+        key_equals(key, "disney") ||
+        key_equals(key, "disney_sound_source") ||
+        key_equals(key, "dss")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_disney",
+            &audio_disney_enabled,
+            audio_disney_enabled_text,
+            sizeof(audio_disney_enabled_text));
+    }
+
+    if (key_equals(key, "audio_covox") ||
+        key_equals(key, "covox") ||
+        key_equals(key, "speech_thing") ||
+        key_equals(key, "covox_speech_thing")) {
+        return set_audio_bool_value(
+            key, value, line_no, "audio_covox",
+            &audio_covox_enabled,
+            audio_covox_enabled_text,
+            sizeof(audio_covox_enabled_text));
+    }
+
+    return 0;
+}
+
 static int set_timing_value(const char *key, const char *value, int line_no)
 {
     if (key_equals(key, "target_fps") ||
@@ -969,6 +1092,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
+    if (set_audio_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_timing_value(key, value, line_no)) {
         return 1;
     }
@@ -1172,6 +1298,17 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# Supported values: nearest, bilinear.\n");
     fprintf(fp, "[video]\n");
     fprintf(fp, "scaling_filter=%s\n\n", scaling_filter_text);
+
+    fprintf(fp, "# Emulated audio devices mixed into the output stream.\n");
+    fprintf(fp, "# The built-in PC speaker/beeper is always enabled.\n");
+    fprintf(fp, "[audio]\n");
+    fprintf(fp, "audio_adlib=%s\n", audio_adlib_enabled_text);
+    fprintf(fp, "audio_sound_blaster=%s\n", audio_sound_blaster_enabled_text);
+    fprintf(fp, "audio_cms=%s\n", audio_cms_enabled_text);
+    fprintf(fp, "audio_sn76489=%s\n", audio_sn76489_enabled_text);
+    fprintf(fp, "audio_mpu401=%s\n", audio_mpu401_enabled_text);
+    fprintf(fp, "audio_disney=%s\n", audio_disney_enabled_text);
+    fprintf(fp, "audio_covox=%s\n\n", audio_covox_enabled_text);
 
     fprintf(fp, "# Boot behavior and boot-sector probe order.\n");
     fprintf(fp, "[boot]\n");
@@ -1432,6 +1569,55 @@ int r36sx_pico286_app_stats_enabled(void)
     load_disk_config();
 
     return app_stats_enabled;
+}
+
+int r36sx_pico286_audio_adlib_enabled(void)
+{
+    load_disk_config();
+
+    return audio_adlib_enabled;
+}
+
+int r36sx_pico286_audio_sound_blaster_enabled(void)
+{
+    load_disk_config();
+
+    return audio_sound_blaster_enabled;
+}
+
+int r36sx_pico286_audio_cms_enabled(void)
+{
+    load_disk_config();
+
+    return audio_cms_enabled;
+}
+
+int r36sx_pico286_audio_sn76489_enabled(void)
+{
+    load_disk_config();
+
+    return audio_sn76489_enabled;
+}
+
+int r36sx_pico286_audio_mpu401_enabled(void)
+{
+    load_disk_config();
+
+    return audio_mpu401_enabled;
+}
+
+int r36sx_pico286_audio_disney_enabled(void)
+{
+    load_disk_config();
+
+    return audio_disney_enabled;
+}
+
+int r36sx_pico286_audio_covox_enabled(void)
+{
+    load_disk_config();
+
+    return audio_covox_enabled;
 }
 
 uint32_t r36sx_pico286_conventional_memory_kb(void)

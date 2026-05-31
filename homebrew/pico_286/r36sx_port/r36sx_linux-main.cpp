@@ -1082,6 +1082,10 @@ void *ticks_thread(void *arg) {
     const unsigned int max_dss_catchup = 700;
     const unsigned int max_sb_catchup = 2205;
     const unsigned int max_audio_catchup = SOUND_FREQUENCY / 20;
+    const int dss_audio_enabled = r36sx_pico286_audio_disney_enabled();
+    const int sb_audio_enabled = r36sx_pico286_audio_sound_blaster_enabled();
+    r36sx_pico286_debug_log("ticks_thread: audio dss=%d sound_blaster=%d",
+                            dss_audio_enabled, sb_audio_enabled);
 
     unsigned int ticks_loop_count = 0;
     while (running) {
@@ -1120,7 +1124,8 @@ void *ticks_thread(void *arg) {
         for (;
              elapsedTime - last_dss_tick >= dss_period;
              dss_catchup_count++) {
-            last_dss_sample = dss_sample();
+            const int16_t sample = dss_sample();
+            last_dss_sample = dss_audio_enabled ? sample : 0;
             last_dss_tick += dss_period;
             if (dss_catchup_count >= max_dss_catchup) {
                 last_dss_tick = elapsedTime;
@@ -1136,7 +1141,8 @@ void *ticks_thread(void *arg) {
         for (;
              elapsedTime - last_sb_tick >= sb_period;
              sb_catchup_count++) {
-            last_sb_sample = blaster_sample();
+            const int16_t sample = blaster_sample();
+            last_sb_sample = sb_audio_enabled ? sample : 0;
             last_sb_tick += sb_period;
             if (sb_catchup_count >= max_sb_catchup) {
                 last_sb_tick = elapsedTime;

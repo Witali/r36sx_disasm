@@ -32,6 +32,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 configurable audio device mix
+
+The current `pico_286` binary reads `[audio]` switches from `pico_286.conf`.
+The built-in PC speaker/beeper is always enabled; the following non-speaker
+devices can be muted independently while their emulated I/O ports remain
+visible to DOS software:
+
+- `audio_adlib`
+- `audio_sound_blaster`
+- `audio_cms`
+- `audio_sn76489`
+- `audio_mpu401`
+- `audio_disney`
+- `audio_covox`
+
+pico_286 size: 1363884 bytes
+pico_286 SHA256: 558284BB5DBC900280A412071ACE7049069C3AC1BAB8686D0560DE52B0019CFE
+
 ## 2026-05-31 cached pixel-font stats overlay
 
 The current `pico_286` binary draws the `Fn` + D-pad `Down` statistics overlay
