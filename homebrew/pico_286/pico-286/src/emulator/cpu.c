@@ -549,6 +549,8 @@ void intcall86(uint8_t intnum) {
                                 tga_palette_map[color_index] = color_byte;
                             } else {
                                 vga_palette[color_index] = rgb((r * 85), (g * 85), (b * 85));
+                                r36sx_pico286_vga_palette565_set(color_index,
+                                                                 vga_palette[color_index]);
 #if PICO_ON_DEVICE
                                 graphics_set_palette(color_index, vga_palette[color_index]);
 #endif
@@ -564,6 +566,8 @@ void intcall86(uint8_t intnum) {
                                 const uint8_t b = (((color_byte >> 0) & 1) << 1) + (color_byte >> 3 & 1);
 
                                 vga_palette[color_index] = rgb((r * 85), (g * 85), (b * 85));
+                                r36sx_pico286_vga_palette565_set(color_index,
+                                                                 vga_palette[color_index]);
 #if PICO_ON_DEVICE
                                 graphics_set_palette(color_index, vga_palette[color_index]);
 #endif

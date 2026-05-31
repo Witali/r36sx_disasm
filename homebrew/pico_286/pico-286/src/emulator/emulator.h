@@ -185,9 +185,44 @@ uint32_t vga_dac_color(uint8_t red6, uint8_t green6, uint8_t blue6);
 void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue6);
 void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6);
 
+/*
+ * Shadow Palette hooks for the Linux/R36SX renderer.
+ * The RGB888 arrays above remain the emulated hardware state and are used for
+ * DAC readback.  The renderer keeps RGB565 shadow copies in sync so drawing
+ * does not reconvert palettes every frame.
+ */
+#if !PICO_ON_DEVICE
+void r36sx_pico286_vga_palette565_set(uint8_t index, uint32_t color);
+void r36sx_pico286_vga_palette565_set_all(const uint32_t *palette, uint16_t count);
+#else
+static inline void r36sx_pico286_vga_palette565_set(uint8_t index,
+                                                    uint32_t color)
+{
+    (void)index;
+    (void)color;
+}
+
+static inline void r36sx_pico286_vga_palette565_set_all(
+    const uint32_t *palette, uint16_t count)
+{
+    (void)palette;
+    (void)count;
+}
+#endif
+
 // TGA
 extern uint32_t tga_palette[16];
 extern uint8_t tga_palette_map[16];
+#if !PICO_ON_DEVICE
+void r36sx_pico286_tga_palette565_set(uint8_t index, uint32_t color);
+#else
+static inline void r36sx_pico286_tga_palette565_set(uint8_t index,
+                                                    uint32_t color)
+{
+    (void)index;
+    (void)color;
+}
+#endif
 
 extern void tga_portout(uint16_t portnum, uint16_t value);
 

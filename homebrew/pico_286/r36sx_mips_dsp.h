@@ -113,7 +113,28 @@ static inline uint8_t r36sx_mips_rgb565_to_b8(uint16_t color)
     return (uint8_t)((b << 3) | (b >> 2));
 }
 
+static inline uint16_t r36sx_mips_rgb888_to_rgb565(uint32_t color)
+{
+    return (uint16_t)(((color >> 8) & 0xf800u) |
+                      ((color >> 5) & 0x07e0u) |
+                      ((color >> 3) & 0x001fu));
+}
+
 #if R36SX_MIPS_DSP_ENABLED
+static inline uint32_t r36sx_mips_dsp_rgb888_pair_to_rgb565(uint32_t color0,
+                                                            uint32_t color1)
+{
+    uint32_t rg_pair = ((color0 >> 8) & 0x0000ffffu) |
+                       ((color1 << 8) & 0xffff0000u);
+    uint32_t b_pair = (color0 & 0x000000ffu) |
+                      ((color1 & 0x000000ffu) << 16);
+    uint32_t r = rg_pair & 0xf800f800u;
+    uint32_t g = r36sx_mips_dsp_shll_ph_3(rg_pair) & 0x07e007e0u;
+    uint32_t b = r36sx_mips_dsp_shrl_ph_3(b_pair) & 0x001f001fu;
+
+    return r | g | b;
+}
+
 static inline void r36sx_mips_dsp_rgb565_pair_to_rgb24(uint8_t *dst,
                                                        uint32_t packed)
 {
@@ -150,6 +171,35 @@ static inline void r36sx_mips_dsp_rgb565_pair_to_bgr24(uint8_t *dst,
     dst[5] = (uint8_t)(r >> 16);
 }
 #endif
+
+static inline void r36sx_mips_dsp_rgb888_to_rgb565(uint16_t *dst,
+                                                   const uint32_t *src,
+                                                   size_t count)
+{
+    if (!dst || !src || count == 0) {
+        return;
+    }
+
+#if R36SX_MIPS_DSP_ENABLED
+    while (count > 0 && (((uintptr_t)dst) & (uintptr_t)3u) != 0) {
+        *dst++ = r36sx_mips_rgb888_to_rgb565(*src++);
+        count--;
+    }
+
+    while (count >= 2) {
+        *(uint32_t *)dst =
+            r36sx_mips_dsp_rgb888_pair_to_rgb565(src[0], src[1]);
+        dst += 2;
+        src += 2;
+        count -= 2;
+    }
+#endif
+
+    while (count > 0) {
+        *dst++ = r36sx_mips_rgb888_to_rgb565(*src++);
+        count--;
+    }
+}
 
 static inline void r36sx_mips_dsp_rgb565_to_rgb24(uint8_t *dst,
                                                   const uint16_t *src,

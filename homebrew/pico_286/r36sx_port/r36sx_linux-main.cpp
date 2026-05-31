@@ -21,6 +21,12 @@ uint8_t ALIGN(4, DEBUG_VRAM[80 * 10]) = {0};
 int cursor_blink_state = 0;
 uint8_t log_debug = 0;
 
+/*
+ * Shadow Palette:
+ * VGA/TGA/CGA keep their original RGB888 palette arrays for emulated hardware
+ * reads.  The Linux/R36SX renderer consumes these RGB565 shadows, updated when
+ * the original palette changes, so frame rendering does not reconvert colors.
+ */
 static uint16_t cga_palette565[16];
 static uint16_t cga_composite_palette565[3][16];
 static uint16_t tga_palette565[16];
@@ -283,33 +289,43 @@ extern "C" void _putchar(char character) {
     }
 }
 
-static inline uint16_t rgb888_to_rgb565(uint32_t color)
+extern "C" void r36sx_pico286_vga_palette565_set(uint8_t index,
+                                                  uint32_t color)
 {
-    uint32_t r = (color >> 16) & 0xffu;
-    uint32_t g = (color >> 8) & 0xffu;
-    uint32_t b = color & 0xffu;
-    return (uint16_t)(((r & 0xf8u) << 8) | ((g & 0xfcu) << 3) | (b >> 3));
+    vga_palette565[index] = r36sx_mips_rgb888_to_rgb565(color);
 }
 
-static void refresh_palettes565(void)
+extern "C" void r36sx_pico286_vga_palette565_set_all(const uint32_t *palette,
+                                                      uint16_t count)
 {
-    if (!static_palettes565_ready) {
-        for (int i = 0; i < 16; i++) {
-            cga_palette565[i] = rgb888_to_rgb565(cga_palette[i]);
-            for (int p = 0; p < 3; p++) {
-                cga_composite_palette565[p][i] =
-                    rgb888_to_rgb565(cga_composite_palette[p][i]);
-            }
-        }
-        static_palettes565_ready = 1;
+    if (count > 256) {
+        count = 256;
+    }
+    r36sx_mips_dsp_rgb888_to_rgb565(vga_palette565, palette, count);
+}
+
+extern "C" void r36sx_pico286_tga_palette565_set(uint8_t index,
+                                                  uint32_t color)
+{
+    if (index < 16) {
+        tga_palette565[index] = r36sx_mips_rgb888_to_rgb565(color);
+    }
+}
+
+static void init_palettes565_once(void)
+{
+    if (static_palettes565_ready) {
+        return;
     }
 
-    for (int i = 0; i < 16; i++) {
-        tga_palette565[i] = rgb888_to_rgb565(tga_palette[i]);
+    r36sx_mips_dsp_rgb888_to_rgb565(cga_palette565, cga_palette, 16);
+    for (int p = 0; p < 3; p++) {
+        r36sx_mips_dsp_rgb888_to_rgb565(cga_composite_palette565[p],
+                                        cga_composite_palette[p], 16);
     }
-    for (int i = 0; i < 256; i++) {
-        vga_palette565[i] = rgb888_to_rgb565(vga_palette[i]);
-    }
+    r36sx_mips_dsp_rgb888_to_rgb565(tga_palette565, tga_palette, 16);
+    r36sx_mips_dsp_rgb888_to_rgb565(vga_palette565, vga_palette, 256);
+    static_palettes565_ready = 1;
 }
 
 static inline void fill_black_row(uint16_t *pixels)
@@ -321,7 +337,8 @@ static inline void fill_black_row(uint16_t *pixels)
 
 static inline uint16_t mda_text_color(uint8_t attr, int is_foreground)
 {
-    uint16_t fg = (attr & 0x08) ? 0xffff : rgb888_to_rgb565(0xc4c4c4u);
+    uint16_t fg = (attr & 0x08) ? 0xffff :
+                  r36sx_mips_rgb888_to_rgb565(0xc4c4c4u);
     uint16_t bg = 0x0000;
 
     if ((attr & 0x70) != 0) {
@@ -449,7 +466,7 @@ static inline uint32_t cga_graphics_row_offset(int screen_y)
 
 static inline void renderer() {
     static int v = -1;
-    refresh_palettes565();
+    init_palettes565_once();
 
     if (v != videomode) {
         printf("videomode %x %x\n", videomode, v);

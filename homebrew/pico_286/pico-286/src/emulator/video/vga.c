@@ -153,6 +153,7 @@ void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue
     uint32_t color = vga_dac_color(red6, green6, blue6);
     if (vga_palette[index] != color) {
         vga_palette[index] = color;
+        r36sx_pico286_vga_palette565_set(index, color);
         r36sx_pico286_video_mark_dirty();
     }
 #if PICO_ON_DEVICE
@@ -364,6 +365,8 @@ static const vga_standard_regs_t vga_mode_320x200_256 = {
 static void vga_reset_dac_palette(void)
 {
     memcpy(vga_palette, vga_default_palette, sizeof(vga_palette));
+    /* Keep the renderer shadow copy in sync; DAC reads still use RGB888. */
+    r36sx_pico286_vga_palette565_set_all(vga_palette, 256);
 #if PICO_ON_DEVICE
     for (uint16_t i = 0; i < 256; i++) {
         graphics_set_palette((uint8_t)i, vga_palette[i]);
@@ -917,7 +920,9 @@ void vga_portout(uint16_t portnum, uint16_t value) {
                     const uint8_t g = (((value >> 1) & 1) << 1) + ((value >> 4) & 1);
                     const uint8_t b = (((value >> 0) & 1) << 1) + ((value >> 3) & 1);
 
-                    vga_palette[vga_register] = rgb(r * 85, g * 85, b * 85);
+                    uint32_t color = rgb(r * 85, g * 85, b * 85);
+                    vga_palette[vga_register] = color;
+                    r36sx_pico286_vga_palette565_set(vga_register, color);
 #if PICO_ON_DEVICE
                     graphics_set_palette(vga_register, vga_palette[vga_register]);
 #endif

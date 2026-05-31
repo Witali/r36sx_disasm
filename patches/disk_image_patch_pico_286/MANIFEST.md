@@ -36,6 +36,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 Shadow Palette binary update
+
+The patch binaries now keep RGB565 shadow palettes in sync with the emulated
+RGB888 VGA/TGA palette arrays.  The RGB888 arrays remain the source for
+software/DAC readback, while the renderer reads the preconverted RGB565 shadow
+copies and no longer reconverts VGA/TGA palettes every frame.
+
+```text
+pico_286 size: 422640 bytes
+pico_286 SHA256: 9C718E6C34219EB52FA7D938E28CB6335F7557CBE67F075F015689F9C8C334F5
+pico_286.dsp size: 414880 bytes
+pico_286.dsp SHA256: ABB8068DCF5FCC2BB830E8B73E0C418530E089A5AAA4F99E9AF702524F2D8F1A
+Defender scan: found no threats
+```
+
 ## 2026-05-31 test386 VGA breadcrumbs
 
 The patch includes a rebuilt `test386.bin` BIOS payload and matching

@@ -1777,6 +1777,8 @@ void intcall86(uint8_t intnum) {
                                 uint32_t color = rgb((r * 85), (g * 85), (b * 85));
                                 if (vga_palette[color_index] != color) {
                                     vga_palette[color_index] = color;
+                                    r36sx_pico286_vga_palette565_set(color_index,
+                                                                     color);
                                     r36sx_pico286_video_mark_dirty();
                                 }
 #if PICO_ON_DEVICE
@@ -1796,6 +1798,8 @@ void intcall86(uint8_t intnum) {
                                 uint32_t color = rgb((r * 85), (g * 85), (b * 85));
                                 if (vga_palette[color_index] != color) {
                                     vga_palette[color_index] = color;
+                                    r36sx_pico286_vga_palette565_set(color_index,
+                                                                     color);
                                     r36sx_pico286_video_mark_dirty();
                                 }
 #if PICO_ON_DEVICE

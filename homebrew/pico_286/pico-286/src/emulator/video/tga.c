@@ -63,6 +63,8 @@ void tga_portout(uint16_t portnum, uint16_t value) {
 
 
             tga_palette[palette] = rgb(r * 85, g * 85, b * 85);
+            /* The renderer uses the RGB565 shadow; RGB888 stays readable. */
+            r36sx_pico286_tga_palette565_set(palette, tga_palette[palette]);
 #if PICO_ON_DEVICE
             graphics_set_palette(palette, tga_palette[palette]);
 #endif

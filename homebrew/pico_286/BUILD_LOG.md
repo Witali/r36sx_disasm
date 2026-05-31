@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-05-31 Shadow Palette RGB565 updates
+
+Added explicit Shadow Palette comments and moved dynamic palette conversion out
+of the per-frame renderer path.  The emulated VGA/TGA RGB888 palette arrays
+remain the authoritative hardware state for DAC reads.  The R36SX renderer now
+keeps RGB565 shadow arrays in sync when the original palette is reset or
+updated, so normal frame rendering uses preconverted colors.
+
+The DSP build also routes batch `RGB888 -> RGB565` conversion through the
+existing MIPS DSP helper for two-color palette updates where that path is used.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: `422640` bytes
+- `pico_286` SHA256:
+  `9C718E6C34219EB52FA7D938E28CB6335F7557CBE67F075F015689F9C8C334F5`
+- `pico_286.dsp` size: `414880` bytes
+- `pico_286.dsp` SHA256:
+  `ABB8068DCF5FCC2BB830E8B73E0C418530E089A5AAA4F99E9AF702524F2D8F1A`
+
+Verification:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Microsoft Defender reported no threats for all rebuilt binaries and patch
+copies.  WSL `objdump` confirmed that `pico_286.dsp` still contains MIPS DSP
+instructions including `addu.qb`, `addu.ph`, `shrl.ph`, and `shll.ph`.
+
 ## 2026-05-31 DSP RGB565 screenshot conversion helpers
 
 Extended `r36sx_mips_dsp.h` with batch `RGB565 -> RGB24/BGR24` helpers used by
@@ -9,10 +51,10 @@ MIPS DSP halfword shifts (`shrl.ph` / `shll.ph`).  The assembly probe now also
 emits a byte-lane `addu.qb` instruction so the DSP binary clearly shows both
 packed byte and packed halfword DSP coverage in `objdump`.
 
-This path is deliberately limited to screenshot export because the active
-frame renderer already runs in RGB565.  The per-palette `RGB888 -> RGB565`
-conversion remains scalar: it is small, lookup-oriented, and does not gain
-enough from DSP byte operations to justify more packing code.
+This path was deliberately limited to screenshot export because the active
+frame renderer already runs in RGB565.  A later Shadow Palette update moved
+dynamic palette conversion out of the frame renderer and added a DSP-assisted
+batch `RGB888 -> RGB565` helper for palette initialization/update paths.
 
 Rebuild commands:
 
