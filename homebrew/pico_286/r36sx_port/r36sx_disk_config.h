@@ -150,6 +150,9 @@ int r36sx_pico286_audio_disney_enabled(void);
 // Return non-zero when Covox Speech Thing audio is mixed into the stream.
 int r36sx_pico286_audio_covox_enabled(void);
 
+// Return the configured internal audio mixer rate, normally 44100 or 22050 Hz.
+uint32_t r36sx_pico286_audio_sample_rate(uint32_t fallback_rate);
+
 // Return conventional DOS memory reported through the BIOS Data Area.
 uint32_t r36sx_pico286_conventional_memory_kb(void);
 

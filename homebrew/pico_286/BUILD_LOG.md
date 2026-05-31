@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-05-31 configurable audio sample rate
+
+Added runtime audio mixer rate selection to `pico_286.conf`.
+
+- `[audio] audio_sample_rate` accepts `44100` and `22050`.
+- The R36SX native default remains `44100` Hz stereo.
+- `22050` Hz halves the internal Pico-286 mixer rate and duplicates samples
+  back to 44.1 kHz before calling the stock `driver.so` output path.
+- `SOUND_FREQUENCY` is now runtime-configurable for the R36SX build, so PC
+  speaker, SN76489, MIDI, OPL, and the main audio tick rate use the selected
+  value.
+- `driver.so` is still initialized at 44.1 kHz through the existing
+  `driver_audio.h` helper.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1368624` bytes
+- `pico_286` SHA256:
+  `29F5235670480F9B648267CC5A4FCA29AEB03D72C0864E05EE5F0CCB89759D91`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 configurable audio device mix
 
 Added `[audio]` switches to `pico_286.conf` so non-PC-speaker playback

@@ -43,7 +43,10 @@ extern bool PSRAM_AVAILABLE;
 #define butter_psram_size 1
 #define PSRAM_AVAILABLE 1
 #endif
-#ifdef HARDWARE_SOUND
+#if defined(R36SX_RUNTIME_SOUND_FREQUENCY) && R36SX_RUNTIME_SOUND_FREQUENCY
+extern uint32_t r36sx_sound_frequency;
+#define SOUND_FREQUENCY (r36sx_sound_frequency)
+#elif defined(HARDWARE_SOUND)
 #define SOUND_FREQUENCY (44100)
 #else
     #if PICO_RP2040

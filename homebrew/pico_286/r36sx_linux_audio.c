@@ -27,6 +27,8 @@ struct r36sx_pico286_audio {
     struct r36sx_driver_audio_state driver;
     int16_t *mix_buffer;
     size_t mix_buffer_frames;
+    uint32_t source_rate;
+    uint32_t resample_ratio;
     uint32_t shutter_pos;
     uint32_t shutter_len;
     uint32_t shutter_noise;
@@ -111,17 +113,22 @@ int linux_audio_init(int sample_rate, int channels, int buffer_size)
     r36sx_pico286_debug_log("audio: init rate=%d channels=%d buffer=%d",
                             sample_rate, channels, buffer_size);
     linux_audio_close();
-    if (sample_rate != (int)R36SX_DRIVER_AUDIO_RATE ||
-        channels != (int)R36SX_DRIVER_AUDIO_CHANNELS) {
+    if ((sample_rate != 22050 &&
+         sample_rate != (int)R36SX_DRIVER_AUDIO_RATE) ||
+        channels != (int)R36SX_DRIVER_AUDIO_CHANNELS ||
+        (R36SX_DRIVER_AUDIO_RATE % (uint32_t)sample_rate) != 0u) {
         r36sx_pico286_debug_log("audio: unsupported format rate=%d channels=%d",
                                 sample_rate, channels);
         return -1;
     }
 
     memset(&g_audio, 0, sizeof(g_audio));
+    g_audio.source_rate = (uint32_t)sample_rate;
+    g_audio.resample_ratio = R36SX_DRIVER_AUDIO_RATE / g_audio.source_rate;
     r36sx_driver_audio_init(&g_audio.driver);
     if (buffer_size > 0) {
-        g_audio.mix_buffer_frames = (size_t)buffer_size;
+        g_audio.mix_buffer_frames =
+            (size_t)buffer_size * (size_t)g_audio.resample_ratio;
         g_audio.mix_buffer =
             (int16_t *)calloc(g_audio.mix_buffer_frames *
                                   R36SX_DRIVER_AUDIO_CHANNELS,
@@ -149,7 +156,9 @@ int linux_audio_init(int sample_rate, int channels, int buffer_size)
         return -1;
     }
     g_audio.initialized = 1;
-    r36sx_pico286_debug_log("audio: initialized");
+    r36sx_pico286_debug_log("audio: initialized source_rate=%u driver_rate=%u ratio=%u",
+                            g_audio.source_rate, R36SX_DRIVER_AUDIO_RATE,
+                            g_audio.resample_ratio);
     return 0;
 }
 
@@ -163,6 +172,7 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
 {
     int rc;
     const int16_t *play_buffer = buffer;
+    size_t play_frames = samples;
     static int logged_failures;
 
     if (!g_audio.initialized || !g_audio.driver.playframe || !buffer) {
@@ -176,13 +186,36 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
     }
 
     pthread_mutex_lock(&g_audio_lock);
-    if (g_audio.shutter_pos < g_audio.shutter_len &&
-        g_audio.mix_buffer && samples <= g_audio.mix_buffer_frames) {
-        size_t stereo_samples = samples * R36SX_DRIVER_AUDIO_CHANNELS;
+    if (g_audio.resample_ratio > 1u &&
+        g_audio.mix_buffer &&
+        samples * g_audio.resample_ratio <= g_audio.mix_buffer_frames) {
+        size_t out_frame = 0;
 
-        memcpy(g_audio.mix_buffer, buffer,
-               stereo_samples * sizeof(g_audio.mix_buffer[0]));
         for (size_t frame = 0; frame < samples; frame++) {
+            const int16_t left = buffer[frame * R36SX_DRIVER_AUDIO_CHANNELS];
+            const int16_t right =
+                buffer[frame * R36SX_DRIVER_AUDIO_CHANNELS + 1u];
+            for (uint32_t dup = 0; dup < g_audio.resample_ratio; dup++) {
+                size_t idx = out_frame++ * R36SX_DRIVER_AUDIO_CHANNELS;
+
+                g_audio.mix_buffer[idx] = left;
+                g_audio.mix_buffer[idx + 1u] = right;
+            }
+        }
+        play_buffer = g_audio.mix_buffer;
+        play_frames = samples * g_audio.resample_ratio;
+    }
+
+    if (g_audio.shutter_pos < g_audio.shutter_len &&
+        g_audio.mix_buffer && play_frames <= g_audio.mix_buffer_frames) {
+        size_t stereo_samples = play_frames * R36SX_DRIVER_AUDIO_CHANNELS;
+
+        if (play_buffer != g_audio.mix_buffer) {
+            memcpy(g_audio.mix_buffer, play_buffer,
+                   stereo_samples * sizeof(g_audio.mix_buffer[0]));
+            play_buffer = g_audio.mix_buffer;
+        }
+        for (size_t frame = 0; frame < play_frames; frame++) {
             int16_t click = r36sx_pico286_audio_next_shutter_sample();
             size_t idx = frame * R36SX_DRIVER_AUDIO_CHANNELS;
 
@@ -197,10 +230,10 @@ int linux_audio_write(const int16_t *buffer, size_t samples)
     }
     pthread_mutex_unlock(&g_audio_lock);
 
-    rc = g_audio.driver.playframe(play_buffer, (int)samples);
+    rc = g_audio.driver.playframe(play_buffer, (int)play_frames);
     if (rc != 0 && logged_failures < 8) {
         r36sx_pico286_debug_log("audio: playframe rc=%d samples=%lu",
-                                rc, (unsigned long)samples);
+                                rc, (unsigned long)play_frames);
         logged_failures++;
     }
     return rc;

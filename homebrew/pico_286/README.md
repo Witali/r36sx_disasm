@@ -209,6 +209,7 @@ target_fps=60
 scaling_filter=nearest
 
 [audio]
+audio_sample_rate=44100
 audio_adlib=1
 audio_sound_blaster=1
 audio_cms=1
@@ -291,8 +292,10 @@ the emulated screen.  `nearest` keeps hard pixel edges and is the default.
 `bilinear` blends neighboring source rows for smoother scaled text/graphics.
 
 The `[audio]` switches mute emulated playback devices without disabling their
-I/O ports.  The built-in PC speaker/beeper always remains active.  Set any
-non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
+I/O ports.  The built-in PC speaker/beeper always remains active.
+`audio_sample_rate` can be `44100` or `22050`; `22050` halves internal mixer
+work and is duplicated back to 44.1 kHz for the stock `driver.so` output path.
+Set any non-PC-speaker device to `0` to keep it silent: AdLib/OPL2
 (`audio_adlib`), Sound Blaster (`audio_sound_blaster`), CMS/GameBlaster
 (`audio_cms`), Tandy SN76489 PSG (`audio_sn76489`), MPU-401/MIDI
 (`audio_mpu401`), Disney Sound Source (`audio_disney`), or Covox Speech

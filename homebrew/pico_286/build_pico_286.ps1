@@ -82,6 +82,7 @@ $CommonArgs = @(
     "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
     "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
     "-DCPU_386_EXTENDED_OPS=1",
+    "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",
     "-DUSE_EMU8950_OPL",
     "-DEMU8950_SLOT_RENDER=1",
     "-DEMU8950_ASM=0",

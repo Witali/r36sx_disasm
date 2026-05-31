@@ -24,6 +24,7 @@ uint8_t cursor_start = 12, cursor_end = 13;
 uint32_t vram_offset = 0x0;
 
 int sound_chips_clock = 0;
+uint32_t r36sx_sound_frequency = 44100u;
 
 static int audio_flags_loaded;
 static int audio_adlib_enabled = 1;

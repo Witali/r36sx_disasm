@@ -33,16 +33,18 @@ extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
 
-#define AUDIO_BUFFER_LENGTH ((SOUND_FREQUENCY / 10))
+#define R36SX_AUDIO_DRIVER_RATE 44100u
+#define R36SX_AUDIO_BUFFER_MAX_FRAMES (R36SX_AUDIO_DRIVER_RATE / 10u)
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
 #define R36SX_HLT_SLEEP_US 1000u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
 #define R36SX_EXEC86_MIN_LOOPS 1000u
-static int16_t audio_buffer[AUDIO_BUFFER_LENGTH * 2] = {};
+static int16_t audio_buffer[R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
 static int sample_index = 0;
 static volatile int soft_reset_requested = 0;
 static volatile int soft_reset_in_progress = 0;
 static uint32_t g_main_loop_frame_us = 1000000u / R36SX_MAIN_LOOP_DEFAULT_FPS;
+static uint32_t g_audio_buffer_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
 
 static inline uint32_t vga_vram_cell(uint32_t index) {
     return VIDEORAM[index & 0xFFFFu];
@@ -1044,7 +1046,8 @@ void *sound_thread(void *arg) {
                                     sound_loop_count, sample_index);
         }
         R36SX_PROFILE_BEGIN(profile_audio_write);
-        int audio_write_rc = linux_audio_write(audio_buffer, AUDIO_BUFFER_LENGTH);
+        int audio_write_rc = linux_audio_write(audio_buffer,
+                                               g_audio_buffer_frames);
         R36SX_PROFILE_END(R36SX_PROFILE_AUDIO_WRITE, profile_audio_write);
         if (audio_write_rc != 0) {
             // Audio write failed, but continue running
@@ -1075,13 +1078,15 @@ void *ticks_thread(void *arg) {
     const uint64_t hostfreq = 1000000000; // nanoseconds
     const uint64_t dss_period = hostfreq / 7000;
     const uint64_t sb_period = hostfreq / 22050;
-    const uint64_t sound_period = hostfreq / SOUND_FREQUENCY;
+    const uint32_t audio_sample_rate = r36sx_sound_frequency ?
+        r36sx_sound_frequency : R36SX_AUDIO_DRIVER_RATE;
+    const uint64_t sound_period = hostfreq / audio_sample_rate;
     const uint64_t blink_period = 333333333;
     const uint64_t frame_period = (uint64_t)g_main_loop_frame_us * 1000ull;
     const unsigned int max_system_catchup = 8;
     const unsigned int max_dss_catchup = 700;
     const unsigned int max_sb_catchup = 2205;
-    const unsigned int max_audio_catchup = SOUND_FREQUENCY / 20;
+    const unsigned int max_audio_catchup = audio_sample_rate / 20;
     const int dss_audio_enabled = r36sx_pico286_audio_disney_enabled();
     const int sb_audio_enabled = r36sx_pico286_audio_sound_blaster_enabled();
     r36sx_pico286_debug_log("ticks_thread: audio dss=%d sound_blaster=%d",
@@ -1161,7 +1166,7 @@ void *ticks_thread(void *arg) {
             get_sound_sample(last_dss_sample + last_sb_sample, &audio_buffer[sample_index]);
             sample_index += 2;
 
-            if (sample_index >= AUDIO_BUFFER_LENGTH * 2) {
+            if (sample_index >= (int)(g_audio_buffer_frames * 2u)) {
                 pthread_mutex_lock(&update_mutex);
                 update_ready = 1;
                 pthread_cond_signal(&update_cond);
@@ -1231,8 +1236,21 @@ int main() {
     memset(SCREEN, 0, sizeof(SCREEN));
     r36sx_mfb_mark_frame_ready();
     r36sx_pico286_debug_log("main: screen cleared");
-    emu8950_opl = OPL_new(3579552, SOUND_FREQUENCY);
-    r36sx_pico286_debug_log("main: OPL_new=%p", emu8950_opl);
+    r36sx_sound_frequency =
+        r36sx_pico286_audio_sample_rate(R36SX_AUDIO_DRIVER_RATE);
+    if (r36sx_sound_frequency != 22050u &&
+        r36sx_sound_frequency != R36SX_AUDIO_DRIVER_RATE) {
+        r36sx_sound_frequency = R36SX_AUDIO_DRIVER_RATE;
+    }
+    g_audio_buffer_frames = r36sx_sound_frequency / 10u;
+    if (g_audio_buffer_frames > R36SX_AUDIO_BUFFER_MAX_FRAMES) {
+        g_audio_buffer_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
+    }
+    r36sx_pico286_debug_log("main: audio sample_rate=%u buffer_frames=%u",
+                            r36sx_sound_frequency, g_audio_buffer_frames);
+    emu8950_opl = OPL_new(3579552, r36sx_sound_frequency);
+    r36sx_pico286_debug_log("main: OPL_new=%p rate=%u", emu8950_opl,
+                            r36sx_sound_frequency);
     blaster_reset();
     r36sx_pico286_debug_log("main: blaster_reset done");
     sn76489_reset();
@@ -1241,7 +1259,8 @@ int main() {
     r36sx_pico286_debug_log("main: reset86 done");
 
     // Initialize audio system
-    if (linux_audio_init(SOUND_FREQUENCY, 2, AUDIO_BUFFER_LENGTH) == 0) {
+    if (linux_audio_init((int)r36sx_sound_frequency, 2,
+                         (int)g_audio_buffer_frames) == 0) {
         if (linux_audio_start() == 0) {
             printf("Audio: %s backend started\n", linux_audio_get_backend_name());
         } else {

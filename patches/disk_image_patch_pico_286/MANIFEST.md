@@ -32,6 +32,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 configurable audio sample rate
+
+The current `pico_286` binary reads `[audio] audio_sample_rate` from
+`pico_286.conf`.
+
+- `44100` is the default R36SX native mixer rate.
+- `22050` halves the internal Pico-286 mixer work and is duplicated back to
+  44.1 kHz before sending samples to the stock `driver.so` output path.
+
+pico_286 size: 1368624 bytes
+pico_286 SHA256: 29F5235670480F9B648267CC5A4FCA29AEB03D72C0864E05EE5F0CCB89759D91
+
 ## 2026-05-31 configurable audio device mix
 
 The current `pico_286` binary reads `[audio]` switches from `pico_286.conf`.

@@ -78,6 +78,7 @@ static char audio_sn76489_enabled_text[8] = "1";
 static char audio_mpu401_enabled_text[8] = "1";
 static char audio_disney_enabled_text[8] = "1";
 static char audio_covox_enabled_text[8] = "1";
+static char audio_sample_rate_text[16] = "44100";
 static char conventional_memory_kb_text[16] = "640";
 static char upper_memory_kb_text[16] = "176";
 static char extended_memory_kb_text[16] = "64";
@@ -101,6 +102,7 @@ static int audio_sn76489_enabled = 1;
 static int audio_mpu401_enabled = 1;
 static int audio_disney_enabled = 1;
 static int audio_covox_enabled = 1;
+static uint32_t audio_sample_rate = 44100u;
 static uint32_t conventional_memory_kb = 640u;
 static uint32_t upper_memory_kb = 176u;
 static uint32_t extended_memory_kb = 64u;
@@ -740,6 +742,38 @@ static int set_audio_bool_value(const char *key, const char *value,
 
 static int set_audio_value(const char *key, const char *value, int line_no)
 {
+    if (key_equals(key, "audio_sample_rate") ||
+        key_equals(key, "audio_rate") ||
+        key_equals(key, "sample_rate") ||
+        key_equals(key, "sound_frequency") ||
+        key_equals(key, "sound_rate")) {
+        if (key_equals(value, "44100") ||
+            key_equals(value, "44") ||
+            key_equals(value, "44k") ||
+            key_equals(value, "44khz")) {
+            audio_sample_rate = 44100u;
+            snprintf(audio_sample_rate_text, sizeof(audio_sample_rate_text),
+                     "44100");
+            r36sx_pico286_debug_log("diskcfg: audio_sample_rate=44100");
+            return 1;
+        }
+        if (key_equals(value, "22050") ||
+            key_equals(value, "22") ||
+            key_equals(value, "22k") ||
+            key_equals(value, "22khz")) {
+            audio_sample_rate = 22050u;
+            snprintf(audio_sample_rate_text, sizeof(audio_sample_rate_text),
+                     "22050");
+            r36sx_pico286_debug_log("diskcfg: audio_sample_rate=22050");
+            return 1;
+        }
+
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
     if (key_equals(key, "audio_adlib") ||
         key_equals(key, "audio_opl2") ||
         key_equals(key, "adlib") ||
@@ -1301,7 +1335,9 @@ int r36sx_pico286_save_config(void)
 
     fprintf(fp, "# Emulated audio devices mixed into the output stream.\n");
     fprintf(fp, "# The built-in PC speaker/beeper is always enabled.\n");
+    fprintf(fp, "# audio_sample_rate supports 44100 and 22050 Hz.\n");
     fprintf(fp, "[audio]\n");
+    fprintf(fp, "audio_sample_rate=%s\n", audio_sample_rate_text);
     fprintf(fp, "audio_adlib=%s\n", audio_adlib_enabled_text);
     fprintf(fp, "audio_sound_blaster=%s\n", audio_sound_blaster_enabled_text);
     fprintf(fp, "audio_cms=%s\n", audio_cms_enabled_text);
@@ -1618,6 +1654,13 @@ int r36sx_pico286_audio_covox_enabled(void)
     load_disk_config();
 
     return audio_covox_enabled;
+}
+
+uint32_t r36sx_pico286_audio_sample_rate(uint32_t fallback_rate)
+{
+    load_disk_config();
+
+    return audio_sample_rate ? audio_sample_rate : fallback_rate;
 }
 
 uint32_t r36sx_pico286_conventional_memory_kb(void)
