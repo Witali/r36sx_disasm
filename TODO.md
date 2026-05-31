@@ -17,7 +17,7 @@
   descriptor, DOS memory allocation/free, get/set real-mode vectors,
   get/set protected-mode vectors, simulate real-mode interrupt, call real-mode
   procedure, and protected-mode termination through `INT 21h AH=4Ch`.
-- [ ] Decide whether to emulate VCPI.  Some 386 DOS extenders probe `INT 67h`
+- [x] Decide whether to emulate VCPI.  Some 386 DOS extenders probe `INT 67h`
   VCPI services when DPMI is absent; if Doom/DOS4GW does not need it, logging a
   clean unsupported response may be enough initially.
 - [ ] Complete protected-mode privilege semantics.  Track CPL and enforce selector

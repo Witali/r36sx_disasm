@@ -602,6 +602,7 @@ static void r36sx_cpu_set_cr0(uint32_t value)
         (unsigned long)old_cr0, (unsigned long)value,
         (unsigned long)r36sx_cr0, old_pe, new_pe,
         CPU_CS, (unsigned long)CPU_IP);
+    (void)old_cr0;
 
     if (old_pe != new_pe) {
 #if DEBUG && !PICO_ON_DEVICE
@@ -2260,6 +2261,51 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum)
     return 1;
 }
 
+static uint8_t r36sx_cpu_handle_vcpi(void)
+{
+    if ((CPU_AX & 0xff00u) != 0xde00u) {
+        return 0;
+    }
+
+    /*
+     * VCPI is supplied by an EMS/V86 control program such as EMM386.  Pico-286
+     * currently boots real-mode DOS directly, so claiming a live VCPI server
+     * would send DOS extenders into an interface we cannot yet back with V86,
+     * paging, or a real protected-mode entry point.
+     */
+    switch (CPU_AL) {
+        case 0x00: /* Installation check */
+            R36SX_PM_DIAG_LOG(
+                "[PM] VCPI DE00 installation check: not present");
+            CPU_AH = 0x80u;
+            CPU_BH = 0;
+            CPU_BL = 0;
+            return 1;
+        case 0x01: /* Get protected-mode interface */
+        case 0x02: /* Get maximum physical memory address */
+        case 0x03: /* Get number of free 4K pages */
+        case 0x04: /* Allocate a 4K page */
+        case 0x05: /* Free a 4K page */
+        case 0x06: /* Get physical address of page in first MB */
+        case 0x07: /* Read CR0 */
+        case 0x08: /* Read debug registers */
+        case 0x09: /* Set debug registers */
+        case 0x0A: /* Get 8259 interrupt vector mappings */
+        case 0x0B: /* Set 8259 interrupt vector mappings */
+        case 0x0C: /* Switch to protected mode */
+            R36SX_PM_DIAG_LOG(
+                "[PM] VCPI DE%02X requested while VCPI server absent",
+                CPU_AL);
+            CPU_AH = 0x80u;
+            return 1;
+        default:
+            R36SX_PM_DIAG_LOG(
+                "[PM] VCPI DE%02X unsupported subfunction", CPU_AL);
+            CPU_AH = 0x8Fu;
+            return 1;
+    }
+}
+
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
@@ -2528,6 +2574,11 @@ void intcall86(uint8_t intnum) {
         }
         case 0x13:
             return diskhandler();
+        case 0x67:
+            if (r36sx_cpu_handle_vcpi()) {
+                return;
+            }
+            break;
         case 0x15: /* XMS */
             switch (CPU_AH) {
                 case 0x87: {

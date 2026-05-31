@@ -1922,6 +1922,66 @@ Result:
 - `pico_286.debug` built successfully.
 - Defender scan: found no threats.
 
+## 2026-05-31 VCPI probe handling
+
+Added an explicit VCPI handler for `INT 67h AX=DE00h..DE0Ch`.  The current
+port does not claim VCPI availability because VCPI is normally provided by an
+EMS/V86 control program such as EMM386, and Pico-286 still boots real-mode DOS
+directly.  Reporting VCPI as present would make DOS extenders call into a
+server interface that does not yet have V86 mode, paging, or a real VCPI
+protected-mode entry point behind it.
+
+Behavior:
+
+- `INT 67h AX=DE00h` now returns `AH=80h`, `BH=0`, `BL=0` to report VCPI not
+  present.
+- `INT 67h AX=DE01h..DE0Ch` now returns `AH=80h` instead of falling through an
+  unrelated interrupt vector.
+- Unknown `INT 67h AX=DExxh` subfunctions return `AH=8Fh`.
+- Debug builds log these probes with the existing protected-mode diagnostics.
+
+References:
+
+- RBIL VCPI installation check:
+  `https://fd.lod.bz/rbil/interrup/dos_extenders/67de00.html`
+- RBIL VCPI protected-mode interface:
+  `https://fd.lod.bz/rbil/interrup/dos_extenders/67de01.html`
+- RBIL VCPI switch-to-protected-mode summary:
+  `https://files.mpoli.fi/unpacked/software/texts/computer/inter58d.zip/interrup.o`
+
+Build commands:
+
+```powershell
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd C:\Work\r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `pico_286` size: 440,048 bytes
+- `pico_286` SHA256:
+  `8C25DF78734B272D4BF5BECA081875B9B7BCFF4F6A09145F965CB2064512E5CC`
+- `pico_286.dsp` size: 432,896 bytes
+- `pico_286.dsp` SHA256:
+  `48A60D02A8199F5AC132DCCAB8FCBA46EFD7B00F93F4885A549751DDB26D2F3F`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286.dsp`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.dsp`
+
 ## 2026-05-31 protected-mode descriptor checks
 
 Reviewed Intel 80386 protected-mode descriptor behavior and DOSBox-X CPU
