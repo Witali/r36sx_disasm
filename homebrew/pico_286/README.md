@@ -110,13 +110,14 @@ Default input mapping:
 - Hold Fn and press Select: open the disk image binding menu.
 - Hold Fn and press Start: open the key preset editor.
 - Hold Fn and press D-pad Down: show or hide the app statistics overlay.
+- Hold Fn and press D-pad Right: show or hide the POST-code overlay.
 - Hold Fn and press B: soft-reset the emulated PC.
 - Hold Fn and press X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 
-These are the complete active Fn shortcuts.  Fn+A, Fn+Y, Fn+D-pad Right,
-Fn+L, Fn+L2, Fn+R, and Fn+R2 currently have no action.  Select+Start is not an
-exit shortcut in Pico-286.
+These are the complete active Fn shortcuts.  Fn+A, Fn+Y, Fn+L, Fn+L2, Fn+R,
+and Fn+R2 currently have no action.  Select+Start is not an exit shortcut in
+Pico-286.
 
 The default game/input mapping is stored in `keypresets.conf` next to the
 executable:
@@ -325,7 +326,8 @@ executable.  It contains PCjs `ID.COM` and `TEST386.COM` CPU/protected-mode
 tests, their `ID.ASM`/`CPUID.ASM` sources, `README.TXT`, and `TEST386.BIN`.
 `TEST386.BIN` is the R36SX debug build of
 `homebrew/pico_286/tests/test386.asm`, configured with `DEBUG=1`, ASCII output
-port `191h`, and POST port `190h`.  Pico-286 logs those ports to
+port `191h`, and standard POST port `80h`.  Pico-286 also still accepts the
+legacy R36SX test POST port `190h`.  Pico-286 logs those ports to
 `pico_286.log`.
 
 Boot FreeDOS from `images/FreeDOS1.img`, mount `images/cpu_tests.img` as `B:`
@@ -342,14 +344,18 @@ BIOS option is switched from `NORMAL` to `TEST386`.
 confirmation overlay with a small screenshot preview.
 `Fn` + D-pad `Left` toggles an on-screen help panel listing the active Fn
 shortcuts.
+`Fn` + D-pad `Right` toggles a compact POST-code overlay.  Pico-286 captures
+standard BIOS POST writes to port `80h` and the legacy R36SX test386 POST port
+`190h`.  The rebuilt `test386.bin` now writes POST codes to the standard `80h`
+port.  The embedded Turbo XT BIOS image has no obvious `OUT 80h` POST sequence,
+so the normal BIOS may not produce values.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a lower-right
 two-column overlay above the disk LED.  It shows decoded x86 instruction loops
 in K/s, host disk image read/write KB/s, and presented FPS using a compact
 pixel font.  The rendered block is cached between one-second statistics
-samples; direct-present frames only save the covered rectangle, blit the cached
-block, present, and restore the previous pixels.  Set it to `0` to disable the
-shortcut and overlay.
+samples; direct-present frames use a stable output buffer when a small overlay
+is active.  Set it to `0` to disable the shortcut and overlay.
 
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are

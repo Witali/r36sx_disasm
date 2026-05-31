@@ -37,8 +37,11 @@ static int audio_covox_enabled = 1;
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
 #define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
+#define R36SX_PC_POST_PORT 0x80u
 #define R36SX_TEST386_POST_PORT 0x190u
 #define R36SX_TEST386_ASCII_PORT 0x191u
+
+extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
 
 static uint8_t keyboard_queue[R36SX_KEYBOARD_QUEUE_CAPACITY];
 static uint8_t keyboard_queue_head;
@@ -67,6 +70,7 @@ static void r36sx_test386_ascii_out(uint8_t value) {
 }
 
 static void r36sx_test386_post_out(uint8_t value) {
+    r36sx_pico286_post_code_out(R36SX_TEST386_POST_PORT, value);
     r36sx_pico286_debug_log("test386: POST=0x%02x", value);
 }
 
@@ -258,6 +262,9 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 
 void portout(uint16_t portnum, uint16_t value) {
     switch (portnum) {
+        case R36SX_PC_POST_PORT:
+            r36sx_pico286_post_code_out(portnum, (uint8_t)value);
+            return;
         case R36SX_TEST386_POST_PORT:
             r36sx_test386_post_out((uint8_t)value);
             return;

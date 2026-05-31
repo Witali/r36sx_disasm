@@ -30,12 +30,13 @@ Shift, Ctrl, and Alt.
 - Fn+D-pad Left: show or hide the Fn shortcut help overlay.
 - Fn+D-pad Up: save a 640x480 screenshot, play a shutter click, and briefly show a preview.
 - Fn+D-pad Down: show or hide app statistics.
+- Fn+D-pad Right: show or hide the POST-code overlay.
 - Fn+B: soft-reset the emulated PC.
 - Fn+X: exit back to TinyMC.
 - Hold Fn for more than 3 seconds: emergency exit back to TinyMC.
 
 The active Fn shortcuts are exactly the ones listed above.  Fn+A, Fn+Y,
-Fn+D-pad Right, Fn+L, Fn+L2, Fn+R, and Fn+R2 currently have no action.
+Fn+L, Fn+L2, Fn+R, and Fn+R2 currently have no action.
 
 Screenshots are written to `MIPS_NATIVE/pico_286/screenshots` as
 `pico_286_YYYYMMDD_HHMMSS_NNN.png` or
@@ -177,7 +178,7 @@ It contains PCjs `ID.COM` and `TEST386.COM`; boot FreeDOS, mount it as `B:`,
 then run `ID` or `TEST386`.  It also contains `TEST386.BIN`, the R36SX debug
 build of `barotto/test386.asm`.  That file is a 64 KB BIOS replacement ROM,
 not a DOS `.COM` program; Pico-286 currently stores it as a payload/reference
-and logs its configured debug ports `190h`/`191h` when it is loaded as a ROM.
+and logs its configured debug ports `80h`/`191h` when it is loaded as a ROM.
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 
@@ -197,6 +198,12 @@ Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86
 instruction loops in K/s, host disk image read/write KB/s, and presented FPS.
 Set it to `0` to disable the shortcut and overlay.
+
+`Fn` + D-pad `Right` toggles a compact POST-code overlay.  Pico-286 captures
+standard BIOS POST writes to port `80h` and the legacy R36SX test386 POST port
+`190h`.  The rebuilt `test386.bin` writes POST codes to the standard `80h`
+port.  The embedded Turbo XT BIOS image has no obvious `OUT 80h` POST sequence,
+so the normal BIOS may not produce values.
 
 Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps

@@ -100,6 +100,7 @@ struct r36sx_mfb_driver {
     uint8_t screenshot_toast_success;
     uint8_t screenshot_preview_valid;
     uint8_t fn_help_visible;
+    uint8_t post_codes_visible;
     uint8_t osk_overlay_valid;
     uint8_t stats_overlay_valid;
     int base_content_h;
@@ -111,6 +112,7 @@ struct r36sx_mfb_driver {
     int stats_overlay_h;
     uint32_t base_generation;
     uint32_t presented_generation;
+    uint32_t post_code_presented_generation;
     uint32_t osk_overlay_signature;
     uint32_t stats_overlay_last_ms;
     uint32_t screenshot_counter;
@@ -121,6 +123,9 @@ static struct r36sx_mfb_driver g_mfb;
 static uint16_t g_palette[256];
 static volatile uint32_t g_frame_generation;
 static volatile uint32_t g_disk_activity_until_ms;
+static volatile uint32_t g_post_code_generation;
+static volatile uint16_t g_post_code_port;
+static volatile uint8_t g_post_code_value;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
@@ -153,6 +158,16 @@ void r36sx_pico286_disk_activity(void)
 {
     g_disk_activity_until_ms =
         r36sx_mfb_now_ms32() + R36SX_PICO286_DISK_LED_HOLD_MS;
+}
+
+void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
+{
+    g_post_code_port = portnum;
+    g_post_code_value = value;
+    g_post_code_generation++;
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("post: port=0x%03x code=0x%02x",
+                            (unsigned int)portnum, (unsigned int)value);
 }
 
 static uint16_t r36sx_mfb_rgb888_to_rgb565(uint32_t color)
@@ -567,6 +582,43 @@ static void r36sx_mfb_draw_stats_overlay(uint16_t *target, uint32_t now_ms)
     }
 }
 
+static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
+{
+    char line[32];
+    uint32_t generation = g_post_code_generation;
+    uint16_t port = g_post_code_port;
+    uint8_t value = g_post_code_value;
+    int text_w;
+    int box_w;
+    const int box_h = 20;
+    int x;
+    int y = 8;
+    uint16_t bg = r36sx_mfb_rgb565(8, 12, 18);
+    uint16_t border = r36sx_mfb_rgb565(96, 148, 170);
+    uint16_t text = r36sx_mfb_rgb565(255, 228, 120);
+
+    if (!target || !g_mfb.post_codes_visible) {
+        return;
+    }
+
+    if (generation == 0) {
+        snprintf(line, sizeof(line), "POST --");
+    } else {
+        snprintf(line, sizeof(line), "POST %03X:%02X",
+                 (unsigned int)port, (unsigned int)value);
+    }
+
+    text_w = (int)strlen(line) * 8;
+    box_w = text_w + 14;
+    x = g_mfb.width - box_w - 8;
+    if (x < 8) {
+        x = 8;
+    }
+    r36sx_mfb_fill_rect_target(target, x, y, box_w, box_h, bg);
+    r36sx_mfb_stroke_rect(target, x, y, box_w, box_h, border);
+    r36sx_mfb_draw_text8(target, x + 7, y + 6, line, text);
+}
+
 static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
 {
     static const char *lines[] = {
@@ -574,6 +626,7 @@ static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
         "FN+LEFT: HIDE THIS HELP",
         "FN+UP: SCREENSHOT + PREVIEW",
         "FN+DOWN: APP STATISTICS",
+        "FN+RIGHT: POST CODES",
         "FN+SELECT: DISK MENU",
         "FN+START: KEY PRESETS",
         "FN+B: SOFT RESET PC",
@@ -1348,6 +1401,14 @@ static void r36sx_mfb_toggle_fn_help(void)
                             g_mfb.fn_help_visible ? "on" : "off");
 }
 
+static void r36sx_mfb_toggle_post_codes(void)
+{
+    g_mfb.post_codes_visible = !g_mfb.post_codes_visible;
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("minifb: Fn+Right POST codes %s",
+                            g_mfb.post_codes_visible ? "on" : "off");
+}
+
 static int r36sx_mfb_disk_led_active(uint32_t now_ms)
 {
     return (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
@@ -1740,6 +1801,11 @@ static int r36sx_mfb_poll_input(void)
             g_mfb.last_raw_keys = raw;
             return 0;
         }
+        if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+            r36sx_mfb_toggle_post_codes();
+            g_mfb.last_raw_keys = raw;
+            return 0;
+        }
         if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
             r36sx_mfb_toggle_fn_help();
             g_mfb.last_raw_keys = raw;
@@ -1925,8 +1991,11 @@ int mfb_update(void *buffer, int fps_limit)
     int disk_led_active;
     int stats_overlay_visible;
     int stats_refresh_due;
+    int post_codes_visible;
+    int post_codes_refresh_due;
     int screenshot_toast_visible;
     int need_present;
+    uint32_t post_code_generation;
     r36sx_pico286_scaling_filter_t scaling_filter;
     (void)fps_limit;
 
@@ -1972,6 +2041,11 @@ int mfb_update(void *buffer, int fps_limit)
     stats_refresh_due =
         stats_overlay_visible && g_mfb.stats_overlay &&
         r36sx_mfb_stats_cache_due(now_ms);
+    post_code_generation = g_post_code_generation;
+    post_codes_visible = g_mfb.post_codes_visible;
+    post_codes_refresh_due =
+        post_codes_visible &&
+        post_code_generation != g_mfb.post_code_presented_generation;
     need_present =
         source_changed ||
         osk_overlay_refresh_due ||
@@ -1979,6 +2053,7 @@ int mfb_update(void *buffer, int fps_limit)
         disk_led_active ||
         g_mfb.disk_led_was_active ||
         stats_refresh_due ||
+        post_codes_refresh_due ||
         screenshot_toast_visible ||
         g_mfb.screenshot_toast_was_visible ||
         g_mfb.force_present ||
@@ -2013,6 +2088,7 @@ int mfb_update(void *buffer, int fps_limit)
         }
         if (!fullscreen_menu_active) {
             r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
+            r36sx_mfb_draw_post_codes_overlay(g_mfb.frame);
             r36sx_mfb_draw_fn_help_overlay(g_mfb.frame);
         }
         if (g_mfb.screenshot_requested) {
@@ -2028,7 +2104,8 @@ int mfb_update(void *buffer, int fps_limit)
         int direct_overlay_active =
             osk_overlay_active ||
             r36sx_mfb_disk_led_visible(now_ms) ||
-            stats_overlay_visible;
+            stats_overlay_visible ||
+            post_codes_visible;
         uint16_t *present_frame = src;
 
         if (direct_overlay_active) {
@@ -2037,6 +2114,7 @@ int mfb_update(void *buffer, int fps_limit)
                        sizeof(g_mfb.frame[0]));
             r36sx_mfb_draw_osk_overlay_direct(g_mfb.frame);
             r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
+            r36sx_mfb_draw_post_codes_overlay(g_mfb.frame);
             r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
             present_frame = g_mfb.frame;
         }
@@ -2054,6 +2132,7 @@ int mfb_update(void *buffer, int fps_limit)
         r36sx_mfb_screenshot_toast_visible(r36sx_mfb_now_ms32());
     g_mfb.force_present = 0;
     g_mfb.presented_generation = frame_generation;
+    g_mfb.post_code_presented_generation = post_code_generation;
     g_mfb.last_present_us = now;
     return 0;
 }

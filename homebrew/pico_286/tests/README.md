@@ -11,12 +11,13 @@ https://github.com/barotto/test386.asm
 
 The R36SX copy is configured in `test386.asm/src/configuration.asm` with:
 
-- `POST_PORT equ 0x190`
+- `POST_PORT equ 0x80`
 - `OUT_PORT equ 0x191`
 - `DEBUG equ 1`
 
-Pico-286 logs writes to those ports from `r36sx_ports.c` as `test386:` lines in
-`pico_286.log`.
+Pico-286 captures standard POST writes to `80h`, keeps legacy support for the
+older R36SX `190h` test port, and logs output-port text from `191h` as
+`test386:` lines in `pico_286.log`.
 
 Build the ROM payload with:
 

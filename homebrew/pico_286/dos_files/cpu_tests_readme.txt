@@ -16,8 +16,9 @@ TEST386.BIN
   R36SX build of barotto/test386.asm. This is a 64KB BIOS replacement test
   ROM, not a DOS COM program. It is stored here as a test payload/reference.
   The source is in homebrew/pico_286/tests/test386.asm. This build enables
-  DEBUG, writes ASCII output to port 0191h, and writes POST codes to port
-  0190h. The Pico-286 port logs those ports to pico_286.log.
+  DEBUG, writes ASCII output to port 0191h, and writes POST codes to the
+  standard POST port 0080h. The Pico-286 port logs those ports to
+  pico_286.log.
 
 CPUID.ASM
 ID.ASM

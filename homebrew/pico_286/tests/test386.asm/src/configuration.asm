@@ -8,7 +8,7 @@
 
 ; The diagnostic port used to emit the current test procedure number.
 ; Possible values: the 16-bit value of the diagnostic port of your system.
-POST_PORT equ 0x190
+POST_PORT equ 0x80
 
 ; The parallel port to use to print ASCII computational results.
 ; Possible values: 0=disabled, 1=LPT1 (3BCh), 2=LPT2 (378h), 3=LPT3 (278h)

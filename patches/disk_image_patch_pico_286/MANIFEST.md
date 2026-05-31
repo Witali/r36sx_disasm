@@ -32,6 +32,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 POST-code overlay and standard test ROM port
+
+The current `pico_286` binary can show POST-code writes with `Fn` + D-pad
+`Right`.  It captures standard BIOS POST writes to port `80h` and keeps legacy
+support for the older R36SX test386 POST port `190h`.  The embedded Turbo XT
+BIOS image has no obvious `OUT 80h` POST sequence, so the normal BIOS may not
+produce values.
+
+The current `test386.bin` was rebuilt with `POST_PORT equ 0x80`; ASCII debug
+output still uses `OUT_PORT equ 0x191`.  `images/cpu_tests.img` was also
+rebuilt so its `TEST386.BIN` payload matches.
+
+pico_286 size: 1389532 bytes
+pico_286 SHA256: 637792DF7404B28B93576CB4D84764FCD83719492DFDDFD096973700526C4029
+test386.bin size: 65536 bytes
+test386.bin SHA256: 9BD72BB8ACC9FD8BDCB81E7DD9E5E756D16A5608B66CF8E44D6F26751107F67B
+images/cpu_tests.img size: 1474560 bytes
+images/cpu_tests.img SHA256: EEA493C9E526B8083F96F3FB4A93326459A4D425F28E8E4F4DF106C116D42447
+
 ## 2026-05-31 stable direct-overlay present buffer
 
 The current `pico_286` binary fixes flicker in small direct overlays.  App
@@ -221,7 +240,8 @@ R36SX debug build of `barotto/test386.asm`.
 - `TEST386.BIN` is a 64 KB BIOS replacement ROM payload, not a DOS `.COM`
   program.
 - The source copy is stored in `homebrew/pico_286/tests/test386.asm`.
-- The build uses `DEBUG=1`, POST port `190h`, and ASCII output port `191h`.
+- The build used `DEBUG=1`, POST port `190h`, and ASCII output port `191h` at
+  the time; a later build changed the POST port to standard `80h`.
 - The current `pico_286` binary logs those ports to `pico_286.log` as
   `test386:` lines.
 - The disk menu BIOS row switches `bios=normal` / `bios=test386`; the external

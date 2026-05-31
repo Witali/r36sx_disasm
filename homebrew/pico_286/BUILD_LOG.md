@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-05-31 POST-code overlay and standard test ROM port
+
+Added an optional on-screen POST-code overlay.
+
+- `Fn` + D-pad `Right` now toggles a compact `POST port:code` display.
+- Pico-286 captures standard BIOS POST writes to port `80h`.
+- Pico-286 also keeps legacy support for the older R36SX test386 POST port
+  `190h`.
+- The embedded Turbo XT BIOS image was scanned for obvious `OUT 80h` patterns;
+  none were found, so the normal BIOS may not emit POST values.
+- The R36SX `test386.asm` build now uses `POST_PORT equ 0x80`; `OUT_PORT`
+  remains `0x191`.
+- `cpu_tests.img` was rebuilt so its `TEST386.BIN` payload matches the new
+  ROM.
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped Pico-286 binary was kept.  The build also printed the existing
+upstream audio/pragma warnings in `r36sx_ports.c` and included `.inl` sources.
+
+Results:
+
+- `pico_286` size: `1389532` bytes
+- `pico_286` SHA256:
+  `637792DF7404B28B93576CB4D84764FCD83719492DFDDFD096973700526C4029`
+- `test386.bin` size: `65536` bytes
+- `test386.bin` SHA256:
+  `9BD72BB8ACC9FD8BDCB81E7DD9E5E756D16A5608B66CF8E44D6F26751107F67B`
+- `images/cpu_tests.img` size: `1474560` bytes
+- `images/cpu_tests.img` SHA256:
+  `EEA493C9E526B8083F96F3FB4A93326459A4D425F28E8E4F4DF106C116D42447`
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 .\homebrew\pico_286\test386.bin
+.\tools\scan-download.ps1 .\homebrew\pico_286\images\cpu_tests.img
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 stable direct-overlay present buffer
 
 Fixed flicker in the direct-present overlay path.
@@ -632,12 +681,13 @@ reported.
 
 The R36SX build changes `src/configuration.asm` to use Pico-286 debug ports:
 
-- `POST_PORT equ 0x190`
+- `POST_PORT equ 0x190` at the time; a later build changed this to the
+  standard `0x80`.
 - `OUT_PORT equ 0x191`
 - `DEBUG equ 1`
 
 `r36sx_ports.c` now logs writes to those ports as `test386:` lines in
-`pico_286.log`.  Port `190h` logs POST byte values, and port `191h` collects
+`pico_286.log`.  Port `190h` logged POST byte values at the time, and port `191h` collects
 ASCII text until newline.
 
 Downloaded official NASM 3.01 for Windows x86-64 from:
