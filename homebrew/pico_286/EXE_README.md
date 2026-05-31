@@ -171,10 +171,11 @@ about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
 `exec86()` quantum when emulation itself overruns, grows it back when there is
 spare CPU time, caps it at the `cpu_mhz` limit, and never drops below 1000
 instructions per frame.  Rendering overlays such as the on-screen keyboard do
-not reduce the CPU quantum.  The same target also sets the audio block size
-sent to `driver.so`; the default 60 Hz produces about 735 stereo frames per
-block at 44.1 kHz, and block boundaries are smoothed with a short de-click
-ramp.
+not reduce the CPU quantum.  The same target also sets the nominal audio packet
+cadence.  At 60 Hz this is about 735 stereo frames at 44.1 kHz, but delayed
+packets are sized from the actual elapsed time since the previous audio send,
+up to the 100 ms source buffer capacity.  Block boundaries are smoothed with a
+short de-click ramp.
 
 Dirty writes are flushed after 4 sectors, after 2 seconds without another
 write, on INT 13h disk reset, when an image is changed/closed, and when the

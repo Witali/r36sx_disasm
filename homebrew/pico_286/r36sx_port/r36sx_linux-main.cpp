@@ -35,8 +35,10 @@ extern "C" void r36sx_pico286_disk_flush_all(void);
 
 #define R36SX_AUDIO_DRIVER_RATE 44100u
 #define R36SX_AUDIO_CHANNELS 2u
-#define R36SX_AUDIO_BUFFER_MAX_FRAMES (R36SX_AUDIO_DRIVER_RATE / 10u)
-#define R36SX_AUDIO_BUFFER_COUNT 2u
+#define R36SX_AUDIO_BUFFER_MIN_FPS 10u
+#define R36SX_AUDIO_BUFFER_MAX_FRAMES \
+    (R36SX_AUDIO_DRIVER_RATE / R36SX_AUDIO_BUFFER_MIN_FPS)
+#define R36SX_AUDIO_BUFFER_COUNT 4u
 #define R36SX_TICKS_THREAD_SLEEP_US 1000u
 #define R36SX_HLT_SLEEP_US 1000u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
@@ -46,14 +48,19 @@ static int16_t audio_buffers[R36SX_AUDIO_BUFFER_COUNT]
 static int16_t audio_playback_buffer[R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
 static int sample_index = 0;
 static uint32_t audio_write_buffer = 0;
-static int audio_ready_buffer = -1;
+static uint32_t audio_ready_head = 0;
+static uint32_t audio_ready_count = 0;
+static uint32_t audio_ready_frames[R36SX_AUDIO_BUFFER_COUNT] = {};
 static volatile int soft_reset_requested = 0;
 static volatile int soft_reset_in_progress = 0;
 #if defined(R36SX_VIDEO_DIRTY_TRACKING) && R36SX_VIDEO_DIRTY_TRACKING
 static volatile uint32_t g_video_dirty = 1;
 #endif
 static uint32_t g_main_loop_frame_us = 1000000u / R36SX_MAIN_LOOP_DEFAULT_FPS;
-static uint32_t g_audio_buffer_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
+static uint32_t g_audio_packet_target_frames =
+    R36SX_AUDIO_DRIVER_RATE / R36SX_MAIN_LOOP_DEFAULT_FPS;
+static uint32_t g_audio_buffer_capacity_frames =
+    R36SX_AUDIO_BUFFER_MAX_FRAMES;
 
 static inline uint32_t vga_vram_cell(uint32_t index) {
     return VIDEORAM[index & 0xFFFFu];
@@ -100,6 +107,23 @@ static uint32_t r36sx_pico286_frame_us_from_fps(uint32_t target_fps)
     uint32_t frame_us = (uint32_t)((1000000ull + target_fps / 2u) /
                                    target_fps);
     return frame_us ? frame_us : 1u;
+}
+
+static uint32_t r36sx_pico286_audio_frames_for_elapsed(uint64_t elapsed_ticks,
+                                                       uint32_t sample_rate,
+                                                       uint64_t ticks_per_sec)
+{
+    if (sample_rate == 0 || ticks_per_sec == 0) {
+        return 0;
+    }
+
+    uint64_t frames =
+        (elapsed_ticks * (uint64_t)sample_rate + ticks_per_sec / 2u) /
+        ticks_per_sec;
+    if (frames > 0xffffffffull) {
+        return 0xffffffffu;
+    }
+    return (uint32_t)frames;
 }
 
 static uint32_t r36sx_pico286_frame_exec_loops(uint32_t loops_per_ms,
@@ -1014,6 +1038,54 @@ pthread_mutex_t update_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t update_cond = PTHREAD_COND_INITIALIZER;
 volatile int update_ready = 0;
 
+static void r36sx_pico286_audio_queue_current_locked(uint32_t frames)
+{
+    const uint32_t buffered_frames =
+        (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
+    uint32_t old_write_buffer = audio_write_buffer;
+    uint32_t leftover_frames;
+
+    if (frames == 0) {
+        return;
+    }
+    if (frames > buffered_frames) {
+        frames = buffered_frames;
+    }
+    if (frames > g_audio_buffer_capacity_frames) {
+        frames = g_audio_buffer_capacity_frames;
+    }
+    if (frames == 0) {
+        return;
+    }
+    leftover_frames = buffered_frames - frames;
+
+    if (audio_ready_count >= R36SX_AUDIO_BUFFER_COUNT - 1u) {
+        audio_ready_frames[audio_ready_head] = 0;
+        audio_ready_head =
+            (audio_ready_head + 1u) % R36SX_AUDIO_BUFFER_COUNT;
+        audio_ready_count--;
+    }
+
+    audio_ready_frames[old_write_buffer] = frames;
+    if (audio_ready_count == 0) {
+        audio_ready_head = old_write_buffer;
+    }
+    audio_ready_count++;
+    audio_write_buffer =
+        (audio_write_buffer + 1u) % R36SX_AUDIO_BUFFER_COUNT;
+    sample_index = 0;
+    if (leftover_frames > 0) {
+        memcpy(audio_buffers[audio_write_buffer],
+               &audio_buffers[old_write_buffer]
+                             [frames * R36SX_AUDIO_CHANNELS],
+               (size_t)leftover_frames * R36SX_AUDIO_CHANNELS *
+                   sizeof(audio_buffers[0][0]));
+        sample_index = (int)(leftover_frames * R36SX_AUDIO_CHANNELS);
+    }
+    update_ready = 1;
+    pthread_cond_signal(&update_cond);
+}
+
 static void r36sx_pico286_soft_reset(void) {
     r36sx_pico286_debug_log("main: soft reset begin");
     soft_reset_requested = 0;
@@ -1045,7 +1117,9 @@ static void r36sx_pico286_soft_reset(void) {
     memset(audio_playback_buffer, 0, sizeof(audio_playback_buffer));
     sample_index = 0;
     audio_write_buffer = 0;
-    audio_ready_buffer = -1;
+    audio_ready_head = 0;
+    audio_ready_count = 0;
+    memset(audio_ready_frames, 0, sizeof(audio_ready_frames));
     update_ready = 0;
     pthread_mutex_unlock(&update_mutex);
 
@@ -1059,35 +1133,43 @@ void *sound_thread(void *arg) {
     r36sx_pico286_debug_log("sound_thread: start arg=%p", arg);
     unsigned int sound_loop_count = 0;
     while (running) {
+        uint32_t playback_frames = 0;
         pthread_mutex_lock(&update_mutex);
-        while (!update_ready && running) {
+        while (audio_ready_count == 0 && running) {
             pthread_cond_wait(&update_cond, &update_mutex);
         }
         if (!running) {
             pthread_mutex_unlock(&update_mutex);
             break;
         }
-        if (audio_ready_buffer < 0) {
+        if (audio_ready_count == 0) {
             update_ready = 0;
             pthread_mutex_unlock(&update_mutex);
             continue;
         }
-        memcpy(audio_playback_buffer, audio_buffers[audio_ready_buffer],
-               (size_t)g_audio_buffer_frames *
+        playback_frames = audio_ready_frames[audio_ready_head];
+        if (playback_frames > g_audio_buffer_capacity_frames) {
+            playback_frames = g_audio_buffer_capacity_frames;
+        }
+        memcpy(audio_playback_buffer, audio_buffers[audio_ready_head],
+               (size_t)playback_frames *
                    R36SX_AUDIO_CHANNELS *
                    sizeof(audio_playback_buffer[0]));
-        audio_ready_buffer = -1;
-        update_ready = 0;
+        audio_ready_frames[audio_ready_head] = 0;
+        audio_ready_head =
+            (audio_ready_head + 1u) % R36SX_AUDIO_BUFFER_COUNT;
+        audio_ready_count--;
+        update_ready = audio_ready_count > 0 ? 1 : 0;
         pthread_mutex_unlock(&update_mutex);
 
         // Send audio buffer to Linux audio system
         if (++sound_loop_count <= 4u) {
-            r36sx_pico286_debug_log("sound_thread: write #%u sample_index=%d",
-                                    sound_loop_count, sample_index);
+            r36sx_pico286_debug_log("sound_thread: write #%u frames=%u",
+                                    sound_loop_count, playback_frames);
         }
         R36SX_PROFILE_BEGIN(profile_audio_write);
         int audio_write_rc = linux_audio_write(audio_playback_buffer,
-                                               g_audio_buffer_frames);
+                                               playback_frames);
         R36SX_PROFILE_END(R36SX_PROFILE_AUDIO_WRITE, profile_audio_write);
         if (audio_write_rc != 0) {
             // Audio write failed, but continue running
@@ -1111,6 +1193,7 @@ void *ticks_thread(void *arg) {
     uint64_t last_dss_tick = 0;
     uint64_t last_sb_tick = 0;
     uint64_t last_sound_tick = 0;
+    uint64_t last_audio_packet_tick = 0;
 
     int16_t last_dss_sample = 0;
     int16_t last_sb_sample = 0;
@@ -1123,10 +1206,16 @@ void *ticks_thread(void *arg) {
     const uint64_t sound_period = hostfreq / audio_sample_rate;
     const uint64_t blink_period = 333333333;
     const uint64_t frame_period = (uint64_t)g_main_loop_frame_us * 1000ull;
+    const uint64_t audio_packet_period =
+        g_audio_packet_target_frames > 0 ?
+            ((uint64_t)g_audio_packet_target_frames * hostfreq) /
+                (uint64_t)audio_sample_rate :
+            frame_period;
     const unsigned int max_system_catchup = 8;
     const unsigned int max_dss_catchup = 700;
     const unsigned int max_sb_catchup = 2205;
-    const unsigned int max_audio_catchup = audio_sample_rate / 20;
+    const unsigned int max_audio_catchup =
+        audio_sample_rate / R36SX_AUDIO_BUFFER_MIN_FPS;
     const int dss_audio_enabled = r36sx_pico286_audio_disney_enabled();
     const int sb_audio_enabled = r36sx_pico286_audio_sound_blaster_enabled();
     r36sx_pico286_debug_log("ticks_thread: audio dss=%d sound_blaster=%d",
@@ -1207,17 +1296,15 @@ void *ticks_thread(void *arg) {
                              &audio_buffers[audio_write_buffer][sample_index]);
             sample_index += 2;
 
-            if (sample_index >= (int)(g_audio_buffer_frames * 2u)) {
+            if (sample_index >=
+                (int)(g_audio_buffer_capacity_frames *
+                      R36SX_AUDIO_CHANNELS)) {
+                const uint32_t buffered_frames =
+                    (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
                 pthread_mutex_lock(&update_mutex);
-                if (!update_ready) {
-                    audio_ready_buffer = (int)audio_write_buffer;
-                    audio_write_buffer =
-                        (audio_write_buffer + 1u) % R36SX_AUDIO_BUFFER_COUNT;
-                    update_ready = 1;
-                    pthread_cond_signal(&update_cond);
-                }
+                r36sx_pico286_audio_queue_current_locked(buffered_frames);
                 pthread_mutex_unlock(&update_mutex);
-                sample_index = 0;
+                last_audio_packet_tick = elapsedTime;
             }
 
             last_sound_tick += sound_period;
@@ -1229,6 +1316,29 @@ void *ticks_thread(void *arg) {
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_AUDIO_SAMPLE,
                                 profile_audio_sample,
                                 audio_catchup_count);
+        if (sample_index > 0 &&
+            elapsedTime - last_audio_packet_tick >= audio_packet_period) {
+            uint32_t buffered_frames =
+                (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
+            uint32_t elapsed_frames =
+                r36sx_pico286_audio_frames_for_elapsed(
+                    elapsedTime - last_audio_packet_tick,
+                    audio_sample_rate,
+                    hostfreq);
+
+            if (elapsed_frames > g_audio_buffer_capacity_frames) {
+                elapsed_frames = g_audio_buffer_capacity_frames;
+            }
+            if (buffered_frames > elapsed_frames && elapsed_frames > 0) {
+                buffered_frames = elapsed_frames;
+            }
+            if (buffered_frames > 0) {
+                pthread_mutex_lock(&update_mutex);
+                r36sx_pico286_audio_queue_current_locked(buffered_frames);
+                pthread_mutex_unlock(&update_mutex);
+                last_audio_packet_tick = elapsedTime;
+            }
+        }
 
         // Cursor blink
         if (elapsedTime - elapsed_blink_tics >= blink_period) {
@@ -1297,18 +1407,20 @@ int main() {
         r36sx_sound_frequency != R36SX_AUDIO_DRIVER_RATE) {
         r36sx_sound_frequency = R36SX_AUDIO_DRIVER_RATE;
     }
-    g_audio_buffer_frames =
+    g_audio_packet_target_frames =
         target_fps ? (r36sx_sound_frequency + target_fps / 2u) / target_fps
                    : r36sx_sound_frequency / 60u;
-    if (g_audio_buffer_frames == 0) {
-        g_audio_buffer_frames = 1;
+    if (g_audio_packet_target_frames == 0) {
+        g_audio_packet_target_frames = 1;
     }
-    if (g_audio_buffer_frames > R36SX_AUDIO_BUFFER_MAX_FRAMES) {
-        g_audio_buffer_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
+    g_audio_buffer_capacity_frames = R36SX_AUDIO_BUFFER_MAX_FRAMES;
+    if (g_audio_packet_target_frames > g_audio_buffer_capacity_frames) {
+        g_audio_packet_target_frames = g_audio_buffer_capacity_frames;
     }
-    r36sx_pico286_debug_log("main: audio sample_rate=%u target_fps=%u buffer_frames=%u",
+    r36sx_pico286_debug_log("main: audio sample_rate=%u target_fps=%u packet_frames=%u capacity_frames=%u",
                             r36sx_sound_frequency, target_fps,
-                            g_audio_buffer_frames);
+                            g_audio_packet_target_frames,
+                            g_audio_buffer_capacity_frames);
     emu8950_opl = OPL_new(3579552, r36sx_sound_frequency);
     r36sx_pico286_debug_log("main: OPL_new=%p rate=%u", emu8950_opl,
                             r36sx_sound_frequency);
@@ -1321,7 +1433,7 @@ int main() {
 
     // Initialize audio system
     if (linux_audio_init((int)r36sx_sound_frequency, 2,
-                         (int)g_audio_buffer_frames) == 0) {
+                         (int)g_audio_buffer_capacity_frames) == 0) {
         if (linux_audio_start() == 0) {
             printf("Audio: %s backend started\n", linux_audio_get_backend_name());
         } else {

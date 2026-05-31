@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-05-31 elapsed-time audio packets
+
+Changed Pico-286 audio packet sizing to follow real elapsed time.
+
+- The audio source buffers now keep a per-packet frame count instead of using
+  one fixed global block length.
+- The producer queue was expanded to four source buffers.  Each buffer can hold
+  up to 100 ms of source audio, enough for a 10 Hz packet cadence at 44.1 kHz.
+- `target_fps` now sets the nominal audio packet cadence.  If the host loop is
+  delayed, the packet sent to `driver.so` contains the number of samples that
+  match the elapsed time since the previous audio packet, capped by the 100 ms
+  buffer capacity.
+- `linux_audio_init()` now receives the full buffer capacity so the resampling
+  and de-click path can handle the largest packet.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1411108` bytes
+- `pico_286` SHA256:
+  `F4C963069C0EEAEB204703DD24117CE29D172B331E3E8CE38C9AFF9AF9A7C8AC`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 audio frame de-clicking
 
 Reduced audible clicks at Pico-286 audio block boundaries.

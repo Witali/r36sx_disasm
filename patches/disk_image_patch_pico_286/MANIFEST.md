@@ -32,6 +32,18 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 elapsed-time audio packets
+
+The current `pico_286` binary sizes audio packets from real elapsed time.
+`target_fps` sets the nominal packet cadence, but if the host loop is delayed,
+the packet sent to `driver.so` contains the number of samples matching the time
+since the previous audio packet, capped by a 100 ms source buffer.  The audio
+producer queue now uses four source buffers, and each ready buffer stores its
+own frame count.
+
+pico_286 size: 1411108 bytes
+pico_286 SHA256: F4C963069C0EEAEB204703DD24117CE29D172B331E3E8CE38C9AFF9AF9A7C8AC
+
 ## 2026-05-31 audio frame de-clicking
 
 The current `pico_286` binary reduces audible clicks at audio block
