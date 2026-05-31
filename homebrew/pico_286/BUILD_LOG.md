@@ -1817,6 +1817,47 @@ Result:
 - Defender scan: found no threats for the rebuilt binaries and their
   `disk_image` / `patches` copies.
 
+## 2026-05-31 REP MOVS/STOS RAM block-copy path
+
+Added a conservative fast path for repeated string operations in the R36SX
+native build.  `REP MOVSB/MOVSW/MOVSD` now uses direct RAM block copies when
+`DF=0` and both source and destination spans are entirely conventional RAM.
+Overlapping forward copies are still handled byte/word/dword in x86 order, not
+with `memmove`, so overlap semantics remain the same as the CPU instruction.
+
+`REP STOSB/STOSW/STOSD` also bypasses per-byte `getmem`/`putmem` when the
+destination is conventional RAM.  VGA, EMS, HMA, A20 wrapping, BIOS ROM, and
+reverse-direction string ops continue to use the exact older memory path.
+
+Rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --enable-mips-dsp --strip --out homebrew/pico_286/pico_286.dsp
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286
+.\tools\scan-download.ps1 -Path homebrew\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path disk_image\MIPS_NATIVE\pico_286\pico_286.dsp
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 -Path patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286.dsp
+```
+
+Result:
+
+- `homebrew/pico_286/pico_286`
+  - Size: 431,456 bytes
+  - SHA256: `03802F2B799638D3B4DFA21518E26880961B27DC43C1EF66AC1AF3B4F026B12C`
+- `homebrew/pico_286/pico_286.dsp`
+  - Size: 424,224 bytes
+  - SHA256: `6792F3E53E786690776A18CD61D37FB45022DFE02E1A933A6BCFDED8022A70F7`
+- Defender scan: found no threats for the rebuilt binaries and their
+  `disk_image` / `patches` copies.
+
 ## 2026-05-30 PCjs CPU test floppy
 
 Downloaded the PCjs CPU test sources with a sparse Git checkout:

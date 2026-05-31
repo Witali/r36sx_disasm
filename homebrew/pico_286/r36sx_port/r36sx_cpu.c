@@ -1,5 +1,6 @@
 #include <time.h>
 #include <stdbool.h>
+#include <string.h>
 #include "emulator.h"
 
 #define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
@@ -352,10 +353,220 @@ static inline void r36sx_set_dst_index(uint32_t value)
     }
 }
 
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+static inline int r36sx_rep_offset_span_no_wrap(uint32_t offset,
+                                                uint32_t bytes,
+                                                int index32)
+{
+    if (bytes == 0u) {
+        return 1;
+    }
+    if (index32) {
+        return offset <= UINT32_MAX - (bytes - 1u);
+    }
+    return bytes <= 0x10000u && offset <= 0x10000u - bytes;
+}
+
+static inline int r36sx_rep_ram_span(uint16_t segment,
+                                     uint32_t offset,
+                                     uint32_t bytes,
+                                     uint32_t *linear,
+                                     int index32)
+{
+    uint32_t base;
+    uint32_t address;
+
+    if (!r36sx_rep_offset_span_no_wrap(offset, bytes, index32)) {
+        return 0;
+    }
+    base = segbase(segment);
+    if (offset > UINT32_MAX - base) {
+        return 0;
+    }
+    address = base + offset;
+    if (!r36sx_memory_fast_ram_range(address, bytes)) {
+        return 0;
+    }
+    *linear = address;
+    return 1;
+}
+
+static inline int r36sx_rep_ranges_overlap(uint32_t a,
+                                           uint32_t b,
+                                           uint32_t bytes)
+{
+    return a < b + bytes && b < a + bytes;
+}
+
+static inline void r36sx_rep_movs_ram_forward(uint32_t src,
+                                              uint32_t dst,
+                                              uint32_t count,
+                                              uint32_t unit_bytes)
+{
+    uint32_t bytes = count * unit_bytes;
+    uint8_t *src_ptr = RAM + src;
+    uint8_t *dst_ptr = RAM + dst;
+
+    if (!r36sx_rep_ranges_overlap(src, dst, bytes)) {
+        memcpy(dst_ptr, src_ptr, bytes);
+        return;
+    }
+
+    /* x86 forward MOVS does not have memmove's reverse-copy overlap semantics. */
+    for (uint32_t i = 0; i < count; i++) {
+        uint8_t value0 = src_ptr[0];
+        dst_ptr[0] = value0;
+        if (unit_bytes >= 2u) {
+            uint8_t value1 = src_ptr[1];
+            dst_ptr[1] = value1;
+        }
+        if (unit_bytes == 4u) {
+            uint8_t value2 = src_ptr[2];
+            uint8_t value3 = src_ptr[3];
+            dst_ptr[2] = value2;
+            dst_ptr[3] = value3;
+        }
+        src_ptr += unit_bytes;
+        dst_ptr += unit_bytes;
+    }
+}
+
+static inline int r36sx_rep_try_movs_ram(uint32_t count,
+                                         uint32_t unit_bytes,
+                                         uint32_t si,
+                                         uint32_t di,
+                                         int index32)
+{
+    uint32_t src;
+    uint32_t dst;
+    uint32_t bytes = count * unit_bytes;
+
+    if (df || count == 0u) {
+        return 0;
+    }
+    if (!r36sx_rep_ram_span(useseg, si, bytes, &src, index32) ||
+        !r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32)) {
+        return 0;
+    }
+
+    r36sx_rep_movs_ram_forward(src, dst, count, unit_bytes);
+    if (index32) {
+        r36sx_set_src_index(si + bytes);
+        r36sx_set_dst_index(di + bytes);
+    } else {
+        CPU_SI = (uint16_t)(si + bytes);
+        CPU_DI = (uint16_t)(di + bytes);
+    }
+    return 1;
+}
+
+static inline void r36sx_rep_stosw_ram(uint32_t dst,
+                                       uint32_t count,
+                                       uint16_t value)
+{
+    if ((((uintptr_t)(void *)(RAM + dst)) & 1u) == 0u) {
+        uint16_t *ptr = (uint16_t *)(RAM + dst);
+        while (count--) {
+            *ptr++ = value;
+        }
+        return;
+    }
+
+    uint8_t *ptr = RAM + dst;
+    while (count--) {
+        ptr[0] = (uint8_t)value;
+        ptr[1] = (uint8_t)(value >> 8);
+        ptr += 2;
+    }
+}
+
+static inline void r36sx_rep_stosd_ram(uint32_t dst,
+                                       uint32_t count,
+                                       uint32_t value)
+{
+    if ((((uintptr_t)(void *)(RAM + dst)) & 3u) == 0u) {
+        uint32_t *ptr = (uint32_t *)(RAM + dst);
+        while (count--) {
+            *ptr++ = value;
+        }
+        return;
+    }
+
+    uint8_t *ptr = RAM + dst;
+    while (count--) {
+        ptr[0] = (uint8_t)value;
+        ptr[1] = (uint8_t)(value >> 8);
+        ptr[2] = (uint8_t)(value >> 16);
+        ptr[3] = (uint8_t)(value >> 24);
+        ptr += 4;
+    }
+}
+
+static inline int r36sx_rep_try_stos_ram(uint32_t count,
+                                         uint32_t unit_bytes,
+                                         uint32_t di,
+                                         int index32)
+{
+    uint32_t dst;
+    uint32_t bytes = count * unit_bytes;
+
+    if (df || count == 0u) {
+        return 0;
+    }
+    if (!r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32)) {
+        return 0;
+    }
+
+    if (unit_bytes == 1u) {
+        memset(RAM + dst, CPU_AL, bytes);
+    } else if (unit_bytes == 2u) {
+        r36sx_rep_stosw_ram(dst, count, CPU_AX);
+    } else {
+        r36sx_rep_stosd_ram(dst, count, CPU_EAX);
+    }
+    if (index32) {
+        r36sx_set_dst_index(di + bytes);
+    } else {
+        CPU_DI = (uint16_t)(di + bytes);
+    }
+    return 1;
+}
+#else
+static inline int r36sx_rep_try_movs_ram(uint32_t count,
+                                         uint32_t unit_bytes,
+                                         uint32_t si,
+                                         uint32_t di,
+                                         int index32)
+{
+    (void)count;
+    (void)unit_bytes;
+    (void)si;
+    (void)di;
+    (void)index32;
+    return 0;
+}
+
+static inline int r36sx_rep_try_stos_ram(uint32_t count,
+                                         uint32_t unit_bytes,
+                                         uint32_t di,
+                                         int index32)
+{
+    (void)count;
+    (void)unit_bytes;
+    (void)di;
+    (void)index32;
+    return 0;
+}
+#endif
+
 static inline void r36sx_rep_movsb(uint32_t count)
 {
     uint16_t si = CPU_SI;
     uint16_t di = CPU_DI;
+
+    if (r36sx_rep_try_movs_ram(count, 1u, CPU_SI, CPU_DI, 0)) {
+        return;
+    }
 
     if (df) {
         while (count--) {
@@ -380,6 +591,10 @@ static inline void r36sx_rep_movsw(uint32_t count)
     uint16_t si = CPU_SI;
     uint16_t di = CPU_DI;
 
+    if (r36sx_rep_try_movs_ram(count, 2u, CPU_SI, CPU_DI, 0)) {
+        return;
+    }
+
     if (df) {
         while (count--) {
             putmem16(CPU_ES, di, getmem16(useseg, si));
@@ -402,6 +617,10 @@ static inline void r36sx_rep_movsd(uint32_t count)
 {
     uint32_t si = r36sx_src_index();
     uint32_t di = r36sx_dst_index();
+
+    if (r36sx_rep_try_movs_ram(count, 4u, si, di, addressSizeOverride)) {
+        return;
+    }
 
     if (df) {
         while (count--) {
@@ -426,6 +645,10 @@ static inline void r36sx_rep_stosb(uint32_t count)
     uint16_t di = CPU_DI;
     uint8_t value = CPU_AL;
 
+    if (r36sx_rep_try_stos_ram(count, 1u, CPU_DI, 0)) {
+        return;
+    }
+
     if (df) {
         while (count--) {
             putmem8(CPU_ES, di, value);
@@ -446,6 +669,10 @@ static inline void r36sx_rep_stosd(uint32_t count)
     uint32_t di = r36sx_dst_index();
     uint32_t value = CPU_EAX;
 
+    if (r36sx_rep_try_stos_ram(count, 4u, di, addressSizeOverride)) {
+        return;
+    }
+
     if (df) {
         while (count--) {
             putmem32(CPU_ES, di, value);
@@ -465,6 +692,10 @@ static inline void r36sx_rep_stosw(uint32_t count)
 {
     uint16_t di = CPU_DI;
     uint16_t value = CPU_AX;
+
+    if (r36sx_rep_try_stos_ram(count, 2u, CPU_DI, 0)) {
+        return;
+    }
 
     if (df) {
         while (count--) {

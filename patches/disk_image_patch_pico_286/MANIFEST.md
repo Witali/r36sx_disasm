@@ -1716,3 +1716,19 @@ pico_286.dsp size: 422960 bytes
 pico_286.dsp SHA256: 28D85715B02BFC4D400DD2A29690C598FE56C3EF0D96C59D8D0287AC718AF354
 Defender scan: found no threats
 ```
+
+## 2026-05-31 REP MOVS/STOS RAM block-copy path
+
+The current `pico_286` and `pico_286.dsp` binaries include a conservative fast
+path for repeated string instructions.  `REP MOVSB/MOVSW/MOVSD` uses direct
+conventional-RAM copies for `DF=0`, and `REP STOSB/STOSW/STOSD` uses direct
+RAM fills.  VGA, EMS, HMA, A20 wrapping, BIOS ROM, and reverse-direction ops
+continue to use the older exact memory helpers.
+
+```text
+pico_286 size: 431456 bytes
+pico_286 SHA256: 03802F2B799638D3B4DFA21518E26880961B27DC43C1EF66AC1AF3B4F026B12C
+pico_286.dsp size: 424224 bytes
+pico_286.dsp SHA256: 6792F3E53E786690776A18CD61D37FB45022DFE02E1A933A6BCFDED8022A70F7
+Defender scan: found no threats
+```
