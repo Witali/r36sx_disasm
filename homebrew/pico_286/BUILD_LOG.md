@@ -1,5 +1,39 @@
 # pico-286 Build Log
 
+## 2026-05-31 CPU interpreter source split
+
+Split the R36SX CPU interpreter helpers out of the large `r36sx_cpu.c`
+translation unit into logical include files:
+
+- `r36sx_cpu_8086.inl` keeps 8086/80186-compatible arithmetic, flags, divide,
+  and 16-bit group-op helpers used by the base interpreter.
+- `r36sx_cpu_80286.inl` keeps protected-mode descriptor, selector, CR0/LMSW,
+  and segment-cache helpers.
+- `r36sx_cpu_80286_interrupts.inl` keeps protected-mode interrupt delivery and
+  the current VCPI-facing stub.
+- `r36sx_cpu_80386.inl` keeps 32-bit operand-size helpers, bit-test helpers,
+  32-bit group ops, and the extended `0F` opcode dispatcher.
+
+The main `r36sx_cpu.c` still includes these files into one translation unit so
+GCC can inline the hot interpreter paths exactly as before.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `445420` bytes
+- `pico_286` SHA256:
+  `09564384CDA4E216723AECB087D0891B23BEA63F2117C1DE6CF03BE28BB0FD7B`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-05-31 INT 13h EDD/LBA hard-disk support
 
 Implemented basic Enhanced Disk Drive services in the R36SX native disk backend:
