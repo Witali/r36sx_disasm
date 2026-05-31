@@ -204,12 +204,12 @@ to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
 after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
-The separate composition buffer is still used for the on-screen keyboard,
-disk menu, and key preset editor.  `keyboard_mode=normal` resizes the DOS
-image above the on-screen keyboard; `keyboard_mode=overlay` keeps the DOS
-image unscaled and draws the keyboard over it from a cached keyboard buffer.
-The small disk activity LED is drawn into `SCREEN` only for the present call,
-then its saved rectangle is restored.
+Full-screen menus such as the disk menu and key preset editor draw directly into
+the output frame and skip DOS-frame composition underneath them.
+`keyboard_mode=normal` resizes the DOS image above the on-screen keyboard;
+`keyboard_mode=overlay` keeps the DOS image unscaled and draws the keyboard over
+it from a cached keyboard buffer.  The small disk activity LED is drawn into
+`SCREEN` only for the present call, then its saved rectangle is restored.
 
 This build also enables the computed-goto CPU opcode dispatcher, so the main
 `exec86()` loop jumps directly to opcode handlers instead of entering the large

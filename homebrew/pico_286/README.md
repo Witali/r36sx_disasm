@@ -11,14 +11,14 @@ integration pieces:
 - `r36sx_minifb.c` implements the small upstream `MiniFB` API through
   `/mnt/sdcard/cubegm/driver.so` video and joypad input.  The R36SX renderer
   now uses a 16-bit RGB565 `SCREEN` buffer end-to-end.  Normal DOS frames are
-  presented directly from `SCREEN`; separate composition buffers are only used
-  for the on-screen keyboard and full-screen menus.  The expensive DOS-video
-  renderer runs only after visible emulated video state changes, while small
-  overlays can still update through saved rectangles.  `[video] keyboard_mode`
-  controls whether the on-screen keyboard resizes the DOS image (`normal`) or
-  covers it without scaling (`overlay`).  In overlay mode, the keyboard panel
-  is cached in its own RGB565 buffer and refreshed only when the visible
-  keyboard state changes.
+  presented directly from `SCREEN`.  Full-screen menus draw directly into the
+  output frame and skip DOS-frame composition, while small overlays can still
+  update through saved rectangles.  The expensive DOS-video renderer runs only
+  after visible emulated video state changes.  `[video] keyboard_mode` controls
+  whether the on-screen keyboard resizes the DOS image (`normal`) or covers it
+  without scaling (`overlay`).  In overlay mode, the keyboard panel is cached in
+  its own RGB565 buffer and refreshed only when the visible keyboard state
+  changes.
 - `r36sx_linux_audio.c` implements upstream `linux-audio.h` through
   `driver.so` `sound_driver_playframe()`, preserving mixer volume after audio
   initialization.

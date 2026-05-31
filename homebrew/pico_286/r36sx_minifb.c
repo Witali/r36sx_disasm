@@ -1613,6 +1613,12 @@ static int r36sx_mfb_large_overlay_active(uint32_t now_ms)
            r36sx_mfb_screenshot_toast_visible(now_ms);
 }
 
+static int r36sx_mfb_fullscreen_menu_active(void)
+{
+    return r36sx_disk_menu_is_visible(&g_mfb.disk_menu) ||
+           r36sx_key_presets_is_visible(&g_mfb.key_presets);
+}
+
 static int r36sx_mfb_nearest_source_y(int dst_y, int dst_h, int src_h)
 {
     int sy = (int)(((int64_t)(2 * dst_y + 1) * src_h) /
@@ -2071,6 +2077,7 @@ int mfb_update(void *buffer, int fps_limit)
     int source_dirty;
     int source_changed;
     int large_overlay_active;
+    int fullscreen_menu_active;
     int osk_overlay_active;
     int osk_overlay_refresh_due;
     int disk_led_active;
@@ -2116,6 +2123,7 @@ int mfb_update(void *buffer, int fps_limit)
     osk_overlay_active = r36sx_osk_direct_overlay_active();
     osk_overlay_refresh_due =
         osk_overlay_active && r36sx_mfb_osk_overlay_cache_due();
+    fullscreen_menu_active = r36sx_mfb_fullscreen_menu_active();
     large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
     stats_overlay_visible = r36sx_app_stats_is_visible();
@@ -2140,18 +2148,20 @@ int mfb_update(void *buffer, int fps_limit)
     }
 
     if (large_overlay_active) {
-        if (source_dirty) {
-            r36sx_mfb_copy_source(src, content_h, source_h, scaling_filter);
-            g_mfb.base_generation = frame_generation;
-            g_mfb.base_content_h = content_h;
-            g_mfb.base_source_h = source_h;
-            g_mfb.base_scaling_filter = scaling_filter;
-            g_mfb.base_frame_valid = 1;
+        if (!fullscreen_menu_active) {
+            if (source_dirty) {
+                r36sx_mfb_copy_source(src, content_h, source_h, scaling_filter);
+                g_mfb.base_generation = frame_generation;
+                g_mfb.base_content_h = content_h;
+                g_mfb.base_source_h = source_h;
+                g_mfb.base_scaling_filter = scaling_filter;
+                g_mfb.base_frame_valid = 1;
+            }
+            memcpy(g_mfb.frame, g_mfb.base_frame,
+                   (size_t)g_mfb.width * (size_t)g_mfb.height *
+                       sizeof(g_mfb.frame[0]));
+            r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
         }
-        memcpy(g_mfb.frame, g_mfb.base_frame,
-               (size_t)g_mfb.width * (size_t)g_mfb.height *
-                   sizeof(g_mfb.frame[0]));
-        r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
         if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
             r36sx_disk_menu_draw_overlay();
         } else if (r36sx_key_presets_is_visible(&g_mfb.key_presets)) {
@@ -2159,13 +2169,17 @@ int mfb_update(void *buffer, int fps_limit)
         } else {
             r36sx_osk_draw();
         }
-        r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
-        r36sx_mfb_draw_fn_help_overlay(g_mfb.frame);
+        if (!fullscreen_menu_active) {
+            r36sx_mfb_draw_stats_overlay(g_mfb.frame, now_ms);
+            r36sx_mfb_draw_fn_help_overlay(g_mfb.frame);
+        }
         if (g_mfb.screenshot_requested) {
             r36sx_mfb_finish_screenshot(g_mfb.frame);
             now_ms = r36sx_mfb_now_ms32();
         }
-        r36sx_mfb_draw_screenshot_toast(g_mfb.frame, now_ms);
+        if (!fullscreen_menu_active) {
+            r36sx_mfb_draw_screenshot_toast(g_mfb.frame, now_ms);
+        }
         g_mfb.disp_frame(g_mfb.frame, g_mfb.width, g_mfb.height, g_mfb.stride);
         r36sx_app_stats_record_frame();
     } else {

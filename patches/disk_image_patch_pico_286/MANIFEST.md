@@ -32,6 +32,16 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-05-31 fullscreen menu direct draw
+
+The current `pico_286` binary skips DOS-frame composition while the full-screen
+disk menu or key preset editor is visible.  Those menus fill the whole output
+frame themselves, so MiniFB no longer prepares `base_frame`, copies it into the
+present frame, or mixes small overlays over those menu frames.
+
+pico_286 size: 1391064 bytes
+pico_286 SHA256: 3258BA6D20AD2591F4E9F6D0F7827E6D17D8BF250BDE468DC7033CA5A332425D
+
 ## 2026-05-31 cached overlay keyboard
 
 The current `pico_286` binary optimizes `[video] keyboard_mode=overlay`.
@@ -497,10 +507,11 @@ compatible `libz.so.1` libraries.
 ## 2026-05-30 direct-present video path
 
 The current `pico_286` binary presents normal DOS frames directly from the
-emulator `SCREEN` buffer to `driver.so`.  The separate composition buffers are
-still used for the on-screen keyboard, disk menu, and key preset editor.  The
-small red disk activity LED now saves and restores its rectangle around the
-present call, so it does not leave pixels inside the emulator framebuffer.
+emulator `SCREEN` buffer to `driver.so`.  Full-screen menus later changed to
+draw directly into the output frame without precomposing a DOS frame underneath
+them.  The small red disk activity LED now saves and restores its rectangle
+around the present call, so it does not leave pixels inside the emulator
+framebuffer.
 
 ## 2026-05-30 runtime profiling option
 

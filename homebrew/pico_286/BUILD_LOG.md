@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-05-31 fullscreen menu direct draw
+
+Optimized the full-screen MiniFB menu path.
+
+- The disk menu and key preset editor already fill the whole output frame.
+- When either full-screen menu is visible, `mfb_update()` now skips
+  `SCREEN` -> `base_frame` preparation and skips copying the cached DOS frame
+  back into the output frame.
+- The small overlay layers are not mixed over these menus; the menu draw owns
+  the full frame for that present.
+- Normal DOS frames, saved-rectangle overlays, and the cached overlay keyboard
+  path keep their previous direct-present behavior.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286.ps1 -TryStrip
+```
+
+`zig objcopy --strip-all` still returned `error: unimplemented`, so the
+unstripped binary was kept.
+
+Result:
+
+- `pico_286` size: `1391064` bytes
+- `pico_286` SHA256:
+  `3258BA6D20AD2591F4E9F6D0F7827E6D17D8BF250BDE468DC7033CA5A332425D`
+
+Scan command:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286
+```
+
+Microsoft Defender reported no threats.  The `disk_image` and patch copies are
+byte-identical by SHA256.
+
 ## 2026-05-31 cached overlay keyboard
 
 Optimized `[video] keyboard_mode=overlay`.
@@ -1826,9 +1863,9 @@ from ordinary DOS/game frames.
 
 The red disk activity LED now uses a small save/restore rectangle in direct
 mode: the LED is drawn into `SCREEN` for the `video_driver_disp_frame()` call,
-then the original pixels are restored immediately.  Full-screen overlays still
-use the separate composition buffers so the keyboard scaling and menus do not
-pollute the emulator framebuffer.
+then the original pixels are restored immediately.  Full-screen menus later
+changed to draw directly into the output frame without precomposing a DOS frame
+underneath them.
 
 ## 2026-05-30 runtime profiling option
 
