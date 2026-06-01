@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-01 compact 386 condition-code helper
+
+Rewrote the shared 386 `Jcc`/`SETcc` condition helper so it evaluates the
+eight even x86 condition predicates and applies the low opcode bit as the
+standard inverse selector.  The comments now name the paired mnemonics
+(`O/NO`, `B/NB`, `Z/NZ`, `LE/G`, and so on), which keeps the compact form
+readable while avoiding 16 nearly duplicated switch cases.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `466180` bytes
+- `pico_286` SHA256:
+  `183D55AE623785F7DA6DF08BDFF7D37C5431B17AA959ACDF2A6EE70D63255FB1`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 debug invalid-opcode hex dump
 
 Added a debug-only 256-byte code-context dump to the shared invalid-opcode

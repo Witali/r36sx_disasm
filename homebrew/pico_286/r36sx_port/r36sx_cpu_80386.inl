@@ -87,25 +87,25 @@ static inline void r36sx_cpu_alu_rm_imm32(uint8_t aluop, uint8_t rmval,
 
 static inline uint8_t r36sx_cpu_condition(uint8_t condition)
 {
-    switch (condition & 0x0F) {
-        case 0x0: return of;
-        case 0x1: return !of;
-        case 0x2: return cf;
-        case 0x3: return !cf;
-        case 0x4: return zf;
-        case 0x5: return !zf;
-        case 0x6: return cf || zf;
-        case 0x7: return !cf && !zf;
-        case 0x8: return sf;
-        case 0x9: return !sf;
-        case 0xA: return pf;
-        case 0xB: return !pf;
-        case 0xC: return sf != of;
-        case 0xD: return sf == of;
-        case 0xE: return zf || (sf != of);
-        case 0xF: return !zf && (sf == of);
+    uint8_t value;
+
+    /*
+     * x86 condition codes are paired: the even opcode tests the base
+     * predicate, and the following odd opcode tests its inverse.
+     */
+    switch (condition & 0x0E) {
+        case 0x0: value = of != 0; break;          /* O / NO */
+        case 0x2: value = cf != 0; break;          /* B/C/NAE / NB/NC/AE */
+        case 0x4: value = zf != 0; break;          /* Z/E / NZ/NE */
+        case 0x6: value = (cf || zf) != 0; break;  /* BE/NA / NBE/A */
+        case 0x8: value = sf != 0; break;          /* S / NS */
+        case 0xA: value = pf != 0; break;          /* P/PE / NP/PO */
+        case 0xC: value = (sf != of); break;       /* L/NGE / NL/GE */
+        case 0xE: value = (zf || (sf != of)) != 0; break; /* LE/NG / NLE/G */
+        default: value = 0; break;
     }
-    return 0;
+
+    return (uint8_t)(value ^ (condition & 1u));
 }
 
 static __not_in_flash() uint32_t op_grp2_32(uint8_t cnt, uint32_t value) {
