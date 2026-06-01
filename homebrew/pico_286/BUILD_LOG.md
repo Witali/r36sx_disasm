@@ -1,5 +1,25 @@
 # pico-286 Build Log
 
+## 2026-06-01 move on-screen keyboard F5-F8 group
+
+The on-screen keyboard function-key row now moves the `F5`-to-`F8` block one
+pixel to the right while keeping the `F9`-to-`F12` block in place.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `471108` bytes
+- `pico_286` SHA256:
+  `8BE6C8DA6E707415F4E66D792EA93B16AEC6D2AB15D4A049C2B550FF86BC93B8`
+- Microsoft Defender scan: no threats found.
+
 ## 2026-06-01 fake on-screen keyboard navigation cells
 
 The on-screen keyboard navigation grid now treats the visual gap between
