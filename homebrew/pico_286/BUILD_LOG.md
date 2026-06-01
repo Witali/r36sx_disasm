@@ -1,5 +1,36 @@
 # pico-286 Build Log
 
+## 2026-06-01 safer host-drive connect requests
+
+Hardened the disk menu `CONNECT DISK H:` path against two edge cases:
+
+- if the button is pressed while the emulated CPU is inside a guest interrupt
+  handler, the MAPDRIVE trampoline request now stays pending and starts only
+  after the corresponding real-mode `IRET` returns the interrupt depth to zero;
+- after a successful connection, repeated `CONNECT DISK H:` presses are ignored
+  instead of running the redirector registration again.
+
+The guest interrupt depth is incremented only when `intcall86()` falls through
+to the real-mode IVT path and decremented by real-mode `IRET`.  VM reset clears
+the depth counter, pending request, in-progress marker, and connected flag.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `468196` bytes
+- `pico_286` SHA256:
+  `CC2E8CF295FCBBC60C628C5C21A4577ACC63965AA8EEF145810E03BE0601289B`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 disk menu action button spacing
 
 Moved the disk menu `OK`/`Cancel` action row so it is anchored to the last menu
