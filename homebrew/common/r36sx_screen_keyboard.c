@@ -1226,7 +1226,7 @@ static int row_extra_gap_w(int row, int col, int unit_w)
         gap -= 1;
     }
     if (row == 0 && col == 8) {
-        gap += 3;
+        gap += 2;
     }
     return gap;
 }
