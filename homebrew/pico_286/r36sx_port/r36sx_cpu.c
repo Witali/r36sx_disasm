@@ -199,9 +199,7 @@ typedef struct {
 static volatile uint8_t r36sx_mapdrive_pending;
 static uint8_t r36sx_mapdrive_in_progress;
 static uint8_t r36sx_mapdrive_connected;
-static uint8_t r36sx_mapdrive_defer_logged;
 static uint8_t r36sx_mapdrive_last_status = 0xffu;
-static uint8_t r36sx_real_interrupt_depth;
 static r36sx_mapdrive_cpu_state_t r36sx_mapdrive_saved_state;
 static uint8_t r36sx_mapdrive_scratch_backup[R36SX_MAPDRIVE_SCRATCH_BYTES];
 
@@ -217,7 +215,6 @@ void r36sx_pico286_request_connect_host_drive(void)
             "mapdrive: connect request ignored, already pending");
         return;
     }
-    r36sx_mapdrive_defer_logged = 0;
     r36sx_mapdrive_pending = 1;
 }
 
@@ -275,16 +272,6 @@ static void r36sx_mapdrive_finish(uint8_t status)
 static void r36sx_mapdrive_start_if_pending(void)
 {
     if (!r36sx_mapdrive_pending || r36sx_mapdrive_in_progress) {
-        return;
-    }
-
-    if (r36sx_real_interrupt_depth != 0) {
-        if (!r36sx_mapdrive_defer_logged) {
-            r36sx_pico286_debug_log(
-                "mapdrive: deferred, guest interrupt depth=%u",
-                r36sx_real_interrupt_depth);
-            r36sx_mapdrive_defer_logged = 1;
-        }
         return;
     }
 
@@ -3510,9 +3497,6 @@ void intcall86(uint8_t intnum) {
     push(ip);
     r36sx_cpu_load_segment(regcs, getmem16(0, (uint16_t) intnum * 4 + 2));
     ip = getmem16(0, (uint16_t) intnum * 4);
-    if (r36sx_real_interrupt_depth != 0xffu) {
-        r36sx_real_interrupt_depth++;
-    }
     ifl = 0;
     tf = 0;
 }
@@ -3534,11 +3518,9 @@ void reset86() {
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
-    r36sx_real_interrupt_depth = 0;
     r36sx_mapdrive_pending = 0;
     r36sx_mapdrive_in_progress = 0;
     r36sx_mapdrive_connected = 0;
-    r36sx_mapdrive_defer_logged = 0;
     r36sx_mapdrive_last_status = 0xffu;
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
@@ -6662,9 +6644,6 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #else
                 decodeflagsword(pop() & 0x0FFF);
 #endif
-                if (r36sx_real_interrupt_depth != 0) {
-                    r36sx_real_interrupt_depth--;
-                }
 
 
                 /*

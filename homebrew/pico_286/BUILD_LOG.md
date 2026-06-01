@@ -1,5 +1,32 @@
 # pico-286 Build Log
 
+## 2026-06-01 remove host-drive interrupt-depth gate
+
+Removed the guest interrupt-depth gate from the disk menu `CONNECT DISK H:`
+path.  That gate could keep the MAPDRIVE request pending forever at a normal
+DOS prompt, because COMMAND.COM and DOS console input can wait inside an
+`INT 21h` handler.  The connection path is back to the direct embedded
+trampoline behavior, while retaining the unrelated repeated-press guard:
+after a successful `H:` connection, later connect requests are ignored until
+the VM is reset.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `468068` bytes
+- `pico_286` SHA256:
+  `19FD8A33A3B917E0E8D87951078F0EE85AA3A3E5EE2CD057BE7AA123CA89A77E`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 safer host-drive connect requests
 
 Hardened the disk menu `CONNECT DISK H:` path against two edge cases:
