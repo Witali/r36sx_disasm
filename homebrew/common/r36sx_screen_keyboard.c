@@ -315,8 +315,8 @@ static const struct r36sx_osk_key g_osk_symbol_row5[] = {
 
 static const struct r36sx_osk_key g_osk_cursor_keys[] = {
     R36SX_OSK_KEY("PRT", R36SX_SCREEN_KEY_PRINT, 0),
-    R36SX_OSK_KEY("SCR", R36SX_SCREEN_KEY_SCROLL, 0),
-    R36SX_OSK_KEY("PAU", R36SX_SCREEN_KEY_PAUSE, 0),
+    R36SX_OSK_KEY("SL", R36SX_SCREEN_KEY_SCROLL, 0),
+    R36SX_OSK_KEY("P/B", R36SX_SCREEN_KEY_PAUSE, 0),
     R36SX_OSK_KEY("INS", R36SX_SCREEN_KEY_INSERT, 0),
     R36SX_OSK_KEY("HOM", R36SX_SCREEN_KEY_HOME, 0),
     R36SX_OSK_KEY("PUP", R36SX_SCREEN_KEY_PRIOR, 0),

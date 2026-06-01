@@ -1,5 +1,25 @@
 # pico-286 Build Log
 
+## 2026-06-01 shorter on-screen keyboard system-key labels
+
+Shortened the on-screen keyboard cursor/system block labels: Scroll Lock now
+draws as `SL`, and Pause Break now draws as `P/B`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `471108` bytes
+- `pico_286` SHA256:
+  `404F89A9C23A13E4AE93A1F62484600F85D5F182FC0C0BD3F86E6B5ACDAC31D7`
+- Microsoft Defender scan: no threats found.
+
 ## 2026-06-01 on-screen keyboard navigation grid
 
 The on-screen keyboard now uses the provided `key-map.csv` style 6x18
