@@ -1,5 +1,11 @@
 # pico-286 Build Log
 
+## 2026-06-01 stats Q glyph fix
+
+Fixed the compact statistics overlay font by adding a 3x5 `Q` glyph.  The
+`QPS` row no longer loses its first letter when the `Fn` + D-pad `Down`
+statistics overlay is visible.
+
 ## 2026-06-01 app statistics QPS
 
 Added `QPS` to the `Fn` + D-pad `Down` statistics overlay.  It counts main-loop

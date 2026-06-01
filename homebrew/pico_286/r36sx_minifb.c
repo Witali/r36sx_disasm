@@ -400,6 +400,7 @@ static const uint8_t *r36sx_mfb_stats_glyph(char ch)
     static const uint8_t glyph_i[5] = { 7, 2, 2, 2, 7 };
     static const uint8_t glyph_k[5] = { 5, 5, 6, 5, 5 };
     static const uint8_t glyph_p[5] = { 6, 5, 6, 4, 4 };
+    static const uint8_t glyph_q[5] = { 7, 5, 5, 7, 1 };
     static const uint8_t glyph_r[5] = { 6, 5, 6, 5, 5 };
     static const uint8_t glyph_s[5] = { 7, 4, 7, 1, 7 };
     static const uint8_t glyph_t[5] = { 7, 2, 2, 2, 2 };
@@ -422,6 +423,7 @@ static const uint8_t *r36sx_mfb_stats_glyph(char ch)
     case 'I': return glyph_i;
     case 'K': return glyph_k;
     case 'P': return glyph_p;
+    case 'Q': return glyph_q;
     case 'R': return glyph_r;
     case 'S': return glyph_s;
     case 'T': return glyph_t;
