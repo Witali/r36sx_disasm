@@ -147,6 +147,259 @@ void intcall86(uint8_t intnum);
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
+
+static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear);
+static inline uint16_t r36sx_cpu_read_linear16(uint32_t linear);
+static inline uint32_t r36sx_cpu_read_linear32(uint32_t linear);
+static inline void r36sx_cpu_write_linear8(uint32_t linear, uint8_t value);
+static inline void r36sx_cpu_write_linear16(uint32_t linear, uint16_t value);
+static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value);
+
+/*
+ * getmem*/putmem* model guest segment-register accesses and must enforce
+ * protected-mode descriptor limits and permissions.  read*/write* helpers stay
+ * linear for descriptor tables, paging structures, and already-checked EAs.
+ */
+static inline uint8_t r36sx_cpu_pick_segment_cache(
+    uint8_t segid,
+    uint16_t selector,
+    uint8_t *out_segid,
+    const r36sx_segment_cache_t **out_cache)
+{
+    if (segid > reggs || segselector16[segid] != selector) {
+        return 0;
+    }
+
+    *out_segid = segid;
+    *out_cache = &r36sx_seg_cache[segid];
+    return 1;
+}
+
+static uint8_t r36sx_cpu_find_segment_cache(
+    uint16_t selector,
+    uint8_t *segid,
+    const r36sx_segment_cache_t **cache)
+{
+    if (r36sx_cpu_pick_segment_cache(regcs, selector, segid, cache) ||
+        r36sx_cpu_pick_segment_cache(regss, selector, segid, cache) ||
+        r36sx_cpu_pick_segment_cache(reges, selector, segid, cache) ||
+        r36sx_cpu_pick_segment_cache(regds, selector, segid, cache) ||
+        r36sx_cpu_pick_segment_cache(regfs, selector, segid, cache) ||
+        r36sx_cpu_pick_segment_cache(reggs, selector, segid, cache)) {
+        return 1;
+    }
+
+    for (uint8_t i = reges; i <= reggs; i++) {
+        if (r36sx_seg_cache[i].selector == selector) {
+            *segid = i;
+            *cache = &r36sx_seg_cache[i];
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static uint8_t r36sx_cpu_check_segment_cache_access(
+    uint8_t segid,
+    const r36sx_segment_cache_t *cache,
+    uint32_t offset,
+    uint32_t bytes,
+    uint8_t write_access,
+    uint8_t execute_access)
+{
+    if (!r36sx_cpu_protected_enabled() || bytes == 0u) {
+        return 1;
+    }
+
+    if (!cache || !cache->valid) {
+        r36sx_cpu_raise_exception(
+            segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
+            segid == regss ? 0u : (cache ? cache->selector & 0xfffcu : 0u),
+            1, CPU_IP);
+        return 0;
+    }
+
+    if (execute_access) {
+        if (!r36sx_descriptor_is_code(cache)) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
+                                      cache->selector & 0xfffcu,
+                                      1, CPU_IP);
+            return 0;
+        }
+    } else if (write_access) {
+        if (!r36sx_descriptor_is_writable_data(cache)) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
+                                      cache->selector & 0xfffcu,
+                                      1, CPU_IP);
+            return 0;
+        }
+    } else if (r36sx_descriptor_is_code(cache)) {
+        if (!r36sx_descriptor_is_readable_code(cache)) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
+                                      cache->selector & 0xfffcu,
+                                      1, CPU_IP);
+            return 0;
+        }
+    } else if (!r36sx_descriptor_is_data(cache)) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
+                                  cache->selector & 0xfffcu,
+                                  1, CPU_IP);
+        return 0;
+    }
+
+    uint32_t last = offset + bytes - 1u;
+    uint8_t overflow = last < offset;
+    uint8_t limit_fault;
+
+    if (r36sx_descriptor_is_expand_down_data(cache)) {
+        uint32_t upper = (cache->flags & R36SX_DESCRIPTOR_FLAG_DB) ?
+                         0xffffffffu : 0xffffu;
+        limit_fault = overflow || offset <= cache->limit || last > upper;
+    } else {
+        limit_fault = overflow || last > cache->limit;
+    }
+
+    if (limit_fault) {
+        r36sx_cpu_raise_exception(
+            segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
+            segid == regss ? 0u : (cache->selector & 0xfffcu), 1, CPU_IP);
+        return 0;
+    }
+
+    return 1;
+}
+
+static uint8_t r36sx_cpu_segment_linear_checked(
+    uint16_t selector,
+    uint32_t offset,
+    uint32_t bytes,
+    uint8_t write_access,
+    uint8_t execute_access,
+    uint32_t *linear)
+{
+    if (!r36sx_cpu_protected_enabled()) {
+        *linear = ((uint32_t)selector << 4) + offset;
+        return 1;
+    }
+
+    uint8_t segid = 0xffu;
+    const r36sx_segment_cache_t *cache = NULL;
+    if (!r36sx_cpu_find_segment_cache(selector, &segid, &cache)) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, CPU_IP);
+        return 0;
+    }
+
+    if (!r36sx_cpu_check_segment_cache_access(
+            segid, cache, offset, bytes, write_access, execute_access)) {
+        return 0;
+    }
+
+    if (offset > UINT32_MAX - cache->base) {
+        r36sx_cpu_raise_exception(
+            segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
+            segid == regss ? 0u : (cache->selector & 0xfffcu), 1, CPU_IP);
+        return 0;
+    }
+
+    *linear = cache->base + offset;
+    return 1;
+}
+
+static inline uint8_t r36sx_cpu_selector_is_current_cs(uint16_t selector)
+{
+    return r36sx_cpu_protected_enabled() && selector == CPU_CS;
+}
+
+static inline uint8_t r36sx_cpu_getmem8_checked(uint16_t selector,
+                                                uint32_t offset)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(
+            selector, offset, 1u, 0, r36sx_cpu_selector_is_current_cs(selector),
+            &linear)) {
+        return 0xffu;
+    }
+    return r36sx_cpu_read_linear8(linear);
+}
+
+static inline uint16_t r36sx_cpu_getmem16_checked(uint16_t selector,
+                                                  uint32_t offset)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(
+            selector, offset, 2u, 0, r36sx_cpu_selector_is_current_cs(selector),
+            &linear)) {
+        return 0xffffu;
+    }
+    return r36sx_cpu_read_linear16(linear);
+}
+
+static inline uint32_t r36sx_cpu_getmem32_checked(uint16_t selector,
+                                                  uint32_t offset)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(
+            selector, offset, 4u, 0, r36sx_cpu_selector_is_current_cs(selector),
+            &linear)) {
+        return 0xffffffffu;
+    }
+    return r36sx_cpu_read_linear32(linear);
+}
+
+static inline void r36sx_cpu_putmem8_checked(uint16_t selector,
+                                             uint32_t offset,
+                                             uint8_t value)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(selector, offset, 1u, 1, 0,
+                                          &linear)) {
+        return;
+    }
+    r36sx_cpu_write_linear8(linear, value);
+}
+
+static inline void r36sx_cpu_putmem16_checked(uint16_t selector,
+                                              uint32_t offset,
+                                              uint16_t value)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(selector, offset, 2u, 1, 0,
+                                          &linear)) {
+        return;
+    }
+    r36sx_cpu_write_linear16(linear, value);
+}
+
+static inline void r36sx_cpu_putmem32_checked(uint16_t selector,
+                                              uint32_t offset,
+                                              uint32_t value)
+{
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(selector, offset, 4u, 1, 0,
+                                          &linear)) {
+        return;
+    }
+    r36sx_cpu_write_linear32(linear, value);
+}
+
+#undef getmem8
+#undef getmem16
+#undef getmem32
+#undef putmem8
+#undef putmem16
+#undef putmem32
+#define getmem8(x, y) r36sx_cpu_getmem8_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem16(x, y) r36sx_cpu_getmem16_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem32(x, y) r36sx_cpu_getmem32_checked((uint16_t)(x), (uint32_t)(y))
+#define putmem8(x, y, z) \
+    r36sx_cpu_putmem8_checked((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
+#define putmem16(x, y, z) \
+    r36sx_cpu_putmem16_checked((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
+#define putmem32(x, y, z) \
+    r36sx_cpu_putmem32_checked((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
+
 static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
 {
     return i8259_controller.interrupt_request_register &
@@ -234,19 +487,18 @@ static inline int r36sx_rep_ram_span(uint16_t segment,
                                      uint32_t offset,
                                      uint32_t bytes,
                                      uint32_t *linear,
-                                     int index32)
+                                     int index32,
+                                     uint8_t write_access)
 {
-    uint32_t base;
     uint32_t address;
 
     if (!r36sx_rep_offset_span_no_wrap(offset, bytes, index32)) {
         return 0;
     }
-    base = segbase(segment);
-    if (offset > UINT32_MAX - base) {
+    if (!r36sx_cpu_segment_linear_checked(segment, offset, bytes,
+                                          write_access, 0, &address)) {
         return 0;
     }
-    address = base + offset;
     if (!r36sx_memory_fast_ram_range(address, bytes)) {
         return 0;
     }
@@ -307,8 +559,8 @@ static inline int r36sx_rep_try_movs_ram(uint32_t count,
     if (df || count == 0u) {
         return 0;
     }
-    if (!r36sx_rep_ram_span(useseg, si, bytes, &src, index32) ||
-        !r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32)) {
+    if (!r36sx_rep_ram_span(useseg, si, bytes, &src, index32, 0) ||
+        !r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32, 1)) {
         return 0;
     }
 
@@ -376,7 +628,7 @@ static inline int r36sx_rep_try_stos_ram(uint32_t count,
     if (df || count == 0u) {
         return 0;
     }
-    if (!r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32)) {
+    if (!r36sx_rep_ram_span(CPU_ES, di, bytes, &dst, index32, 1)) {
         return 0;
     }
 
@@ -1240,71 +1492,23 @@ static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value)
     r36sx_cpu_write_linear16((uint32_t)(address), (uint16_t)(value))
 #define writedw86(address, value) \
     r36sx_cpu_write_linear32((uint32_t)(address), (uint32_t)(value))
-#define getmem8(x, y) read86(segbase(x) + (uint32_t)(y))
-#define getmem16(x, y) readw86(segbase(x) + (uint32_t)(y))
-#define getmem32(x, y) readdw86(segbase(x) + (uint32_t)(y))
-#define putmem8(x, y, z) write86(segbase(x) + (uint32_t)(y), (z))
-#define putmem16(x, y, z) writew86(segbase(x) + (uint32_t)(y), (z))
-#define putmem32(x, y, z) writedw86(segbase(x) + (uint32_t)(y), (z))
+#define getmem8(x, y) r36sx_cpu_getmem8_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem16(x, y) r36sx_cpu_getmem16_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem32(x, y) r36sx_cpu_getmem32_checked((uint16_t)(x), (uint32_t)(y))
+#define putmem8(x, y, z) \
+    r36sx_cpu_putmem8_checked((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
+#define putmem16(x, y, z) \
+    r36sx_cpu_putmem16_checked((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
+#define putmem32(x, y, z) \
+    r36sx_cpu_putmem32_checked((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
 
 static uint8_t r36sx_cpu_check_segment_access(uint32_t offset,
                                               uint32_t bytes,
                                               uint8_t write_access)
 {
-    if (!r36sx_cpu_protected_enabled() || bytes == 0u) {
-        return 1;
-    }
-
-    r36sx_segment_cache_t *cache = NULL;
-    uint8_t segid = 0xffu;
-    for (uint8_t i = reges; i <= reggs; i++) {
-        if (r36sx_seg_cache[i].valid &&
-            r36sx_seg_cache[i].selector == useseg &&
-            segbase32[i] == useseg_base) {
-            cache = &r36sx_seg_cache[i];
-            segid = i;
-            break;
-        }
-    }
-
-    if (cache == NULL || !cache->valid) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
-        return 0;
-    }
-
-    if (write_access) {
-        if (!r36sx_descriptor_is_writable_data(cache)) {
-            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, useseg & 0xfffcu,
-                                      1, CPU_IP);
-            return 0;
-        }
-    } else if (r36sx_descriptor_is_code(cache) &&
-               !r36sx_descriptor_is_readable_code(cache)) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, useseg & 0xfffcu,
-                                  1, CPU_IP);
-        return 0;
-    }
-
-    uint32_t last = offset + bytes - 1u;
-    uint8_t overflow = last < offset;
-    uint8_t limit_fault = 0;
-
-    if (r36sx_descriptor_is_expand_down_data(cache)) {
-        uint32_t upper = (cache->flags & R36SX_DESCRIPTOR_FLAG_DB) ?
-                         0xffffffffu : 0xffffu;
-        limit_fault = overflow || offset <= cache->limit || last > upper;
-    } else {
-        limit_fault = overflow || last > cache->limit;
-    }
-
-    if (limit_fault) {
-        r36sx_cpu_raise_exception(
-            segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            segid == regss ? 0u : (useseg & 0xfffcu), 1, CPU_IP);
-        return 0;
-    }
-
-    return 1;
+    uint32_t linear;
+    return r36sx_cpu_segment_linear_checked(useseg, offset, bytes,
+                                            write_access, 0, &linear);
 }
 
 static INLINE void push(uint16_t pushval) {
@@ -3971,19 +4175,13 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 modregrm();
 
                 getea(rm);
-                if (
-                    signext32(getreg16(reg)
-                    ) <
-                    signext32(getmem16(ea >> 4, ea & 15)
-                    )) {
+                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
+                    break;
+                }
+                if (signext32(getreg16(reg)) < signext32(readw86(ea))) {
                     intcall86(5); //bounds check exception
                 } else {
-                    ea += 2;
-                    if (
-                        signext32(getreg16(reg)
-                        ) >
-                        signext32(getmem16(ea >> 4, ea & 15)
-                        )) {
+                    if (signext32(getreg16(reg)) > signext32(readw86(ea + 2u))) {
                         intcall86(5); //bounds check exception
                     }
                 }
@@ -5476,9 +5674,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 modregrm();
 
                 getea(rm);
-                putreg16(reg, read86(ea) + read86(ea + 1) * 256);
-                r36sx_cpu_load_segment(
-                    reges, read86(ea + 2) + read86(ea + 3) * 256);
+                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
+                    break;
+                }
+                putreg16(reg, readw86(ea));
+                r36sx_cpu_load_segment(reges, readw86(ea + 2u));
                 break;
 
             case 0xC5:
@@ -5489,9 +5689,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 modregrm();
 
                 getea(rm);
-                putreg16(reg, read86(ea) + read86(ea + 1) * 256);
-                r36sx_cpu_load_segment(
-                    regds, read86(ea + 2) + read86(ea + 3) * 256);
+                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
+                    break;
+                }
+                putreg16(reg, readw86(ea));
+                r36sx_cpu_load_segment(regds, readw86(ea + 2u));
                 break;
 
             case 0xC6:

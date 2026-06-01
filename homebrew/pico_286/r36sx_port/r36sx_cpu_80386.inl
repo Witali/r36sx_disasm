@@ -711,6 +711,9 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 }
                 case 3: { /* CALL Mp */
                     getea(rm);
+                    if (!r36sx_cpu_check_segment_access(ea - useseg_base, 6u, 0)) {
+                        return true;
+                    }
                     uint32_t target_ip = readdw86(ea);
                     uint16_t target_cs = readw86(ea + 4);
                     push(CPU_CS);
@@ -724,6 +727,9 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     return true;
                 case 5: { /* JMP Mp */
                     getea(rm);
+                    if (!r36sx_cpu_check_segment_access(ea - useseg_base, 6u, 0)) {
+                        return true;
+                    }
                     uint32_t target_ip = readdw86(ea);
                     r36sx_cpu_load_segment(regcs, readw86(ea + 4));
                     r36sx_cpu_set_ip(target_ip);
@@ -753,6 +759,11 @@ static __not_in_flash() void r36sx_cpu_exec_bit_test(uint8_t operation,
         getea(rm);
         if (register_offset) {
             ea += (bit_offset / width) * (uint32_t)(width / 8u);
+        }
+        if (!r36sx_cpu_check_segment_access(
+                ea - useseg_base, (uint32_t)(width / 8u),
+                operation != 0u)) {
+            return;
         }
         value = operandSizeOverride ? readdw86(ea) : readw86(ea);
     } else {

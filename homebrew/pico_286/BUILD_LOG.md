@@ -1,5 +1,14 @@
 # pico-286 Build Log
 
+## 2026-06-01 protected-mode segment access checks
+
+Changed the CPU core so `getmem*` and `putmem*` go through protected-mode
+segment limit/type checks instead of directly doing `segbase + offset`.
+The REP MOVS/STOS RAM fast path now validates the whole source/destination
+span before using the block-copy shortcut, and the remaining direct `ea`
+reads for BOUND, LES/LDS, 386 far CALL/JMP, and memory bit-test operations are
+guarded by the same segment access helper.
+
 ## 2026-06-01 stats Q glyph fix
 
 Fixed the compact statistics overlay font by adding a 3x5 `Q` glyph.  The
