@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-06-01 disk menu host-drive connector
+
+Updated the disk image menu to match the key preset editor layout more closely:
+drive/config rows use the same compact row height and gap, the bottom action
+row now has side-by-side `OK` and `Cancel` buttons, and the old `SAVE/APPLY`
+row is replaced by `OK`.  Added a `CONNECT DISK H:` row after `HDD1 D:`.
+
+`CONNECT DISK H:` no longer needs a separate `MAPDRIVE.COM` file copied into
+the DOS disk.  Pico-286 now embeds a tiny MAPDRIVE-compatible COM trampoline in
+the native executable, backs up RAM at `9000:0000`, copies the trampoline to
+`9000:0100`, runs it in real mode, catches a private `INT F1h`, restores the
+previous CPU/RAM scratch state, and leaves DOS's CDS/redirector changes in
+place.  The command is refused if protected mode is active, if the scratch
+segment is outside conventional RAM, or if DOS has not installed an `INT 21h`
+vector yet.  `CONFIG.SYS` still needs `LASTDRIVE=H` or higher.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `467972` bytes
+- `pico_286` SHA256:
+  `1AB5A08924450FC5DA85239A68E8306EB1B791AF78C47A40B1F38B7CF92D81E4`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 compact 386 condition-code helper
 
 Rewrote the shared 386 `Jcc`/`SETcc` condition helper so it evaluates the

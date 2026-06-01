@@ -151,6 +151,7 @@ static volatile uint8_t g_post_code_value;
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
 extern void r36sx_pico286_request_soft_reset(void);
+extern void r36sx_pico286_request_connect_host_drive(void);
 extern void r36sx_pico286_audio_play_shutter(void);
 
 static uint64_t r36sx_mfb_now_us(void)
@@ -1375,6 +1376,11 @@ static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
         r36sx_pico286_debug_log("minifb: disk menu BIOS change reset");
         r36sx_mfb_disk_menu_set_visible(0);
         r36sx_pico286_request_soft_reset();
+    }
+    if ((result & R36SX_DISK_MENU_RESULT_CONNECT_HOST_DRIVE) != 0) {
+        r36sx_pico286_debug_log("minifb: disk menu connect host drive H");
+        g_mfb.input_release_guard = 1;
+        r36sx_pico286_request_connect_host_drive();
     }
     if ((result & (R36SX_DISK_MENU_RESULT_CLOSED |
                    R36SX_DISK_MENU_RESULT_EXIT_APP |

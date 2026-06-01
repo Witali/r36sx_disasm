@@ -150,6 +150,158 @@ void intcall86(uint8_t intnum);
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
 
+#define R36SX_MAPDRIVE_SEGMENT 0x9000u
+#define R36SX_MAPDRIVE_LINEAR 0x90000u
+#define R36SX_MAPDRIVE_IP 0x0100u
+#define R36SX_MAPDRIVE_SCRATCH_BYTES 0x10000u
+
+/*
+ * Tiny COM-style trampoline equivalent to tools/mapdrive.asm, embedded in the
+ * native executable.  It runs under real DOS, asks DOS for List-of-Lists/SDA,
+ * marks CDS entry H: as NET|PHY, calls the built-in INT 2Fh redirector, then
+ * returns through private INT F1h instead of terminating a DOS process.
+ */
+static const uint8_t r36sx_mapdrive_trampoline[] = {
+    0xB4, 0x52, 0xCD, 0x21,                         /* mov ah,52h; int 21h */
+    0xBE, 0x21, 0x00, 0x26, 0x8A, 0x10,             /* mov dl,[es:bx+21h] */
+    0xBE, 0x16, 0x00, 0x26, 0xC4, 0x18,             /* les bx,[es:bx+16h] */
+    0x81, 0xFB, 0xFF, 0xFF, 0x75, 0x07,             /* cmp bx,ffff; jne ok */
+    0x8C, 0xC0, 0x3D, 0xFF, 0xFF, 0x74, 0x41,       /* cmp es,ffff; je err */
+    0xB0, 0x07, 0x38, 0xD0, 0x7F, 0x3F,             /* H > lastdrive? */
+    0x89, 0xDF, 0x31, 0xC0, 0xB0, 0x07, 0xB3, 0x58, /* di=cds[H] */
+    0xF6, 0xE3, 0x01, 0xC7,
+    0x26, 0xC7, 0x45, 0x43, 0x00, 0xC0,             /* CDS flags NET|PHY */
+    0x26, 0xC6, 0x05, 0x48,                         /* "H:\\" */
+    0x26, 0xC6, 0x45, 0x01, 0x3A,
+    0x26, 0xC6, 0x45, 0x02, 0x5C,
+    0x26, 0xC6, 0x45, 0x03, 0x00,
+    0xB8, 0x06, 0x5D, 0x1E, 0x56, 0xCD, 0x21,       /* get SDA DS:SI */
+    0x8C, 0xDB, 0x89, 0xF2, 0x5E, 0x1F,
+    0xB8, 0x00, 0x11, 0xCD, 0x2F,                   /* redirector init */
+    0xB0, 0x00, 0xCD, 0xF1,                         /* success */
+    0xB0, 0x01, 0xCD, 0xF1,                         /* invalid CDS */
+    0xB0, 0x02, 0xCD, 0xF1                          /* LASTDRIVE too low */
+};
+
+typedef struct {
+    uint32_t dwordregs[8];
+    uint32_t segregs32[6];
+    uint16_t segselector16[6];
+    uint32_t segbase32[6];
+    r36sx_segment_cache_t seg_cache[6];
+    x86_flags_t flags;
+    uint32_t ip32;
+    uint16_t useseg;
+    uint32_t useseg_base;
+    uint8_t hltstate;
+} r36sx_mapdrive_cpu_state_t;
+
+static volatile uint8_t r36sx_mapdrive_pending;
+static uint8_t r36sx_mapdrive_in_progress;
+static uint8_t r36sx_mapdrive_last_status = 0xffu;
+static r36sx_mapdrive_cpu_state_t r36sx_mapdrive_saved_state;
+static uint8_t r36sx_mapdrive_scratch_backup[R36SX_MAPDRIVE_SCRATCH_BYTES];
+
+void r36sx_pico286_request_connect_host_drive(void)
+{
+    r36sx_mapdrive_pending = 1;
+}
+
+static void r36sx_mapdrive_save_cpu_state(void)
+{
+    memcpy(r36sx_mapdrive_saved_state.dwordregs, dwordregs,
+           sizeof(r36sx_mapdrive_saved_state.dwordregs));
+    memcpy(r36sx_mapdrive_saved_state.segregs32, segregs32,
+           sizeof(r36sx_mapdrive_saved_state.segregs32));
+    memcpy(r36sx_mapdrive_saved_state.segselector16, segselector16,
+           sizeof(r36sx_mapdrive_saved_state.segselector16));
+    memcpy(r36sx_mapdrive_saved_state.segbase32, segbase32,
+           sizeof(r36sx_mapdrive_saved_state.segbase32));
+    memcpy(r36sx_mapdrive_saved_state.seg_cache, r36sx_seg_cache,
+           sizeof(r36sx_mapdrive_saved_state.seg_cache));
+    r36sx_mapdrive_saved_state.flags = x86_flags;
+    r36sx_mapdrive_saved_state.ip32 = ip32;
+    r36sx_mapdrive_saved_state.useseg = useseg;
+    r36sx_mapdrive_saved_state.useseg_base = useseg_base;
+    r36sx_mapdrive_saved_state.hltstate = hltstate;
+}
+
+static void r36sx_mapdrive_restore_cpu_state(void)
+{
+    memcpy(dwordregs, r36sx_mapdrive_saved_state.dwordregs,
+           sizeof(r36sx_mapdrive_saved_state.dwordregs));
+    memcpy(segregs32, r36sx_mapdrive_saved_state.segregs32,
+           sizeof(r36sx_mapdrive_saved_state.segregs32));
+    memcpy(segselector16, r36sx_mapdrive_saved_state.segselector16,
+           sizeof(r36sx_mapdrive_saved_state.segselector16));
+    memcpy(segbase32, r36sx_mapdrive_saved_state.segbase32,
+           sizeof(r36sx_mapdrive_saved_state.segbase32));
+    memcpy(r36sx_seg_cache, r36sx_mapdrive_saved_state.seg_cache,
+           sizeof(r36sx_mapdrive_saved_state.seg_cache));
+    x86_flags = r36sx_mapdrive_saved_state.flags;
+    ip32 = r36sx_mapdrive_saved_state.ip32;
+    useseg = r36sx_mapdrive_saved_state.useseg;
+    useseg_base = r36sx_mapdrive_saved_state.useseg_base;
+    hltstate = r36sx_mapdrive_saved_state.hltstate;
+}
+
+static void r36sx_mapdrive_finish(uint8_t status)
+{
+    memcpy(&RAM[R36SX_MAPDRIVE_LINEAR], r36sx_mapdrive_scratch_backup,
+           sizeof(r36sx_mapdrive_scratch_backup));
+    r36sx_mapdrive_restore_cpu_state();
+    r36sx_mapdrive_last_status = status;
+    r36sx_mapdrive_in_progress = 0;
+    r36sx_pico286_debug_log("mapdrive: finished status=%u", status);
+}
+
+static void r36sx_mapdrive_start_if_pending(void)
+{
+    if (!r36sx_mapdrive_pending || r36sx_mapdrive_in_progress) {
+        return;
+    }
+    r36sx_mapdrive_pending = 0;
+
+    if (r36sx_cpu_protected_enabled()) {
+        r36sx_mapdrive_last_status = 3;
+        r36sx_pico286_debug_log("mapdrive: refused in protected mode");
+        return;
+    }
+    if (R36SX_MAPDRIVE_LINEAR + R36SX_MAPDRIVE_SCRATCH_BYTES > RAM_SIZE) {
+        r36sx_mapdrive_last_status = 4;
+        r36sx_pico286_debug_log("mapdrive: scratch segment outside RAM");
+        return;
+    }
+    uint16_t int21_off = (uint16_t)RAM[0x21u * 4u] |
+                         ((uint16_t)RAM[0x21u * 4u + 1u] << 8);
+    uint16_t int21_seg = (uint16_t)RAM[0x21u * 4u + 2u] |
+                         ((uint16_t)RAM[0x21u * 4u + 3u] << 8);
+    if ((int21_off | int21_seg) == 0u) {
+        r36sx_mapdrive_last_status = 5;
+        r36sx_pico286_debug_log("mapdrive: refused, DOS INT 21h unavailable");
+        return;
+    }
+
+    r36sx_mapdrive_save_cpu_state();
+    memcpy(r36sx_mapdrive_scratch_backup, &RAM[R36SX_MAPDRIVE_LINEAR],
+           sizeof(r36sx_mapdrive_scratch_backup));
+    memset(&RAM[R36SX_MAPDRIVE_LINEAR], 0, R36SX_MAPDRIVE_SCRATCH_BYTES);
+    memcpy(&RAM[R36SX_MAPDRIVE_LINEAR + R36SX_MAPDRIVE_IP],
+           r36sx_mapdrive_trampoline, sizeof(r36sx_mapdrive_trampoline));
+
+    for (uint8_t segid = reges; segid <= reggs; segid++) {
+        r36sx_cpu_load_segment(segid, R36SX_MAPDRIVE_SEGMENT);
+    }
+    memset(dwordregs, 0, sizeof(dwordregs));
+    CPU_SP = 0xfffeu;
+    CPU_IP = R36SX_MAPDRIVE_IP;
+    x86_flags.value = 2u;
+    r36sx_cpu_use_segment(regds);
+    hltstate = 0;
+    r36sx_mapdrive_in_progress = 1;
+    r36sx_pico286_debug_log("mapdrive: trampoline started");
+}
+
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear);
 static inline uint16_t r36sx_cpu_read_linear16(uint32_t linear);
 static inline uint32_t r36sx_cpu_read_linear32(uint32_t linear);
@@ -2944,6 +3096,11 @@ static int r36sx_bios_boot_configured_order(void)
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
+    if (intnum == 0xF1 && r36sx_mapdrive_in_progress) {
+        r36sx_mapdrive_finish(CPU_AL);
+        return;
+    }
+
     if (r36sx_cpu_protected_enabled() &&
         r36sx_cpu_protected_interrupt(intnum, 0, 0)) {
         return;
@@ -3388,6 +3545,8 @@ void __not_in_flash() exec86(uint32_t execloops) {
     static uint32_t firstip;
     static bool was_TF;
     uint32_t loopcount = 0;
+
+    r36sx_mapdrive_start_if_pending();
 
     //counterticks = (uint64_t) ( (double) timerfreq / (double) 65536.0);
     //tickssource();

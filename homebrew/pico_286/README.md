@@ -167,15 +167,13 @@ lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
 or A/Y on a drive row cycles through matching files found in the configured
 `image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
 `.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
-The
-`BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try the
-floppy or hard disk first.  The `SAVE/APPLY` row writes current bindings to
-`pico_286.conf` and applies them.  The `EXIT APP` row exits Pico-286 so
-hard-disk changes can be seen after restart.  B/X cancels the menu.
-`SAVE/APPLY` writes the selected bindings and boot order to `pico_286.conf`
-and calls `insertdisk()` for the running emulator.  For hard-disk changes, DOS
-may still cache drive state, so the `EXIT APP` row is available for a clean
-restart through TinyMC.
+The `CONNECT DISK H:` row runs an embedded MAPDRIVE-compatible trampoline from
+emulator RAM after DOS has booted; `CONFIG.SYS` must contain `LASTDRIVE=H` or
+higher.  The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot
+can try the floppy or hard disk first.  The `OK` button writes current bindings
+and boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
+Pico-286 so hard-disk changes can be seen after restart.  `Cancel`, B, or X
+cancels the menu.
 
 On-screen keyboard controls:
 
@@ -407,9 +405,9 @@ rerendered.  Set it to `0` to disable the shortcut and overlay.
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are
 resolved next to `pico_286.conf`, so the default `host` means
-`MIPS_NATIVE/pico_286/host` on the SD card.  DOS still needs to run
-`MAPDRIVE.COM` once after boot, and `CONFIG.SYS` must contain `LASTDRIVE=H` or
-higher so DOS allocates a CDS entry for drive `H:`.
+`MIPS_NATIVE/pico_286/host` on the SD card.  The disk menu can run the embedded
+MAPDRIVE-compatible trampoline once after DOS boots, and `CONFIG.SYS` must
+contain `LASTDRIVE=H` or higher so DOS allocates a CDS entry for drive `H:`.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

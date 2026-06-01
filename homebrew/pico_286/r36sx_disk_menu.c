@@ -11,12 +11,13 @@
 
 #define R36SX_DISK_MENU_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define R36SX_DISK_MENU_DRIVE_COUNT 4
-#define R36SX_DISK_MENU_ROW_BOOT_ORDER 4
-#define R36SX_DISK_MENU_ROW_BIOS 5
-#define R36SX_DISK_MENU_ROW_SAVE 6
+#define R36SX_DISK_MENU_ROW_CONNECT_H 4
+#define R36SX_DISK_MENU_ROW_BOOT_ORDER 5
+#define R36SX_DISK_MENU_ROW_BIOS 6
 #define R36SX_DISK_MENU_ROW_EXIT 7
-#define R36SX_DISK_MENU_ROW_CANCEL 8
-#define R36SX_DISK_MENU_ROW_COUNT 9
+#define R36SX_DISK_MENU_ROW_OK 8
+#define R36SX_DISK_MENU_ROW_CANCEL 9
+#define R36SX_DISK_MENU_ROW_COUNT 10
 
 #define R36SX_DISK_BOOT_ORDER_AC 0u
 #define R36SX_DISK_BOOT_ORDER_CA 1u
@@ -572,12 +573,31 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
         return R36SX_DISK_MENU_RESULT_CLOSED;
     }
     if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
-        menu->selected_row = menu->selected_row == 0 ?
-            R36SX_DISK_MENU_ROW_COUNT - 1 : menu->selected_row - 1;
+        if (menu->selected_row == 0) {
+            menu->selected_row = R36SX_DISK_MENU_ROW_CANCEL;
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK ||
+                   menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+            menu->selected_row = R36SX_DISK_MENU_ROW_EXIT;
+        } else {
+            menu->selected_row--;
+        }
     }
     if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
-        menu->selected_row = (uint8_t)((menu->selected_row + 1) %
-                                       R36SX_DISK_MENU_ROW_COUNT);
+        if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
+            menu->selected_row = R36SX_DISK_MENU_ROW_OK;
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK ||
+                   menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+            menu->selected_row = 0;
+        } else {
+            menu->selected_row++;
+        }
+    }
+    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0 &&
+        menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+        menu->selected_row = R36SX_DISK_MENU_ROW_OK;
+    } else if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0 &&
+               menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
+        menu->selected_row = R36SX_DISK_MENU_ROW_CANCEL;
     }
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
         (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
@@ -606,7 +626,11 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
             cycle_boot_order(menu, 1);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS) {
             cycle_bios(menu);
-        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_SAVE) {
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CONNECT_H) {
+            snprintf(menu->message, sizeof(menu->message),
+                     "CONNECTING HOST DRIVE H:");
+            return R36SX_DISK_MENU_RESULT_CONNECT_HOST_DRIVE;
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
             return apply_disk_bindings(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
             return R36SX_DISK_MENU_RESULT_EXIT_APP;
@@ -637,7 +661,7 @@ static void draw_row(const struct r36sx_disk_menu *menu,
 
     fill_rect(frame, width, height, stride, x, y, w, h, bg);
     stroke_rect(frame, width, height, stride, x, y, w, h, border);
-    draw_text(frame, width, height, stride, x + 10, y + 7, text, fg, 2);
+    draw_text(frame, width, height, stride, x + 10, y + 5, text, fg, 2);
 }
 
 void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
@@ -647,11 +671,15 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
                           int stride_pixels)
 {
     char line[160];
-    int x = 36;
-    int y = 88;
+    int x = 28;
+    int y = 86;
     int full_w = width - x * 2;
-    const int row_h = 30;
-    const int gap = 6;
+    int ok_w = 128;
+    int ok_gap = 24;
+    int ok_x = (width - ok_w * 2 - ok_gap) / 2;
+    int cancel_x = ok_x + ok_w + ok_gap;
+    const int row_h = 24;
+    const int gap = 4;
 
     if (!r36sx_disk_menu_is_visible(menu) || !frame) {
         return;
@@ -664,7 +692,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     draw_text(frame, width, height, stride_pixels, 28, 28, "DISK MENU",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
-              "LEFT/RIGHT CHANGE  A/Y CHANGE  X/B CANCEL  SAVE APPLIES",
+              "LEFT/RIGHT CHANGE  A/Y SELECT/OK  X/B CANCEL",
               rgb565(180, 202, 208), 1);
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
@@ -676,7 +704,11 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
         y += row_h + gap;
     }
 
-    y += 10;
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_CONNECT_H, x, y, full_w, row_h,
+             "CONNECT DISK H:");
+    y += row_h + gap + 10;
+
     snprintf(line, sizeof(line), "BOOT ORDER  %s",
              boot_order_label(menu->boot_order_choice));
     draw_row(menu, frame, width, height, stride_pixels,
@@ -688,13 +720,13 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
              R36SX_DISK_MENU_ROW_BIOS, x, y, full_w, row_h, line);
     y += row_h + gap;
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_SAVE, x, y, full_w, row_h, "SAVE/APPLY");
-    y += row_h + gap;
-    draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_EXIT, x, y, full_w, row_h, "EXIT APP");
-    y += row_h + gap;
+
+    y = height - 54;
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_CANCEL, x, y, full_w, row_h, "CANCEL");
+             R36SX_DISK_MENU_ROW_OK, ok_x, y, ok_w, 28, "OK");
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_CANCEL, cancel_x, y, ok_w, 28, "CANCEL");
 
     if (menu->message[0]) {
         int msg_w = text_width(menu->message, 1);
