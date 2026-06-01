@@ -4,6 +4,48 @@
  * compiler can still inline hot interpreter paths.
  */
 
+#if DEBUG
+#define R36SX_INVALID_OPCODE_DUMP_BYTES 256u
+#define R36SX_INVALID_OPCODE_DUMP_HALF (R36SX_INVALID_OPCODE_DUMP_BYTES / 2u)
+
+static inline void r36sx_cpu_log_invalid_opcode_dump(uint32_t fault_ip)
+{
+    const uint32_t center_ip = r36sx_cpu_mask_ip(fault_ip);
+    const uint32_t start_ip = r36sx_cpu_mask_ip(fault_ip - R36SX_INVALID_OPCODE_DUMP_HALF);
+
+    r36sx_pico286_debug_log(
+        "[CPU] INT6 context dump cs=%04X center=%08lX start=%08lX bytes=%lu",
+        CPU_CS,
+        (unsigned long)center_ip,
+        (unsigned long)start_ip,
+        (unsigned long)R36SX_INVALID_OPCODE_DUMP_BYTES);
+
+    for (uint32_t row = 0; row < R36SX_INVALID_OPCODE_DUMP_BYTES; row += 16u) {
+        uint8_t bytes[16];
+        char marks[17];
+
+        for (uint32_t col = 0; col < 16u; ++col) {
+            const uint32_t code_ip = r36sx_cpu_mask_ip(start_ip + row + col);
+            bytes[col] = getmem8(CPU_CS, code_ip);
+            marks[col] = (code_ip == center_ip) ? '^' : ' ';
+        }
+        marks[16] = '\0';
+
+        r36sx_pico286_debug_log(
+            "[CPU] %04X:%08lX  "
+            "%02X %02X %02X %02X %02X %02X %02X %02X  "
+            "%02X %02X %02X %02X %02X %02X %02X %02X  |%s|",
+            CPU_CS,
+            (unsigned long)r36sx_cpu_mask_ip(start_ip + row),
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15],
+            marks);
+    }
+}
+#endif
+
 static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
 {
     r36sx_pm_diag_log_first_fault("invalid opcode", fault_ip);
@@ -23,6 +65,7 @@ static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
         CPU_AX, CPU_BX, CPU_CX, CPU_DX,
         CPU_SI, CPU_DI, CPU_BP, CPU_SP,
         CPU_DS, CPU_ES, CPU_SS);
+    r36sx_cpu_log_invalid_opcode_dump(fault_ip);
 #endif
     r36sx_cpu_set_ip(fault_ip);
     intcall86(6);

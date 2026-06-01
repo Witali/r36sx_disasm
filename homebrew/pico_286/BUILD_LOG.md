@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-01 debug invalid-opcode hex dump
+
+Added a debug-only 256-byte code-context dump to the shared invalid-opcode
+handler.  When `DEBUG` is enabled and the CPU trips INT 6, the log now prints
+the usual register snapshot followed by 16 hex rows of 16 bytes from `CS`,
+centered around the faulting opcode.  The byte at the faulting `IP/EIP` is
+marked with `^`, which makes it easier to see the surrounding instruction
+stream when DOS programs hit an unsupported opcode.
+
+Validation and rebuild commands:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --debug-log --opt-level O3 --strip --out .tmp/pico_286_debug
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- Debug-log build succeeded; the new `DEBUG` path compiles.
+- Release `pico_286` size: `466756` bytes
+- Release `pico_286` SHA256:
+  `D10CD2D26A83E7F735EA3E7FB2C9072903155E5B8876F6CA6C2022F42A790866`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 CPU physical memory width fast path
 
 Changed the CPU core's paging-aware physical memory helpers to use the existing
