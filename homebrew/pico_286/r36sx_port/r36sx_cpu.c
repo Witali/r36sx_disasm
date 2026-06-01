@@ -105,7 +105,9 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE 0x01u
 #define R36SX_DESCRIPTOR_TYPE_LDT 0x02u
 #define R36SX_DESCRIPTOR_TYPE_TSS16_BUSY 0x03u
+#define R36SX_DESCRIPTOR_TYPE_CALL_GATE16 0x04u
 #define R36SX_DESCRIPTOR_TYPE_TASK_GATE 0x05u
+#define R36SX_DESCRIPTOR_TYPE_CALL_GATE32 0x0cu
 #define R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE 0x09u
 #define R36SX_DESCRIPTOR_TYPE_TSS32_BUSY 0x0bu
 #define R36SX_EXCEPTION_INVALID_TSS 10u
@@ -156,8 +158,8 @@ static inline void r36sx_cpu_write_linear16(uint32_t linear, uint16_t value);
 static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value);
 
 /*
- * getmem*/putmem* model guest segment-register accesses and must enforce
- * protected-mode descriptor limits and permissions.  read*/write* helpers stay
+ * getmem/putmem model guest segment-register accesses and must enforce
+ * protected-mode descriptor limits and permissions.  read/write helpers stay
  * linear for descriptor tables, paging structures, and already-checked EAs.
  */
 static inline uint8_t r36sx_cpu_pick_segment_cache(
@@ -1569,6 +1571,615 @@ static INLINE void r36sx_cpu_set_stack_pointer(uint32_t value)
     } else {
         CPU_SP = (uint16_t)value;
     }
+}
+
+typedef struct {
+    uint16_t selector;
+    uint32_t offset;
+    uint8_t param_count;
+    uint8_t type;
+    uint8_t dpl;
+    uint8_t present;
+    uint8_t is_32;
+} r36sx_far_gate_t;
+
+static INLINE void decodeflagsword(uint16_t x);
+static INLINE void decodeflagsdword(uint32_t x);
+
+static inline uint32_t r36sx_cpu_stack_pointer_value(void)
+{
+    return r36sx_cpu_stack_default32() ? CPU_ESP : CPU_SP;
+}
+
+static inline void r36sx_cpu_raise_selector_fault(uint8_t exception,
+                                                  uint16_t selector)
+{
+    r36sx_cpu_raise_exception(exception, selector & 0xfffcu, 1, CPU_IP);
+}
+
+static uint8_t r36sx_cpu_decode_descriptor_raw(uint16_t selector,
+                                               uint32_t *lo,
+                                               uint32_t *hi,
+                                               r36sx_segment_cache_t *cache)
+{
+    if ((selector & 0xfffcu) == 0) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
+        return 0;
+    }
+
+    uint32_t table_base = r36sx_gdtr_base;
+    uint32_t table_limit = r36sx_gdtr_limit;
+    if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
+        if (!r36sx_ldtr_cache.valid) {
+            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            return 0;
+        }
+        table_base = r36sx_ldtr_cache.base;
+        table_limit = r36sx_ldtr_cache.limit;
+    }
+
+    uint32_t descriptor_offset = selector & R36SX_SELECTOR_INDEX_MASK;
+    if (descriptor_offset + 7u > table_limit) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    uint32_t addr = table_base + descriptor_offset;
+    *lo = readdw86(addr);
+    *hi = readdw86(addr + 4u);
+
+    uint32_t limit = (*lo & 0xffffu) | (*hi & 0x000f0000u);
+    uint8_t flags = (uint8_t)((*hi >> 20) & 0x0fu);
+    if (flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
+        limit = (limit << 12) | 0x0fffu;
+    }
+
+    cache->selector = selector;
+    cache->base = ((*lo >> 16) & 0xffffu) |
+                  ((*hi & 0x000000ffu) << 16) |
+                  (*hi & 0xff000000u);
+    cache->limit = limit;
+    cache->access = (uint8_t)((*hi >> 8) & 0xffu);
+    cache->flags = flags;
+    cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
+    return 1;
+}
+
+static uint8_t r36sx_cpu_decode_call_gate(uint16_t selector,
+                                          r36sx_far_gate_t *gate)
+{
+    uint32_t lo;
+    uint32_t hi;
+    r36sx_segment_cache_t gate_cache;
+    memset(&gate_cache, 0, sizeof(gate_cache));
+    if (!r36sx_cpu_decode_descriptor_raw(selector, &lo, &hi, &gate_cache)) {
+        return 0;
+    }
+
+    uint8_t type = r36sx_descriptor_type(&gate_cache);
+    if (r36sx_descriptor_is_code_data(&gate_cache) ||
+        !(type == R36SX_DESCRIPTOR_TYPE_CALL_GATE16 ||
+          type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    if (!gate_cache.valid) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_NOT_PRESENT, selector);
+        return 0;
+    }
+
+    gate->selector = (uint16_t)(lo >> 16);
+    gate->offset = (lo & 0xffffu) |
+                   (type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32
+                        ? (hi & 0xffff0000u) : 0u);
+    gate->param_count = (uint8_t)(hi & 0x1fu);
+    gate->type = type;
+    gate->dpl = r36sx_descriptor_dpl(&gate_cache);
+    gate->present = gate_cache.valid;
+    gate->is_32 = type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32;
+    return 1;
+}
+
+static uint8_t r36sx_cpu_code_offset_valid(
+    uint16_t selector,
+    const r36sx_segment_cache_t *cache,
+    uint32_t offset)
+{
+    if (offset > cache->limit) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    return 1;
+}
+
+static uint8_t r36sx_cpu_load_code_for_transfer(
+    uint16_t selector,
+    uint32_t offset,
+    uint8_t gate_transfer,
+    uint8_t jump_transfer,
+    r36sx_segment_cache_t *target_cache,
+    uint8_t *new_cpl)
+{
+    if ((selector & 0xfffcu) == 0) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
+        return 0;
+    }
+
+    memset(target_cache, 0, sizeof(*target_cache));
+    if (!r36sx_cpu_decode_descriptor(selector, target_cache)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    if (!target_cache->valid) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_NOT_PRESENT, selector);
+        return 0;
+    }
+    if (!r36sx_descriptor_is_code(target_cache)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    if (!r36sx_cpu_code_offset_valid(selector, target_cache, offset)) {
+        return 0;
+    }
+
+    uint8_t cpl = r36sx_cpu_cpl();
+    uint8_t dpl = r36sx_descriptor_dpl(target_cache);
+    uint8_t rpl = r36sx_selector_rpl(selector);
+
+    if (r36sx_descriptor_is_conforming_code(target_cache)) {
+        if (dpl > cpl) {
+            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            return 0;
+        }
+        *new_cpl = cpl;
+        return 1;
+    }
+
+    if (!gate_transfer) {
+        if (dpl != cpl || rpl > cpl) {
+            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            return 0;
+        }
+        *new_cpl = cpl;
+        return 1;
+    }
+
+    if (jump_transfer) {
+        if (dpl != cpl) {
+            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            return 0;
+        }
+        *new_cpl = cpl;
+        return 1;
+    }
+
+    if (dpl > cpl) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    *new_cpl = dpl;
+    return 1;
+}
+
+static void r36sx_cpu_commit_code_transfer(uint16_t selector,
+                                           const r36sx_segment_cache_t *cache,
+                                           uint8_t cpl,
+                                           uint32_t offset)
+{
+    uint16_t loaded_selector = (uint16_t)((selector & 0xfffcu) | (cpl & 3u));
+    r36sx_segment_cache_t committed = *cache;
+    committed.selector = loaded_selector;
+    r36sx_cpu_commit_segment_cache(regcs, loaded_selector, &committed);
+    r36sx_cpu_set_ip(offset);
+}
+
+static uint8_t r36sx_cpu_decode_stack_segment_for_level(
+    uint16_t selector,
+    uint8_t cpl,
+    r36sx_segment_cache_t *stack_cache,
+    uint8_t invalid_exception)
+{
+    if ((selector & 0xfffcu) == 0) {
+        r36sx_cpu_raise_exception(invalid_exception, 0, 1, CPU_IP);
+        return 0;
+    }
+
+    memset(stack_cache, 0, sizeof(*stack_cache));
+    if (!r36sx_cpu_decode_descriptor(selector, stack_cache)) {
+        r36sx_cpu_raise_selector_fault(invalid_exception, selector);
+        return 0;
+    }
+    if (!stack_cache->valid) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_STACK, selector);
+        return 0;
+    }
+    if (!r36sx_descriptor_is_writable_data(stack_cache) ||
+        r36sx_descriptor_dpl(stack_cache) != cpl ||
+        r36sx_selector_rpl(selector) != cpl) {
+        r36sx_cpu_raise_selector_fault(invalid_exception, selector);
+        return 0;
+    }
+    return 1;
+}
+
+static void r36sx_cpu_commit_stack_segment(uint16_t selector,
+                                           const r36sx_segment_cache_t *cache)
+{
+    r36sx_segment_cache_t committed = *cache;
+    committed.selector = selector;
+    r36sx_cpu_commit_segment_cache(regss, selector, &committed);
+}
+
+static uint8_t r36sx_cpu_tss_stack_for_level(uint8_t cpl,
+                                             uint32_t *new_sp,
+                                             uint16_t *new_ss)
+{
+    if (cpl > 2u || (r36sx_tr_selector & 0xfffcu) == 0 ||
+        !r36sx_tr_cache.valid) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                                  r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
+        return 0;
+    }
+
+    uint8_t type = r36sx_descriptor_type(&r36sx_tr_cache);
+    uint32_t offset;
+    uint32_t needed_last;
+
+    if (type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE ||
+        type == R36SX_DESCRIPTOR_TYPE_TSS32_BUSY) {
+        offset = 4u + (uint32_t)cpl * 8u;
+        needed_last = offset + 5u;
+        if (needed_last > r36sx_tr_cache.limit) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                                      r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
+            return 0;
+        }
+        *new_sp = readdw86(r36sx_tr_cache.base + offset);
+        *new_ss = readw86(r36sx_tr_cache.base + offset + 4u);
+        return 1;
+    }
+
+    if (type == R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE ||
+        type == R36SX_DESCRIPTOR_TYPE_TSS16_BUSY) {
+        offset = 2u + (uint32_t)cpl * 4u;
+        needed_last = offset + 3u;
+        if (needed_last > r36sx_tr_cache.limit) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                                      r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
+            return 0;
+        }
+        *new_sp = readw86(r36sx_tr_cache.base + offset);
+        *new_ss = readw86(r36sx_tr_cache.base + offset + 2u);
+        return 1;
+    }
+
+    r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                              r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
+    return 0;
+}
+
+static inline void r36sx_cpu_push_frame_value(uint32_t value, uint8_t wide)
+{
+    if (wide) {
+        push32(value);
+    } else {
+        push((uint16_t)value);
+    }
+}
+
+static inline uint32_t r36sx_cpu_pop_frame_value(uint8_t wide)
+{
+    return wide ? pop32() : pop();
+}
+
+static void r36sx_cpu_invalidate_data_segments_for_cpl(uint8_t cpl)
+{
+    for (uint8_t segid = reges; segid <= reggs; segid++) {
+        if (segid == regcs || segid == regss ||
+            (segselector16[segid] & 0xfffcu) == 0 ||
+            !r36sx_seg_cache[segid].valid) {
+            continue;
+        }
+        if (r36sx_descriptor_is_code(&r36sx_seg_cache[segid]) &&
+            !r36sx_descriptor_is_readable_code(&r36sx_seg_cache[segid])) {
+            r36sx_cpu_clear_segment_cache(segid, segselector16[segid]);
+            continue;
+        }
+        if (r36sx_descriptor_is_conforming_code(&r36sx_seg_cache[segid])) {
+            continue;
+        }
+        if (r36sx_descriptor_dpl(&r36sx_seg_cache[segid]) < cpl) {
+            r36sx_cpu_clear_segment_cache(segid, segselector16[segid]);
+        }
+    }
+}
+
+static uint8_t r36sx_cpu_protected_far_call(uint16_t selector,
+                                            uint32_t offset,
+                                            uint8_t wide)
+{
+    uint32_t raw_lo;
+    uint32_t raw_hi;
+    r36sx_segment_cache_t descriptor_cache;
+    memset(&descriptor_cache, 0, sizeof(descriptor_cache));
+    if (!r36sx_cpu_decode_descriptor_raw(selector, &raw_lo, &raw_hi,
+                                         &descriptor_cache)) {
+        return 0;
+    }
+
+    uint8_t descriptor_type = r36sx_descriptor_type(&descriptor_cache);
+    if (r36sx_descriptor_is_code(&descriptor_cache)) {
+        r36sx_segment_cache_t target_cache;
+        uint8_t new_cpl;
+        if (!r36sx_cpu_load_code_for_transfer(selector, offset, 0, 0,
+                                              &target_cache, &new_cpl)) {
+            return 0;
+        }
+        r36sx_cpu_push_frame_value(CPU_CS, wide);
+        r36sx_cpu_push_frame_value(CPU_IP, wide);
+        r36sx_cpu_commit_code_transfer(selector, &target_cache, new_cpl,
+                                       offset);
+        return 1;
+    }
+
+    if (r36sx_descriptor_is_code_data(&descriptor_cache) ||
+        !(descriptor_type == R36SX_DESCRIPTOR_TYPE_CALL_GATE16 ||
+          descriptor_type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    r36sx_segment_cache_t target_cache;
+    uint8_t new_cpl;
+    uint8_t old_cpl = r36sx_cpu_cpl();
+
+    r36sx_far_gate_t gate;
+    if (!r36sx_cpu_decode_call_gate(selector, &gate)) {
+        return 0;
+    }
+
+    if (r36sx_priv_max(old_cpl, r36sx_selector_rpl(selector)) > gate.dpl) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    if (!r36sx_cpu_load_code_for_transfer(gate.selector, gate.offset, 1, 0,
+                                          &target_cache, &new_cpl)) {
+        return 0;
+    }
+
+    uint8_t frame_wide = gate.is_32 || wide;
+    uint16_t old_cs = CPU_CS;
+    uint32_t old_ip = CPU_IP;
+    uint16_t old_ss = CPU_SS;
+    uint32_t old_sp = r36sx_cpu_stack_pointer_value();
+
+    if (new_cpl < old_cpl) {
+        uint32_t params[32];
+        uint8_t param_count = gate.param_count;
+        uint8_t param_wide = gate.is_32;
+        uint32_t param_bytes = param_wide ? 4u : 2u;
+        uint32_t copied_param_span = (uint32_t)param_count * param_bytes;
+        uint32_t copied_param_linear;
+        if (copied_param_span &&
+            !r36sx_cpu_segment_linear_checked(old_ss, old_sp,
+                                              copied_param_span, 0, 0,
+                                              &copied_param_linear)) {
+            return 0;
+        }
+        for (uint8_t i = 0; i < param_count; i++) {
+            uint32_t param_offset = old_sp + (uint32_t)i * param_bytes;
+            params[i] = param_wide ? getmem32(old_ss, param_offset)
+                                   : getmem16(old_ss, param_offset);
+        }
+
+        uint32_t new_sp;
+        uint16_t new_ss;
+        r36sx_segment_cache_t new_ss_cache;
+        if (!r36sx_cpu_tss_stack_for_level(new_cpl, &new_sp, &new_ss) ||
+            !r36sx_cpu_decode_stack_segment_for_level(
+                new_ss, new_cpl, &new_ss_cache,
+                R36SX_EXCEPTION_INVALID_TSS)) {
+            return 0;
+        }
+
+        r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
+        r36sx_cpu_set_stack_pointer(new_sp);
+        r36sx_cpu_push_frame_value(old_ss, frame_wide);
+        r36sx_cpu_push_frame_value(old_sp, frame_wide);
+        for (uint8_t i = param_count; i > 0; i--) {
+            r36sx_cpu_push_frame_value(params[i - 1u], param_wide);
+        }
+    }
+
+    r36sx_cpu_push_frame_value(old_cs, frame_wide);
+    r36sx_cpu_push_frame_value(old_ip, frame_wide);
+    r36sx_cpu_commit_code_transfer(gate.selector, &target_cache, new_cpl,
+                                   gate.offset);
+    return 1;
+}
+
+static uint8_t r36sx_cpu_protected_far_jump(uint16_t selector,
+                                            uint32_t offset)
+{
+    uint32_t raw_lo;
+    uint32_t raw_hi;
+    r36sx_segment_cache_t descriptor_cache;
+    memset(&descriptor_cache, 0, sizeof(descriptor_cache));
+    if (!r36sx_cpu_decode_descriptor_raw(selector, &raw_lo, &raw_hi,
+                                         &descriptor_cache)) {
+        return 0;
+    }
+
+    uint8_t descriptor_type = r36sx_descriptor_type(&descriptor_cache);
+    r36sx_segment_cache_t target_cache;
+    uint8_t new_cpl;
+    if (r36sx_descriptor_is_code(&descriptor_cache)) {
+        if (!r36sx_cpu_load_code_for_transfer(selector, offset, 0, 1,
+                                              &target_cache, &new_cpl)) {
+            return 0;
+        }
+        r36sx_cpu_commit_code_transfer(selector, &target_cache, new_cpl,
+                                       offset);
+        return 1;
+    }
+
+    if (r36sx_descriptor_is_code_data(&descriptor_cache) ||
+        !(descriptor_type == R36SX_DESCRIPTOR_TYPE_CALL_GATE16 ||
+          descriptor_type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    r36sx_far_gate_t gate;
+    if (!r36sx_cpu_decode_call_gate(selector, &gate)) {
+        return 0;
+    }
+    if (r36sx_priv_max(r36sx_cpu_cpl(), r36sx_selector_rpl(selector)) >
+        gate.dpl) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    if (!r36sx_cpu_load_code_for_transfer(gate.selector, gate.offset, 1, 1,
+                                          &target_cache, &new_cpl)) {
+        return 0;
+    }
+    r36sx_cpu_commit_code_transfer(gate.selector, &target_cache, new_cpl,
+                                   gate.offset);
+    return 1;
+}
+
+static uint8_t r36sx_cpu_validate_return_code(uint16_t selector,
+                                              uint32_t offset,
+                                              uint8_t new_cpl,
+                                              r36sx_segment_cache_t *cache)
+{
+    memset(cache, 0, sizeof(*cache));
+    if ((selector & 0xfffcu) == 0 ||
+        !r36sx_cpu_decode_descriptor(selector, cache)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    if (!cache->valid) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_NOT_PRESENT, selector);
+        return 0;
+    }
+    if (!r36sx_descriptor_is_code(cache) ||
+        !r36sx_cpu_code_offset_valid(selector, cache, offset)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+
+    uint8_t dpl = r36sx_descriptor_dpl(cache);
+    if (r36sx_descriptor_is_conforming_code(cache)) {
+        if (dpl > new_cpl) {
+            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            return 0;
+        }
+    } else if (dpl != new_cpl) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    return 1;
+}
+
+static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide)
+{
+    uint8_t old_cpl = r36sx_cpu_cpl();
+    uint32_t target_ip = r36sx_cpu_pop_frame_value(wide);
+    uint16_t target_cs = (uint16_t)r36sx_cpu_pop_frame_value(wide);
+    uint8_t new_cpl = r36sx_selector_rpl(target_cs);
+    r36sx_segment_cache_t target_cache;
+
+    if (new_cpl < old_cpl ||
+        !r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
+                                        &target_cache)) {
+        return 0;
+    }
+
+    r36sx_cpu_adjust_stack(adjust);
+
+    if (new_cpl == old_cpl) {
+        r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
+                                       target_ip);
+        return 1;
+    }
+
+    uint32_t new_sp = r36sx_cpu_pop_frame_value(wide);
+    uint16_t new_ss = (uint16_t)r36sx_cpu_pop_frame_value(wide);
+    r36sx_segment_cache_t new_ss_cache;
+    if (!r36sx_cpu_decode_stack_segment_for_level(
+            new_ss, new_cpl, &new_ss_cache, R36SX_EXCEPTION_GP)) {
+        return 0;
+    }
+
+    r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
+                                   target_ip);
+    r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
+    r36sx_cpu_set_stack_pointer(new_sp);
+    r36sx_cpu_invalidate_data_segments_for_cpl(new_cpl);
+    return 1;
+}
+
+static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
+{
+    uint8_t old_cpl = r36sx_cpu_cpl();
+    uint32_t target_ip = r36sx_cpu_pop_frame_value(wide);
+    uint16_t target_cs = (uint16_t)r36sx_cpu_pop_frame_value(wide);
+    uint32_t target_flags = r36sx_cpu_pop_frame_value(wide);
+    uint8_t new_cpl = r36sx_selector_rpl(target_cs);
+    r36sx_segment_cache_t target_cache;
+
+    if (target_flags & 0x00004000u) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
+        return 0;
+    }
+
+    if (new_cpl < old_cpl ||
+        !r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
+                                        &target_cache)) {
+        return 0;
+    }
+
+    if (new_cpl == old_cpl) {
+        r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
+                                       target_ip);
+        if (wide) {
+            decodeflagsdword(target_flags);
+        } else {
+#ifdef CPU_SET_HIGH_FLAGS
+            decodeflagsword((uint16_t)target_flags | 0xF000u);
+#else
+            decodeflagsword((uint16_t)target_flags & 0x0FFFu);
+#endif
+        }
+        return 1;
+    }
+
+    uint32_t new_sp = r36sx_cpu_pop_frame_value(wide);
+    uint16_t new_ss = (uint16_t)r36sx_cpu_pop_frame_value(wide);
+    r36sx_segment_cache_t new_ss_cache;
+    if (!r36sx_cpu_decode_stack_segment_for_level(
+            new_ss, new_cpl, &new_ss_cache, R36SX_EXCEPTION_GP)) {
+        return 0;
+    }
+
+    r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
+                                   target_ip);
+    r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
+    r36sx_cpu_set_stack_pointer(new_sp);
+    r36sx_cpu_invalidate_data_segments_for_cpl(new_cpl);
+    if (wide) {
+        decodeflagsdword(target_flags);
+    } else {
+#ifdef CPU_SET_HIGH_FLAGS
+        decodeflagsword((uint16_t)target_flags | 0xF000u);
+#else
+        decodeflagsword((uint16_t)target_flags & 0x0FFFu);
+#endif
+    }
+    return 1;
 }
 
 static INLINE uint32_t readrm32(uint8_t rmval) {
@@ -5002,6 +5613,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
+                if (r36sx_cpu_protected_enabled()) {
+                    r36sx_cpu_protected_far_call(oper2, oper1, 0);
+                    break;
+                }
                 push(CPU_CS);
                 push(CPU_IP);
                 r36sx_cpu_load_segment(regcs, oper2);
@@ -5771,6 +6386,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* CA RETF Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
+                StepIP(2);
+                if (r36sx_cpu_protected_enabled()) {
+                    r36sx_cpu_protected_retf(oper1, 0);
+                    break;
+                }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
                 r36sx_cpu_adjust_stack(oper1);
@@ -5781,6 +6401,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CB: ;
 #endif
                 /* CB RETF */
+                if (r36sx_cpu_protected_enabled()) {
+                    r36sx_cpu_protected_retf(0, 0);
+                    break;
+                }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
                 break;
@@ -5818,6 +6442,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CF: ;
 #endif
                 /* CF IRET */
+                if (r36sx_cpu_protected_enabled()) {
+                    r36sx_cpu_protected_iret(0);
+                    break;
+                }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
 #ifdef CPU_SET_HIGH_FLAGS
@@ -6087,6 +6715,10 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
+                if (r36sx_cpu_protected_enabled()) {
+                    r36sx_cpu_protected_far_jump(oper2, oper1);
+                    break;
+                }
                 r36sx_cpu_load_segment(regcs, oper2);
                 r36sx_cpu_set_ip(oper1);
                 break;

@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-01 protected far control transfers
+
+Changed protected-mode `CALL FAR`, `JMP FAR`, `RETF`, and `IRET` handling so
+the CPU core no longer just loads a new `CS:IP`.  Immediate and indirect far
+forms now decode protected descriptors, accept 16-bit and 32-bit call gates,
+check `CPL`/`DPL`/`RPL`, validate target code descriptors and offsets, and use
+the current TSS `SSn:SPn/ESPn` entries for inter-privilege call-gate stack
+switches.  Protected `RETF`/`IRET` now validate return selectors and restore an
+outer `SS:SP/ESP` when returning to a less privileged ring.  Hardware task
+switching through task gates/TSS descriptors is still intentionally rejected
+with a protected fault and remains a separate TODO.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `467012` bytes
+- `pico_286` SHA256:
+  `66A75F6CB6B79E3B949E149F33CD1AA1864E9B434FEA2247417FB152A91BE2F8`
+- Defender CLI scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 protected-mode segment access checks
 
 Changed the CPU core so `getmem*` and `putmem*` go through protected-mode

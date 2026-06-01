@@ -14,12 +14,13 @@ multiple decoder cores, so this is not a wholesale CPU core import.
 | `LGDT`/`LIDT` base size | Always loaded a 32-bit base. | DOSBox masks the base to 24 bits without operand-size override and uses full 32 bits with `66h`. | Descriptor-table loads now follow the same 24-bit vs 32-bit base rule. |
 | `MOV Rd,CR0` | Returned the raw local CR0 value. | DOSBox reports 386 CR0 reads with reserved bits 4..30 set. | CR0 reads now OR in the 386 reserved-bit read mask. |
 | `MOV CR3`/`MOV Rd,CR3` | Preserved low 12 bits. | DOSBox exposes CR3 as a page-directory base. | CR3 writes and reads now keep only the page-directory-aligned upper bits. |
+| Far protected transfers | Far `CALL`/`JMP`/`RET`/`IRET` mostly loaded a new `CS:IP`. | DOSBox validates protected descriptors, gates, and privilege transitions. | Immediate and indirect far forms now validate code descriptors, support 16/32-bit call gates, and use TSS stack slots for call-gate privilege switches. |
 
 ## Deferred
 
-- Full DOSBox protected-mode privilege model (`CPL`, `DPL`, `RPL`, gate checks).
+- Full DOSBox protected-mode privilege model for every CPU path and exception.
 - Paging and page faults.
-- Task switching and TSS descriptors.
+- Hardware task switching through task gates/TSS descriptors.
 - v86 mode.
 - A full replacement decoder based on DOSBox `core_normal` or `core_full`.
 

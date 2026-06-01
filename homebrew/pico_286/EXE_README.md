@@ -189,10 +189,12 @@ features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, `PUSHAD`/`POPAD`,
 `BSF`/`BSR`, and `IMUL` require `cpu_model=80386`.  Protected mode is
 experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
 `LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
-protected interrupt gates, and access linear physical memory above 1 MB
-through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
-switching, call gates, and DOS extender services such as DPMI/VCPI are still
-incomplete, so keep `cpu_mode=real` for normal DOS use.
+protected interrupt gates and call gates, switch stacks through the current
+TSS on call-gate privilege transitions, and access linear physical memory
+above 1 MB through the XMS-backed extended RAM buffer.  Paging, hardware task
+switching through task gates/TSS descriptors, v86 mode, and DOS extender
+services such as DPMI/VCPI are still incomplete, so keep `cpu_mode=real` for
+normal DOS use.
 
 `target_fps` controls the main-loop frame budget.  The default `60` targets
 about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the

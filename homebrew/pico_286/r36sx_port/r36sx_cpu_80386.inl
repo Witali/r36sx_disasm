@@ -458,6 +458,10 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             StepIP(4);
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
+                return true;
+            }
             push(CPU_CS);
             push32(CPU_IP);
             r36sx_cpu_load_segment(regcs, target_cs);
@@ -626,6 +630,10 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         case 0xCA: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_retf(bytes, 1);
+                return true;
+            }
             r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, pop());
             r36sx_cpu_adjust_stack(bytes);
@@ -633,11 +641,19 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         }
 
         case 0xCB:
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_retf(0, 1);
+                return true;
+            }
             r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, pop());
             return true;
 
         case 0xCF:
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_iret(1);
+                return true;
+            }
             r36sx_cpu_set_ip(pop32());
             r36sx_cpu_load_segment(regcs, (uint16_t)pop32());
             decodeflagsdword(pop32());
@@ -672,6 +688,10 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_far_jump(target_cs, target_ip);
+                return true;
+            }
             r36sx_cpu_load_segment(regcs, target_cs);
             r36sx_cpu_set_ip(target_ip);
             return true;
@@ -716,6 +736,10 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     }
                     uint32_t target_ip = readdw86(ea);
                     uint16_t target_cs = readw86(ea + 4);
+                    if (r36sx_cpu_protected_enabled()) {
+                        r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
+                        return true;
+                    }
                     push(CPU_CS);
                     push32(CPU_IP);
                     r36sx_cpu_load_segment(regcs, target_cs);
@@ -731,7 +755,12 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                         return true;
                     }
                     uint32_t target_ip = readdw86(ea);
-                    r36sx_cpu_load_segment(regcs, readw86(ea + 4));
+                    uint16_t target_cs = readw86(ea + 4);
+                    if (r36sx_cpu_protected_enabled()) {
+                        r36sx_cpu_protected_far_jump(target_cs, target_ip);
+                        return true;
+                    }
+                    r36sx_cpu_load_segment(regcs, target_cs);
                     r36sx_cpu_set_ip(target_ip);
                     return true;
                 }

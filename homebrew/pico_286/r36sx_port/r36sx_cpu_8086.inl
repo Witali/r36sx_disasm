@@ -588,13 +588,20 @@ static __not_in_flash() void op_grp5() {
             break;
 
         case 3: /* CALL Mp */
+            getea(rm);
+            if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
+                break;
+            }
+            oper1 = readw86(ea);
+            oper2 = readw86(ea + 2u);
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_far_call(oper2, oper1, 0);
+                break;
+            }
             push(CPU_CS);
             push(ip);
-            getea(rm);
-            ip = (uint16_t) read86(ea) + (uint16_t) read86(ea + 1) * 256;
-            r36sx_cpu_load_segment(
-                regcs,
-                (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256);
+            r36sx_cpu_load_segment(regcs, oper2);
+            r36sx_cpu_set_ip(oper1);
             break;
 
         case 4: /* JMP Ev */
@@ -603,10 +610,17 @@ static __not_in_flash() void op_grp5() {
 
         case 5: /* JMP Mp */
             getea(rm);
-            ip = (uint16_t) read86(ea) + (uint16_t) read86(ea + 1) * 256;
-            r36sx_cpu_load_segment(
-                regcs,
-                (uint16_t) read86(ea + 2) + (uint16_t) read86(ea + 3) * 256);
+            if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
+                break;
+            }
+            oper1 = readw86(ea);
+            oper2 = readw86(ea + 2u);
+            if (r36sx_cpu_protected_enabled()) {
+                r36sx_cpu_protected_far_jump(oper2, oper1);
+                break;
+            }
+            r36sx_cpu_load_segment(regcs, oper2);
+            r36sx_cpu_set_ip(oper1);
             break;
 
         case 6: /* PUSH Ev */
