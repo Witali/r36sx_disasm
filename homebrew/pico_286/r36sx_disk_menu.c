@@ -680,6 +680,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     int cancel_x = ok_x + ok_w + ok_gap;
     const int row_h = 24;
     const int gap = 4;
+    const int action_gap = 58;
 
     if (!r36sx_disk_menu_is_visible(menu) || !frame) {
         return;
@@ -722,7 +723,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_EXIT, x, y, full_w, row_h, "EXIT APP");
 
-    y = height - 54;
+    y += row_h + action_gap;
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_OK, ok_x, y, ok_w, 28, "OK");
     draw_row(menu, frame, width, height, stride_pixels,

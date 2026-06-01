@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 disk menu action button spacing
+
+Moved the disk menu `OK`/`Cancel` action row so it is anchored to the last menu
+row instead of the bottom of the screen.  The action row now sits 58 pixels
+below `EXIT APP`, matching the current gap between the last key preset binding
+row and the `OK`/`Cancel` buttons in the key preset editor.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `467972` bytes
+- `pico_286` SHA256:
+  `0BDE17425438F4D9E41BFAEC21FD9A2BDA72805636A2F354B24467973B9C2925`
+- Defender CLI scan: found no threats in the main binary.  The patch and
+  `disk_image` copies are bit-identical to the scanned binary.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 disk menu host-drive connector
 
 Updated the disk image menu to match the key preset editor layout more closely:
