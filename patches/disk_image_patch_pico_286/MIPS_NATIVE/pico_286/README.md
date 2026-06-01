@@ -61,7 +61,7 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 - B: Backspace.
 - X: Escape.
 - Y: Enter.
-- Select: close the keyboard.
+- Select: toggle compact and fit-height keyboard panels.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The physical L/R modifiers are held only while the physical trigger is held.
@@ -77,10 +77,12 @@ nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
 and Caps Lock also change the visible labels: letters switch between lowercase
 and uppercase, while the number row switches to `!@#$%^&*()`.  The `CAPS` key
 draws a small green LED on the right side of the key when Caps Lock is active.
-Taller key rows scroll inside the fixed bottom panel, with a small scrollbar at
-the right edge.  The keyboard panel is
-drawn edge-to-edge along the bottom of the screen, keeps the header/status
-text, and uses a one-pixel inner gap around the key rows at the panel border.
+In compact mode, taller key rows scroll inside the fixed bottom panel, with a
+small scrollbar at the right edge.  Press Select to expand the panel just far
+enough to fit all key rows, keeping a one-pixel key-area gap above and below
+the keys; press Select again to collapse it.  The keyboard panel is drawn
+edge-to-edge along the bottom of the screen, keeps the header/status text, and
+uses a one-pixel inner gap around the key rows at the panel border.
 Key labels are rendered with FreeType through the firmware Arial font when
 available, with the older bitmap font kept as a fallback.
 A pressed virtual key shifts down-right and darkens until the physical button

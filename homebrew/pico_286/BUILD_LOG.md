@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard fit-height toggle
+
+Select now toggles the on-screen keyboard between the compact 96 px panel and a
+fit-height panel instead of closing the keyboard.  The expanded panel is only
+tall enough to show all six key rows at once; it is not full-screen, and keeps a
+one-pixel key-area gap above and below the keys.  Fn tap remains the show/hide
+shortcut.
+
+The Pico-286 overlay path now allocates keyboard overlay buffers for the
+maximum fit-height panel and stores the exact saved overlay rectangle before
+restoring it, so switching panel height cannot restore the wrong rows.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `462100` bytes
+- `pico_286` SHA256:
+  `EDF4B2D97354206AA1153B197510758B9C0ABA955589BCBA74825994A8DE0D66`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard Caps Lock LED
 
 Added a small green Caps Lock indicator to the right side of the on-screen

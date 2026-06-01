@@ -63,6 +63,7 @@ struct r36sx_screen_keyboard {
     uint8_t physical_shift;
     uint8_t physical_ctrl;
     uint8_t caps_lock;
+    uint8_t expanded;
     uint8_t symbol_mode;
     uint8_t cursor_block;
     uint8_t scroll_y;
@@ -90,7 +91,16 @@ void r36sx_screen_keyboard_set_cursor_block(
     struct r36sx_screen_keyboard *keyboard, int enabled);
 int r36sx_screen_keyboard_cursor_block_enabled(
     const struct r36sx_screen_keyboard *keyboard);
+void r36sx_screen_keyboard_set_expanded(
+    struct r36sx_screen_keyboard *keyboard, int expanded);
+int r36sx_screen_keyboard_is_expanded(
+    const struct r36sx_screen_keyboard *keyboard);
+int r36sx_screen_keyboard_fit_panel_height(int framebuffer_height);
+int r36sx_screen_keyboard_panel_height(
+    const struct r36sx_screen_keyboard *keyboard, int framebuffer_height);
 int r36sx_screen_keyboard_panel_y(int framebuffer_height);
+int r36sx_screen_keyboard_panel_y_for(
+    const struct r36sx_screen_keyboard *keyboard, int framebuffer_height);
 int r36sx_screen_keyboard_content_height(
     const struct r36sx_screen_keyboard *keyboard, int framebuffer_height);
 uint16_t r36sx_screen_keyboard_current_keycode(

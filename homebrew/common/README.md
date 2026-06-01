@@ -54,7 +54,9 @@ A or Start is pressed; it does not call the emit callback or send scancodes.
 Pico-286 uses this mode in the key preset editor for selecting bindings and
 renaming presets.
 
-The keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.  Use
+The compact keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.
+Select toggles a fit-height panel that is just tall enough to show every key
+row at once, with a one-pixel key-area gap at the top and bottom.  Use
 `r36sx_screen_keyboard_content_height()` when the underlying app screen should
 be vertically compressed or clipped while the keyboard is visible.
 
@@ -85,10 +87,11 @@ Current physical button bindings while the keyboard is visible:
 - B sends Backspace immediately.
 - Y sends Enter immediately.
 - X sends Escape immediately.
-- Select closes the keyboard.
+- Select toggles compact and fit-height keyboard panels.
 
 Holding A, Start, B, X, or Y repeats the emitted key after a short delay;
 Caps Lock is excluded from that repeat so one press toggles it once.  Shift is
-still available as the on-screen `SHIFT` key.
-The keyboard header repeats the same compact binding hints while the keyboard
-is open.
+still available as the on-screen `SHIFT` key.  Host applications should keep a
+separate shortcut, such as Fn tap in Pico-286, for showing and hiding the
+keyboard.  The keyboard header repeats the same compact binding hints while the
+keyboard is open.

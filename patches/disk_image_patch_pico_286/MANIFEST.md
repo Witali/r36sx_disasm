@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard fit-height toggle
+
+Select now expands/collapses the on-screen keyboard instead of closing it.  The
+expanded panel is just tall enough to show every key row, with a one-pixel
+key-area gap above and below the keys; tap Fn to hide the keyboard.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `462100` bytes
+- SHA256:
+  `EDF4B2D97354206AA1153B197510758B9C0ABA955589BCBA74825994A8DE0D66`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard Caps Lock LED
 
 The on-screen `CAPS` key now has a small green LED on its right side.  It lights

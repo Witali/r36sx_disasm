@@ -1105,16 +1105,37 @@ static int keyboard_rows_h(void)
     return rows * R36SX_OSK_KEY_H + (rows - 1) * R36SX_OSK_KEY_GAP;
 }
 
-static int keyboard_view_h(void)
+static int keyboard_fit_panel_h(void)
 {
-    return R36SX_SCREEN_KEYBOARD_PANEL_H - 2 - R36SX_OSK_HEADER_H -
-           2 * R36SX_OSK_INNER_PAD;
+    return 2 + R36SX_OSK_HEADER_H + 2 * R36SX_OSK_INNER_PAD +
+           keyboard_rows_h();
 }
 
-static int keyboard_scroll_max(void)
+static int keyboard_view_h_for_panel(int panel_h)
 {
-    int max_scroll = keyboard_rows_h() - keyboard_view_h();
+    int view_h = panel_h - 2 - R36SX_OSK_HEADER_H -
+                 2 * R36SX_OSK_INNER_PAD;
+    return view_h > 0 ? view_h : 0;
+}
+
+static int keyboard_view_h_for_state(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->expanded ?
+        keyboard_view_h_for_panel(keyboard_fit_panel_h()) :
+        keyboard_view_h_for_panel(R36SX_SCREEN_KEYBOARD_PANEL_H);
+}
+
+static int keyboard_scroll_max_for_view(int view_h)
+{
+    int max_scroll = keyboard_rows_h() - view_h;
     return max_scroll > 0 ? max_scroll : 0;
+}
+
+static int keyboard_scroll_max_for_state(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard_scroll_max_for_view(keyboard_view_h_for_state(keyboard));
 }
 
 static int key_units(const struct r36sx_osk_key *key)
@@ -1268,8 +1289,8 @@ static void update_scroll_for_selection(struct r36sx_screen_keyboard *keyboard)
 {
     int selected_row;
     int row_y;
-    int view_h = keyboard_view_h();
-    int max_scroll = keyboard_scroll_max();
+    int view_h = keyboard_view_h_for_state(keyboard);
+    int max_scroll = keyboard_scroll_max_for_state(keyboard);
     int scroll;
 
     if (!keyboard) {
@@ -1973,6 +1994,7 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->physical_shift = 0;
     keyboard->physical_ctrl = 0;
     keyboard->caps_lock = 0;
+    keyboard->expanded = 0;
     keyboard->symbol_mode = 0;
     keyboard->cursor_block = 0;
     keyboard->scroll_y = 0;
@@ -2030,6 +2052,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->physical_ctrl = 0;
         keyboard->symbol_mode = 0;
         keyboard->scroll_y = 0;
+        keyboard->expanded = 0;
         keyboard->press_buttons = 0;
         reset_nav_repeat(keyboard);
         reset_key_repeat(keyboard);
@@ -2059,17 +2082,71 @@ int r36sx_screen_keyboard_cursor_block_enabled(
     return keyboard && keyboard->cursor_block != 0;
 }
 
+void r36sx_screen_keyboard_set_expanded(
+    struct r36sx_screen_keyboard *keyboard, int expanded)
+{
+    if (!keyboard) {
+        return;
+    }
+    keyboard->expanded = (uint8_t)(expanded != 0);
+    keyboard->press_buttons = 0;
+    reset_nav_repeat(keyboard);
+    reset_key_repeat(keyboard);
+    update_scroll_for_selection(keyboard);
+}
+
+int r36sx_screen_keyboard_is_expanded(
+    const struct r36sx_screen_keyboard *keyboard)
+{
+    return keyboard && keyboard->expanded != 0;
+}
+
+int r36sx_screen_keyboard_fit_panel_height(int framebuffer_height)
+{
+    int panel_h = keyboard_fit_panel_h();
+    if (framebuffer_height <= 0) {
+        return 0;
+    }
+    if (panel_h > framebuffer_height) {
+        panel_h = framebuffer_height;
+    }
+    return panel_h;
+}
+
+int r36sx_screen_keyboard_panel_height(
+    const struct r36sx_screen_keyboard *keyboard, int framebuffer_height)
+{
+    if (framebuffer_height <= 0) {
+        return 0;
+    }
+    if (r36sx_screen_keyboard_is_visible(keyboard) &&
+        r36sx_screen_keyboard_is_expanded(keyboard)) {
+        return r36sx_screen_keyboard_fit_panel_height(framebuffer_height);
+    }
+    return framebuffer_height > R36SX_SCREEN_KEYBOARD_PANEL_H ?
+        R36SX_SCREEN_KEYBOARD_PANEL_H : framebuffer_height;
+}
+
 int r36sx_screen_keyboard_panel_y(int framebuffer_height)
 {
     return framebuffer_height > R36SX_SCREEN_KEYBOARD_PANEL_H ?
         framebuffer_height - R36SX_SCREEN_KEYBOARD_PANEL_H : 0;
 }
 
+int r36sx_screen_keyboard_panel_y_for(
+    const struct r36sx_screen_keyboard *keyboard, int framebuffer_height)
+{
+    int panel_h = r36sx_screen_keyboard_panel_height(keyboard,
+                                                    framebuffer_height);
+    return framebuffer_height > panel_h ? framebuffer_height - panel_h : 0;
+}
+
 int r36sx_screen_keyboard_content_height(
     const struct r36sx_screen_keyboard *keyboard, int framebuffer_height)
 {
     return r36sx_screen_keyboard_is_visible(keyboard) ?
-        r36sx_screen_keyboard_panel_y(framebuffer_height) : framebuffer_height;
+        r36sx_screen_keyboard_panel_y_for(keyboard, framebuffer_height) :
+        framebuffer_height;
 }
 
 uint16_t r36sx_screen_keyboard_current_keycode(
@@ -2108,9 +2185,8 @@ uint32_t r36sx_screen_keyboard_handle_buttons(
     nav_buttons = nav_buttons_with_repeat(keyboard, pressed, held);
     handle_navigation(keyboard, nav_buttons);
     if ((pressed & R36SX_RKGAME_KEY_SELECT) != 0) {
-        release_physical_modifiers(keyboard, emit, emit_user);
-        r36sx_screen_keyboard_set_visible(keyboard, 0);
-        return R36SX_SCREEN_KEYBOARD_RESULT_CLOSED;
+        r36sx_screen_keyboard_set_expanded(keyboard, !keyboard->expanded);
+        result |= R36SX_SCREEN_KEYBOARD_RESULT_ACCEPTED;
     }
     if ((pressed & R36SX_RKGAME_KEY_B) != 0) {
         start_keycode_press_animation(keyboard, R36SX_SCREEN_KEY_BACK,
@@ -2218,7 +2294,8 @@ void r36sx_screen_keyboard_draw(
     const uint8_t *counts = active_row_counts(keyboard);
     const int panel_x = 0;
     const int panel_w = width;
-    const int panel_y = r36sx_screen_keyboard_panel_y(height);
+    const int panel_h = r36sx_screen_keyboard_panel_height(keyboard, height);
+    const int panel_y = r36sx_screen_keyboard_panel_y_for(keyboard, height);
     const int content_x = panel_x + 1 + R36SX_OSK_INNER_PAD;
     const int content_w = panel_w - 2 * (1 + R36SX_OSK_INNER_PAD);
     const int compact = r36sx_screen_keyboard_cursor_block_enabled(keyboard);
@@ -2230,11 +2307,11 @@ void r36sx_screen_keyboard_draw(
     const int row_target_w = max_main_row_pixel_w(rows, counts, unit_w);
     const int view_y = panel_y + 1 + R36SX_OSK_HEADER_H +
         R36SX_OSK_INNER_PAD;
-    const int view_h = keyboard_view_h();
+    const int view_h = keyboard_view_h_for_panel(panel_h);
     const int view_bottom = view_y + view_h;
     const int keys_y = view_y - (int)keyboard->scroll_y;
     const int cursor_x = content_x + main_w + side_gap;
-    const int max_scroll = keyboard_scroll_max();
+    const int max_scroll = keyboard_scroll_max_for_view(view_h);
     const uint16_t panel = rgb565(12, 18, 24);
     const uint16_t header = rgb565(24, 54, 70);
     const uint16_t border = rgb565(160, 192, 204);
@@ -2246,15 +2323,19 @@ void r36sx_screen_keyboard_draw(
     }
 
     fill_rect(frame, width, height, stride_pixels, panel_x, panel_y, panel_w,
-              R36SX_SCREEN_KEYBOARD_PANEL_H, panel);
+              panel_h, panel);
     stroke_rect(frame, width, height, stride_pixels, panel_x, panel_y, panel_w,
-                R36SX_SCREEN_KEYBOARD_PANEL_H, border);
+                panel_h, border);
     fill_rect(frame, width, height, stride_pixels, panel_x + 1, panel_y + 1,
               panel_w - 2, R36SX_OSK_HEADER_H, header);
     draw_text(frame, width, height, stride_pixels, panel_x + 5, panel_y + 3,
               keyboard->symbol_mode ?
-                  "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE" :
-                  "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=CLOSE",
+                  (keyboard->expanded ?
+                   "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=MIN" :
+                   "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=FIT") :
+                  (keyboard->expanded ?
+                   "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=MIN" :
+                   "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=FIT"),
               text, 1);
 
     for (size_t row = 0; row < (size_t)keyboard_row_count(); row++) {
