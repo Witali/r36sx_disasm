@@ -347,12 +347,12 @@ static const int8_t g_osk_cursor_grid
  */
 static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
     {
-        R36SX_OSK_NAV_MAIN(0, 0), R36SX_OSK_NAV_EMPTY,
+        R36SX_OSK_NAV_MAIN(0, 0), R36SX_OSK_NAV_MAIN(0, 0),
         R36SX_OSK_NAV_MAIN(0, 1), R36SX_OSK_NAV_MAIN(0, 2),
         R36SX_OSK_NAV_MAIN(0, 3), R36SX_OSK_NAV_MAIN(0, 4),
         R36SX_OSK_NAV_MAIN(0, 5), R36SX_OSK_NAV_MAIN(0, 6),
         R36SX_OSK_NAV_MAIN(0, 7), R36SX_OSK_NAV_MAIN(0, 8),
-        R36SX_OSK_NAV_EMPTY,
+        R36SX_OSK_NAV_MAIN(0, 8),
         R36SX_OSK_NAV_MAIN(0, 9), R36SX_OSK_NAV_MAIN(0, 10),
         R36SX_OSK_NAV_MAIN(0, 11), R36SX_OSK_NAV_MAIN(0, 12),
         R36SX_OSK_NAV_CURSOR(0, 0), R36SX_OSK_NAV_CURSOR(0, 1),

@@ -1,5 +1,27 @@
 # pico-286 Build Log
 
+## 2026-06-01 fake on-screen keyboard navigation cells
+
+The on-screen keyboard navigation grid now treats the visual gap between
+`Esc` and `F1` as another `Esc` cell, and the gap between `F8` and `F9` as
+another `F8` cell.  This keeps vertical movement predictable without adding a
+separate redirect rule.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `471108` bytes
+- `pico_286` SHA256:
+  `1A349F9FCB7C4AEAA391705A261BD01D0DACEB8585D061C4E94D3BEFE51F7565`
+- Microsoft Defender scan: no threats found.
+
 ## 2026-06-01 remember on-screen keyboard height mode
 
 The on-screen keyboard now keeps its expanded/compact height choice across
