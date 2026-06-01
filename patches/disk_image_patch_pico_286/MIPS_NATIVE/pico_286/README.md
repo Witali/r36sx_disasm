@@ -70,19 +70,22 @@ DOS keyboard uses a PC-style layout with Esc/F1-F12 on the top row and a
 right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
 left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
-same left edge.  The bottom row includes `CTRL WIN ALT`, a wide `SPC`, then
-`ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes `E0 5B` and
+same left edge.  The bottom row includes `CTRL WIN ALT`, a wide unlabeled
+spacebar, then `ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes
+`E0 5B` and
 `E0 5D`.  The function-key row keeps grouped gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
 and Caps Lock also change the visible labels: letters switch between lowercase
 and uppercase, while the number row switches to `!@#$%^&*()`.  The `CAPS` key
 draws a small green LED on the right side of the key when Caps Lock is active.
-In compact mode, taller key rows scroll inside the fixed bottom panel, with a
-small scrollbar at the right edge.  Press Select to expand the panel just far
-enough to fit all key rows, keeping a one-pixel key-area gap above and below
-the keys; press Select again to collapse it.  The keyboard panel is drawn
-edge-to-edge along the bottom of the screen, keeps the header/status text, and
-uses a one-pixel inner gap around the key rows at the panel border.
+The keyboard opens in fit-height mode by default, just tall enough to fit all
+key rows while keeping a one-pixel key-area gap above and below the keys.
+Press Select to collapse it to the compact 80 px panel; in compact mode, taller
+key rows scroll inside the fixed bottom panel, with a small scrollbar at the
+right edge and no header/status text.  Press Select again to return to
+fit-height mode.  The keyboard panel is drawn edge-to-edge along the bottom of
+the screen and uses a one-pixel inner gap around the key rows at the panel
+border.
 Key labels are rendered with FreeType through the firmware Arial font when
 available, with the older bitmap font kept as a fallback.
 A pressed virtual key shifts down-right and darkens until the physical button

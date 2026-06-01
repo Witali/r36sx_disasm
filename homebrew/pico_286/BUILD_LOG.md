@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard default fit-height compact 80
+
+The on-screen keyboard now opens in fit-height mode by default, just tall
+enough to show all key rows.  Select collapses it to an 80 px compact panel and
+toggles back to fit-height mode.  The compact panel hides the header hints so
+the fixed 80 px area is used for keys and scrolling; fit-height mode still
+shows the button hints in the header.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `462100` bytes
+- `pico_286` SHA256:
+  `103BB2C61FCDF47AD007FC75864E21B6BDD9B75ABC2C9B20A6C49714A23C1689`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard header spacing
 
 Removed the `DOS KBD ABC` / `DOS KBD SYM` prefix from the on-screen keyboard

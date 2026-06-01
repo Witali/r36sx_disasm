@@ -37,6 +37,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard default fit-height compact 80
+
+The on-screen keyboard now opens in fit-height mode by default.  Select
+collapses it to an 80 px compact panel and toggles back to fit-height mode.
+Compact mode hides the header/status hints so the small panel leaves more room
+for key rows and scrolling.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `462100` bytes
+- SHA256:
+  `103BB2C61FCDF47AD007FC75864E21B6BDD9B75ABC2C9B20A6C49714A23C1689`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard header spacing
 
 The on-screen keyboard header no longer includes the `DOS KBD ABC/SYM` mode

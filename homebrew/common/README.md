@@ -54,11 +54,13 @@ A or Start is pressed; it does not call the emit callback or send scancodes.
 Pico-286 uses this mode in the key preset editor for selecting bindings and
 renaming presets.
 
-The compact keyboard panel is `R36SX_SCREEN_KEYBOARD_PANEL_H` pixels tall.
-Select toggles a fit-height panel that is just tall enough to show every key
-row at once, with a one-pixel key-area gap at the top and bottom.  Use
-`r36sx_screen_keyboard_content_height()` when the underlying app screen should
-be vertically compressed or clipped while the keyboard is visible.
+The keyboard opens in the fit-height panel by default.  That panel is just tall
+enough to show every key row at once, with a one-pixel key-area gap at the top
+and bottom.  Select collapses it to the compact
+`R36SX_SCREEN_KEYBOARD_PANEL_H` panel, currently 80 pixels tall, and toggles it
+back to fit-height.  Compact mode hides the header hints to preserve key space.
+Use `r36sx_screen_keyboard_content_height()` when the underlying app screen
+should be vertically compressed or clipped while the keyboard is visible.
 
 `r36sx_screen_keyboard_set_cursor_block()` optionally adds a compact cursor-key
 cluster to the right side of the keyboard.  The main keys are narrowed to keep
@@ -69,14 +71,14 @@ moving up from Left Arrow selects `DEL` instead of the Up Arrow key.
 
 The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
 `CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row
-includes `WIN`, a stretched `SPC`, and a context `MNU` key; host applications
-can map these emitted Windows-like keycodes as needed.  The last key in each
-row absorbs the row-width remainder so `F12`, Backspace, `\`, Enter, right
-`SHIFT`, and right `CTRL` share a clean visual right edge.  On the bottom row,
-the spacebar absorbs that remainder instead, keeping the visible gaps between
-`CTRL`, `WIN`, `ALT`, `SPC`, `MNU`, and right `CTRL` consistent with the rows
-above.  The `CAPS` key includes a small green lock LED that follows the
-keyboard module's Caps Lock state.
+includes `WIN`, an unlabeled stretched spacebar, and a context `MNU` key; host
+applications can map these emitted Windows-like keycodes as needed.  The last
+key in each row absorbs the row-width remainder so `F12`, Backspace, `\`,
+Enter, right `SHIFT`, and right `CTRL` share a clean visual right edge.  On the
+bottom row, the spacebar absorbs that remainder instead, keeping the visible
+gaps between `CTRL`, `WIN`, `ALT`, the spacebar, `MNU`, and right `CTRL`
+consistent with the rows above.  The `CAPS` key includes a small green lock LED
+that follows the keyboard module's Caps Lock state.
 
 Current physical button bindings while the keyboard is visible:
 
@@ -93,5 +95,5 @@ Holding A, Start, B, X, or Y repeats the emitted key after a short delay;
 Caps Lock is excluded from that repeat so one press toggles it once.  Shift is
 still available as the on-screen `SHIFT` key.  Host applications should keep a
 separate shortcut, such as Fn tap in Pico-286, for showing and hiding the
-keyboard.  The keyboard header repeats the same compact binding hints while the
-keyboard is open.
+keyboard.  The fit-height keyboard header repeats the compact binding hints;
+compact mode hides the header.
