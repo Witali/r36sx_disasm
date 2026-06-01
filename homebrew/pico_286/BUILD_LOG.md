@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard navigation grid
+
+The on-screen keyboard now uses the provided `key-map.csv` style 6x18
+navigation grid instead of plain row/column index movement.  Repeated adjacent
+cells model wide keys such as Backspace, Enter, Shift, Space, Menu, and Ctrl.
+Horizontal movement skips over repeated cells and `empty` holes; vertical
+movement starts from the wide key's middle cell, choosing the left-middle cell
+when the width is even.  Hidden cursor-block keys are treated like empty cells.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `471108` bytes
+- `pico_286` SHA256:
+  `F9FAB2346903264F63C3976CE9AFF6CB33ECC2E17B5ED2380A0318110D4189EA`
+- Microsoft Defender scan: no threats found.
+
 ## 2026-06-01 disk menu host-drive connected state
 
 The disk menu now mirrors the emulator-side MAPDRIVE state.  Before `H:` is

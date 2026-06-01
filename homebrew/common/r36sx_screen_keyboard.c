@@ -56,6 +56,7 @@
 
 #define R36SX_OSK_ZONE_MAIN 0u
 #define R36SX_OSK_ZONE_CURSOR 1u
+#define R36SX_OSK_ZONE_EMPTY 0xffu
 #define R36SX_OSK_NO_CURSOR_KEY (-1)
 #define R36SX_OSK_LABEL_LEFT "\x11"
 #define R36SX_OSK_LABEL_UP "\x12"
@@ -67,6 +68,12 @@ struct r36sx_osk_key {
     uint16_t keycode;
     uint8_t flags;
     uint8_t units;
+};
+
+struct r36sx_osk_nav_cell {
+    uint8_t zone;
+    uint8_t row;
+    uint8_t col;
 };
 
 typedef FT_Error (*r36sx_ft_init_free_type_fn)(FT_Library *);
@@ -113,6 +120,12 @@ struct r36sx_osk_font_state {
     { label, keycode, flags, R36SX_OSK_KEY_DEFAULT_UNITS }
 #define R36SX_OSK_WIDE(label, keycode, flags, units) \
     { label, keycode, flags, units }
+#define R36SX_OSK_NAV_EMPTY \
+    { R36SX_OSK_ZONE_EMPTY, 0, 0 }
+#define R36SX_OSK_NAV_MAIN(row, col) \
+    { R36SX_OSK_ZONE_MAIN, row, col }
+#define R36SX_OSK_NAV_CURSOR(row, col) \
+    { R36SX_OSK_ZONE_CURSOR, row, col }
 
 static const struct r36sx_osk_key g_osk_row0[] = {
     R36SX_OSK_KEY("ESC", R36SX_SCREEN_KEY_ESCAPE, 0),
@@ -325,6 +338,85 @@ static const int8_t g_osk_cursor_grid
       R36SX_OSK_NO_CURSOR_KEY },
     { R36SX_OSK_NO_CURSOR_KEY, 9, R36SX_OSK_NO_CURSOR_KEY },
     { 10, 11, 12 },
+};
+
+/*
+ * Navigation grid from key-map.csv.  Wide keys occupy repeated adjacent
+ * cells; empty cells are skipped.  For vertical movement from a wide key we
+ * use the middle cell, choosing the left-middle cell for even-width runs.
+ */
+static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
+    {
+        R36SX_OSK_NAV_MAIN(0, 0), R36SX_OSK_NAV_EMPTY,
+        R36SX_OSK_NAV_MAIN(0, 1), R36SX_OSK_NAV_MAIN(0, 2),
+        R36SX_OSK_NAV_MAIN(0, 3), R36SX_OSK_NAV_MAIN(0, 4),
+        R36SX_OSK_NAV_MAIN(0, 5), R36SX_OSK_NAV_MAIN(0, 6),
+        R36SX_OSK_NAV_MAIN(0, 7), R36SX_OSK_NAV_MAIN(0, 8),
+        R36SX_OSK_NAV_EMPTY,
+        R36SX_OSK_NAV_MAIN(0, 9), R36SX_OSK_NAV_MAIN(0, 10),
+        R36SX_OSK_NAV_MAIN(0, 11), R36SX_OSK_NAV_MAIN(0, 12),
+        R36SX_OSK_NAV_CURSOR(0, 0), R36SX_OSK_NAV_CURSOR(0, 1),
+        R36SX_OSK_NAV_CURSOR(0, 2)
+    },
+    {
+        R36SX_OSK_NAV_MAIN(1, 0), R36SX_OSK_NAV_MAIN(1, 1),
+        R36SX_OSK_NAV_MAIN(1, 2), R36SX_OSK_NAV_MAIN(1, 3),
+        R36SX_OSK_NAV_MAIN(1, 4), R36SX_OSK_NAV_MAIN(1, 5),
+        R36SX_OSK_NAV_MAIN(1, 6), R36SX_OSK_NAV_MAIN(1, 7),
+        R36SX_OSK_NAV_MAIN(1, 8), R36SX_OSK_NAV_MAIN(1, 9),
+        R36SX_OSK_NAV_MAIN(1, 10), R36SX_OSK_NAV_MAIN(1, 11),
+        R36SX_OSK_NAV_MAIN(1, 12), R36SX_OSK_NAV_MAIN(1, 13),
+        R36SX_OSK_NAV_MAIN(1, 13),
+        R36SX_OSK_NAV_CURSOR(1, 0), R36SX_OSK_NAV_CURSOR(1, 1),
+        R36SX_OSK_NAV_CURSOR(1, 2)
+    },
+    {
+        R36SX_OSK_NAV_MAIN(2, 0), R36SX_OSK_NAV_MAIN(2, 1),
+        R36SX_OSK_NAV_MAIN(2, 2), R36SX_OSK_NAV_MAIN(2, 3),
+        R36SX_OSK_NAV_MAIN(2, 4), R36SX_OSK_NAV_MAIN(2, 5),
+        R36SX_OSK_NAV_MAIN(2, 6), R36SX_OSK_NAV_MAIN(2, 7),
+        R36SX_OSK_NAV_MAIN(2, 8), R36SX_OSK_NAV_MAIN(2, 9),
+        R36SX_OSK_NAV_MAIN(2, 10), R36SX_OSK_NAV_MAIN(2, 11),
+        R36SX_OSK_NAV_MAIN(2, 12), R36SX_OSK_NAV_MAIN(2, 13),
+        R36SX_OSK_NAV_MAIN(2, 13),
+        R36SX_OSK_NAV_CURSOR(2, 0), R36SX_OSK_NAV_CURSOR(2, 1),
+        R36SX_OSK_NAV_CURSOR(2, 2)
+    },
+    {
+        R36SX_OSK_NAV_MAIN(3, 0), R36SX_OSK_NAV_MAIN(3, 0),
+        R36SX_OSK_NAV_MAIN(3, 1), R36SX_OSK_NAV_MAIN(3, 2),
+        R36SX_OSK_NAV_MAIN(3, 3), R36SX_OSK_NAV_MAIN(3, 4),
+        R36SX_OSK_NAV_MAIN(3, 5), R36SX_OSK_NAV_MAIN(3, 6),
+        R36SX_OSK_NAV_MAIN(3, 7), R36SX_OSK_NAV_MAIN(3, 8),
+        R36SX_OSK_NAV_MAIN(3, 9), R36SX_OSK_NAV_MAIN(3, 10),
+        R36SX_OSK_NAV_MAIN(3, 11), R36SX_OSK_NAV_MAIN(3, 12),
+        R36SX_OSK_NAV_MAIN(3, 12),
+        R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_EMPTY
+    },
+    {
+        R36SX_OSK_NAV_MAIN(4, 0), R36SX_OSK_NAV_MAIN(4, 0),
+        R36SX_OSK_NAV_MAIN(4, 1), R36SX_OSK_NAV_MAIN(4, 2),
+        R36SX_OSK_NAV_MAIN(4, 3), R36SX_OSK_NAV_MAIN(4, 4),
+        R36SX_OSK_NAV_MAIN(4, 5), R36SX_OSK_NAV_MAIN(4, 6),
+        R36SX_OSK_NAV_MAIN(4, 7), R36SX_OSK_NAV_MAIN(4, 8),
+        R36SX_OSK_NAV_MAIN(4, 9), R36SX_OSK_NAV_MAIN(4, 10),
+        R36SX_OSK_NAV_MAIN(4, 11), R36SX_OSK_NAV_MAIN(4, 11),
+        R36SX_OSK_NAV_MAIN(4, 11),
+        R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_CURSOR(4, 1),
+        R36SX_OSK_NAV_EMPTY
+    },
+    {
+        R36SX_OSK_NAV_MAIN(5, 0), R36SX_OSK_NAV_MAIN(5, 0),
+        R36SX_OSK_NAV_MAIN(5, 1), R36SX_OSK_NAV_MAIN(5, 2),
+        R36SX_OSK_NAV_MAIN(5, 3), R36SX_OSK_NAV_MAIN(5, 3),
+        R36SX_OSK_NAV_MAIN(5, 3), R36SX_OSK_NAV_MAIN(5, 3),
+        R36SX_OSK_NAV_MAIN(5, 3), R36SX_OSK_NAV_MAIN(5, 3),
+        R36SX_OSK_NAV_MAIN(5, 4), R36SX_OSK_NAV_MAIN(5, 5),
+        R36SX_OSK_NAV_MAIN(5, 5), R36SX_OSK_NAV_MAIN(5, 6),
+        R36SX_OSK_NAV_MAIN(5, 6),
+        R36SX_OSK_NAV_CURSOR(5, 0), R36SX_OSK_NAV_CURSOR(5, 1),
+        R36SX_OSK_NAV_CURSOR(5, 2)
+    }
 };
 
 static const struct r36sx_osk_key *const g_osk_rows[] = {
@@ -1540,10 +1632,132 @@ static void move_main_selection(struct r36sx_screen_keyboard *keyboard, int dx,
     keyboard->col = (uint8_t)col;
 }
 
+static int nav_cell_is_target(const struct r36sx_osk_nav_cell *cell,
+                              uint8_t zone,
+                              uint8_t row,
+                              uint8_t col)
+{
+    return cell && cell->zone == zone && cell->row == row &&
+           cell->col == col;
+}
+
+static int nav_cell_valid(const struct r36sx_screen_keyboard *keyboard,
+                          const struct r36sx_osk_nav_cell *cell)
+{
+    const uint8_t *counts = active_row_counts(keyboard);
+
+    if (!keyboard || !cell || cell->zone == R36SX_OSK_ZONE_EMPTY) {
+        return 0;
+    }
+    if (cell->zone == R36SX_OSK_ZONE_MAIN) {
+        return cell->row < keyboard_row_count() &&
+               cell->col < counts[cell->row];
+    }
+    if (cell->zone == R36SX_OSK_ZONE_CURSOR) {
+        return keyboard->cursor_block && cursor_key_at(cell->row, cell->col);
+    }
+    return 0;
+}
+
+static void nav_cell_select(struct r36sx_screen_keyboard *keyboard,
+                            const struct r36sx_osk_nav_cell *cell)
+{
+    keyboard->zone = cell->zone;
+    keyboard->row = cell->row;
+    keyboard->col = cell->col;
+}
+
+static int find_nav_group(const struct r36sx_screen_keyboard *keyboard,
+                          int *out_row,
+                          int *out_left,
+                          int *out_right)
+{
+    uint8_t zone = keyboard->zone;
+    uint8_t row = keyboard->row;
+    uint8_t col = keyboard->col;
+
+    for (int nav_row = 0; nav_row < 6; nav_row++) {
+        for (int nav_col = 0; nav_col < 18; nav_col++) {
+            if (!nav_cell_is_target(&g_osk_nav_grid[nav_row][nav_col],
+                                    zone, row, col)) {
+                continue;
+            }
+
+            int left = nav_col;
+            int right = nav_col;
+            while (left > 0 &&
+                   nav_cell_is_target(&g_osk_nav_grid[nav_row][left - 1],
+                                      zone, row, col)) {
+                left--;
+            }
+            while (right + 1 < 18 &&
+                   nav_cell_is_target(&g_osk_nav_grid[nav_row][right + 1],
+                                      zone, row, col)) {
+                right++;
+            }
+            *out_row = nav_row;
+            *out_left = left;
+            *out_right = right;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int move_grid_selection(struct r36sx_screen_keyboard *keyboard,
+                               int dx,
+                               int dy)
+{
+    int nav_row;
+    int left;
+    int right;
+
+    if (!keyboard || (dx == 0 && dy == 0) || (dx != 0 && dy != 0)) {
+        return 0;
+    }
+    if (!find_nav_group(keyboard, &nav_row, &left, &right)) {
+        return 0;
+    }
+
+    if (dy != 0) {
+        int nav_col = left + (right - left) / 2;
+        nav_row += dy;
+        while (nav_row >= 0 && nav_row < 6) {
+            const struct r36sx_osk_nav_cell *cell =
+                &g_osk_nav_grid[nav_row][nav_col];
+            if (nav_cell_valid(keyboard, cell)) {
+                nav_cell_select(keyboard, cell);
+                return 1;
+            }
+            nav_row += dy;
+        }
+        return 1;
+    }
+
+    if (dx != 0) {
+        int nav_col = dx < 0 ? left - 1 : right + 1;
+        while (nav_col >= 0 && nav_col < 18) {
+            const struct r36sx_osk_nav_cell *cell =
+                &g_osk_nav_grid[nav_row][nav_col];
+            if (nav_cell_valid(keyboard, cell)) {
+                nav_cell_select(keyboard, cell);
+                return 1;
+            }
+            nav_col += dx;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 static void move_selection(struct r36sx_screen_keyboard *keyboard, int dx,
                            int dy)
 {
     normalize_cursor_selection(keyboard);
+    if (move_grid_selection(keyboard, dx, dy)) {
+        update_scroll_for_selection(keyboard);
+        return;
+    }
     if (keyboard->zone == R36SX_OSK_ZONE_CURSOR) {
         move_cursor_selection(keyboard, dx, dy);
     } else {
