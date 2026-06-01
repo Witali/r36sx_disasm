@@ -73,7 +73,8 @@ row absorbs the row-width remainder so `F12`, Backspace, `\`, Enter, right
 `SHIFT`, and right `CTRL` share a clean visual right edge.  On the bottom row,
 the spacebar absorbs that remainder instead, keeping the visible gaps between
 `CTRL`, `WIN`, `ALT`, `SPC`, `MNU`, and right `CTRL` consistent with the rows
-above.
+above.  The `CAPS` key includes a small green lock LED that follows the
+keyboard module's Caps Lock state.
 
 Current physical button bindings while the keyboard is visible:
 
@@ -86,7 +87,8 @@ Current physical button bindings while the keyboard is visible:
 - X sends Escape immediately.
 - Select closes the keyboard.
 
-Holding A, Start, B, X, or Y repeats the emitted key after a short delay.
-Shift is still available as the on-screen `SHIFT` key.
+Holding A, Start, B, X, or Y repeats the emitted key after a short delay;
+Caps Lock is excluded from that repeat so one press toggles it once.  Shift is
+still available as the on-screen `SHIFT` key.
 The keyboard header repeats the same compact binding hints while the keyboard
 is open.

@@ -1,5 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard Caps Lock LED
+
+Added a small green Caps Lock indicator to the right side of the on-screen
+`CAPS` key.  The keyboard module now tracks Caps Lock state, uses it when
+choosing uppercase/lowercase labels, and excludes Caps Lock from key repeat so
+holding the physical confirm button does not toggle it repeatedly.  Pico-286's
+keyboard overlay cache signature now includes Caps Lock state so the LED and
+labels refresh correctly in overlay mode.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `461920` bytes
+- `pico_286` SHA256:
+  `4404F86A95107A1AAC20822A130EFB8D4FFA331BDBFB6DFE392E2DA8E9C900DB`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard bottom row cleanup
 
 Removed the on-screen `CLS` key from the bottom keyboard row.  The bottom row

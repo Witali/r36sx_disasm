@@ -1229,6 +1229,7 @@ static uint32_t r36sx_osk_draw_signature(void)
     hash = r36sx_osk_mix_signature(hash, keyboard->alt);
     hash = r36sx_osk_mix_signature(hash, keyboard->physical_shift);
     hash = r36sx_osk_mix_signature(hash, keyboard->physical_ctrl);
+    hash = r36sx_osk_mix_signature(hash, keyboard->caps_lock);
     hash = r36sx_osk_mix_signature(hash, keyboard->symbol_mode);
     hash = r36sx_osk_mix_signature(hash, keyboard->cursor_block);
     hash = r36sx_osk_mix_signature(hash, keyboard->scroll_y);

@@ -45,6 +45,8 @@
 #define R36SX_OSK_FONT_PX 13
 #define R36SX_OSK_FONT_SMALL_PX 10
 #define R36SX_OSK_FONT_CACHE_SLOTS 128
+#define R36SX_OSK_CAPS_LED_RADIUS 4
+#define R36SX_OSK_CAPS_LED_OUTER_RADIUS 5
 
 #define R36SX_OSK_FLAG_SHIFTED 0x01u
 #define R36SX_OSK_FLAG_SHIFT_MOD 0x02u
@@ -419,6 +421,40 @@ static void stroke_rect(uint16_t *frame, int width, int height, int stride,
     fill_rect(frame, width, height, stride, x, y + h - 1, w, 1, color);
     fill_rect(frame, width, height, stride, x, y, 1, h, color);
     fill_rect(frame, width, height, stride, x + w - 1, y, 1, h, color);
+}
+
+static void draw_caps_lock_led(uint16_t *frame, int width, int height,
+                               int stride, int cx, int cy, int enabled)
+{
+    const int radius = R36SX_OSK_CAPS_LED_RADIUS;
+    const int outer_radius = R36SX_OSK_CAPS_LED_OUTER_RADIUS;
+    const uint16_t bright_green = rgb565(64, 255, 106);
+    const uint16_t dim_green = rgb565(18, 72, 34);
+    const uint16_t dark_green = rgb565(8, 34, 18);
+    const uint16_t outline = rgb565(0, 0, 0);
+
+    for (int y = -outer_radius; y <= outer_radius; y++) {
+        int py = cy + y;
+        if (py < 0 || py >= height) {
+            continue;
+        }
+        for (int x = -outer_radius; x <= outer_radius; x++) {
+            int px = cx + x;
+            int dist2 = x * x + y * y;
+            if (px < 0 || px >= width) {
+                continue;
+            }
+            if (dist2 <= radius * radius) {
+                uint16_t color = enabled ? bright_green : dark_green;
+                if (enabled && dist2 > (radius - 1) * (radius - 1)) {
+                    color = dim_green;
+                }
+                frame[(size_t)py * (size_t)stride + (size_t)px] = color;
+            } else if (dist2 <= outer_radius * outer_radius) {
+                frame[(size_t)py * (size_t)stride + (size_t)px] = outline;
+            }
+        }
+    }
 }
 
 static void put_pixel_alpha(uint16_t *frame, int width, int height, int stride,
@@ -1042,6 +1078,9 @@ static void emit_key(struct r36sx_screen_keyboard *keyboard,
     }
     emit(emit_user, keycode, 1);
     emit(emit_user, keycode, 0);
+    if (keycode == R36SX_SCREEN_KEY_CAPITAL) {
+        keyboard->caps_lock ^= 1u;
+    }
     if (use_shift) {
         emit(emit_user, R36SX_SCREEN_KEY_SHIFT, 0);
     }
@@ -1512,7 +1551,8 @@ static void start_key_repeat(struct r36sx_screen_keyboard *keyboard,
 {
     uint32_t repeat_button = first_key_repeat_button(buttons);
 
-    if (!keyboard || repeat_button == 0 || keycode == 0) {
+    if (!keyboard || repeat_button == 0 || keycode == 0 ||
+        keycode == R36SX_SCREEN_KEY_CAPITAL) {
         return;
     }
 
@@ -1817,8 +1857,9 @@ static const char *display_label_for_key(
     }
     if ((key->flags & R36SX_OSK_FLAG_SHIFTED) == 0 &&
         key->keycode >= 'A' && key->keycode <= 'Z' && scratch_size >= 2) {
-        scratch[0] = (char)(((keyboard->shift || keyboard->physical_shift) ?
-                             'A' : 'a') +
+        int upper = (keyboard->shift || keyboard->physical_shift) ^
+                    keyboard->caps_lock;
+        scratch[0] = (char)((upper ? 'A' : 'a') +
                             (key->keycode - 'A'));
         scratch[1] = '\0';
         return scratch;
@@ -1894,6 +1935,24 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
             osk_font_px_for_scale(scale) : 7 * scale;
         int text_x = x + (key_w - text_w) / 2;
         int text_y = y + (R36SX_OSK_KEY_H - text_h) / 2;
+        if (key->keycode == R36SX_SCREEN_KEY_CAPITAL) {
+            int led_outer = R36SX_OSK_CAPS_LED_OUTER_RADIUS;
+            int led_pad = 4;
+            int label_w = key_w - (led_outer * 2 + 1) - led_pad - 4;
+            if (label_w < 1) {
+                label_w = 1;
+            }
+            scale = key_text_scale(label, label_w);
+            text_w = text_width(label, scale);
+            text_h = osk_font_open() == 0 ?
+                osk_font_px_for_scale(scale) : 7 * scale;
+            text_x = x + 4;
+            text_y = y + (R36SX_OSK_KEY_H - text_h) / 2;
+            draw_caps_lock_led(frame, width, height, stride,
+                               x + key_w - led_outer - led_pad,
+                               y + R36SX_OSK_KEY_H / 2,
+                               keyboard->caps_lock != 0);
+        }
         draw_text(frame, width, height, stride, text_x, text_y, label, fg,
                   scale);
     }
@@ -1913,6 +1972,7 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->alt = 0;
     keyboard->physical_shift = 0;
     keyboard->physical_ctrl = 0;
+    keyboard->caps_lock = 0;
     keyboard->symbol_mode = 0;
     keyboard->cursor_block = 0;
     keyboard->scroll_y = 0;

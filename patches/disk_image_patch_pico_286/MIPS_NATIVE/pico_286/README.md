@@ -74,10 +74,11 @@ same left edge.  The bottom row includes `CTRL WIN ALT`, a wide `SPC`, then
 `ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes `E0 5B` and
 `E0 5D`.  The function-key row keeps grouped gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
-also changes the
-visible labels: letters switch between lowercase and uppercase, while the
-number row switches to `!@#$%^&*()`.  Taller key rows scroll inside the fixed
-bottom panel, with a small scrollbar at the right edge.  The keyboard panel is
+and Caps Lock also change the visible labels: letters switch between lowercase
+and uppercase, while the number row switches to `!@#$%^&*()`.  The `CAPS` key
+draws a small green LED on the right side of the key when Caps Lock is active.
+Taller key rows scroll inside the fixed bottom panel, with a small scrollbar at
+the right edge.  The keyboard panel is
 drawn edge-to-edge along the bottom of the screen, keeps the header/status
 text, and uses a one-pixel inner gap around the key rows at the panel border.
 Key labels are rendered with FreeType through the firmware Arial font when

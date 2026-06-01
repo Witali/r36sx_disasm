@@ -37,6 +37,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard Caps Lock LED
+
+The on-screen `CAPS` key now has a small green LED on its right side.  It lights
+when the keyboard module's Caps Lock state is active, and Caps Lock is excluded
+from key repeat so one confirm press toggles it once.  The keyboard overlay
+cache also includes Caps Lock state, so overlay mode refreshes the LED
+immediately after toggling it.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `461920` bytes
+- SHA256:
+  `4404F86A95107A1AAC20822A130EFB8D4FFA331BDBFB6DFE392E2DA8E9C900DB`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard bottom row cleanup
 
 The bottom on-screen keyboard row no longer includes the `CLS` key.  It now
