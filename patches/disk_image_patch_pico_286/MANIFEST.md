@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 app statistics QPS
+
+The `Fn` + D-pad `Down` statistics overlay now includes `QPS`, the number of
+main-loop quanta completed per second.  The displayed rows are `X86`, `QPS`,
+`READ`, `WRITE`, and `FPS`.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `461352` bytes
+- SHA256:
+  `7AEF3381E8430036DF134D6EE5925E164E86200C738BA0AEC4A428D2DE53DB8D`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard Caps LED and Backspace label
 
 The on-screen `CAPS` key now centers its label between the left key edge and

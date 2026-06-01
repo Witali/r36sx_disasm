@@ -11,6 +11,7 @@
 #include "emulator/includes/font8x8.h"
 #include "emu8950.h"
 #include "linux-audio.h"
+#include "r36sx_app_stats.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
 #include "r36sx_profile.h"
@@ -1599,6 +1600,7 @@ int main() {
         r36sx_pico286_now_us() + main_loop_frame_us;
     while (running) {
         uint64_t exec_elapsed_us;
+        r36sx_app_stats_record_quantum();
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();

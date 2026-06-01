@@ -10,6 +10,7 @@ extern "C" {
 
 typedef struct {
     uint32_t x86_per_sec;
+    uint32_t quanta_per_sec;
     uint32_t disk_read_kb_per_sec;
     uint32_t disk_write_kb_per_sec;
     uint32_t fps;
@@ -21,6 +22,7 @@ int r36sx_app_stats_is_visible(void);
 void r36sx_app_stats_set_visible(int visible);
 void r36sx_app_stats_toggle_visible(void);
 void r36sx_app_stats_record_x86(uint32_t instructions);
+void r36sx_app_stats_record_quantum(void);
 void r36sx_app_stats_record_disk_read(size_t bytes);
 void r36sx_app_stats_record_disk_write(size_t bytes);
 void r36sx_app_stats_record_frame(void);

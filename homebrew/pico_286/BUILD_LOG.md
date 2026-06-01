@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 app statistics QPS
+
+Added `QPS` to the `Fn` + D-pad `Down` statistics overlay.  It counts main-loop
+quanta per second, i.e. how many host `while (running)` loop passes completed
+per second.  The overlay now shows five rows: `X86`, `QPS`, `READ`, `WRITE`,
+and `FPS`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `461352` bytes
+- `pico_286` SHA256:
+  `7AEF3381E8430036DF134D6EE5925E164E86200C738BA0AEC4A428D2DE53DB8D`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard Caps LED and Backspace label
 
 Adjusted the `CAPS` key label/LED layout: the green Caps Lock LED moved one

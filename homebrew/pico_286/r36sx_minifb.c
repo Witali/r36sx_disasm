@@ -55,6 +55,7 @@
 #define R36SX_PICO286_STATS_FONT_SCALE 2
 #define R36SX_PICO286_STATS_CHAR_ADVANCE \
     ((R36SX_PICO286_STATS_FONT_W + 1) * R36SX_PICO286_STATS_FONT_SCALE)
+#define R36SX_PICO286_STATS_ROWS 5
 #define R36SX_PICO286_POST_FONT_SCALE 2
 #define R36SX_PICO286_POST_PAD 6
 #define R36SX_PICO286_POST_MARGIN 8
@@ -477,8 +478,8 @@ static void r36sx_mfb_draw_stats_text_surface(uint16_t *target, int surface_w,
 static void r36sx_mfb_disk_led_center(int *cx, int *cy);
 
 struct r36sx_mfb_stats_view {
-    const char *labels[4];
-    char values[4][16];
+    const char *labels[R36SX_PICO286_STATS_ROWS];
+    char values[R36SX_PICO286_STATS_ROWS][16];
     int x;
     int y;
     int w;
@@ -490,6 +491,7 @@ static void r36sx_mfb_prepare_stats_view(struct r36sx_mfb_stats_view *view)
     r36sx_app_stats_snapshot_t stats;
     static const char *labels[] = {
         "X86",
+        "QPS",
         "READ",
         "WRITE",
         "FPS"
@@ -504,21 +506,23 @@ static void r36sx_mfb_prepare_stats_view(struct r36sx_mfb_stats_view *view)
     const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
 
     memset(view, 0, sizeof(*view));
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < R36SX_PICO286_STATS_ROWS; i++) {
         view->labels[i] = labels[i];
     }
 
     r36sx_app_stats_snapshot(&stats);
     snprintf(view->values[0], sizeof(view->values[0]), "%luK/S",
              (unsigned long)(stats.x86_per_sec / 1000u));
-    snprintf(view->values[1], sizeof(view->values[1]), "%luK/S",
-             (unsigned long)stats.disk_read_kb_per_sec);
+    snprintf(view->values[1], sizeof(view->values[1]), "%lu",
+             (unsigned long)stats.quanta_per_sec);
     snprintf(view->values[2], sizeof(view->values[2]), "%luK/S",
+             (unsigned long)stats.disk_read_kb_per_sec);
+    snprintf(view->values[3], sizeof(view->values[3]), "%luK/S",
              (unsigned long)stats.disk_write_kb_per_sec);
-    snprintf(view->values[3], sizeof(view->values[3]), "%lu",
+    snprintf(view->values[4], sizeof(view->values[4]), "%lu",
              (unsigned long)stats.fps);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < R36SX_PICO286_STATS_ROWS; i++) {
         int lw = r36sx_mfb_stats_text_width(labels[i]);
         int vw = r36sx_mfb_stats_text_width(view->values[i]);
         if (lw > label_w) {
@@ -530,7 +534,7 @@ static void r36sx_mfb_prepare_stats_view(struct r36sx_mfb_stats_view *view)
     }
 
     view->w = pad * 2 + label_w + gap + value_w;
-    view->h = pad * 2 + 4 * row_h -
+    view->h = pad * 2 + R36SX_PICO286_STATS_ROWS * row_h -
               (row_h - R36SX_PICO286_STATS_FONT_H *
                        R36SX_PICO286_STATS_FONT_SCALE);
     r36sx_mfb_disk_led_center(&led_cx, &led_cy);
@@ -566,7 +570,7 @@ static void r36sx_mfb_draw_stats_view_surface(
     r36sx_mfb_stroke_rect_surface(target, surface_w, surface_h, stride_pixels,
                                   view->x, view->y, view->w, view->h,
                                   r36sx_mfb_rgb565(70, 96, 112));
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < R36SX_PICO286_STATS_ROWS; i++) {
         int row_y = view->y + pad + i * row_h;
         r36sx_mfb_draw_stats_text_surface(target, surface_w, surface_h,
                                           stride_pixels, view->x + pad,

@@ -396,11 +396,11 @@ obvious `OUT 80h` POST sequence, so the normal BIOS may not produce values.
 
 `app_stats_enabled=1` allows `Fn` + D-pad `Down` to toggle a lower-right
 two-column overlay above the disk LED.  It shows decoded x86 instruction loops
-in K/s, host disk image read/write KB/s, and presented FPS using a compact
-pixel font.  The rendered block is cached between one-second statistics
-samples; direct-present frames restore small overlay rectangles on the next
-`mfb_update()` when the DOS frame was not rerendered.  Set it to `0` to disable
-the shortcut and overlay.
+in K/s, main-loop quanta per second as `QPS`, host disk image read/write KB/s,
+and presented FPS using a compact pixel font.  The rendered block is cached
+between one-second statistics samples; direct-present frames restore small
+overlay rectangles on the next `mfb_update()` when the DOS frame was not
+rerendered.  Set it to `0` to disable the shortcut and overlay.
 
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are

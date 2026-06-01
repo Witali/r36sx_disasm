@@ -9,6 +9,7 @@ static int stats_enabled = 1;
 static int stats_visible = 0;
 static uint64_t stats_last_sample_us = 0;
 static uint64_t stats_x86_count = 0;
+static uint64_t stats_quanta = 0;
 static uint64_t stats_disk_read_bytes = 0;
 static uint64_t stats_disk_write_bytes = 0;
 static uint64_t stats_frames = 0;
@@ -37,6 +38,7 @@ void r36sx_app_stats_init(void)
     stats_visible = 0;
     stats_last_sample_us = stats_now_us();
     stats_x86_count = 0;
+    stats_quanta = 0;
     stats_disk_read_bytes = 0;
     stats_disk_write_bytes = 0;
     stats_frames = 0;
@@ -71,6 +73,13 @@ void r36sx_app_stats_record_x86(uint32_t instructions)
 {
     if (stats_enabled) {
         stats_x86_count += instructions;
+    }
+}
+
+void r36sx_app_stats_record_quantum(void)
+{
+    if (stats_enabled) {
+        stats_quanta++;
     }
 }
 
@@ -114,6 +123,8 @@ void r36sx_app_stats_snapshot(r36sx_app_stats_snapshot_t *snapshot)
     if (stats_last_sample_us == 0 || elapsed_us >= 1000000ull) {
         stats_snapshot.x86_per_sec =
             rate_per_sec(stats_x86_count, elapsed_us);
+        stats_snapshot.quanta_per_sec =
+            rate_per_sec(stats_quanta, elapsed_us);
         stats_snapshot.disk_read_kb_per_sec =
             rate_per_sec(stats_disk_read_bytes, elapsed_us) / 1024u;
         stats_snapshot.disk_write_kb_per_sec =
@@ -121,6 +132,7 @@ void r36sx_app_stats_snapshot(r36sx_app_stats_snapshot_t *snapshot)
         stats_snapshot.fps = rate_per_sec(stats_frames, elapsed_us);
 
         stats_x86_count = 0;
+        stats_quanta = 0;
         stats_disk_read_bytes = 0;
         stats_disk_write_bytes = 0;
         stats_frames = 0;
