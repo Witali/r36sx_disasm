@@ -2254,7 +2254,7 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->physical_shift = 0;
     keyboard->physical_ctrl = 0;
     keyboard->caps_lock = 0;
-    keyboard->expanded = 0;
+    keyboard->expanded = 1;
     keyboard->symbol_mode = 0;
     keyboard->cursor_block = 0;
     keyboard->scroll_y = 0;
@@ -2312,12 +2312,10 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->physical_ctrl = 0;
         keyboard->symbol_mode = 0;
         keyboard->scroll_y = 0;
-        keyboard->expanded = 0;
         keyboard->press_buttons = 0;
         reset_nav_repeat(keyboard);
         reset_key_repeat(keyboard);
     } else {
-        keyboard->expanded = 1;
         update_scroll_for_selection(keyboard);
     }
 }
