@@ -1,5 +1,32 @@
 # pico-286 Build Log
 
+## 2026-06-01 CPU physical memory width fast path
+
+Changed the CPU core's paging-aware physical memory helpers to use the existing
+native fast 16-bit and 32-bit memory accessors when `R36SX_NATIVE_FAST_MEMORY`
+is enabled.  This avoids splitting every word/dword CPU memory access into
+multiple byte backend calls for normal RAM while keeping byte fallback behavior
+for unaligned/non-fast paths.  The optimization benefits many opcode paths at
+once: `MOV`, stack operations, far control transfers, string operations, and
+386 dword instructions all pass through these helpers.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `466756` bytes
+- `pico_286` SHA256:
+  `D10CD2D26A83E7F735EA3E7FB2C9072903155E5B8876F6CA6C2022F42A790866`
+- Defender CLI scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 protected far control transfers
 
 Changed protected-mode `CALL FAR`, `JMP FAR`, `RETF`, and `IRET` handling so

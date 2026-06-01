@@ -1312,30 +1312,41 @@ __not_in_flash() void getea(uint8_t rmval) {
 
 static inline uint16_t r36sx_cpu_phys_read16(uint32_t address)
 {
-    return (uint16_t)read86_ob(address) |
-           ((uint16_t)read86_ob(address + 1u) << 8);
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+    return r36sx_readw86_fast(address);
+#else
+    return readw86_ob(address);
+#endif
 }
 
 static inline uint32_t r36sx_cpu_phys_read32(uint32_t address)
 {
-    return (uint32_t)read86_ob(address) |
-           ((uint32_t)read86_ob(address + 1u) << 8) |
-           ((uint32_t)read86_ob(address + 2u) << 16) |
-           ((uint32_t)read86_ob(address + 3u) << 24);
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+    return r36sx_readdw86_fast(address);
+#else
+    return readdw86_ob(address);
+#endif
 }
 
 static inline void r36sx_cpu_phys_write16(uint32_t address, uint16_t value)
 {
-    write86_ob(address, (uint8_t)value);
-    write86_ob(address + 1u, (uint8_t)(value >> 8));
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+    r36sx_writew86_fast(address, value);
+#else
+    writew86_ob(address, value);
+#endif
 }
 
 static inline void r36sx_cpu_phys_write32(uint32_t address, uint32_t value)
 {
+#if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
+    r36sx_writedw86_fast(address, value);
+#else
     write86_ob(address, (uint8_t)value);
     write86_ob(address + 1u, (uint8_t)(value >> 8));
     write86_ob(address + 2u, (uint8_t)(value >> 16));
     write86_ob(address + 3u, (uint8_t)(value >> 24));
+#endif
 }
 
 static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
