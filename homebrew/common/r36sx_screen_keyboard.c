@@ -20,7 +20,7 @@
 #define R36SX_OSK_UNIT_1_5 6
 #define R36SX_OSK_UNIT_2 8
 #define R36SX_OSK_UNIT_2_5 10
-#define R36SX_OSK_UNIT_6_5 26
+#define R36SX_OSK_UNIT_6 24
 #define R36SX_OSK_KEY_DEFAULT_UNITS R36SX_OSK_UNIT_1
 #define R36SX_OSK_MIN_UNIT_W 6
 #define R36SX_OSK_SIDE_KEY_W 38
@@ -184,11 +184,11 @@ static const struct r36sx_osk_key g_osk_row4[] = {
 static const struct r36sx_osk_key g_osk_row5[] = {
     R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_KEY("WIN", R36SX_SCREEN_KEY_LWIN, 0),
+    R36SX_OSK_WIDE("WIN", R36SX_SCREEN_KEY_LWIN, 0, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("", R36SX_SCREEN_KEY_SPACE, 0,
-                   R36SX_OSK_UNIT_6_5),
+                   R36SX_OSK_UNIT_6),
     R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
@@ -286,11 +286,11 @@ static const struct r36sx_osk_key g_osk_symbol_row4[] = {
 static const struct r36sx_osk_key g_osk_symbol_row5[] = {
     R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_KEY("WIN", R36SX_SCREEN_KEY_LWIN, 0),
+    R36SX_OSK_WIDE("WIN", R36SX_SCREEN_KEY_LWIN, 0, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("", R36SX_SCREEN_KEY_SPACE, 0,
-                   R36SX_OSK_UNIT_6_5),
+                   R36SX_OSK_UNIT_6),
     R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
@@ -1269,16 +1269,52 @@ static int max_main_row_pixel_w(const struct r36sx_osk_key *const *rows,
     return max_width;
 }
 
-static int row_tail_extra_col(int row, int count)
+static int row_tail_extra_col(int count)
 {
-    /*
-     * Keep the bottom-row gaps visually identical to the other rows by letting
-     * the spacebar absorb the extra width instead of widening right Ctrl.
-     */
-    if (row == 5 && count > 3) {
-        return 3;
-    }
     return count - 1;
+}
+
+static int bottom_row_tail_extra_for_col(int col, int tail_extra)
+{
+    int space_extra;
+    int right_alt_extra;
+    int remaining;
+
+    if (tail_extra <= 0) {
+        return 0;
+    }
+
+    /*
+     * Distribute the short bottom-row remainder along the PC-keyboard guide
+     * columns: spacebar right edge under comma, MNU left edge under =/F10/',
+     * and the final Ctrl edge under the rows above.
+     */
+    space_extra = tail_extra > 5 ? 5 : tail_extra;
+    remaining = tail_extra - space_extra;
+    right_alt_extra = remaining > 2 ? 2 : remaining;
+    remaining -= right_alt_extra;
+
+    if (col == 3) {
+        return space_extra;
+    }
+    if (col == 4) {
+        return right_alt_extra;
+    }
+    if (col == 6) {
+        return remaining;
+    }
+    return 0;
+}
+
+static int row_tail_extra_for_col(int row,
+                                  int col,
+                                  int count,
+                                  int tail_extra)
+{
+    if (row == 5 && count > 6) {
+        return bottom_row_tail_extra_for_col(col, tail_extra);
+    }
+    return col == row_tail_extra_col(count) ? tail_extra : 0;
 }
 
 static int key_text_scale(const char *label, int key_w)
@@ -2348,15 +2384,13 @@ void r36sx_screen_keyboard_draw(
         int y = keys_y + (int)row * R36SX_OSK_ROW_STEP;
         int row_w = row_pixel_w(rows, counts, (int)row, unit_w);
         int tail_extra = row_target_w > row_w ? row_target_w - row_w : 0;
-        int tail_col = row_tail_extra_col((int)row, count);
         if (y < view_y || y + R36SX_OSK_KEY_H > view_bottom) {
             continue;
         }
         for (int col = 0; col < count; col++) {
             int key_w = key_pixel_w(&rows[row][col], unit_w);
-            if (col == tail_col) {
-                key_w += tail_extra;
-            }
+            key_w += row_tail_extra_for_col((int)row, col, count,
+                                            tail_extra);
             draw_key(keyboard, &rows[row][col], frame, width, height,
                      stride_pixels, x, y, key_w,
                      keyboard->zone == R36SX_OSK_ZONE_MAIN &&

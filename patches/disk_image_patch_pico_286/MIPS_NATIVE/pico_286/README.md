@@ -73,7 +73,9 @@ left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
 same left edge.  The bottom row includes `CTRL WIN ALT`, a wide unlabeled
 spacebar, then `ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes
 `E0 5B` and
-`E0 5D`.  The function-key row keeps grouped gaps, with the late group
+`E0 5D`.  `WIN` ends under `A`, the spacebar ends under comma, and `MNU`
+starts under the `=`/`F10` guide column.  The function-key row keeps grouped
+gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
 and Caps Lock also change the visible labels: letters switch between lowercase
 and uppercase, while the number row switches to `!@#$%^&*()`.  The `CAPS` key

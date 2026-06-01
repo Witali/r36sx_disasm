@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard bottom-row alignment
+
+Adjusted the PC-style on-screen keyboard bottom row so its visual guide
+columns match the rows above: `WIN` is now 1.5 units wide and ends under `A`,
+the spacebar ends under comma, and `MNU` starts under the `=`/`F10` guide
+column.  The row remainder is split between the spacebar, right Alt, and right
+Ctrl instead of putting all extra pixels into one key.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `462100` bytes
+- `pico_286` SHA256:
+  `0A4A6C2E0D489CD15B49C24280530B0BB658EBD21566D60C13750BC1F36DF418`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard default fit-height compact 80
 
 The on-screen keyboard now opens in fit-height mode by default, just tall

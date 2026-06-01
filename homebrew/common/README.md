@@ -77,8 +77,10 @@ key in each row absorbs the row-width remainder so `F12`, Backspace, `\`,
 Enter, right `SHIFT`, and right `CTRL` share a clean visual right edge.  On the
 bottom row, the spacebar absorbs that remainder instead, keeping the visible
 gaps between `CTRL`, `WIN`, `ALT`, the spacebar, `MNU`, and right `CTRL`
-consistent with the rows above.  The `CAPS` key includes a small green lock LED
-that follows the keyboard module's Caps Lock state.
+consistent with the rows above.  The bottom-row remainder is split so `WIN`
+ends under `A`, the spacebar ends under comma, and `MNU` starts under the
+`=`/`F10` guide column.  The `CAPS` key includes a small green lock LED that
+follows the keyboard module's Caps Lock state.
 
 Current physical button bindings while the keyboard is visible:
 

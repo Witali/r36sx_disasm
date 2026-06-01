@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard bottom-row alignment
+
+The on-screen keyboard bottom row now aligns better with the PC-style rows
+above it: `WIN` is 1.5 units wide and ends under `A`, the spacebar ends under
+comma, and `MNU` starts under the `=`/`F10` guide column.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `462100` bytes
+- SHA256:
+  `0A4A6C2E0D489CD15B49C24280530B0BB658EBD21566D60C13750BC1F36DF418`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard default fit-height compact 80
 
 The on-screen keyboard now opens in fit-height mode by default.  Select
