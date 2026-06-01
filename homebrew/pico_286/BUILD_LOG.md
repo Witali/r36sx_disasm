@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard header spacing
+
+Removed the `DOS KBD ABC` / `DOS KBD SYM` prefix from the on-screen keyboard
+header.  The header now shows only the physical-button hints, with double
+spaces between each hint so the labels are easier to scan.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `462100` bytes
+- `pico_286` SHA256:
+  `69EA74C2893E6F49E527D6D3A812B870E1C20535289E702785DFA8D1423450AC`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard fit-height toggle
 
 Select now toggles the on-screen keyboard between the compact 96 px panel and a

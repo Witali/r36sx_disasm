@@ -2331,11 +2331,11 @@ void r36sx_screen_keyboard_draw(
     draw_text(frame, width, height, stride_pixels, panel_x + 5, panel_y + 3,
               keyboard->symbol_mode ?
                   (keyboard->expanded ?
-                   "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=MIN" :
-                   "DOS KBD SYM  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=FIT") :
+                   "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  SEL=MIN" :
+                   "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  SEL=FIT") :
                   (keyboard->expanded ?
-                   "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=MIN" :
-                   "DOS KBD ABC  A/START=TYPE B=BACK Y=ENTER X=ESC L=SHIFT R=CTRL SEL=FIT"),
+                   "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  SEL=MIN" :
+                   "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  SEL=FIT"),
               text, 1);
 
     for (size_t row = 0; row < (size_t)keyboard_row_count(); row++) {
