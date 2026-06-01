@@ -315,23 +315,27 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
     uint8_t aluop = opcode >> 3;
 
     switch (opcode) {
+        /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP r/m32, r32 */
         case 0x01: case 0x09: case 0x11: case 0x19:
         case 0x21: case 0x29: case 0x31: case 0x39:
             modregrm();
             r36sx_cpu_alu_rm_reg32(aluop, rm, reg);
             return true;
 
+        /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP r32, r/m32 */
         case 0x03: case 0x0B: case 0x13: case 0x1B:
         case 0x23: case 0x2B: case 0x33: case 0x3B:
             modregrm();
             r36sx_cpu_alu_reg_rm32(aluop, reg, rm);
             return true;
 
+        /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP EAX, imm32 */
         case 0x05: case 0x0D: case 0x15: case 0x1D:
         case 0x25: case 0x2D: case 0x35: case 0x3D:
             r36sx_cpu_alu_eax_imm32(aluop);
             return true;
 
+        /* INC r32 */
         case 0x40: case 0x41: case 0x42: case 0x43:
         case 0x44: case 0x45: case 0x46: case 0x47: {
             uint8_t regid = opcode & 7u;
@@ -344,6 +348,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* DEC r32 */
         case 0x48: case 0x49: case 0x4A: case 0x4B:
         case 0x4C: case 0x4D: case 0x4E: case 0x4F: {
             uint8_t regid = opcode & 7u;
@@ -356,21 +361,25 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* PUSH r32 */
         case 0x50: case 0x51: case 0x52: case 0x53:
         case 0x54: case 0x55: case 0x56: case 0x57:
             push32(getreg32(opcode & 7u));
             return true;
 
+        /* POP r32 */
         case 0x58: case 0x59: case 0x5A: case 0x5B:
         case 0x5C: case 0x5D: case 0x5E: case 0x5F:
             putreg32(opcode & 7u, pop32());
             return true;
 
+        /* PUSH imm32 */
         case 0x68:
             push32(getmem32(CPU_CS, CPU_IP));
             StepIP(4);
             return true;
 
+        /* IMUL r32, r/m32, imm32 */
         case 0x69: {
             modregrm();
             int64_t result = (int64_t)(int32_t)readrm32(rm) *
@@ -385,11 +394,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* PUSH imm8 */
         case 0x6A:
             push32((uint32_t)(int32_t)(int8_t)getmem8(CPU_CS, CPU_IP));
             StepIP(1);
             return true;
 
+        /* IMUL r32, r/m32, imm8 */
         case 0x6B: {
             modregrm();
             int64_t result = (int64_t)(int32_t)readrm32(rm) *
@@ -404,6 +415,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP r/m32, imm32/imm8 */
         case 0x81:
         case 0x83: {
             modregrm();
@@ -419,11 +431,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* TEST r/m32, r32 */
         case 0x85:
             modregrm();
             flag_log32(getreg32(reg) & readrm32(rm));
             return true;
 
+        /* XCHG r/m32, r32 */
         case 0x87: {
             modregrm();
             uint32_t tmp = getreg32(reg);
@@ -432,27 +446,32 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* MOV r/m32, r32 */
         case 0x89:
             modregrm();
             writerm32(rm, getreg32(reg));
             return true;
 
+        /* MOV r32, r/m32 */
         case 0x8B:
             modregrm();
             putreg32(reg, readrm32(rm));
             return true;
 
+        /* LEA r32, m */
         case 0x8D:
             modregrm();
             getea(rm);
             putreg32(reg, ea - useseg_base);
             return true;
 
+        /* POP r/m32 */
         case 0x8F:
             modregrm();
             writerm32(rm, pop32());
             return true;
 
+        /* CALL ptr16:32 */
         case 0x9A: {
             uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
             StepIP(4);
@@ -469,9 +488,11 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* NOP */
         case 0x90:
             return true;
 
+        /* XCHG EAX, r32 */
         case 0x91: case 0x92: case 0x93:
         case 0x94: case 0x95: case 0x96: case 0x97: {
             uint8_t regid = opcode & 7u;
@@ -481,22 +502,27 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* CWDE */
         case 0x98:
             CPU_EAX = (uint32_t)(int32_t)(int16_t)CPU_AX;
             return true;
 
+        /* CDQ */
         case 0x99:
             CPU_EDX = ((int32_t)CPU_EAX < 0) ? 0xFFFFFFFFu : 0u;
             return true;
 
+        /* MOV EAX, moffs32 */
         case 0xA1:
             CPU_EAX = getmem32(useseg, r36sx_read_moffs());
             return true;
 
+        /* MOV moffs32, EAX */
         case 0xA3:
             putmem32(useseg, r36sx_read_moffs(), CPU_EAX);
             return true;
 
+        /* MOVSD */
         case 0xA5:
             if (reptype && r36sx_rep_get_count() == 0) {
                 return true;
@@ -518,11 +544,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             (*loopcount)++;
             return true;
 
+        /* TEST EAX, imm32 */
         case 0xA9:
             flag_log32(CPU_EAX & getmem32(CPU_CS, CPU_IP));
             StepIP(4);
             return true;
 
+        /* STOSD */
         case 0xAB:
             if (reptype && r36sx_rep_get_count() == 0) {
                 return true;
@@ -544,6 +572,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             (*loopcount)++;
             return true;
 
+        /* LODSD */
         case 0xAD: {
             if (reptype && r36sx_rep_get_count() == 0) {
                 return true;
@@ -561,6 +590,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* SCASD */
         case 0xAF: {
             if (reptype && r36sx_rep_get_count() == 0) {
                 return true;
@@ -584,12 +614,14 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* MOV r32, imm32 */
         case 0xB8: case 0xB9: case 0xBA: case 0xBB:
         case 0xBC: case 0xBD: case 0xBE: case 0xBF:
             putreg32(opcode & 7u, getmem32(CPU_CS, CPU_IP));
             StepIP(4);
             return true;
 
+        /* SHL/SHR/SAR/ROL/ROR/RCL/RCR r/m32, imm8 */
         case 0xC1:
             modregrm();
             {
@@ -600,6 +632,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             }
             return true;
 
+        /* RET imm16 */
         case 0xC2: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
@@ -608,10 +641,12 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* RET */
         case 0xC3:
             r36sx_cpu_set_ip(pop32());
             return true;
 
+        /* MOV r/m32, imm32 */
         case 0xC7:
             modregrm();
             if (reg != 0) {
@@ -622,11 +657,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             StepIP(4);
             return true;
 
+        /* LEAVE */
         case 0xC9:
             r36sx_cpu_set_stack_pointer(CPU_EBP);
             CPU_EBP = pop32();
             return true;
 
+        /* RETF imm16 */
         case 0xCA: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
@@ -640,6 +677,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* RETF */
         case 0xCB:
             if (r36sx_cpu_protected_enabled()) {
                 r36sx_cpu_protected_retf(0, 1);
@@ -649,6 +687,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             r36sx_cpu_load_segment(regcs, pop());
             return true;
 
+        /* IRETD */
         case 0xCF:
             if (r36sx_cpu_protected_enabled()) {
                 r36sx_cpu_protected_iret(1);
@@ -659,16 +698,19 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             decodeflagsdword(pop32());
             return true;
 
+        /* SHL/SHR/SAR/ROL/ROR/RCL/RCR r/m32, 1 */
         case 0xD1:
             modregrm();
             writerm32(rm, op_grp2_32(1, readrm32(rm)));
             return true;
 
+        /* SHL/SHR/SAR/ROL/ROR/RCL/RCR r/m32, CL */
         case 0xD3:
             modregrm();
             writerm32(rm, op_grp2_32(CPU_CL, readrm32(rm)));
             return true;
 
+        /* CALL rel32 */
         case 0xE8: {
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
@@ -677,6 +719,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* JMP rel32 */
         case 0xE9: {
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
@@ -684,6 +727,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* JMP ptr16:32 */
         case 0xEA: {
             uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
             StepIP(4);
@@ -697,11 +741,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             return true;
         }
 
+        /* TEST/NOT/NEG/MUL/IMUL/DIV/IDIV r/m32 */
         case 0xF7:
             modregrm();
             op_grp3_32(rm);
             return true;
 
+        /* INC/DEC/CALL/JMP/PUSH r/m32 */
         case 0xFF:
             modregrm();
             switch (reg) {
