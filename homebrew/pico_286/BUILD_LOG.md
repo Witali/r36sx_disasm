@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-01 disk menu host-drive connected state
+
+The disk menu now mirrors the emulator-side MAPDRIVE state.  Before `H:` is
+connected the row reads `CONNECT DISK H: HOST/`; while the trampoline is
+pending it reads `DISK H: CONNECTING TO HOST/`; after a successful MAPDRIVE
+completion it reads `DISK H: CONNECTED TO HOST/` and repeat presses no longer
+start another trampoline.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `469748` bytes
+- `pico_286` SHA256:
+  `75A00B846C9499BC03D698461E19829FE0F00D0193A5CFFE7999AABD7DFE6726`
+- Microsoft Defender scan: no threats found.
+
 ## 2026-06-01 remove host-drive interrupt-depth gate
 
 Removed the guest interrupt-depth gate from the disk menu `CONNECT DISK H:`

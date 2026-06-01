@@ -167,11 +167,13 @@ lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
 or A/Y on a drive row cycles through matching files found in the configured
 `image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
 `.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
-The `CONNECT DISK H:` row runs an embedded MAPDRIVE-compatible trampoline from
-emulator RAM after DOS has booted; `CONFIG.SYS` must contain `LASTDRIVE=H` or
-higher.  The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot
-can try the floppy or hard disk first.  The `OK` button writes current bindings
-and boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
+The `CONNECT DISK H: HOST/` row runs an embedded MAPDRIVE-compatible
+trampoline from emulator RAM after DOS has booted; `CONFIG.SYS` must contain
+`LASTDRIVE=H` or higher.  After a successful connection the row changes to
+`DISK H: CONNECTED TO HOST/` and later presses do not run the trampoline again.
+The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try
+the floppy or hard disk first.  The `OK` button writes current bindings and
+boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
 Pico-286 so hard-disk changes can be seen after restart.  `Cancel`, B, or X
 cancels the menu.
 

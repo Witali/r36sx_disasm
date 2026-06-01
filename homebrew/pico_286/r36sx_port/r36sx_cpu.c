@@ -218,6 +218,21 @@ void r36sx_pico286_request_connect_host_drive(void)
     r36sx_mapdrive_pending = 1;
 }
 
+int r36sx_pico286_host_drive_connected(void)
+{
+    return r36sx_mapdrive_connected != 0;
+}
+
+int r36sx_pico286_host_drive_busy(void)
+{
+    return r36sx_mapdrive_pending || r36sx_mapdrive_in_progress;
+}
+
+uint8_t r36sx_pico286_host_drive_last_status(void)
+{
+    return r36sx_mapdrive_last_status;
+}
+
 static void r36sx_mapdrive_save_cpu_state(void)
 {
     memcpy(r36sx_mapdrive_saved_state.dwordregs, dwordregs,

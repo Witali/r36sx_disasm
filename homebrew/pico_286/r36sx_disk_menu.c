@@ -540,6 +540,7 @@ void r36sx_disk_menu_init(struct r36sx_disk_menu *menu)
         return;
     }
     memset(menu, 0, sizeof(*menu));
+    menu->host_drive_last_status = 0xffu;
     refresh_menu(menu);
 }
 
@@ -559,6 +560,44 @@ void r36sx_disk_menu_set_visible(struct r36sx_disk_menu *menu, int visible)
         menu->message[0] = '\0';
         refresh_menu(menu);
     }
+}
+
+void r36sx_disk_menu_set_host_drive_state(struct r36sx_disk_menu *menu,
+                                          int connected,
+                                          int busy,
+                                          uint8_t last_status)
+{
+    if (!menu) {
+        return;
+    }
+    menu->host_drive_connected = (uint8_t)(connected != 0);
+    menu->host_drive_busy = (uint8_t)(busy != 0);
+    menu->host_drive_last_status = last_status;
+    if (strcmp(menu->message, "CONNECTING HOST DRIVE H:") == 0) {
+        if (menu->host_drive_connected) {
+            snprintf(menu->message, sizeof(menu->message),
+                     "DISK H: CONNECTED TO HOST/");
+        } else if (!menu->host_drive_busy && last_status != 0xffu &&
+                   last_status != 0u) {
+            snprintf(menu->message, sizeof(menu->message),
+                     "DISK H: CONNECT FAILED");
+        }
+    }
+}
+
+static const char *host_drive_label(const struct r36sx_disk_menu *menu)
+{
+    if (menu && menu->host_drive_connected) {
+        return "DISK H: CONNECTED TO HOST/";
+    }
+    if (menu && menu->host_drive_busy) {
+        return "DISK H: CONNECTING TO HOST/";
+    }
+    if (menu && menu->host_drive_last_status != 0xffu &&
+        menu->host_drive_last_status != 0u) {
+        return "DISK H: CONNECT FAILED";
+    }
+    return "CONNECT DISK H: HOST/";
 }
 
 uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
@@ -627,6 +666,16 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS) {
             cycle_bios(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CONNECT_H) {
+            if (menu->host_drive_connected) {
+                snprintf(menu->message, sizeof(menu->message),
+                         "DISK H: CONNECTED TO HOST/");
+                return 0;
+            }
+            if (menu->host_drive_busy) {
+                snprintf(menu->message, sizeof(menu->message),
+                         "DISK H: CONNECTING TO HOST/");
+                return 0;
+            }
             snprintf(menu->message, sizeof(menu->message),
                      "CONNECTING HOST DRIVE H:");
             return R36SX_DISK_MENU_RESULT_CONNECT_HOST_DRIVE;
@@ -707,7 +756,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
 
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_CONNECT_H, x, y, full_w, row_h,
-             "CONNECT DISK H:");
+             host_drive_label(menu));
     y += row_h + gap + 10;
 
     snprintf(line, sizeof(line), "BOOT ORDER  %s",

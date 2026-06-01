@@ -91,7 +91,9 @@ Open it with Fn+Select.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
-- A or Y on `CONNECT DISK H:`: run the embedded MAPDRIVE trampoline from RAM.
+- A or Y on `CONNECT DISK H: HOST/`: run the embedded MAPDRIVE trampoline from
+  RAM.  After a successful connection the row changes to
+  `DISK H: CONNECTED TO HOST/`.
 - A or Y on `OK`: write current bindings to `pico_286.conf` and apply them.
 - A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 - A or Y on `CANCEL`: close the menu.
