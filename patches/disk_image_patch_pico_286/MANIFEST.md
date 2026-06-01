@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-01 on-screen keyboard Caps LED and Backspace label
+
+The on-screen `CAPS` key now centers its label between the left key edge and
+the Caps Lock LED, and the LED moved one pixel left.  Backspace now shows the
+same left-arrow glyph as the cursor block before `BS`.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `462100` bytes
+- SHA256:
+  `B7FB1F62C4FDA67DE2D46B31240145B03EECFC6CAE8C1695D6E509FFE2AF1490`
+- Defender scan: no threats in the source binary, patch copy, or `disk_image`
+  copy.
+
 ## 2026-06-01 on-screen keyboard bottom-row alignment
 
 The on-screen keyboard bottom row now aligns better with the PC-style rows

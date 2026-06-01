@@ -139,7 +139,8 @@ static const struct r36sx_osk_key g_osk_row1[] = {
     R36SX_OSK_KEY("9", '9', 0), R36SX_OSK_KEY("0", '0', 0),
     R36SX_OSK_KEY("-", R36SX_SCREEN_KEY_OEM_MINUS, 0),
     R36SX_OSK_KEY("=", R36SX_SCREEN_KEY_OEM_PLUS, 0),
-    R36SX_OSK_WIDE("BS", R36SX_SCREEN_KEY_BACK, 0, R36SX_OSK_UNIT_2)
+    R36SX_OSK_WIDE(R36SX_OSK_LABEL_LEFT "BS", R36SX_SCREEN_KEY_BACK, 0,
+                   R36SX_OSK_UNIT_2)
 };
 
 static const struct r36sx_osk_key g_osk_row2[] = {
@@ -228,7 +229,8 @@ static const struct r36sx_osk_key g_osk_symbol_row1[] = {
                   R36SX_OSK_FLAG_SHIFTED),
     R36SX_OSK_KEY("+", R36SX_SCREEN_KEY_OEM_PLUS,
                   R36SX_OSK_FLAG_SHIFTED),
-    R36SX_OSK_WIDE("BS", R36SX_SCREEN_KEY_BACK, 0, R36SX_OSK_UNIT_2)
+    R36SX_OSK_WIDE(R36SX_OSK_LABEL_LEFT "BS", R36SX_SCREEN_KEY_BACK, 0,
+                   R36SX_OSK_UNIT_2)
 };
 
 static const struct r36sx_osk_key g_osk_symbol_row2[] = {
@@ -2000,8 +2002,10 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
         int text_y = y + (R36SX_OSK_KEY_H - text_h) / 2;
         if (key->keycode == R36SX_SCREEN_KEY_CAPITAL) {
             int led_outer = R36SX_OSK_CAPS_LED_OUTER_RADIUS;
-            int led_pad = 4;
-            int label_w = key_w - (led_outer * 2 + 1) - led_pad - 4;
+            int led_pad = 5;
+            int led_x = x + key_w - led_outer - led_pad;
+            int led_left = led_x - led_outer;
+            int label_w = led_left - x;
             if (label_w < 1) {
                 label_w = 1;
             }
@@ -2009,10 +2013,10 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
             text_w = text_width(label, scale);
             text_h = osk_font_open() == 0 ?
                 osk_font_px_for_scale(scale) : 7 * scale;
-            text_x = x + 4;
+            text_x = x + (label_w - text_w) / 2;
             text_y = y + (R36SX_OSK_KEY_H - text_h) / 2;
             draw_caps_lock_led(frame, width, height, stride,
-                               x + key_w - led_outer - led_pad,
+                               led_x,
                                y + R36SX_OSK_KEY_H / 2,
                                keyboard->caps_lock != 0);
         }

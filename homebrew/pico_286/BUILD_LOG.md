@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-01 on-screen keyboard Caps LED and Backspace label
+
+Adjusted the `CAPS` key label/LED layout: the green Caps Lock LED moved one
+pixel left, and the `CAPS` text is centered between the key's left edge and the
+LED's left edge.  Backspace now uses the same left-arrow glyph as the cursor
+block before the `BS` label.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath homebrew\pico_286\pico_286 -Destination disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `462100` bytes
+- `pico_286` SHA256:
+  `B7FB1F62C4FDA67DE2D46B31240145B03EECFC6CAE8C1695D6E509FFE2AF1490`
+- Defender scan: found no threats in the main binary, patch copy, and
+  `disk_image` copy
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 on-screen keyboard bottom-row alignment
 
 Adjusted the PC-style on-screen keyboard bottom row so its visual guide
