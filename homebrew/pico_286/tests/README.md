@@ -30,6 +30,12 @@ Build the ROM payload with:
 .\homebrew\pico_286\tests\build_test386_r36sx.ps1
 ```
 
+The script uses the local NASM 3.01 executable:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test386.asm\src\ -f bin .\homebrew\pico_286\tests\test386.asm\src\test386.asm -w-all -l .\homebrew\pico_286\tests\test386.asm\build\test386.lst -o .\homebrew\pico_286\tests\test386.asm\build\test386.bin
+```
+
 Rebuild `cpu_tests.img` with:
 
 ```powershell
@@ -45,3 +51,19 @@ stores it as `TEST386.BIN` for reference and for future emulator BIOS-loading
 work.  `rebuild_cpu_tests_disk.ps1` also copies the same ROM to
 `homebrew/pico_286/test386.bin`, which is the default `test_bios_rom` used by
 the native executable.
+
+## MAPDRIVE.COM
+
+`homebrew/pico_286/pico-286/tools/mapdrive.asm` is the standalone DOS utility
+source for registering drive `H:` as a network drive.  The R36SX native
+executable normally uses an embedded MAPDRIVE-compatible trampoline, but the
+patch folder also keeps a real `.COM` copy for DOS-side testing.
+
+Build it with the same NASM 3.01 executable:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+```
+
+The generated file is mirrored to
+`disk_image/MIPS_NATIVE/pico_286/mapdrive.com` for the local working image.

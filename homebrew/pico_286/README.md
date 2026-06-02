@@ -556,6 +556,46 @@ The Windows/Zig script remains only as a fallback build path.  Zig/LLVM's MIPS
 backend does not recognize `74kc` as a CPU name, and `zig objcopy --strip-all`
 currently reports `error: unimplemented` for this MIPS ELF.
 
+### Auxiliary Binary Builds
+
+`test386.bin` is assembled with the local NASM 3.01 toolchain.  The wrapper
+script also copies the resulting 64 KB BIOS ROM to the executable directory:
+
+```powershell
+.\homebrew\pico_286\tests\build_test386_r36sx.ps1
+```
+
+Equivalent direct NASM command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test386.asm\src\ -f bin .\homebrew\pico_286\tests\test386.asm\src\test386.asm -w-all -l .\homebrew\pico_286\tests\test386.asm\build\test386.lst -o .\homebrew\pico_286\tests\test386.asm\build\test386.bin
+```
+
+Rebuild the optional CPU test floppy after rebuilding `test386.bin`:
+
+```powershell
+.\homebrew\pico_286\tests\rebuild_cpu_tests_disk.ps1
+```
+
+`mapdrive.com` is also assembled with the same NASM executable.  The source is
+`homebrew/pico_286/pico-286/tools/mapdrive.asm`; it is kept compatible with
+NASM by using the precomputed `0C000h` value for the DOS CDS `NET|PHY` flags.
+Build the patch copy with:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+```
+
+Then mirror it into the local disk-image working copy if needed:
+
+```powershell
+Copy-Item -LiteralPath .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com -Destination .\disk_image\MIPS_NATIVE\pico_286\mapdrive.com -Force
+```
+
+Scan generated binaries before distributing or copying them to the SD card.
+For `mapdrive.com`, the current checked-in patch file was scanned with
+Microsoft Defender and found clean.
+
 Before replacing the vendored `homebrew/pico_286/pico-286` source snapshot,
 scan the downloaded checkout/archive first, then scan the copied vendored tree:
 
