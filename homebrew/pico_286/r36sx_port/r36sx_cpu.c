@@ -205,13 +205,15 @@ static inline uint8_t r36sx_cpu_v86_enabled(void)
 
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
-                                             uint8_t has_error_code);
+                                             uint8_t has_error_code,
+                                             uint8_t software_int);
 static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint32_t error_code,
                                       uint8_t has_error_code,
                                       uint32_t fault_ip);
 static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
 void intcall86(uint8_t intnum);
+static void r36sx_cpu_software_interrupt(uint8_t intnum);
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
@@ -3705,7 +3707,7 @@ void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
     if (r36sx_cpu_protected_enabled() &&
-        r36sx_cpu_protected_interrupt(intnum, 0, 0)) {
+        r36sx_cpu_protected_interrupt(intnum, 0, 0, 0)) {
         return;
     }
 
@@ -4085,6 +4087,17 @@ void intcall86(uint8_t intnum) {
     ip = getmem16(0, (uint16_t) intnum * 4);
     ifl = 0;
     tf = 0;
+}
+
+static void r36sx_cpu_software_interrupt(uint8_t intnum)
+{
+    if (r36sx_cpu_protected_enabled()) {
+        r36sx_pm_diag_log_interrupt(intnum);
+        (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1);
+        return;
+    }
+
+    intcall86(intnum);
 }
 
 /* 8086/80186-compatible arithmetic, flag, and group-op helpers. */
@@ -7194,7 +7207,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CC: ;
 #endif
                 /* CC INT 3 */
-                intcall86(3);
+                r36sx_cpu_software_interrupt(3);
                 break;
 
             case 0xCD:
@@ -7204,7 +7217,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* CD INT Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                intcall86(oper1b);
+                r36sx_cpu_software_interrupt(oper1b);
                 break;
 
             case 0xCE:
@@ -7213,7 +7226,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* CE INTO */
                 if (of) {
-                    intcall86(4);
+                    r36sx_cpu_software_interrupt(4);
                 }
                 break;
 

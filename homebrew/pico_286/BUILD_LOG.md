@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-02 protected software INT gate checks
+
+Software interrupt opcodes (`INT3`, `INT imm8`, and `INTO`) now enter the
+protected interrupt path with a software-interrupt flag.  In protected mode the
+IDT gate DPL is checked against CPL, and a denied software interrupt raises
+`#GP` with an IDT-style error code.  Hardware interrupts and CPU exceptions keep
+using the non-software path, so their delivery is not incorrectly blocked by
+gate DPL.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `540268` bytes
+- `pico_286` SHA256:
+  `EEFB97563D7565BECDD7EC722BC7BA20356B0D26DF1EBA880A4C563054F6AC7C`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 protected interrupt VM86 frames
 
 Protected-mode interrupt/trap gates now switch to an inner-privilege stack

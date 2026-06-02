@@ -6,7 +6,8 @@
 
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
-                                             uint8_t has_error_code)
+                                             uint8_t has_error_code,
+                                             uint8_t software_int)
 {
     uint32_t gate_offset = (uint32_t)intnum * 8u;
     if (gate_offset + 7u > r36sx_idtr_limit) {
@@ -27,6 +28,9 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint8_t gate16 = type == 0x06u || type == 0x07u;
     uint8_t gate32 = type == 0x0eu || type == 0x0fu;
     uint8_t task_gate = type == R36SX_DESCRIPTOR_TYPE_TASK_GATE;
+    uint8_t gate_dpl = (access >> 5) & 3u;
+    /* IDT selector-style error code: vector index plus the IDT source bit. */
+    uint32_t gate_error = ((uint32_t)intnum << 3) | 0x02u;
 
     if (task_gate) {
         if ((access & R36SX_DESCRIPTOR_PRESENT) == 0) {
@@ -37,6 +41,11 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
 #endif
             r36sx_pm_diag_log_first_fault("protected task gate not present",
                                           CPU_IP);
+            return 0;
+        }
+        if (software_int && r36sx_cpu_cpl() > gate_dpl) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, gate_error, 1,
+                                      CPU_IP);
             return 0;
         }
         return r36sx_cpu_task_switch((uint16_t)(lo >> 16),
@@ -53,6 +62,11 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
 #endif
         r36sx_pm_diag_log_first_fault("protected interrupt gate unsupported",
                                       CPU_IP);
+        return 0;
+    }
+
+    if (software_int && r36sx_cpu_cpl() > gate_dpl) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, gate_error, 1, CPU_IP);
         return 0;
     }
 
@@ -160,7 +174,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
 
     if (r36sx_cpu_protected_enabled()) {
         if (!r36sx_cpu_protected_interrupt(
-                intnum, error_code, has_error_code)) {
+                intnum, error_code, has_error_code, 0)) {
             r36sx_pm_diag_log_first_fault("protected exception delivery",
                                           fault_ip);
         }
