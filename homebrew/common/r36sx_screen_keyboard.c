@@ -346,6 +346,7 @@ static const int8_t g_osk_cursor_grid
  * use the middle cell, choosing the left-middle cell for even-width runs.
  */
 static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
+    /* ESC, fake ESC gap, F1-F8, fake F8 gap, F9-F12, PRT, SL, P/B */
     {
         R36SX_OSK_NAV_MAIN(0, 0), R36SX_OSK_NAV_MAIN(0, 0),
         R36SX_OSK_NAV_MAIN(0, 1), R36SX_OSK_NAV_MAIN(0, 2),
@@ -358,6 +359,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_CURSOR(0, 0), R36SX_OSK_NAV_CURSOR(0, 1),
         R36SX_OSK_NAV_CURSOR(0, 2)
     },
+    /* `, 1-0, -, =, Backspace x2, INS, HOM, PUP */
     {
         R36SX_OSK_NAV_MAIN(1, 0), R36SX_OSK_NAV_MAIN(1, 1),
         R36SX_OSK_NAV_MAIN(1, 2), R36SX_OSK_NAV_MAIN(1, 3),
@@ -370,6 +372,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_CURSOR(1, 0), R36SX_OSK_NAV_CURSOR(1, 1),
         R36SX_OSK_NAV_CURSOR(1, 2)
     },
+    /* TAB, Q-P, [, ], Backslash x2, DEL, END, PDN */
     {
         R36SX_OSK_NAV_MAIN(2, 0), R36SX_OSK_NAV_MAIN(2, 1),
         R36SX_OSK_NAV_MAIN(2, 2), R36SX_OSK_NAV_MAIN(2, 3),
@@ -382,6 +385,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_CURSOR(2, 0), R36SX_OSK_NAV_CURSOR(2, 1),
         R36SX_OSK_NAV_CURSOR(2, 2)
     },
+    /* CAPS x2, A-L, ;, ', Enter x2, empty cursor-block gap */
     {
         R36SX_OSK_NAV_MAIN(3, 0), R36SX_OSK_NAV_MAIN(3, 0),
         R36SX_OSK_NAV_MAIN(3, 1), R36SX_OSK_NAV_MAIN(3, 2),
@@ -393,6 +397,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_MAIN(3, 12),
         R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_EMPTY
     },
+    /* Left Shift x2, Z-M, comma, period, slash, Right Shift x3, Up */
     {
         R36SX_OSK_NAV_MAIN(4, 0), R36SX_OSK_NAV_MAIN(4, 0),
         R36SX_OSK_NAV_MAIN(4, 1), R36SX_OSK_NAV_MAIN(4, 2),
@@ -405,6 +410,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_CURSOR(4, 1),
         R36SX_OSK_NAV_EMPTY
     },
+    /* CTRL x2, WIN, ALT, Space x6, ALT, MNU x2, CTRL x2, Left, Down, Right */
     {
         R36SX_OSK_NAV_MAIN(5, 0), R36SX_OSK_NAV_MAIN(5, 0),
         R36SX_OSK_NAV_MAIN(5, 1), R36SX_OSK_NAV_MAIN(5, 2),
