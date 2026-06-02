@@ -119,6 +119,8 @@ uint32_t dwordregs[8];
 #define R36SX_EXCEPTION_X87_ERROR 16u
 #define R36SX_FLAGS_ALWAYS_ONE 0x0002u
 #define R36SX_FLAGS_STATUS_MASK 0x0fd5u
+#define R36SX_FLAGS_IOPL_MASK 0x3000u
+#define R36SX_FLAGS_IOPL_SHIFT 12u
 #define R36SX_FLAGS_286_CONTROL_MASK 0x7000u
 #define R36SX_FLAGS_8086_FIXED_MASK 0xf000u
 #define R36SX_EFLAGS_386_MASK 0x00037fd5u
@@ -156,6 +158,31 @@ void intcall86(uint8_t intnum);
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
+
+static inline uint8_t r36sx_cpu_iopl(void)
+{
+    return (uint8_t)((x86_flags.value & R36SX_FLAGS_IOPL_MASK) >>
+                     R36SX_FLAGS_IOPL_SHIFT);
+}
+
+static uint8_t r36sx_cpu_require_cpl0(uint32_t fault_ip)
+{
+    if (r36sx_cpu_protected_enabled() && r36sx_cpu_cpl() != 0u) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return 0;
+    }
+    return 1;
+}
+
+static uint8_t r36sx_cpu_require_iopl(uint32_t fault_ip)
+{
+    if (r36sx_cpu_protected_enabled() &&
+        r36sx_cpu_cpl() > r36sx_cpu_iopl()) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return 0;
+    }
+    return 1;
+}
 
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear);
 static inline uint16_t r36sx_cpu_read_linear16(uint32_t linear);
@@ -6715,6 +6742,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E4 IN CPU_AL Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 CPU_AL = (uint8_t) portin(oper1b);
                 break;
 
@@ -6725,6 +6755,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E5 IN eAX Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 CPU_AX = portin16(oper1b);
                 break;
 
@@ -6735,6 +6768,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E6 OUT Ib CPU_AL */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 portout(oper1b, CPU_AL
                 );
                 break;
@@ -6746,6 +6782,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E7 OUT Ib eAX */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 portout16(oper1b, CPU_AX
                 );
                 break;
@@ -6803,6 +6842,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EC IN CPU_AL regdx */
                 oper1 = CPU_DX;
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 CPU_AL = (uint8_t) portin(oper1);
                 break;
 
@@ -6812,6 +6854,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* ED IN eAX regdx */
                 oper1 = CPU_DX;
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 CPU_AX = portin16(oper1);
                 break;
 
@@ -6821,6 +6866,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EE OUT regdx CPU_AL */
                 oper1 = CPU_DX;
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 portout(oper1, CPU_AL
                 );
                 break;
@@ -6831,6 +6879,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EF OUT regdx eAX */
                 oper1 = CPU_DX;
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 portout16(oper1, CPU_AX);
                 break;
 
@@ -6846,6 +6897,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_F4: ;
 #endif
                 /* F4 HLT */
+                if (!r36sx_cpu_require_cpl0(firstip)) {
+                    break;
+                }
                 hltstate = 1;
                 return;
 
@@ -6976,6 +7030,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_FA: ;
 #endif
                 /* FA CLI */
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 ifl = 0;
                 break;
 
@@ -6984,6 +7041,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_FB: ;
 #endif
                 /* FB STI */
+                if (!r36sx_cpu_require_iopl(firstip)) {
+                    break;
+                }
                 ifl = 1;
                 break;
 
