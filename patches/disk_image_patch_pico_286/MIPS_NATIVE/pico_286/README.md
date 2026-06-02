@@ -45,11 +45,12 @@ The active Fn shortcuts are exactly the ones listed above.  Fn+A, Fn+Y,
 Fn+L, Fn+L2, Fn+R, and Fn+R2 currently have no action.
 
 Screenshots are written to `MIPS_NATIVE/pico_286/screenshots` as
-`pico_286_YYYYMMDD_HHMMSS_NNN.png` or
-`pico_286_YYYYMMDD_HHMMSS_NNN.bmp`, depending on `screenshot_format` in
-`pico_286.conf`.  If that absolute SD-card path is not available, Pico-286
-falls back to a local `screenshots` directory.  After each capture, the screen
-briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
+`pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.png` or
+`pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.bmp`, depending on `screenshot_format` and
+`screenshot_build_hash` in `pico_286.conf`.  If that absolute SD-card path is
+not available, Pico-286 falls back to a local `screenshots` directory.  After
+each capture, the screen briefly shows `SCREENSHOT SAVED` or
+`SCREENSHOT FAILED` with a small preview.
 
 ## On-Screen Keyboard
 
@@ -170,6 +171,7 @@ total_memory_kb=4912
 
 [screenshot]
 screenshot_format=png
+screenshot_build_hash=1
 
 [stats]
 app_stats_enabled=1
@@ -270,6 +272,9 @@ compiled out with `build_pico_286.ps1 -DisableProfiling`.
 
 Set `screenshot_format=png` for compressed screenshots or
 `screenshot_format=bmp` for the old uncompressed 24-bit BMP output.
+Set `screenshot_build_hash=1` to add the first 8 hex digits of the embedded
+build commit-object SHA-256 to screenshot file names, or `0` to keep the older
+timestamp-only naming.
 
 Set `app_stats_enabled=1` to allow the `Fn` + D-pad `Down` statistics overlay.
 It shows a lower-right two-column table above the disk LED with decoded x86

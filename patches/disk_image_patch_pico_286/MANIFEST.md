@@ -37,6 +37,28 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 screenshot build hash filenames
+
+`pico_286.conf` now has `screenshot_build_hash=1` in `[screenshot]`.
+Screenshots are named with the first 8 hex digits of the embedded build
+commit-object SHA-256:
+
+```text
+pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.png
+```
+
+The current normal binary embeds `c93853b3` as `HASH8`.  Set
+`screenshot_build_hash=0` to keep the older
+`pico_286_YYYYMMDD_HHMMSS_NNN.png` naming.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `482832` bytes
+- SHA256:
+  `FD3DD2C638D413FD900E3CF507F9BF39E68FE9D6A020B7BA54F0E475EE992C61`
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-02 CPU MHz throughput multipliers
 
 `cpu_mhz` now maps to `exec86()` instruction budgets using model-specific,

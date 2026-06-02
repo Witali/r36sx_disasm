@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-02 screenshot build hash filenames
+
+Added `screenshot_build_hash` to `[screenshot]` in `pico_286.conf`.  When it
+is `1`, screenshots include the first 8 hex digits of the embedded build
+commit-object SHA-256:
+
+```text
+pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.png
+```
+
+The current build embeds `c93853b3` as `HASH8`.  Set
+`screenshot_build_hash=0` to keep the older timestamp-only name.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `482832` bytes
+- `pico_286` SHA256:
+  `FD3DD2C638D413FD900E3CF507F9BF39E68FE9D6A020B7BA54F0E475EE992C61`
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 13:17:46`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 CPU MHz throughput multipliers
 
 Changed the `cpu_mhz` speed knob so it no longer maps one emulated x86

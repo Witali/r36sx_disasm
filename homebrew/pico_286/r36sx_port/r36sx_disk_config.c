@@ -100,6 +100,7 @@ static char rtc_xt_enabled_text[8] = "1";
 static char rtc_start_time_text[32] =
     R36SX_PICO286_DEFAULT_RTC_START_TIME;
 static char screenshot_format_text[8] = "png";
+static char screenshot_build_hash_text[8] = "1";
 static char scaling_filter_text[16] = "nearest";
 static char keyboard_mode_text[16] = "normal";
 static char audio_adlib_enabled_text[8] = "1";
@@ -132,6 +133,7 @@ static int rtc_at_enabled = 1;
 static int rtc_xt_enabled = 1;
 static int64_t rtc_start_time_unix = 0;
 static int rtc_start_time_valid = 0;
+static int screenshot_build_hash_enabled = 1;
 static int audio_adlib_enabled = 1;
 static int audio_sound_blaster_enabled = 1;
 static int audio_cms_enabled = 1;
@@ -775,6 +777,38 @@ static int set_screenshot_format(const char *key, const char *value,
         "diskcfg: ignoring invalid %s '%s' at line %d",
         key, value, line_no);
     return 1;
+}
+
+static int set_screenshot_value(const char *key, const char *value,
+                                int line_no)
+{
+    if (set_screenshot_format(key, value, line_no)) {
+        return 1;
+    }
+
+    if (key_equals(key, "screenshot_build_hash") ||
+        key_equals(key, "screenshot_hash") ||
+        key_equals(key, "screenshot_include_build_hash") ||
+        key_equals(key, "screenshot_filename_hash")) {
+        int enabled;
+
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        screenshot_build_hash_enabled = enabled;
+        snprintf(screenshot_build_hash_text,
+                 sizeof(screenshot_build_hash_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: screenshot_build_hash=%d",
+                                screenshot_build_hash_enabled);
+        return 1;
+    }
+
+    return 0;
 }
 
 static int set_scaling_filter(const char *key, const char *value,
@@ -1566,7 +1600,7 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_memory_value(key, value, line_no)) {
         return 1;
     }
-    if (set_screenshot_format(key, value, line_no)) {
+    if (set_screenshot_value(key, value, line_no)) {
         return 1;
     }
     if (set_scaling_filter(key, value, line_no)) {
@@ -1860,8 +1894,12 @@ int r36sx_pico286_save_config(void)
             extended_memory_kb_text);
 
     fprintf(fp, "# Screenshot output format: png or bmp.\n");
+    fprintf(fp, "# screenshot_build_hash=1 adds the first 8 hex digits of the\n");
+    fprintf(fp, "# embedded build commit-object SHA-256 to screenshot file names.\n");
     fprintf(fp, "[screenshot]\n");
-    fprintf(fp, "screenshot_format=%s\n\n", screenshot_format_text);
+    fprintf(fp, "screenshot_format=%s\n", screenshot_format_text);
+    fprintf(fp, "screenshot_build_hash=%s\n\n",
+            screenshot_build_hash_text);
 
     fprintf(fp, "# Disk image I/O cache.\n");
     fprintf(fp, "# disk_cache_buffer_kb is the stdio buffer allocated per image file.\n");
@@ -2240,6 +2278,13 @@ const char *r36sx_pico286_screenshot_format_name(void)
     load_disk_config();
 
     return screenshot_format_text;
+}
+
+int r36sx_pico286_screenshot_build_hash_enabled(void)
+{
+    load_disk_config();
+
+    return screenshot_build_hash_enabled;
 }
 
 r36sx_pico286_scaling_filter_t r36sx_pico286_scaling_filter(void)

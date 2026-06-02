@@ -10,6 +10,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <ctype.h>
 #include <dlfcn.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,6 +29,7 @@
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
 #include "r36sx_port/r36sx_app_stats.h"
+#include "r36sx_port/r36sx_debug_config.h"
 #include "r36sx_port/r36sx_disk_config.h"
 
 #define R36SX_PICO286_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -958,6 +960,31 @@ static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
     return 0;
 }
 
+static int r36sx_mfb_build_hash8(char *dst, size_t dst_size)
+{
+    const char *hash = R36SX_BUILD_COMMIT_OBJECT_SHA256;
+
+    if (!dst || dst_size < 9 ||
+        !r36sx_pico286_screenshot_build_hash_enabled()) {
+        return 0;
+    }
+
+    if (!hash || !hash[0] || strcmp(hash, "unknown") == 0) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < 8; i++) {
+        unsigned char ch = (unsigned char)hash[i];
+
+        if (!isxdigit(ch)) {
+            return 0;
+        }
+        dst[i] = (char)tolower(ch);
+    }
+    dst[8] = '\0';
+    return 1;
+}
+
 static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
                                             const uint16_t *pixels,
                                             char *saved_path,
@@ -966,10 +993,12 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     time_t now;
     struct tm tm_now;
     char stamp[32];
+    char build_hash[9];
     char path[512];
     uint32_t seq;
     r36sx_pico286_screenshot_format_t format;
     const char *ext;
+    int include_build_hash;
 
     if (!dir || !pixels) {
         return -1;
@@ -984,9 +1013,16 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     seq = g_mfb.screenshot_counter++;
     format = r36sx_pico286_screenshot_format();
     ext = format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP ? "bmp" : "png";
+    include_build_hash =
+        r36sx_mfb_build_hash8(build_hash, sizeof(build_hash));
 
-    snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.%s",
-             dir, stamp, (unsigned)(seq % 1000u), ext);
+    if (include_build_hash) {
+        snprintf(path, sizeof(path), "%s/pico_286_%s_%s_%03u.%s",
+                 dir, stamp, build_hash, (unsigned)(seq % 1000u), ext);
+    } else {
+        snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.%s",
+                 dir, stamp, (unsigned)(seq % 1000u), ext);
+    }
     if (format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP) {
         if (r36sx_mfb_write_bmp24(path, pixels, g_mfb.width,
                                   g_mfb.height) != 0) {

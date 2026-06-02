@@ -251,6 +251,7 @@ total_memory_kb=4912
 
 [screenshot]
 screenshot_format=png
+screenshot_build_hash=1
 
 [stats]
 app_stats_enabled=1
@@ -389,6 +390,10 @@ BIOS option is switched from `NORMAL` to `TEST386`.
 
 `screenshot_format=png` saves compressed screenshots through zlib.
 `screenshot_format=bmp` keeps the older uncompressed 24-bit BMP path.
+With `screenshot_build_hash=1`, screenshot names include the first 8 hex
+digits of the embedded build commit-object SHA-256:
+`pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.png`.  Set it to `0` to keep the older
+`pico_286_YYYYMMDD_HHMMSS_NNN.png` form.
 `Fn` + D-pad `Up` also plays a short shutter click and shows a half-second
 confirmation overlay with a small screenshot preview.
 `Fn` + D-pad `Left` toggles an on-screen help panel listing the active Fn

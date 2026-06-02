@@ -202,6 +202,9 @@ r36sx_pico286_screenshot_format_t r36sx_pico286_screenshot_format(void);
 // Return the configured screenshot format text used when rewriting config.
 const char *r36sx_pico286_screenshot_format_name(void);
 
+// Return non-zero when screenshot filenames include the build hash fragment.
+int r36sx_pico286_screenshot_build_hash_enabled(void);
+
 // Return the filter used when the DOS image must be scaled.
 r36sx_pico286_scaling_filter_t r36sx_pico286_scaling_filter(void);
 
