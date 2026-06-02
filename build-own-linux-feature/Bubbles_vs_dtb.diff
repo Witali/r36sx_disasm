@@ -1,0 +1,56 @@
+--- dtb.bin.raw.dts
++++ Bubbles.dts
+@@ -445,7 +445,7 @@
+ 			reg = <0x1883a000 0x1000>;
+ 			buffer-source = "static";
+ 			extra-buffer-size = <0x0>;
+-			buffer-phy-static = <0xaf91e50 0xe11000>;
++			buffer-phy-static = <0x2f91e50 0xe11000>;
+ 			buffer-header-size = <0x1000>;
+ 			use-static-header;
+ 			status = "okay";
+@@ -1316,22 +1316,22 @@
+ 			#size-cells = <0x1>;
+ 
+ 			bootmem {
+-				reg = <0x9da0000 0x2000000>;
++				reg = <0x1da0000 0x2000000>;
+ 			};
+ 
+ 			sysmem {
+-				reg = <0xbda2e50 0xb53600>;
++				reg = <0x3da2e50 0xb53600>;
+ 			};
+ 
+ 			mmz0 {
+ 				id = <0x0>;
+-				reg = <0xcda2e50 0x325d1b0>;
++				reg = <0x4da2e50 0x325d1b0>;
+ 				blocklog = <0xc>;
+ 			};
+ 
+ 			mmz1 {
+ 				id = <0x1>;
+-				reg = <0xc8f6450 0x4aca00>;
++				reg = <0x48f6450 0x4aca00>;
+ 				blocklog = <0xc>;
+ 				mmzname = "kshm";
+ 			};
+@@ -1461,7 +1461,7 @@
+ 			reg = <0x1883a000 0x1000>;
+ 			buffer-source = "static";
+ 			extra-buffer-size = <0x0>;
+-			buffer-phy-static = <0xaf91e50 0xe11000>;
++			buffer-phy-static = <0x2f91e50 0xe11000>;
+ 			buffer-header-size = <0x1000>;
+ 			use-static-header;
+ 			status = "okay";
+@@ -1760,7 +1760,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x0 0xaf91e50>;
++		reg = <0x0 0x2f91e50>;
+ 	};
+ 
+ 	chosen {

@@ -1,0 +1,6 @@
+Warning (reg_format): "reg" property in /hcrtos/sfspi/spi_nor_flash has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (reg_format): "reg" property in /hcrtos/sfspi/spidev@0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /hcrtos/sfspi/spi_nor_flash
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /hcrtos/sfspi/spi_nor_flash
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /hcrtos/sfspi/spidev@0
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /hcrtos/sfspi/spidev@0
