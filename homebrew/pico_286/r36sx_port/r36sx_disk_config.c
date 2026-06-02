@@ -16,6 +16,10 @@
 #define R36SX_PICO286_DEFAULT_RTC_START_TIME "2024-01-01 00:00:00"
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 250.000
+/* Round historical throughput estimates used to turn MHz into exec86 IPS. */
+#define R36SX_PICO286_8086_IPS_PER_MHZ 75000u
+#define R36SX_PICO286_80286_IPS_PER_MHZ 150000u
+#define R36SX_PICO286_80386_IPS_PER_MHZ 300000u
 #define R36SX_PICO286_MIN_CACHE_BUFFER_KB 0UL
 #define R36SX_PICO286_MAX_CACHE_BUFFER_KB 1024UL
 #define R36SX_PICO286_MIN_CACHE_FLUSH_SECTORS 1UL
@@ -74,6 +78,7 @@ static char image_dir_path[R36SX_PICO286_MAX_DISK_PATH] =
 static char cpu_model_text[16] = "80386";
 static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
+static double cpu_mhz_value = 32.768;
 static char bios_mode_text[16] = "normal";
 static char test_bios_value[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
 static char test_bios_path[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
@@ -404,11 +409,38 @@ static void set_config_dir(const char *config_path)
     set_image_dir_value(image_dir_value);
 }
 
+static uint32_t cpu_model_ips_per_mhz(void)
+{
+    switch (cpu_model) {
+        case R36SX_PICO286_CPU_8086:
+            return R36SX_PICO286_8086_IPS_PER_MHZ;
+        case R36SX_PICO286_CPU_80286:
+            return R36SX_PICO286_80286_IPS_PER_MHZ;
+        case R36SX_PICO286_CPU_80386:
+        default:
+            return R36SX_PICO286_80386_IPS_PER_MHZ;
+    }
+}
+
+static void update_cpu_exec_loops(void)
+{
+    uint32_t ips_per_mhz = cpu_model_ips_per_mhz();
+    uint32_t loops =
+        (uint32_t)(cpu_mhz_value * ((double)ips_per_mhz / 1000.0) + 0.5);
+
+    if (loops == 0) {
+        loops = 1;
+    }
+    cpu_exec_loops = loops;
+    r36sx_pico286_debug_log(
+        "diskcfg: cpu_model=%s cpu_mhz=%.3f ips_per_mhz=%u exec_loops=%u",
+        cpu_model_text, cpu_mhz_value, ips_per_mhz, cpu_exec_loops);
+}
+
 static int set_cpu_mhz(const char *value, int line_no)
 {
     char *end = NULL;
     double mhz = strtod(value, &end);
-    uint32_t loops;
 
     if (end) {
         end = trim_space(end);
@@ -422,14 +454,9 @@ static int set_cpu_mhz(const char *value, int line_no)
         return 0;
     }
 
-    loops = (uint32_t)(mhz * 1000.0 + 0.5);
-    if (loops == 0) {
-        loops = 1;
-    }
-    cpu_exec_loops = loops;
+    cpu_mhz_value = mhz;
     snprintf(cpu_mhz_text, sizeof(cpu_mhz_text), "%s", value);
-    r36sx_pico286_debug_log("diskcfg: cpu_mhz=%.3f exec_loops=%u",
-                            mhz, cpu_exec_loops);
+    update_cpu_exec_loops();
     return 1;
 }
 
@@ -441,7 +468,7 @@ static int set_cpu_model(const char *value, int line_no)
         key_equals(value, "xt")) {
         cpu_model = R36SX_PICO286_CPU_8086;
         snprintf(cpu_model_text, sizeof(cpu_model_text), "8086");
-        r36sx_pico286_debug_log("diskcfg: cpu_model=8086");
+        update_cpu_exec_loops();
         return 1;
     }
 
@@ -451,7 +478,7 @@ static int set_cpu_model(const char *value, int line_no)
         key_equals(value, "at")) {
         cpu_model = R36SX_PICO286_CPU_80286;
         snprintf(cpu_model_text, sizeof(cpu_model_text), "80286");
-        r36sx_pico286_debug_log("diskcfg: cpu_model=80286");
+        update_cpu_exec_loops();
         return 1;
     }
 
@@ -460,7 +487,7 @@ static int set_cpu_model(const char *value, int line_no)
         key_equals(value, "i386")) {
         cpu_model = R36SX_PICO286_CPU_80386;
         snprintf(cpu_model_text, sizeof(cpu_model_text), "80386");
-        r36sx_pico286_debug_log("diskcfg: cpu_model=80386");
+        update_cpu_exec_loops();
         return 1;
     }
 
@@ -1617,6 +1644,7 @@ static void load_disk_config(void)
     if (!fp) {
         r36sx_pico286_debug_log("diskcfg: %s not found; using built-in defaults",
                                 R36SX_PICO286_CONFIG_PATH);
+        update_cpu_exec_loops();
         apply_automatic_memory_layout();
         ensure_host_drive_dir();
         return;
@@ -1636,6 +1664,7 @@ static void load_disk_config(void)
     }
 
     fclose(fp);
+    update_cpu_exec_loops();
     apply_automatic_memory_layout();
     ensure_host_drive_dir();
 }
@@ -1746,7 +1775,9 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# model supports them; unsupported opcodes raise INT 6.\n");
     fprintf(fp, "# cpu_mode=real is the normal PC boot mode. cpu_mode=protected is\n");
     fprintf(fp, "# parsed for experiments; full protected-mode execution is still WIP.\n");
-    fprintf(fp, "# CPU speed knob maps to exec86 loops per host scheduler slice.\n");
+    fprintf(fp, "# CPU speed knob is converted to exec86 instructions/sec using\n");
+    fprintf(fp, "# round historical throughput: 8086=75k, 80286=150k,\n");
+    fprintf(fp, "# 80386=300k instructions/sec per MHz.\n");
     fprintf(fp, "[cpu]\n");
     fprintf(fp, "cpu_model=%s\n", cpu_model_text);
     fprintf(fp, "cpu_mode=%s\n", cpu_mode_text);

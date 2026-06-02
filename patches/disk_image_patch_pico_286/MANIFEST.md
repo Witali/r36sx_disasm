@@ -37,6 +37,28 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 CPU MHz throughput multipliers
+
+`cpu_mhz` now maps to `exec86()` instruction budgets using model-specific,
+round historical throughput estimates instead of the old 1 MIPS/MHz shortcut:
+
+- `8086`: `75,000` instructions/sec per MHz.
+- `80286`: `150,000` instructions/sec per MHz.
+- `80386`: `300,000` instructions/sec per MHz.
+
+For example, `cpu_mhz=10` now means roughly `0.75 MIPS` for 8086, `1.5 MIPS`
+for 80286, and `3.0 MIPS` for 80386.  The parser recalculates the instruction
+budget whenever either `cpu_model` or `cpu_mhz` is read, so config key order
+does not affect the result.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `481852` bytes
+- SHA256:
+  `75420D3EAC08C84D2010CAA7A7F6857E1D50273D5AD49A8B991C22082D029A90`
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-01 app statistics QPS
 
 The `Fn` + D-pad `Down` statistics overlay now includes `QPS`, the number of

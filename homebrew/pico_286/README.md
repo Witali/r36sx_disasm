@@ -306,10 +306,12 @@ DPMI/VCPI are not complete yet, so keep `cpu_mode=real` for normal DOS use.
 Protected-mode support can be compiled out with
 `R36SX_ENABLE_PROTECTED_MODE=0`.
 
-`cpu_mhz` controls the R36SX host execution quantum passed to `exec86()`.
-`32.768` preserves the old hard-coded behavior (`exec86(32768)` per
-millisecond-like host loop).  This is a practical speed knob for this port,
-not a cycle-exact 80286 timing model.
+`cpu_mhz` is converted to an `exec86()` instruction budget with a
+model-specific, round historical throughput estimate: 8086 uses about
+75,000 instructions/sec per MHz, 80286 uses 150,000, and 80386 uses 300,000.
+This makes `cpu_mhz=10` roughly mean 0.75 MIPS for 8086, 1.5 MIPS for 80286,
+and 3.0 MIPS for 80386.  It is still a practical speed knob for this port,
+not a cycle-exact timing model.
 
 `target_fps` controls the main-loop frame budget.  At the default `60`, the
 `exec86()` pass targets about 16.7 ms.  Pico-286 adapts the `exec86()`

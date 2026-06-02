@@ -1,5 +1,44 @@
 # pico-286 Build Log
 
+## 2026-06-02 CPU MHz throughput multipliers
+
+Changed the `cpu_mhz` speed knob so it no longer maps one emulated x86
+instruction to one host-side "cycle" at 1 MIPS/MHz.  Pico-286 now converts
+`cpu_mhz` to `exec86()` instruction budgets with model-specific, round
+historical throughput estimates:
+
+- `8086`: `75,000` instructions/sec per MHz.
+- `80286`: `150,000` instructions/sec per MHz.
+- `80386`: `300,000` instructions/sec per MHz.
+
+These round values are based on common period-performance figures: 8086 around
+`0.75 MIPS @ 10 MHz`, 80286 around `1.5 MIPS @ 10 MHz`, and 386-class
+systems around `11.4 MIPS @ 33 MHz`.  The parser stores the numeric MHz value
+and recalculates `exec_loops` whenever either `cpu_model` or `cpu_mhz` changes,
+so config key order no longer changes the result.
+
+Reference pages used while choosing the rounded multipliers:
+
+- https://www.microelec.patricklecoq.fr/guide/8086.html
+- https://svho.omeka.net/items/show/2058
+- https://www.dosdays.co.uk/topics/cpus.php
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `481852` bytes
+- `pico_286` SHA256:
+  `75420D3EAC08C84D2010CAA7A7F6857E1D50273D5AD49A8B991C22082D029A90`
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 13:07:26`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 screenshot RTC timestamp fix
 
 Changed screenshot filename timestamps to use Pico-286's emulated RTC counter

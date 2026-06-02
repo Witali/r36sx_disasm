@@ -212,6 +212,13 @@ through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
 switching, call gates, and DOS extender services such as DPMI/VCPI are still
 incomplete, so keep `cpu_mode=real` for normal DOS use.
 
+`cpu_mhz` is converted to an `exec86()` instruction budget with a
+model-specific, round historical throughput estimate: 8086 uses about
+75,000 instructions/sec per MHz, 80286 uses 150,000, and 80386 uses 300,000.
+This makes `cpu_mhz=10` roughly mean 0.75 MIPS for 8086, 1.5 MIPS for 80286,
+and 3.0 MIPS for 80386.  It is a practical speed knob, not cycle-exact CPU
+timing.
+
 `target_fps` controls the main-loop frame budget.  The default `60` targets
 about 16.7 ms per `exec86()` pass.  Pico-286 automatically reduces the
 `exec86()` quantum when emulation itself overruns, grows it back when there is
