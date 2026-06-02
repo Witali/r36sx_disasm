@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-06-02 DPMI LDT descriptor services
+
+Added the first DPMI LDT-style descriptor pool and wired it into the protected
+CPU descriptor decoder.  This step follows the DPMI 1.0 LDT descriptor services
+and keeps the real-mode `AX=1687h` installation check disabled until a real
+mode-switch entry exists.
+
+Implemented `INT 31h` functions:
+
+- `AX=0000h`: allocate one or more LDT descriptors.
+- `AX=0001h`: free an LDT descriptor.
+- `AX=0006h`: get segment base address.
+- `AX=0007h`: set segment base address.
+- `AX=0008h`: set segment limit with 386 page-granularity validation.
+- `AX=0009h`: set descriptor access rights with DPMI DPL/type checks.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `544768` bytes
+- `pico_286` SHA256:
+  `9F7A2F69385CCAA8F23F22909557F7FD97F30C0B2A3177FC4B056A9F3857374D`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 DPMI INT 31h version scaffold
 
 Added the first protected-mode `INT 31h` services checked against the DPMI

@@ -433,6 +433,10 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
 static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
                                            r36sx_segment_cache_t *cache)
 {
+    if (r36sx_dpmi_lookup_descriptor(selector, cache)) {
+        return 1;
+    }
+
     if ((selector & 0xfffcu) == 0) {
         return r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 1);
@@ -459,6 +463,10 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
 static uint8_t r36sx_cpu_decode_descriptor_any(uint16_t selector,
                                                r36sx_segment_cache_t *cache)
 {
+    if (r36sx_dpmi_lookup_descriptor(selector, cache)) {
+        return 1;
+    }
+
     if ((selector & 0xfffcu) == 0) {
         return r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 0);
