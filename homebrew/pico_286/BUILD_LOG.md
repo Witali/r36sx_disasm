@@ -1,5 +1,36 @@
 # pico-286 Build Log
 
+## 2026-06-02 DPMI probe and dispatcher groundwork
+
+Created the first DPMI host scaffold against the DPMI Committee Version 1.0
+specification.  `INT 2Fh AX=1686h/1687h` is now routed through a named DPMI
+multiplex helper, and `INT 31h` has a separate dispatcher stub.  The host still
+reports not installed for `AX=1687h` because there is no protected-mode entry
+point yet; the `INT 31h` stub returns the DPMI 1.0 unsupported-function error
+shape (`CF=1`, `AX=8001h`) and is ready for service-by-service expansion.
+
+Reference checkpoints used:
+
+- DPMI 1.0 client initialization and `INT 2Fh AX=1687h` entry discovery.
+- DPMI 1.0 Appendix B error reporting, including unsupported function
+  `8001h`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `540304` bytes
+- `pico_286` SHA256:
+  `85628D655471201CE2D2843BE17FD8C0BDF349A2D8E77C5075EC3E7ACC87DB54`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 VM86 rejects protected descriptor instructions
 
 Descriptor-management and selector-validation instructions now distinguish

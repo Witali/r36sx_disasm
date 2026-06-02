@@ -157,6 +157,10 @@ uint32_t dwordregs[8];
 #define R36SX_EXCEPTION_GP 13u
 #define R36SX_EXCEPTION_PF 14u
 #define R36SX_EXCEPTION_X87_ERROR 16u
+#define R36SX_DPMI_INT2F_GET_CPU_MODE 0x1686u
+#define R36SX_DPMI_INT2F_INSTALLATION_CHECK 0x1687u
+#define R36SX_DPMI_NOT_INSTALLED 0xffffu
+#define R36SX_DPMI_UNSUPPORTED_FUNCTION 0x8001u
 #define R36SX_FLAGS_ALWAYS_ONE 0x0002u
 #define R36SX_FLAGS_STATUS_MASK 0x0fd5u
 #define R36SX_FLAGS_IF_MASK 0x0200u
@@ -3730,6 +3734,63 @@ static int r36sx_bios_boot_configured_order(void)
 /* 80286 protected-mode interrupt and VCPI-facing helpers. */
 #include "r36sx_cpu_80286_interrupts.inl"
 
+static inline uint8_t r36sx_dpmi_host_available(void)
+{
+    /*
+     * DPMI Specification 1.0 client initialization starts with INT 2Fh
+     * AX=1687h.  Keep the host disabled until we have a real protected-mode
+     * entry point and enough INT 31h services to support a client safely.
+     */
+    return 0;
+}
+
+static uint8_t r36sx_dpmi_int2f_handler(void)
+{
+    switch (CPU_AX) {
+        case R36SX_DPMI_INT2F_GET_CPU_MODE:
+            /*
+             * INT 2Fh AX=1686h reports the current CPU mode.  The result is
+             * useful for diagnostics even before the DPMI host is enabled.
+             */
+            CPU_AX = r36sx_cpu_native_protected_enabled()
+                ? 0u
+                : R36SX_DPMI_NOT_INSTALLED;
+            return 1;
+
+        case R36SX_DPMI_INT2F_INSTALLATION_CHECK:
+            /*
+             * The official installation check succeeds with AX=0 and returns
+             * the protected-mode entry in ES:DI.  Until that entry exists,
+             * report no host instead of returning garbage from the IVT path.
+             */
+            if (!r36sx_dpmi_host_available()) {
+                CPU_AX = R36SX_DPMI_NOT_INSTALLED;
+                return 1;
+            }
+            return 0;
+    }
+
+    return 0;
+}
+
+static uint8_t r36sx_dpmi_int31_handler(void)
+{
+    /*
+     * INT 31h is the DPMI service dispatcher.  DPMI 1.0 defines CF=1,
+     * AX=8001h for unsupported functions; use that as the safe scaffold until
+     * individual services are implemented.
+     */
+    if (!r36sx_dpmi_host_available()) {
+        cf = 1;
+        CPU_AX = R36SX_DPMI_UNSUPPORTED_FUNCTION;
+        return 1;
+    }
+
+    cf = 1;
+    CPU_AX = R36SX_DPMI_UNSUPPORTED_FUNCTION;
+    return 1;
+}
+
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
@@ -4088,7 +4149,15 @@ void intcall86(uint8_t intnum) {
                     return;
             }
             break;
+        case 0x31: /* DPMI services */
+            if (r36sx_dpmi_int31_handler()) {
+                return;
+            }
+            break;
         case 0x2F: /* Multiplex Interrupt */
+            if (r36sx_dpmi_int2f_handler()) {
+                return;
+            }
             switch (CPU_AX) {
                 /* XMS */
                 case 0x4300:
