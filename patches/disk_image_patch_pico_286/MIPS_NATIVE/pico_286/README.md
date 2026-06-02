@@ -281,7 +281,9 @@ Relative paths are resolved next to `pico_286.conf`; the default `host` maps
 to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
 after boot; with no argument it registers `H:`, and `MAPDRIVE G:` or
 `MAPDRIVE G` registers another letter.  `CONFIG.SYS` needs `LASTDRIVE=` set to
-the selected letter or higher.
+the selected letter or higher.  To map the drive automatically, add the chosen
+command, such as `MAPDRIVE` or `MAPDRIVE G:`, to the end of `AUTOEXEC.BAT`,
+`FDAUTO.BAT`, or the DOS startup `autorun.bat` used by your image.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 Full-screen menus such as the disk menu and key preset editor draw directly into

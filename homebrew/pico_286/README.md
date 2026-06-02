@@ -411,7 +411,10 @@ rerendered.  Set it to `0` to disable the shortcut and overlay.
 SD card.  DOS must run `MAPDRIVE.COM` after boot to register the drive; it
 defaults to `H:` and accepts another letter as `MAPDRIVE G:` or `MAPDRIVE G`.
 `CONFIG.SYS` must contain `LASTDRIVE=` set to the selected letter or higher so
-DOS allocates the needed CDS entry.
+DOS allocates the needed CDS entry.  To map the drive automatically, add the
+chosen command, such as `MAPDRIVE` or `MAPDRIVE G:`, to the end of
+`AUTOEXEC.BAT`, `FDAUTO.BAT`, or the DOS startup `autorun.bat` used by your
+image.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,
@@ -583,7 +586,9 @@ Rebuild the optional CPU test floppy after rebuilding `test386.bin`:
 `homebrew/pico_286/pico-286/tools/mapdrive.asm`; it is kept compatible with
 NASM by using the precomputed `0C000h` value for the DOS CDS `NET|PHY` flags.
 The command defaults to `H:` and also accepts a drive parameter such as
-`MAPDRIVE G:` or `MAPDRIVE G`.
+`MAPDRIVE G:` or `MAPDRIVE G`.  To run it automatically, add that command to
+the end of `AUTOEXEC.BAT`, `FDAUTO.BAT`, or the DOS startup `autorun.bat` used
+by your image.
 Build the patch copy with:
 
 ```powershell

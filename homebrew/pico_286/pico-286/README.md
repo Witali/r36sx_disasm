@@ -141,7 +141,7 @@ To use it:
 1.  Assemble `mapdrive.asm` to `mapdrive.com`.
 2.  Copy `mapdrive.com` to your boot disk image (e.g., `fdd0.img` or `hdd.img`).
 3.  Run `MAPDRIVE.COM` or `MAPDRIVE G:` from the DOS command line.
-4.  Add the chosen `MAPDRIVE` command to your `AUTOEXEC.BAT` to automatically map the drive on boot.
+4.  Add the chosen `MAPDRIVE` command to the end of `AUTOEXEC.BAT`, `FDAUTO.BAT`, or the DOS startup `autorun.bat` used by your image to automatically map the drive on boot.
 
 
 ## 🔧 Hardware Configuration
