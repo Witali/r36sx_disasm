@@ -119,6 +119,10 @@ cat /mnt/sdcard/root.txt
 
 - Поддерживает простую VT100/ANSI-отрисовку: цвета, cursor movement, clear
   screen/line, printable UTF-8 через FreeType-глифы.
+- Если на прошивке не работает `/dev/ptmx`/`devpts`, `Shell` теперь пытается
+  создать `/dev/ptmx`, смонтировать `devpts` на `/dev/pts`, повторить запуск
+  PTY, а затем переходит в pipe-backed fallback. В fallback-режиме команды и
+  редиректы работают, но полноценного TTY/job-control нет.
 - Управление через встроенные кнопки:
   - `FN` - показать/скрыть экранную клавиатуру.
   - `FN + D-pad Up` - сохранить скриншот framebuffer.

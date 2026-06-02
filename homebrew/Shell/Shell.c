@@ -21,8 +21,10 @@
 #include <time.h>
 #include <linux/input.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 #include <sys/select.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
@@ -54,7 +56,8 @@ enum {
     EVDEV_RESCAN_USEC = 2000000,
     FRAME_USEC = 16666,
     CSI_BUF_LEN = 48,
-    PTY_READ_BUF = 512
+    PTY_READ_BUF = 512,
+    PIPE_LINE_MAX = 1024
 };
 
 typedef int (*video_driver_setting_fn)(int *);
@@ -108,8 +111,14 @@ struct terminal_state {
 
 struct pty_state {
     int master_fd;
+    int read_fd;
+    int write_fd;
     pid_t child_pid;
     int child_exited;
+    int pipe_mode;
+    int pipe_esc_state;
+    char pipe_line[PIPE_LINE_MAX];
+    size_t pipe_line_len;
 };
 
 struct key_state {
@@ -161,7 +170,7 @@ struct term_font_state {
 
 static struct driver_state g_driver;
 static struct terminal_state g_term;
-static struct pty_state g_pty = { -1, -1, 0 };
+static struct pty_state g_pty = { -1, -1, -1, -1, 0, 0, 0, { 0 }, 0 };
 static struct key_state g_keys;
 static struct evdev_keyboard_state g_evdev;
 static struct term_font_state g_font;
@@ -1096,17 +1105,73 @@ static uint32_t input_buttons(void)
     return g_driver.cube_key_mem[0] | g_driver.cube_key_mem[1];
 }
 
+static void term_write_errno_message(const char *prefix, int error_number)
+{
+    term_write_text(prefix);
+    term_write_text(": ");
+    term_write_text(strerror(error_number));
+    term_write_text("\r\n");
+}
+
+static void shell_child_set_env(void)
+{
+    setenv("TERM", "vt100", 1);
+    setenv("PS1", "r36sx:\\w# ", 1);
+    unsetenv("LC_ALL");
+    setenv("LANG", "C.UTF-8", 1);
+    setenv("LC_CTYPE", "C.UTF-8", 1);
+    setenv("PATH",
+           "/bin:/sbin:/usr/bin:/usr/sbin:/mnt/sdcard/cubegm:/mnt/sdcard/MIPS_NATIVE",
+           1);
+}
+
+static void pty_prepare_devpts(void)
+{
+    struct stat st;
+
+    (void)mkdir("/dev", 0755);
+    (void)mkdir("/dev/pts", 0755);
+
+    if (stat("/dev/ptmx", &st) != 0 && errno == ENOENT) {
+        if (mknod("/dev/ptmx", S_IFCHR | 0666, makedev(5, 2)) != 0 &&
+            errno != EEXIST) {
+            term_write_errno_message("mknod /dev/ptmx failed", errno);
+        }
+    }
+
+    if (mount("devpts", "/dev/pts", "devpts", 0, "mode=620") != 0 &&
+        errno != EBUSY) {
+        term_write_errno_message("mount devpts failed", errno);
+    }
+}
+
 static void pty_close(void)
 {
-    if (g_pty.master_fd >= 0) {
-        close(g_pty.master_fd);
+    int read_fd = g_pty.read_fd;
+    int write_fd = g_pty.write_fd;
+    int master_fd = g_pty.master_fd;
+
+    if (read_fd >= 0) {
+        close(read_fd);
+    }
+    if (write_fd >= 0 && write_fd != read_fd) {
+        close(write_fd);
+    }
+    if (master_fd >= 0 && master_fd != read_fd && master_fd != write_fd) {
+        close(master_fd);
     }
     g_pty.master_fd = -1;
+    g_pty.read_fd = -1;
+    g_pty.write_fd = -1;
+    g_pty.pipe_mode = 0;
+    g_pty.pipe_esc_state = 0;
+    g_pty.pipe_line_len = 0;
 }
 
 static void pty_set_winsize(void)
 {
-    if (g_pty.master_fd < 0 || g_term.rows == g_last_winsize_rows) {
+    if (g_pty.master_fd < 0 || g_pty.pipe_mode ||
+        g_term.rows == g_last_winsize_rows) {
         return;
     }
     struct winsize ws;
@@ -1119,30 +1184,119 @@ static void pty_set_winsize(void)
     g_last_winsize_rows = g_term.rows;
 }
 
-static int pty_spawn_shell(void)
+static int pty_open_master(int *out_master, char **out_slave_name)
 {
     int master = posix_openpt(O_RDWR | O_NOCTTY);
     if (master < 0) {
-        term_write_text("posix_openpt failed\r\n");
+        term_write_errno_message("posix_openpt failed", errno);
         return -1;
     }
     if (grantpt(master) != 0 || unlockpt(master) != 0) {
-        term_write_text("grantpt/unlockpt failed\r\n");
+        term_write_errno_message("grantpt/unlockpt failed", errno);
         close(master);
         return -1;
     }
     char *slave_name = ptsname(master);
     if (!slave_name) {
-        term_write_text("ptsname failed\r\n");
+        term_write_errno_message("ptsname failed", errno);
         close(master);
+        return -1;
+    }
+    *out_master = master;
+    *out_slave_name = slave_name;
+    return 0;
+}
+
+static void pty_write_raw_fd(int fd, const char *bytes, size_t len)
+{
+    while (fd >= 0 && len > 0) {
+        ssize_t n = write(fd, bytes, len);
+        if (n > 0) {
+            bytes += n;
+            len -= (size_t)n;
+        } else if (errno != EINTR && errno != EAGAIN) {
+            break;
+        }
+    }
+}
+
+static int pipe_spawn_shell(void)
+{
+    int in_pipe[2] = { -1, -1 };
+    int out_pipe[2] = { -1, -1 };
+
+    if (pipe(in_pipe) != 0 || pipe(out_pipe) != 0) {
+        term_write_errno_message("pipe fallback failed", errno);
+        if (in_pipe[0] >= 0) close(in_pipe[0]);
+        if (in_pipe[1] >= 0) close(in_pipe[1]);
+        if (out_pipe[0] >= 0) close(out_pipe[0]);
+        if (out_pipe[1] >= 0) close(out_pipe[1]);
         return -1;
     }
 
     pid_t pid = fork();
     if (pid < 0) {
-        term_write_text("fork failed\r\n");
-        close(master);
+        term_write_errno_message("fork failed", errno);
+        close(in_pipe[0]);
+        close(in_pipe[1]);
+        close(out_pipe[0]);
+        close(out_pipe[1]);
         return -1;
+    }
+    if (pid == 0) {
+        close(in_pipe[1]);
+        close(out_pipe[0]);
+        dup2(in_pipe[0], STDIN_FILENO);
+        dup2(out_pipe[1], STDOUT_FILENO);
+        dup2(out_pipe[1], STDERR_FILENO);
+        if (in_pipe[0] > STDERR_FILENO) {
+            close(in_pipe[0]);
+        }
+        if (out_pipe[1] > STDERR_FILENO) {
+            close(out_pipe[1]);
+        }
+        shell_child_set_env();
+        execl("/bin/sh", "sh", "-i", (char *)NULL);
+        _exit(127);
+    }
+
+    close(in_pipe[0]);
+    close(out_pipe[1]);
+    fcntl(out_pipe[0], F_SETFL, fcntl(out_pipe[0], F_GETFL, 0) | O_NONBLOCK);
+    fcntl(in_pipe[1], F_SETFL, fcntl(in_pipe[1], F_GETFL, 0) | O_NONBLOCK);
+
+    g_pty.master_fd = -1;
+    g_pty.read_fd = out_pipe[0];
+    g_pty.write_fd = in_pipe[1];
+    g_pty.child_pid = pid;
+    g_pty.child_exited = 0;
+    g_pty.pipe_mode = 1;
+    g_pty.pipe_esc_state = 0;
+    g_pty.pipe_line_len = 0;
+    term_write_text("[PTY unavailable; using pipe shell fallback]\r\n");
+    term_write_text("[line editing is local; job control is unavailable]\r\n");
+    return 0;
+}
+
+static int pty_spawn_shell(void)
+{
+    int master = -1;
+    char *slave_name = NULL;
+
+    if (pty_open_master(&master, &slave_name) != 0) {
+        term_write_text("[trying /dev/pts setup]\r\n");
+        pty_prepare_devpts();
+        if (pty_open_master(&master, &slave_name) != 0) {
+            return pipe_spawn_shell();
+        }
+        term_write_text("[PTY recovered after /dev/pts setup]\r\n");
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        term_write_errno_message("fork failed", errno);
+        close(master);
+        return pipe_spawn_shell();
     }
     if (pid == 0) {
         setsid();
@@ -1158,19 +1312,19 @@ static int pty_spawn_shell(void)
             close(slave);
         }
         close(master);
-        setenv("TERM", "vt100", 1);
-        setenv("PS1", "r36sx:\\w# ", 1);
-        unsetenv("LC_ALL");
-        setenv("LANG", "C.UTF-8", 1);
-        setenv("LC_CTYPE", "C.UTF-8", 1);
-        setenv("PATH", "/bin:/sbin:/usr/bin:/usr/sbin:/mnt/sdcard/cubegm:/mnt/sdcard/MIPS_NATIVE", 1);
+        shell_child_set_env();
         execl("/bin/sh", "sh", "-i", (char *)NULL);
         _exit(127);
     }
 
     g_pty.master_fd = master;
+    g_pty.read_fd = master;
+    g_pty.write_fd = master;
     g_pty.child_pid = pid;
     g_pty.child_exited = 0;
+    g_pty.pipe_mode = 0;
+    g_pty.pipe_esc_state = 0;
+    g_pty.pipe_line_len = 0;
     fcntl(master, F_SETFL, fcntl(master, F_GETFL, 0) | O_NONBLOCK);
     g_last_winsize_rows = 0;
     pty_set_winsize();
@@ -1193,12 +1347,12 @@ static void pty_check_child(void)
 
 static void pty_read_available(void)
 {
-    if (g_pty.master_fd < 0) {
+    if (g_pty.read_fd < 0) {
         return;
     }
     uint8_t buf[PTY_READ_BUF];
     for (;;) {
-        ssize_t n = read(g_pty.master_fd, buf, sizeof(buf));
+        ssize_t n = read(g_pty.read_fd, buf, sizeof(buf));
         if (n > 0) {
             for (ssize_t i = 0; i < n; i++) {
                 term_process_byte(buf[i]);
@@ -1212,20 +1366,85 @@ static void pty_read_available(void)
     }
 }
 
-static void pty_write_bytes(const char *bytes, size_t len)
+static void pipe_echo_backspace(void)
 {
-    if (g_pty.master_fd < 0 || !bytes || len == 0) {
-        return;
+    term_process_byte(8);
+    term_process_byte(' ');
+    term_process_byte(8);
+}
+
+static void pipe_submit_line(void)
+{
+    if (g_pty.pipe_line_len > 0) {
+        pty_write_raw_fd(g_pty.write_fd, g_pty.pipe_line,
+                         g_pty.pipe_line_len);
     }
-    while (len > 0) {
-        ssize_t n = write(g_pty.master_fd, bytes, len);
-        if (n > 0) {
-            bytes += n;
-            len -= (size_t)n;
-        } else if (errno != EINTR && errno != EAGAIN) {
-            break;
+    pty_write_raw_fd(g_pty.write_fd, "\n", 1);
+    g_pty.pipe_line_len = 0;
+    term_process_byte('\r');
+    term_process_byte('\n');
+}
+
+static void pipe_write_interactive_bytes(const char *bytes, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        unsigned char ch = (unsigned char)bytes[i];
+
+        if (g_pty.pipe_esc_state == 1) {
+            g_pty.pipe_esc_state = (ch == '[') ? 2 : 0;
+            continue;
+        }
+        if (g_pty.pipe_esc_state == 2) {
+            if (ch >= 0x40 && ch <= 0x7e) {
+                g_pty.pipe_esc_state = 0;
+            }
+            continue;
+        }
+
+        if (ch == 27) {
+            g_pty.pipe_esc_state = 1;
+            continue;
+        }
+        if (ch == '\r' || ch == '\n') {
+            pipe_submit_line();
+            continue;
+        }
+        if (ch == 8 || ch == 127) {
+            if (g_pty.pipe_line_len > 0) {
+                g_pty.pipe_line_len--;
+                pipe_echo_backspace();
+            }
+            continue;
+        }
+        if (ch == 3) {
+            g_pty.pipe_line_len = 0;
+            term_write_text("^C\r\n");
+            continue;
+        }
+        if (ch == 4 && g_pty.pipe_line_len == 0) {
+            close(g_pty.write_fd);
+            g_pty.write_fd = -1;
+            term_write_text("^D\r\n");
+            continue;
+        }
+        if ((ch >= 32 || ch == '\t') &&
+            g_pty.pipe_line_len + 1 < sizeof(g_pty.pipe_line)) {
+            g_pty.pipe_line[g_pty.pipe_line_len++] = (char)ch;
+            term_process_byte(ch);
         }
     }
+}
+
+static void pty_write_bytes(const char *bytes, size_t len)
+{
+    if (g_pty.write_fd < 0 || !bytes || len == 0) {
+        return;
+    }
+    if (g_pty.pipe_mode) {
+        pipe_write_interactive_bytes(bytes, len);
+        return;
+    }
+    pty_write_raw_fd(g_pty.write_fd, bytes, len);
 }
 
 static void pty_write_str(const char *s)

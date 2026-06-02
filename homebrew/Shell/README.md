@@ -34,6 +34,12 @@ dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 cat /mnt/sdcard/root.txt
 ```
 
+If the firmware has no usable `/dev/ptmx`/`devpts`, Shell tries to create
+`/dev/ptmx`, mount `devpts` on `/dev/pts`, and retry the pseudo-terminal. If
+that still fails, it falls back to a pipe-backed shell. In pipe fallback mode,
+commands and redirection still work, but line editing is local to Shell and
+job-control features from a real TTY are unavailable.
+
 ## Controls
 
 Physical USB keyboards should appear as `/dev/input/event*` and work directly
