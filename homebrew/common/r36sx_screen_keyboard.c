@@ -648,6 +648,13 @@ static int osk_font_open(void)
         "libfreetype.so.6"
     };
     static const char *font_paths[] = {
+        R36SX_DEFAULT_MONO_FONT_PATH,
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/NotoSansMono-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/DejaVuSansMono.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/LiberationMono-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/Hack-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/SourceCodePro-Regular.ttf",
+        R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/RobotoMono-Regular.ttf",
         R36SX_CUBEGM_DIR "/Arial_en.ttf",
         R36SX_CUBEGM_DIR "/Arial_kr.ttf",
         R36SX_CUBEGM_DIR "/font.ttf",
