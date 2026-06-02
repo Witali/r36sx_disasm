@@ -1776,7 +1776,7 @@ int main(void)
         display_close();
         return 1;
     }
-    term_write_text("Shell. SELECT shows keyboard, FN toggles it, FN+UP saves screenshot, FN+START exits.\r\n");
+    term_write_text("Shell. SELECT shows keyboard, FN toggles it, FN+UP saves screenshot, FN+X exits.\r\n");
     term_write_text("USB keyboards are accepted from /dev/input/event*.\r\n");
     term_write_text("Redirection works normally, e.g. ls / > /mnt/sdcard/root.txt\r\n\r\n");
     if (pty_spawn_shell() != 0) {
@@ -1788,7 +1788,7 @@ int main(void)
         uint32_t pressed = buttons & ~g_prev_buttons;
 
         if ((buttons & R36SX_RKGAME_KEY_FN) != 0 &&
-            (pressed & R36SX_RKGAME_KEY_START) != 0) {
+            (pressed & R36SX_RKGAME_KEY_X) != 0) {
             g_running = 0;
         } else if ((buttons & R36SX_RKGAME_KEY_FN) != 0 &&
                    (pressed & R36SX_RKGAME_KEY_UP) != 0) {

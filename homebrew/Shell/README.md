@@ -48,7 +48,7 @@ of seconds and sends key presses to the shell PTY.
 - `SELECT`: expand/collapse the keyboard while visible, show it while hidden.
 - `FN`: show/hide the keyboard.
 - `FN + D-pad Up`: save a screenshot.
-- `FN + START`: exit the shell frontend.
+- `FN + X`: exit the shell frontend.
 
 When the keyboard is hidden, the D-pad sends terminal arrow keys. If the child
 shell exits, hide the keyboard and press `START` to launch a new `/bin/sh`.
