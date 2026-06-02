@@ -91,9 +91,7 @@ Open it with Fn+Select.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
-- A or Y on `CONNECT DISK H: HOST/`: run the embedded MAPDRIVE trampoline from
-  RAM.  After a successful connection the row changes to
-  `DISK H: CONNECTED TO HOST/`.
+- Drive `H:` is mapped from inside DOS by running `MAPDRIVE.COM`.
 - A or Y on `OK`: write current bindings to `pico_286.conf` and apply them.
 - A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 - A or Y on `CANCEL`: close the menu.
@@ -269,10 +267,8 @@ obvious `OUT 80h` POST sequence, so the normal BIOS may not produce values.
 
 Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps
-to `MIPS_NATIVE/pico_286/host` on the SD card.  The disk menu's
-`CONNECT DISK H:` row runs an embedded MAPDRIVE-compatible trampoline directly
-from emulator RAM after DOS has booted.  `CONFIG.SYS` still needs
-`LASTDRIVE=H` or higher.
+to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
+after boot to register `H:`.  `CONFIG.SYS` still needs `LASTDRIVE=H` or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 Full-screen menus such as the disk menu and key preset editor draw directly into

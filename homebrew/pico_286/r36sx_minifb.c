@@ -151,10 +151,6 @@ static volatile uint8_t g_post_code_value;
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
 extern void r36sx_pico286_request_soft_reset(void);
-extern void r36sx_pico286_request_connect_host_drive(void);
-extern int r36sx_pico286_host_drive_connected(void);
-extern int r36sx_pico286_host_drive_busy(void);
-extern uint8_t r36sx_pico286_host_drive_last_status(void);
 extern void r36sx_pico286_audio_play_shutter(void);
 
 static uint64_t r36sx_mfb_now_us(void)
@@ -1347,15 +1343,6 @@ static int r36sx_mfb_osk_overlay_cache_due(void)
             g_mfb.osk_overlay_signature != r36sx_osk_draw_signature());
 }
 
-static void r36sx_disk_menu_sync_host_drive_state(void)
-{
-    r36sx_disk_menu_set_host_drive_state(
-        &g_mfb.disk_menu,
-        r36sx_pico286_host_drive_connected(),
-        r36sx_pico286_host_drive_busy(),
-        r36sx_pico286_host_drive_last_status());
-}
-
 static void r36sx_mfb_disk_menu_set_visible(int visible)
 {
     int old_visible = r36sx_disk_menu_is_visible(&g_mfb.disk_menu);
@@ -1368,9 +1355,6 @@ static void r36sx_mfb_disk_menu_set_visible(int visible)
     r36sx_key_presets_set_visible(&g_mfb.key_presets, 0);
     r36sx_disk_menu_set_visible(&g_mfb.disk_menu, visible);
     if (visible) {
-        r36sx_disk_menu_sync_host_drive_state();
-    }
-    if (visible) {
         g_mfb.fn_help_visible = 0;
     }
     g_mfb.force_present = 1;
@@ -1381,7 +1365,6 @@ static void r36sx_mfb_disk_menu_set_visible(int visible)
 
 static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
 {
-    r36sx_disk_menu_sync_host_drive_state();
     uint32_t result = r36sx_disk_menu_handle_buttons(&g_mfb.disk_menu,
                                                      pressed);
     if ((result & R36SX_DISK_MENU_RESULT_EXIT_APP) != 0) {
@@ -1392,12 +1375,6 @@ static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
         r36sx_pico286_debug_log("minifb: disk menu BIOS change reset");
         r36sx_mfb_disk_menu_set_visible(0);
         r36sx_pico286_request_soft_reset();
-    }
-    if ((result & R36SX_DISK_MENU_RESULT_CONNECT_HOST_DRIVE) != 0) {
-        r36sx_pico286_debug_log("minifb: disk menu connect host drive H");
-        g_mfb.input_release_guard = 1;
-        r36sx_pico286_request_connect_host_drive();
-        r36sx_disk_menu_sync_host_drive_state();
     }
     if ((result & (R36SX_DISK_MENU_RESULT_CLOSED |
                    R36SX_DISK_MENU_RESULT_EXIT_APP |
@@ -1410,7 +1387,6 @@ static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
 
 static void r36sx_disk_menu_draw_overlay(void)
 {
-    r36sx_disk_menu_sync_host_drive_state();
     r36sx_disk_menu_draw(&g_mfb.disk_menu, g_mfb.frame, g_mfb.width,
                          g_mfb.height, g_mfb.width);
 }

@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-06-02 remove embedded host-drive mapper launch
+
+Removed the R36SX-only embedded MAPDRIVE trampoline from Pico-286.  The disk
+menu no longer has a `CONNECT DISK H:` action, the CPU core no longer injects a
+COM stub at `9000:0100`, and the private `INT F1h` return path was removed.
+Drive `H:` is now registered only by running the standalone `MAPDRIVE.COM`
+inside DOS.  The `host_drive_path` config and `INT 2Fh/11h` network redirector
+remain in place as the backend used by that DOS command.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+- `pico_286` size: `467652` bytes
+- `pico_286` SHA256:
+  `E86895862817FA229CEC141E259103E6453C1AA5EE702125E80D4F6E68D50A04`
+- Microsoft Defender scan: no threats found in the main binary and patch copy.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-01 move on-screen keyboard F5-F8 group
 
 The on-screen keyboard function-key row now moves the `F5`-to-`F8` block one

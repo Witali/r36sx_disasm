@@ -167,10 +167,9 @@ lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
 or A/Y on a drive row cycles through matching files found in the configured
 `image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
 `.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
-The `CONNECT DISK H: HOST/` row runs an embedded MAPDRIVE-compatible
-trampoline from emulator RAM after DOS has booted; `CONFIG.SYS` must contain
-`LASTDRIVE=H` or higher.  After a successful connection the row changes to
-`DISK H: CONNECTED TO HOST/` and later presses do not run the trampoline again.
+Drive `H:` is connected from inside DOS by running `MAPDRIVE.COM`; the emulator
+does not inject or launch the mapper from the disk menu.  `CONFIG.SYS` must
+contain `LASTDRIVE=H` or higher.
 The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try
 the floppy or hard disk first.  The `OK` button writes current bindings and
 boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
@@ -407,9 +406,9 @@ rerendered.  Set it to `0` to disable the shortcut and overlay.
 `host_drive_path` is the R36SX host directory exposed to DOS as network drive
 `H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are
 resolved next to `pico_286.conf`, so the default `host` means
-`MIPS_NATIVE/pico_286/host` on the SD card.  The disk menu can run the embedded
-MAPDRIVE-compatible trampoline once after DOS boots, and `CONFIG.SYS` must
-contain `LASTDRIVE=H` or higher so DOS allocates a CDS entry for drive `H:`.
+`MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM` after
+boot to register `H:`; `CONFIG.SYS` must contain `LASTDRIVE=H` or higher so
+DOS allocates a CDS entry for drive `H:`.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

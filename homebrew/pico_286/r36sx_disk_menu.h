@@ -6,7 +6,6 @@
 #define R36SX_DISK_MENU_RESULT_CLOSED 0x01u
 #define R36SX_DISK_MENU_RESULT_EXIT_APP 0x02u
 #define R36SX_DISK_MENU_RESULT_RESET_PC 0x04u
-#define R36SX_DISK_MENU_RESULT_CONNECT_HOST_DRIVE 0x08u
 
 #define R36SX_DISK_MENU_MAX_IMAGES 32
 #define R36SX_DISK_MENU_IMAGE_NAME_LEN 96
@@ -20,9 +19,6 @@ struct r36sx_disk_menu {
     uint8_t boot_order_changed;
     uint8_t bios_choice;
     uint8_t bios_changed;
-    uint8_t host_drive_connected;
-    uint8_t host_drive_busy;
-    uint8_t host_drive_last_status;
     char images[R36SX_DISK_MENU_MAX_IMAGES][R36SX_DISK_MENU_IMAGE_NAME_LEN];
     char message[96];
 };
@@ -30,10 +26,6 @@ struct r36sx_disk_menu {
 void r36sx_disk_menu_init(struct r36sx_disk_menu *menu);
 int r36sx_disk_menu_is_visible(const struct r36sx_disk_menu *menu);
 void r36sx_disk_menu_set_visible(struct r36sx_disk_menu *menu, int visible);
-void r36sx_disk_menu_set_host_drive_state(struct r36sx_disk_menu *menu,
-                                          int connected,
-                                          int busy,
-                                          uint8_t last_status);
 uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
                                         uint32_t pressed);
 void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
