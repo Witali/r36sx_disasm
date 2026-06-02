@@ -26,6 +26,22 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint8_t type = access & 0x0fu;
     uint8_t gate16 = type == 0x06u || type == 0x07u;
     uint8_t gate32 = type == 0x0eu || type == 0x0fu;
+    uint8_t task_gate = type == R36SX_DESCRIPTOR_TYPE_TASK_GATE;
+
+    if (task_gate) {
+        if ((access & R36SX_DESCRIPTOR_PRESENT) == 0) {
+#if R36SX_DEBUG_PM_VERBOSE
+            r36sx_pico286_debug_log(
+                "[CPU] protected interrupt task gate not present int=%02x",
+                intnum);
+#endif
+            r36sx_pm_diag_log_first_fault("protected task gate not present",
+                                          CPU_IP);
+            return 0;
+        }
+        return r36sx_cpu_task_switch((uint16_t)(lo >> 16),
+                                     R36SX_TASK_SWITCH_INTERRUPT);
+    }
 
     if ((access & R36SX_DESCRIPTOR_PRESENT) == 0 ||
         !(gate16 ||

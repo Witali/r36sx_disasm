@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-06-02 hardware task switching
+
+Implemented the first hardware task-switching layer for 286/386 protected
+mode.  `LTR` now marks the loaded TSS descriptor busy.  Far `CALL`/`JMP` can
+target 16-bit or 32-bit TSS descriptors and task gates.  IDT task gates now
+switch tasks instead of being rejected.  `IRET` with `NT` follows the current
+TSS backlink.  Task switches save and restore the 16-bit/32-bit TSS register
+images, update descriptor busy bits, set backlink for task `CALL`/interrupt
+switches, clear the outgoing busy bit for task `JMP`/nested-task `IRET`, load
+`LDTR`/`CR3`, and set `CR0.TS`.
+
+The 16-bit and 32-bit immediate far `JMP` decoders now advance `IP/EIP` past
+the selector before the protected transfer, so a task switch saves the address
+after the full instruction.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3
+```
+
+Result:
+
+- `pico_286.gcc` size: `538512` bytes
+- `pico_286.gcc` SHA256:
+  `A08054B64320D1A471A27E10E4DCC332E9F395C38A7C743883E7CE3644C595A9`
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio helper code.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 FWAIT and CPU-specific FLAGS masks
 
 Implemented the `WAIT/FWAIT` opcode path and tightened `FLAGS`/`EFLAGS`

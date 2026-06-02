@@ -197,10 +197,11 @@ features such as `66h`/`67h`, `FS`/`GS`, `PUSHFD`/`POPFD`, `PUSHAD`/`POPAD`,
 experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
 `LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
 protected interrupt gates and call gates, switch stacks through the current
-TSS on call-gate privilege transitions, and access linear physical memory
-above 1 MB through the XMS-backed extended RAM buffer.  Paging, hardware task
-switching through task gates/TSS descriptors, v86 mode, and DOS extender
-services such as DPMI/VCPI are still incomplete, so keep `cpu_mode=real` for
+TSS on call-gate privilege transitions, switch tasks through 16-bit and 32-bit
+TSS descriptors/task gates, return from nested tasks with `IRET`/`NT`, and
+access linear physical memory above 1 MB through the XMS-backed extended RAM
+buffer.  v86 mode, DOS extender services such as DPMI/VCPI, and some
+protected-mode edge cases are still incomplete, so keep `cpu_mode=real` for
 normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a

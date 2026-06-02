@@ -15,12 +15,13 @@ multiple decoder cores, so this is not a wholesale CPU core import.
 | `MOV Rd,CR0` | Returned the raw local CR0 value. | DOSBox reports 386 CR0 reads with reserved bits 4..30 set. | CR0 reads now OR in the 386 reserved-bit read mask. |
 | `MOV CR3`/`MOV Rd,CR3` | Preserved low 12 bits. | DOSBox exposes CR3 as a page-directory base. | CR3 writes and reads now keep only the page-directory-aligned upper bits. |
 | Far protected transfers | Far `CALL`/`JMP`/`RET`/`IRET` mostly loaded a new `CS:IP`. | DOSBox validates protected descriptors, gates, and privilege transitions. | Immediate and indirect far forms now validate code descriptors, support 16/32-bit call gates, and use TSS stack slots for call-gate privilege switches. |
+| Hardware task switching | TSS descriptors and task gates were rejected. | DOSBox supports task switches through TSS descriptors, task gates, nested-task returns, and descriptor busy-bit updates. | Far `CALL`/`JMP` and IDT task gates now switch to 16-bit or 32-bit TSS images; `IRET` with `NT` follows the backlink; `LTR`, task `CALL`/`JMP`/`IRET`, backlink, busy-bit, `CR3`, `LDTR`, segment selectors, and `CR0.TS` are updated. |
 
 ## Deferred
 
 - Full DOSBox protected-mode privilege model for every CPU path and exception.
 - Paging and page faults.
-- Hardware task switching through task gates/TSS descriptors.
+- More task-switch conformance work around invalid TSS/error-code edge cases.
 - v86 mode.
 - A full replacement decoder based on DOSBox `core_normal` or `core_full`.
 

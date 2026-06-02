@@ -692,6 +692,16 @@ static uint8_t r36sx_cpu_load_tr(uint16_t selector, uint32_t fault_ip)
         return 0;
     }
 
+    if (!r36sx_cpu_set_tss_busy(selector, 1)) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                                  selector & 0xfffcu, 1, fault_ip);
+        return 0;
+    }
+    cache.access = (cache.access & (uint8_t)~R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK) |
+                   (r36sx_descriptor_type(&cache) ==
+                            R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE
+                        ? R36SX_DESCRIPTOR_TYPE_TSS16_BUSY
+                        : R36SX_DESCRIPTOR_TYPE_TSS32_BUSY);
     r36sx_tr_selector = selector;
     r36sx_tr_cache = cache;
     return 1;

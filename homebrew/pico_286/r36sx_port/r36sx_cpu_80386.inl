@@ -732,6 +732,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint32_t target_ip = getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
+            StepIP(2);
             if (r36sx_cpu_protected_enabled()) {
                 r36sx_cpu_protected_far_jump(target_cs, target_ip);
                 return true;
