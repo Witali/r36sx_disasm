@@ -976,7 +976,7 @@ static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
     }
 
     mkdir(dir, 0755);
-    now = time(NULL);
+    now = (time_t)r36sx_pico286_rtc_current_time_unix();
     if (localtime_r(&now, &tm_now) == NULL) {
         memset(&tm_now, 0, sizeof(tm_now));
     }

@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-02 screenshot RTC timestamp fix
+
+Changed screenshot filename timestamps to use Pico-286's emulated RTC counter
+instead of the Linux host clock.  The screenshot backend now calls
+`r36sx_pico286_rtc_current_time_unix()`, which initializes CMOS/RTC state if
+needed and then returns the same emulated time base that DOS reads through the
+RTC ports.  Screenshot names keep the existing
+`pico_286_YYYYMMDD_HHMMSS_NNN` format.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `481468` bytes
+- `pico_286` SHA256:
+  `187B8AD2D50664D4A7398084BEC2D074B10685BF63F83136906FF1FA3BC9C348`
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 12:54:34`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 BOUND register operand fix
 
 Fixed the 80186+ `BOUND` instruction handling in the native Pico-286 CPU core.

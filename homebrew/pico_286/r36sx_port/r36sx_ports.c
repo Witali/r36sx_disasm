@@ -410,6 +410,12 @@ static void r36sx_cmos_init_once(void)
     r36sx_pico286_debug_log("rtc: start unix=%ld", (long)rtc_start);
 }
 
+int64_t r36sx_pico286_rtc_current_time_unix(void)
+{
+    r36sx_cmos_init_once();
+    return (int64_t)r36sx_rtc_current_time_raw();
+}
+
 static void r36sx_cmos_commit_time_regs(void)
 {
     uint8_t second;
