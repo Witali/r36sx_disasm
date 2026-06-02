@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-02 VM86 rejects protected descriptor instructions
+
+Descriptor-management and selector-validation instructions now distinguish
+native protected mode from virtual-8086 mode.  `ARPL`, `LAR`, `LSL`, and the
+`0F 00` group (`SLDT`, `STR`, `LLDT`, `LTR`, `VERR`, `VERW`) now raise invalid
+opcode in VM86 instead of treating VM86 as normal protected mode.  This matches
+the Intel rule that these protected-mode instructions are not recognized in
+real-address or virtual-8086 mode.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `540744` bytes
+- `pico_286` SHA256:
+  `CC195A27C9B704E53EE499EEB7B5CB805305A73CE8F14CDEEB7676DDE684795E`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 VM86 LOCK IOPL trap
 
 The `LOCK` prefix is now checked during prefix decoding in virtual-8086 mode.

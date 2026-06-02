@@ -203,6 +203,19 @@ static inline uint8_t r36sx_cpu_v86_enabled(void)
 #endif
 }
 
+static inline uint8_t r36sx_cpu_native_protected_enabled(void)
+{
+    /*
+     * Descriptor-management instructions are protected-mode instructions, but
+     * Intel still rejects them in virtual-8086 mode with #UD.
+     */
+#if R36SX_ENABLE_PROTECTED_MODE
+    return (r36sx_cr0 & R36SX_CR0_PE) != 0 && !r36sx_cpu_v86_enabled();
+#else
+    return 0;
+#endif
+}
+
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
@@ -5610,7 +5623,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_63: ;
 #endif
                 /* 63 ARPL Ew,Gw (80286+ protected mode) */
-                if (!r36sx_cpu_protected_enabled() ||
+                if (!r36sx_cpu_native_protected_enabled() ||
                     r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;

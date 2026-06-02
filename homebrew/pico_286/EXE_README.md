@@ -206,9 +206,10 @@ bitmaps are checked for VM86 or `CPL > IOPL` port I/O.  Interrupt/trap gates
 can also switch to an inner TSS stack and `IRETD` can return through the 386
 VM86 frame.  VM86 `LOCK`, `PUSHF`, `POPF`, `INT imm8`, and `IRET/IRETD` now
 raise `#GP(0)` when `IOPL < 3` so a future protected monitor can emulate or
-reflect them.  Full VM86 monitor behavior, DOS extender services such as
-DPMI/VCPI, and some protected-mode edge cases are still incomplete, so keep
-`cpu_mode=real` for normal DOS use.
+reflect them, while protected descriptor instructions now raise `#UD` in VM86.
+Full VM86 monitor behavior, DOS extender services such as DPMI/VCPI, and some
+protected-mode edge cases are still incomplete, so keep `cpu_mode=real` for
+normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a
 model-specific, round historical throughput estimate: 8086 uses about

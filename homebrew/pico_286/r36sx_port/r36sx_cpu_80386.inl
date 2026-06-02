@@ -915,7 +915,7 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 
     switch (op2) {
         case 0x00: { /* SLDT/STR/LLDT/LTR/VERR/VERW */
-            if (!r36sx_cpu_protected_enabled()) {
+            if (!r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_invalid_opcode(fault_ip);
                 return;
             }
@@ -1051,7 +1051,7 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 
         case 0x02: /* LAR Gv,Ew */
         case 0x03: { /* LSL Gv,Ew */
-            if (!r36sx_cpu_protected_enabled() ||
+            if (!r36sx_cpu_native_protected_enabled() ||
                 r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
                 r36sx_cpu_invalid_opcode(fault_ip);
                 return;
