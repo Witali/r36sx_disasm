@@ -94,8 +94,14 @@ static const struct r36sx_key_choice g_choices[] = {
     { "ESC", R36SX_SCREEN_KEY_ESCAPE },
     { "SPACE", R36SX_SCREEN_KEY_SPACE },
     { "CTRL", R36SX_SCREEN_KEY_CONTROL },
+    { "LCTRL", R36SX_SCREEN_KEY_LCONTROL },
+    { "RCTRL", R36SX_SCREEN_KEY_RCONTROL },
     { "ALT", R36SX_SCREEN_KEY_MENU },
+    { "LALT", R36SX_SCREEN_KEY_LMENU },
+    { "RALT", R36SX_SCREEN_KEY_RMENU },
     { "SHIFT", R36SX_SCREEN_KEY_SHIFT },
+    { "LSHIFT", R36SX_SCREEN_KEY_LSHIFT },
+    { "RSHIFT", R36SX_SCREEN_KEY_RSHIFT },
     { "WIN", R36SX_SCREEN_KEY_LWIN },
     { "MENU", R36SX_SCREEN_KEY_APPS },
     { "TAB", R36SX_SCREEN_KEY_TAB },
@@ -362,6 +368,31 @@ static const char *choice_label(uint16_t keycode)
 
 static uint16_t keycode_for_label(const char *label)
 {
+    if (str_equals(label, "LEFTSHIFT") || str_equals(label, "LEFT_SHIFT") ||
+        str_equals(label, "LSHIFT")) {
+        return R36SX_SCREEN_KEY_LSHIFT;
+    }
+    if (str_equals(label, "RIGHTSHIFT") || str_equals(label, "RIGHT_SHIFT") ||
+        str_equals(label, "RSHIFT")) {
+        return R36SX_SCREEN_KEY_RSHIFT;
+    }
+    if (str_equals(label, "LEFTCTRL") || str_equals(label, "LEFT_CONTROL") ||
+        str_equals(label, "LEFTCONTROL") || str_equals(label, "LCTRL")) {
+        return R36SX_SCREEN_KEY_LCONTROL;
+    }
+    if (str_equals(label, "RIGHTCTRL") ||
+        str_equals(label, "RIGHT_CONTROL") ||
+        str_equals(label, "RIGHTCONTROL") || str_equals(label, "RCTRL")) {
+        return R36SX_SCREEN_KEY_RCONTROL;
+    }
+    if (str_equals(label, "LEFTALT") || str_equals(label, "LEFT_ALT") ||
+        str_equals(label, "LALT")) {
+        return R36SX_SCREEN_KEY_LMENU;
+    }
+    if (str_equals(label, "RIGHTALT") || str_equals(label, "RIGHT_ALT") ||
+        str_equals(label, "RALT")) {
+        return R36SX_SCREEN_KEY_RMENU;
+    }
     for (size_t i = 0; i < sizeof(g_choices) / sizeof(g_choices[0]); i++) {
         if (str_equals(label, g_choices[i].label)) {
             return g_choices[i].keycode;
@@ -694,6 +725,7 @@ void r36sx_key_presets_save(struct r36sx_key_presets *state)
     snprintf(state->config_path, sizeof(state->config_path), "%s", path);
     fprintf(fp, "# Pico-286 key presets for the R36SX native port.\n");
     fprintf(fp, "# Values use labels such as A, ENTER, ESC, SPACE, CTRL, F1.\n");
+    fprintf(fp, "# Side-specific modifiers are LSHIFT, RSHIFT, LCTRL, RCTRL, LALT, RALT.\n");
     fprintf(fp, "# Modifiers can be combined with '+': CTRL+S, SHIFT+A, CTRL+ALT+DEL.\n\n");
     fprintf(fp, "active=%s\n\n", state->presets[state->active].name);
     for (uint8_t preset = 0; preset < state->count; preset++) {

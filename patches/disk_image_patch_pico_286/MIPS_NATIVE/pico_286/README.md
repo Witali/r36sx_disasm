@@ -65,15 +65,15 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The physical L/R modifiers are held only while the physical trigger is held.
-The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
+The on-screen left/right Shift, Ctrl, and Alt keys act as latched modifiers
+and can be picked separately for key presets.  The normal
 DOS keyboard uses a PC-style layout with Esc/F1-F12 on the top row and a
 right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
 left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
-same left edge.  The bottom row includes `CTRL WIN ALT`, a wide unlabeled
-spacebar, then `ALT MNU CTRL`; `WIN` and `MNU` send the PC extended scancodes
-`E0 5B` and
-`E0 5D`.  `WIN` ends under `A`, the spacebar ends under comma, and `MNU`
+same left edge.  The bottom row includes `LCTRL WIN LALT`, a wide unlabeled
+spacebar, then `RALT MNU RCTRL`; `WIN`, `MNU`, `RCTRL`, and `RALT` send PC
+extended scancodes where appropriate.  `WIN` ends under `A`, the spacebar ends under comma, and `MNU`
 starts under the `=`/`F10` guide column.  The function-key row keeps grouped
 gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift
@@ -321,4 +321,6 @@ Open it with Fn+Start.
 
 The default preset is stored in `keypresets.conf` next to the executable.
 Preset values can be single labels such as `A`, `ENTER`, and `F1`, or combos
-such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.
+such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.  The key picker also supports
+side-specific modifier keys: `LSHIFT`, `RSHIFT`, `LCTRL`, `RCTRL`, `LALT`,
+and `RALT`.

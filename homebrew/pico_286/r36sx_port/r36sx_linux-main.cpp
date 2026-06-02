@@ -1063,12 +1063,21 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // F11
         case 123: scancode = 0x58;
             break; // F12
-        case 16: scancode = 0x2A;
-            break; // Shift
-        case 17: scancode = 0x1D;
-            break; // Ctrl
-        case 18: scancode = 0x38;
-            break; // Alt
+        case R36SX_SCREEN_KEY_SHIFT:
+        case R36SX_SCREEN_KEY_LSHIFT: scancode = 0x2A;
+            break; // Left Shift
+        case R36SX_SCREEN_KEY_RSHIFT: scancode = 0x36;
+            break; // Right Shift
+        case R36SX_SCREEN_KEY_CONTROL:
+        case R36SX_SCREEN_KEY_LCONTROL: scancode = 0x1D;
+            break; // Left Ctrl
+        case R36SX_SCREEN_KEY_RCONTROL: scancode = 0x1D; extended = 1;
+            break; // Right Ctrl
+        case R36SX_SCREEN_KEY_MENU:
+        case R36SX_SCREEN_KEY_LMENU: scancode = 0x38;
+            break; // Left Alt
+        case R36SX_SCREEN_KEY_RMENU: scancode = 0x38; extended = 1;
+            break; // Right Alt
         case 20: scancode = 0x3A;
             break; // Caps Lock
         case R36SX_SCREEN_KEY_LWIN: scancode = 0x5B; extended = 1;

@@ -72,9 +72,11 @@ moving up from Left Arrow selects `DEL` instead of the Up Arrow key.
 The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
 `CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row
 includes `WIN`, an unlabeled stretched spacebar, and a context `MNU` key; host
-applications can map these emitted Windows-like keycodes as needed.  The last
-key in each row absorbs the row-width remainder so `F12`, Backspace, `\`,
-Enter, right `SHIFT`, and right `CTRL` share a clean visual right edge.  On the
+applications can map these emitted Windows-like keycodes as needed.  The
+on-screen left/right modifier keys emit distinct picker keycodes: `LSHIFT`,
+`RSHIFT`, `LCTRL`, `RCTRL`, `LALT`, and `RALT`.  The last key in each row
+absorbs the row-width remainder so `F12`, Backspace, `\`, Enter, right
+`SHIFT`, and right `CTRL` share a clean visual right edge.  On the
 bottom row, the spacebar absorbs that remainder instead, keeping the visible
 gaps between `CTRL`, `WIN`, `ALT`, the spacebar, `MNU`, and right `CTRL`
 consistent with the rows above.  The bottom-row remainder is split so `WIN`

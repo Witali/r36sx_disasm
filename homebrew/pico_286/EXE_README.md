@@ -63,7 +63,8 @@ briefly shows `SCREENSHOT SAVED` or `SCREENSHOT FAILED` with a small preview.
 - Select: close the keyboard.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
-The on-screen Shift, Ctrl, and Alt keys act as latched modifiers.  The normal
+The on-screen left/right Shift, Ctrl, and Alt keys act as latched modifiers
+and can be picked separately for key presets.  The normal
 DOS keyboard now uses a PC-style layout with Esc/F1-F12 on the top row and a
 right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  Shift also changes the
@@ -312,4 +313,6 @@ Open it with Fn+Start.
 
 The default preset is stored in `keypresets.conf` next to the executable.
 Preset values can be single labels such as `A`, `ENTER`, and `F1`, or combos
-such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.
+such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.  The key picker also supports
+side-specific modifier keys: `LSHIFT`, `RSHIFT`, `LCTRL`, `RCTRL`, `LALT`,
+and `RALT`.

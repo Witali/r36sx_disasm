@@ -182,7 +182,7 @@ static const struct r36sx_osk_key g_osk_row3[] = {
 };
 
 static const struct r36sx_osk_key g_osk_row4[] = {
-    R36SX_OSK_WIDE("SHIFT", R36SX_SCREEN_KEY_SHIFT,
+    R36SX_OSK_WIDE("LSHIFT", R36SX_SCREEN_KEY_LSHIFT,
                    R36SX_OSK_FLAG_SHIFT_MOD, R36SX_OSK_UNIT_2_5),
     R36SX_OSK_KEY("Z", 'Z', 0), R36SX_OSK_KEY("X", 'X', 0),
     R36SX_OSK_KEY("C", 'C', 0), R36SX_OSK_KEY("V", 'V', 0),
@@ -191,22 +191,22 @@ static const struct r36sx_osk_key g_osk_row4[] = {
     R36SX_OSK_KEY(",", R36SX_SCREEN_KEY_OEM_COMMA, 0),
     R36SX_OSK_KEY(".", R36SX_SCREEN_KEY_OEM_PERIOD, 0),
     R36SX_OSK_KEY("/", R36SX_SCREEN_KEY_OEM_2, 0),
-    R36SX_OSK_WIDE("SHIFT", R36SX_SCREEN_KEY_SHIFT,
+    R36SX_OSK_WIDE("RSHIFT", R36SX_SCREEN_KEY_RSHIFT,
                    R36SX_OSK_FLAG_SHIFT_MOD, R36SX_OSK_UNIT_2_5)
 };
 
 static const struct r36sx_osk_key g_osk_row5[] = {
-    R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
+    R36SX_OSK_WIDE("LCTRL", R36SX_SCREEN_KEY_LCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("WIN", R36SX_SCREEN_KEY_LWIN, 0, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
+    R36SX_OSK_WIDE("LALT", R36SX_SCREEN_KEY_LMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("", R36SX_SCREEN_KEY_SPACE, 0,
                    R36SX_OSK_UNIT_6),
-    R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
+    R36SX_OSK_WIDE("RALT", R36SX_SCREEN_KEY_RMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
+    R36SX_OSK_WIDE("RCTRL", R36SX_SCREEN_KEY_RCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5)
 };
 
@@ -280,7 +280,7 @@ static const struct r36sx_osk_key g_osk_symbol_row3[] = {
 };
 
 static const struct r36sx_osk_key g_osk_symbol_row4[] = {
-    R36SX_OSK_WIDE("SHIFT", R36SX_SCREEN_KEY_SHIFT,
+    R36SX_OSK_WIDE("LSHIFT", R36SX_SCREEN_KEY_LSHIFT,
                    R36SX_OSK_FLAG_SHIFT_MOD, R36SX_OSK_UNIT_2_5),
     R36SX_OSK_KEY("%", '5', R36SX_OSK_FLAG_SHIFTED),
     R36SX_OSK_KEY("^", '6', R36SX_OSK_FLAG_SHIFTED),
@@ -294,22 +294,22 @@ static const struct r36sx_osk_key g_osk_symbol_row4[] = {
                   R36SX_OSK_FLAG_SHIFTED),
     R36SX_OSK_KEY("?", R36SX_SCREEN_KEY_OEM_2, R36SX_OSK_FLAG_SHIFTED),
     R36SX_OSK_KEY("/", R36SX_SCREEN_KEY_OEM_2, 0),
-    R36SX_OSK_WIDE("SHIFT", R36SX_SCREEN_KEY_SHIFT,
+    R36SX_OSK_WIDE("RSHIFT", R36SX_SCREEN_KEY_RSHIFT,
                    R36SX_OSK_FLAG_SHIFT_MOD, R36SX_OSK_UNIT_2_5)
 };
 
 static const struct r36sx_osk_key g_osk_symbol_row5[] = {
-    R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
+    R36SX_OSK_WIDE("LCTRL", R36SX_SCREEN_KEY_LCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("WIN", R36SX_SCREEN_KEY_LWIN, 0, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
+    R36SX_OSK_WIDE("LALT", R36SX_SCREEN_KEY_LMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("", R36SX_SCREEN_KEY_SPACE, 0,
                    R36SX_OSK_UNIT_6),
-    R36SX_OSK_WIDE("ALT", R36SX_SCREEN_KEY_MENU,
+    R36SX_OSK_WIDE("RALT", R36SX_SCREEN_KEY_RMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("CTRL", R36SX_SCREEN_KEY_CONTROL,
+    R36SX_OSK_WIDE("RCTRL", R36SX_SCREEN_KEY_RCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5)
 };
 
@@ -2014,6 +2014,30 @@ static int keycode_matches(uint16_t a, uint16_t b)
 {
     if (a == b) {
         return 1;
+    }
+    if (a == R36SX_SCREEN_KEY_SHIFT) {
+        return b == R36SX_SCREEN_KEY_LSHIFT ||
+               b == R36SX_SCREEN_KEY_RSHIFT;
+    }
+    if (b == R36SX_SCREEN_KEY_SHIFT) {
+        return a == R36SX_SCREEN_KEY_LSHIFT ||
+               a == R36SX_SCREEN_KEY_RSHIFT;
+    }
+    if (a == R36SX_SCREEN_KEY_CONTROL) {
+        return b == R36SX_SCREEN_KEY_LCONTROL ||
+               b == R36SX_SCREEN_KEY_RCONTROL;
+    }
+    if (b == R36SX_SCREEN_KEY_CONTROL) {
+        return a == R36SX_SCREEN_KEY_LCONTROL ||
+               a == R36SX_SCREEN_KEY_RCONTROL;
+    }
+    if (a == R36SX_SCREEN_KEY_MENU) {
+        return b == R36SX_SCREEN_KEY_LMENU ||
+               b == R36SX_SCREEN_KEY_RMENU;
+    }
+    if (b == R36SX_SCREEN_KEY_MENU) {
+        return a == R36SX_SCREEN_KEY_LMENU ||
+               a == R36SX_SCREEN_KEY_RMENU;
     }
     if (a >= 'A' && a <= 'Z' && a + ('a' - 'A') == b) {
         return 1;

@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-02 side-specific key preset modifiers
+
+Added distinct on-screen keyboard picker keycodes for left/right modifiers:
+`LSHIFT`, `RSHIFT`, `LCTRL`, `RCTRL`, `LALT`, and `RALT`.  The normal keyboard
+still treats those visible modifier keys as latched Shift/Ctrl/Alt keys, while
+the key preset picker can now save the side-specific labels into
+`keypresets.conf`.  Pico-286 maps right Ctrl and right Alt through `E0`
+extended scancodes.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `479036` bytes
+- `pico_286` SHA256:
+  `2A305B44DC1D75AD6DC3860A7A1EB3B0FE5F9EA886ADF4BF0D160AC0C7CF0723`
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 debug builds force O2
 
 Updated the WSL GCC build scripts so any `DEBUG=1`/debug-log build forces
