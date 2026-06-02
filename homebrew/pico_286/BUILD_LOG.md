@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-02 on-screen keyboard Scroll Lock LED
+
+Added a small green lock-state LED to the on-screen `SL` key in the
+cursor/system-key block. It reuses the Caps Lock LED renderer, stores the
+`scroll_lock` state in the shared keyboard object, toggles that state when
+`SL` is emitted, excludes Scroll Lock from key repeat, and includes the flag in
+the Pico-286 MiniFB overlay cache signature.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- `pico_286` size: `467716` bytes
+- `pico_286` SHA256:
+  `88F69DF93A51D391A769748F9156085996B7D65931CD9F620D8632F124E124B0`
+- Microsoft Defender scan: no threats found in the main, patch, and
+  `disk_image` copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 parameterized MAPDRIVE.COM
 
 Updated `homebrew/pico_286/pico-286/tools/mapdrive.asm` so the DOS mapper

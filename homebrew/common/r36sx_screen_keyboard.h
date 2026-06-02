@@ -63,6 +63,7 @@ struct r36sx_screen_keyboard {
     uint8_t physical_shift;
     uint8_t physical_ctrl;
     uint8_t caps_lock;
+    uint8_t scroll_lock;
     uint8_t expanded;
     uint8_t symbol_mode;
     uint8_t cursor_block;
