@@ -204,10 +204,10 @@ buffer.  A 32-bit TSS can also enter an initial VM86 task context with
 real-mode-style visible segment bases and CPL 3, and 386 TSS I/O permission
 bitmaps are checked for VM86 or `CPL > IOPL` port I/O.  Interrupt/trap gates
 can also switch to an inner TSS stack and `IRETD` can return through the 386
-VM86 frame.  VM86 `PUSHF`, `POPF`, `INT imm8`, and `IRET/IRETD` now raise
-`#GP(0)` when `IOPL < 3` so a future protected monitor can emulate or reflect
-them.  Full VM86 monitor behavior, DOS extender services such as DPMI/VCPI,
-and some protected-mode edge cases are still incomplete, so keep
+VM86 frame.  VM86 `LOCK`, `PUSHF`, `POPF`, `INT imm8`, and `IRET/IRETD` now
+raise `#GP(0)` when `IOPL < 3` so a future protected monitor can emulate or
+reflect them.  Full VM86 monitor behavior, DOS extender services such as
+DPMI/VCPI, and some protected-mode edge cases are still incomplete, so keep
 `cpu_mode=real` for normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a

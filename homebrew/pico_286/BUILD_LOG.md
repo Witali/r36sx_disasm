@@ -1,13 +1,38 @@
 # pico-286 Build Log
 
+## 2026-06-02 VM86 LOCK IOPL trap
+
+The `LOCK` prefix is now checked during prefix decoding in virtual-8086 mode.
+When a VM86 task executes `LOCK` with `IOPL < 3`, Pico-286 raises `#GP(0)` at
+the prefix address instead of silently accepting it.  This completes the
+currently implemented set of Intel 80386 VM86 IOPL-sensitive opcodes around
+flags, software interrupts, interrupt returns, `CLI`/`STI`, and `LOCK`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `539872` bytes
+- `pico_286` SHA256:
+  `A98F25789BED6C46F896CB9C4C351A046C2206EE59AF6FBB91C4B1CD630A0AFD`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 VM86 IOPL-sensitive flag and interrupt opcodes
 
 Virtual-8086 mode now treats `PUSHF`, `POPF`, `INT imm8`, `IRET`, and `IRETD`
 as IOPL-sensitive instructions.  If a VM86 task runs with `IOPL < 3`, these
 opcodes now raise `#GP(0)` at the faulting instruction so a protected-mode
 monitor can emulate or reflect them.  `CLI` and `STI` already used the shared
-IOPL check.  `INT3` and `INTO` remain on their existing interrupt path, matching
-the 80386 behavior that only `INT n` is intercepted this way.
+IOPL check, while `LOCK` is covered by the following build entry.  `INT3` and
+`INTO` remain on their existing interrupt path, matching the 80386 behavior
+that only `INT n` is intercepted this way.
 
 Reference checked while implementing this: Intel 80386 Programmer's Reference
 Manual, section 15.4, "Additional Sensitive Instructions".

@@ -246,9 +246,9 @@ static uint8_t r36sx_cpu_require_iopl(uint32_t fault_ip)
 static uint8_t r36sx_cpu_v86_iopl_sensitive_fault(uint32_t fault_ip)
 {
     /*
-     * Intel 80386 virtual-8086 mode makes PUSHF, POPF, INT n, and IRET
-     * sensitive to IOPL.  When IOPL is below 3, the protected monitor gets
-     * #GP(0) and can emulate or reflect the operation.
+     * Intel 80386 virtual-8086 mode makes LOCK, PUSHF, POPF, INT n, and
+     * IRET sensitive to IOPL.  When IOPL is below 3, the protected monitor
+     * gets #GP(0) and can emulate or reflect the operation.
      */
     if (r36sx_cpu_v86_enabled() && r36sx_cpu_iopl() < 3u) {
         r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
@@ -4301,8 +4301,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
 #endif
 
-                case 0xF0: /* LOCK (?????????? ????, ??? ????????? ????????) */
-                    /// TODO:
+                case 0xF0: /* LOCK */
+                    if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                        prefix_exception = 1;
+                        docontinue = 1;
+                    }
                     break;
 
                 case 0xF2: /* REPNE/REPNZ */
@@ -7615,6 +7618,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_F0: ;
 #endif
                 /* F0 LOCK */
+                if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                    break;
+                }
                 break;
 
             case 0xF4:
