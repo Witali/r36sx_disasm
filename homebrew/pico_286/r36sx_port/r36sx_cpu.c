@@ -243,6 +243,20 @@ static uint8_t r36sx_cpu_require_iopl(uint32_t fault_ip)
     return 1;
 }
 
+static uint8_t r36sx_cpu_v86_iopl_sensitive_fault(uint32_t fault_ip)
+{
+    /*
+     * Intel 80386 virtual-8086 mode makes PUSHF, POPF, INT n, and IRET
+     * sensitive to IOPL.  When IOPL is below 3, the protected monitor gets
+     * #GP(0) and can emulate or reflect the operation.
+     */
+    if (r36sx_cpu_v86_enabled() && r36sx_cpu_iopl() < 3u) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return 1;
+    }
+    return 0;
+}
+
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear);
 static inline uint16_t r36sx_cpu_read_linear16(uint32_t linear);
 static inline uint32_t r36sx_cpu_read_linear32(uint32_t linear);
@@ -6448,6 +6462,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_9C: ;
 #endif
                 /* 9C PUSHF */
+                if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                    break;
+                }
                 if (operandSizeOverride) {
                     push32(makeflagsdword());
                     break;
@@ -6460,6 +6477,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_9D: ;
 #endif
                 /* 9D POPF */
+                if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                    break;
+                }
                 if (operandSizeOverride) {
                     decodeflagsdword(pop32());
                     break;
@@ -7217,6 +7237,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* CD INT Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
+                if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                    break;
+                }
                 r36sx_cpu_software_interrupt(oper1b);
                 break;
 
@@ -7235,6 +7258,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_CF: ;
 #endif
                 /* CF IRET */
+                if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
+                    break;
+                }
                 if (r36sx_cpu_protected_enabled()) {
                     r36sx_cpu_protected_iret(0);
                     break;

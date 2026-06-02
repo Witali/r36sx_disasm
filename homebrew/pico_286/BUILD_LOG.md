@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-02 VM86 IOPL-sensitive flag and interrupt opcodes
+
+Virtual-8086 mode now treats `PUSHF`, `POPF`, `INT imm8`, `IRET`, and `IRETD`
+as IOPL-sensitive instructions.  If a VM86 task runs with `IOPL < 3`, these
+opcodes now raise `#GP(0)` at the faulting instruction so a protected-mode
+monitor can emulate or reflect them.  `CLI` and `STI` already used the shared
+IOPL check.  `INT3` and `INTO` remain on their existing interrupt path, matching
+the 80386 behavior that only `INT n` is intercepted this way.
+
+Reference checked while implementing this: Intel 80386 Programmer's Reference
+Manual, section 15.4, "Additional Sensitive Instructions".
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `540704` bytes
+- `pico_286` SHA256:
+  `09948F41345D0E032277F3ED1BF43FADADBC0839FDD9AC012E61295AD6FD96CF`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 protected software INT gate checks
 
 Software interrupt opcodes (`INT3`, `INT imm8`, and `INTO`) now enter the
