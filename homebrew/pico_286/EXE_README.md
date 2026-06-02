@@ -201,8 +201,9 @@ TSS on call-gate privilege transitions, switch tasks through 16-bit and 32-bit
 TSS descriptors/task gates, return from nested tasks with `IRET`/`NT`, and
 access linear physical memory above 1 MB through the XMS-backed extended RAM
 buffer.  A 32-bit TSS can also enter an initial VM86 task context with
-real-mode-style visible segment bases and CPL 3.  Full VM86 monitor behavior,
-DOS extender services such as DPMI/VCPI, and some
+real-mode-style visible segment bases and CPL 3, and 386 TSS I/O permission
+bitmaps are checked for VM86 or `CPL > IOPL` port I/O.  Full VM86 monitor
+behavior, DOS extender services such as DPMI/VCPI, and some
 protected-mode edge cases are still incomplete, so keep `cpu_mode=real` for
 normal DOS use.
 

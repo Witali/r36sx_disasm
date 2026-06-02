@@ -145,7 +145,10 @@ uint32_t dwordregs[8];
 #define R36SX_TSS32_FS 0x58u
 #define R36SX_TSS32_GS 0x5cu
 #define R36SX_TSS32_LDTR 0x60u
+#define R36SX_TSS32_IOMAP_BASE 0x66u
 #define R36SX_TSS32_MIN_LIMIT 0x67u
+#define R36SX_IO_PORT_COUNT 0x10000u
+#define R36SX_IO_PERMISSION_BITS_PER_BYTE 8u
 #define R36SX_EXCEPTION_BOUND 5u
 #define R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE 7u
 #define R36SX_EXCEPTION_INVALID_TSS 10u
@@ -2081,6 +2084,57 @@ static inline uint8_t r36sx_tss_type_is_32(uint8_t type)
     return r36sx_cpu_descriptor_uses_386_format() &&
            (type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE ||
             type == R36SX_DESCRIPTOR_TYPE_TSS32_BUSY);
+}
+
+static uint8_t r36sx_cpu_require_io_permission(uint16_t port,
+                                               uint8_t bytes,
+                                               uint32_t fault_ip)
+{
+    if (!r36sx_cpu_protected_enabled() ||
+        (!r36sx_cpu_v86_enabled() && r36sx_cpu_cpl() <= r36sx_cpu_iopl())) {
+        return 1;
+    }
+
+    /*
+     * On 80386, I/O instructions below IOPL (and all VM86 I/O) are checked
+     * against the current 32-bit TSS I/O permission bitmap.  A set bit denies
+     * the port; an absent or too-short bitmap behaves as denied.
+     */
+    uint8_t tr_type = r36sx_descriptor_type(&r36sx_tr_cache);
+    if (!r36sx_tr_cache.valid || !r36sx_tss_type_is_32(tr_type) ||
+        r36sx_tr_cache.limit < R36SX_TSS32_IOMAP_BASE + 1u) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return 0;
+    }
+
+    uint32_t end_port = (uint32_t)port + bytes;
+    if (bytes == 0u || end_port > R36SX_IO_PORT_COUNT) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return 0;
+    }
+
+    uint32_t bitmap_base = readw86(r36sx_tr_cache.base +
+                                   R36SX_TSS32_IOMAP_BASE);
+    for (uint32_t checked_port = port; checked_port < end_port;
+         checked_port++) {
+        uint32_t bitmap_byte_offset =
+            bitmap_base +
+            checked_port / R36SX_IO_PERMISSION_BITS_PER_BYTE;
+        if (bitmap_byte_offset > r36sx_tr_cache.limit) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+            return 0;
+        }
+        uint8_t bitmap =
+            read86(r36sx_tr_cache.base + bitmap_byte_offset);
+        uint8_t bit =
+            (uint8_t)(checked_port % R36SX_IO_PERMISSION_BITS_PER_BYTE);
+        if (bitmap & (uint8_t)(1u << bit)) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static uint8_t r36sx_cpu_decode_tss_descriptor(
@@ -5615,6 +5669,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
+                if (!r36sx_cpu_require_io_permission(CPU_DX, 1u, firstip)) {
+                    break;
+                }
 
                 putmem8(CPU_ES, CPU_DI, portin(CPU_DX));
                 if (df) {
@@ -5645,6 +5702,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
                 if (reptype && (CPU_CX == 0)) {
+                    break;
+                }
+                if (!r36sx_cpu_require_io_permission(CPU_DX, 2u, firstip)) {
                     break;
                 }
 
@@ -5679,6 +5739,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 if (reptype && (CPU_CX == 0)) {
                     break;
                 }
+                if (!r36sx_cpu_require_io_permission(CPU_DX, 1u, firstip)) {
+                    break;
+                }
 
                 portout(CPU_DX, getmem8(useseg, CPU_SI));
                 if (df) {
@@ -5709,6 +5772,9 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     break;
                 }
                 if (reptype && (CPU_CX == 0)) {
+                    break;
+                }
+                if (!r36sx_cpu_require_io_permission(CPU_DX, 2u, firstip)) {
                     break;
                 }
 
@@ -7323,7 +7389,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E4 IN CPU_AL Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1b, 1u, firstip)) {
                     break;
                 }
                 CPU_AL = (uint8_t) portin(oper1b);
@@ -7336,7 +7402,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E5 IN eAX Ib */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1b, 2u, firstip)) {
                     break;
                 }
                 CPU_AX = portin16(oper1b);
@@ -7349,7 +7415,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E6 OUT Ib CPU_AL */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1b, 1u, firstip)) {
                     break;
                 }
                 portout(oper1b, CPU_AL
@@ -7363,7 +7429,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 /* E7 OUT Ib eAX */
                 oper1b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1b, 2u, firstip)) {
                     break;
                 }
                 portout16(oper1b, CPU_AX
@@ -7424,7 +7490,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EC IN CPU_AL regdx */
                 oper1 = CPU_DX;
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1, 1u, firstip)) {
                     break;
                 }
                 CPU_AL = (uint8_t) portin(oper1);
@@ -7436,7 +7502,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* ED IN eAX regdx */
                 oper1 = CPU_DX;
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1, 2u, firstip)) {
                     break;
                 }
                 CPU_AX = portin16(oper1);
@@ -7448,7 +7514,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EE OUT regdx CPU_AL */
                 oper1 = CPU_DX;
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1, 1u, firstip)) {
                     break;
                 }
                 portout(oper1, CPU_AL
@@ -7461,7 +7527,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
 #endif
                 /* EF OUT regdx eAX */
                 oper1 = CPU_DX;
-                if (!r36sx_cpu_require_iopl(firstip)) {
+                if (!r36sx_cpu_require_io_permission(oper1, 2u, firstip)) {
                     break;
                 }
                 portout16(oper1, CPU_AX);

@@ -1,5 +1,32 @@
 # pico-286 Build Log
 
+## 2026-06-02 386 TSS I/O permission bitmap
+
+Added 80386 I/O permission checks for `IN`, `OUT`, `INSB`, `INSW`, `OUTSB`,
+and `OUTSW`.  When protected code runs with `CPL > IOPL`, or when VM86 mode
+is active, the emulator now checks the current 32-bit TSS I/O permission
+bitmap at offset `66h`.  A set bit, missing 32-bit TSS, too-short bitmap, or
+word access past the 16-bit I/O-port space raises `#GP(0)`.
+
+`CLI` and `STI` still use the stricter IOPL-only helper because they are not
+port I/O instructions.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `488664` bytes
+- `pico_286` SHA256:
+  `C9B1D05D1CCB895A2D636CA16947C70A51ED85189F0BC1FBBA85AA6790EA710A`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 initial VM86 task entry
 
 Added the first virtual-8086 task-entry support for the 80386 protected-mode
