@@ -37,6 +37,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 divide-error fault IP
+
+`DIV`, `IDIV`, and `AAM 0` now raise `#DE` with IP restored to the address of
+the faulting instruction.  This matters for CPU conformance tests because the
+saved interrupt frame must point at the instruction that faulted, not at the
+next byte after decoded operands.  The fix covers 8-bit, 16-bit, and 32-bit
+divide helpers.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `483248` bytes
+- SHA256:
+  `8C727096F86F44FDE82250F423CDE552FC638B692EC335B05407D8E56CF5CE1F`
+- Embedded screenshot `HASH8`: `6c74c964`.
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-02 R2 physical Alt for on-screen keyboard
 
 While the on-screen keyboard is visible, holding `R2` now holds PC `Alt`.

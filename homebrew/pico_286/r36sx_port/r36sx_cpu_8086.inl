@@ -71,6 +71,16 @@ static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
     intcall86(6);
 }
 
+static inline void r36sx_cpu_divide_error(uint32_t fault_ip)
+{
+    /*
+     * #DE pushes the address of the faulting instruction. DIV/IDIV and AAM
+     * detect the fault after operands were fetched, so restore IP first.
+     */
+    r36sx_cpu_set_ip(fault_ip);
+    intcall86(0);
+}
+
 static inline void flag_szp8(uint8_t value) {
     zf = value == 0;
     sf = value >> 7;
@@ -482,10 +492,10 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
     return (uint16_t) s & 0xFFFF;
 }
 
-static inline void op_div8(uint16_t valdiv, uint8_t divisor) {
+static inline void op_div8(uint16_t valdiv, uint8_t divisor, uint32_t fault_ip) {
     if (divisor == 0 || valdiv / divisor > 0xFF) {
         printf("[op_div8] %d / %d\n", valdiv, divisor);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
 
@@ -493,10 +503,10 @@ static inline void op_div8(uint16_t valdiv, uint8_t divisor) {
     CPU_AL = (uint8_t) (valdiv / divisor);
 }
 
-static inline void op_idiv8(uint16_t valdiv, int8_t divisor) {
+static inline void op_idiv8(uint16_t valdiv, int8_t divisor, uint32_t fault_ip) {
     if (divisor == 0) {
         printf("[op_idiv8] %d / 0\n", valdiv);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
     int16_t dividend = (int16_t) valdiv;
@@ -504,19 +514,19 @@ static inline void op_idiv8(uint16_t valdiv, int8_t divisor) {
     int16_t remainder = dividend % divisor;
     if (quotient < -128 || quotient > 127) {
         printf("[op_idiv8] %d / %d overflow\n", dividend, divisor);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
     CPU_AL = (uint8_t)quotient;
     CPU_AH = (uint8_t)remainder;
 }
 
-static inline void op_div16(uint32_t valdiv, uint16_t divisor) {
+static inline void op_div16(uint32_t valdiv, uint16_t divisor, uint32_t fault_ip) {
     if (divisor == 0 || valdiv / divisor > 0xFFFF) {
 //        CPU_DX = 0;
 //        CPU_AX = 0xFFFF;
 //        printf("[op_div16] %d / %d\n", valdiv, divisor);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
 
@@ -524,26 +534,26 @@ static inline void op_div16(uint32_t valdiv, uint16_t divisor) {
     CPU_AX = (uint16_t) (valdiv / divisor);
 }
 
-static inline void op_idiv16(uint32_t valdiv, uint16_t divisor) {
+static inline void op_idiv16(uint32_t valdiv, uint16_t divisor, uint32_t fault_ip) {
     int32_t dividend = (int32_t)valdiv;
     int16_t divisor_signed = (int16_t)divisor;
     if (divisor_signed == 0) {
         printf("[op_idiv16] %d / 0\n", dividend);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
     int32_t quotient  = dividend / divisor_signed;
     int32_t remainder = dividend % divisor_signed;
     if (quotient < -32768 || quotient > 32767) {
         printf("[op_idiv16] %d / %d overflow\n", dividend, divisor_signed);
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
     CPU_AX = (uint16_t)quotient;
     CPU_DX = (uint16_t)remainder;
 }
 
-static __not_in_flash() void op_grp3_16() {
+static __not_in_flash() void op_grp3_16(uint32_t fault_ip) {
     switch (reg) {
         case 0:
         case 1: /* TEST */
@@ -598,11 +608,11 @@ static __not_in_flash() void op_grp3_16() {
             break;
         }
         case 6: /* DIV */
-            op_div16(((uint32_t) CPU_DX << 16) + CPU_AX, oper1);
+            op_div16(((uint32_t) CPU_DX << 16) + CPU_AX, oper1, fault_ip);
             break;
 
-        case 7: /* DIV */
-            op_idiv16(((uint32_t) CPU_DX << 16) + CPU_AX, oper1);
+        case 7: /* IDIV */
+            op_idiv16(((uint32_t) CPU_DX << 16) + CPU_AX, oper1, fault_ip);
             break;
     }
 }

@@ -6543,7 +6543,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 oper1 = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
                 if (!oper1) {
-                    intcall86(0);
+                    r36sx_cpu_divide_error(firstip);
                     break;
                 } /* division by zero */
 
@@ -6892,11 +6892,11 @@ void __not_in_flash() exec86(uint32_t execloops) {
                         break;
                     }
                     case 6: /* DIV */
-                        op_div8(CPU_AX, oper1b);
+                        op_div8(CPU_AX, oper1b, firstip);
                         break;
 
                     case 7: /* IDIV */
-                        op_idiv8(CPU_AX, oper1b);
+                        op_idiv8(CPU_AX, oper1b, firstip);
                         break;
                 }
 
@@ -6914,7 +6914,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 modregrm();
 
                 oper1 = readrm16(rm);
-                op_grp3_16();
+                op_grp3_16(firstip);
                 if ((reg > 1) && (reg < 4)) {
                     writerm16(rm, res16
                     );

@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-02 divide-error fault IP
+
+Fixed the x86 `#DE` path for `DIV`, `IDIV`, and `AAM 0`.  These faults are
+detected after the decoder has already fetched operands, so the CPU core now
+restores IP to the start of the faulting instruction before calling interrupt
+0.  The fix covers 8-bit, 16-bit, and 32-bit divide helpers.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `483248` bytes
+- `pico_286` SHA256:
+  `8C727096F86F44FDE82250F423CDE552FC638B692EC335B05407D8E56CF5CE1F`
+- Embedded screenshot `HASH8`: `6c74c964`.
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 13:48:47`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 R2 physical Alt for on-screen keyboard
 
 Added a third held physical modifier while the on-screen keyboard is visible:

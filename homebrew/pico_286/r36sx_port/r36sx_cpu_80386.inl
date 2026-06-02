@@ -198,9 +198,9 @@ static __not_in_flash() uint32_t op_grp2_32(uint8_t cnt, uint32_t value) {
     return s;
 }
 
-static inline void op_div32(uint64_t valdiv, uint32_t divisor) {
+static inline void op_div32(uint64_t valdiv, uint32_t divisor, uint32_t fault_ip) {
     if (divisor == 0 || valdiv / divisor > 0xFFFFFFFFull) {
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
 
@@ -208,17 +208,17 @@ static inline void op_div32(uint64_t valdiv, uint32_t divisor) {
     CPU_EAX = (uint32_t)(valdiv / divisor);
 }
 
-static inline void op_idiv32(int64_t dividend, uint32_t divisor) {
+static inline void op_idiv32(int64_t dividend, uint32_t divisor, uint32_t fault_ip) {
     int32_t divisor_signed = (int32_t)divisor;
     if (divisor_signed == 0) {
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
 
     int64_t quotient = dividend / divisor_signed;
     int64_t remainder = dividend % divisor_signed;
     if (quotient < INT32_MIN || quotient > INT32_MAX) {
-        intcall86(0);
+        r36sx_cpu_divide_error(fault_ip);
         return;
     }
 
@@ -226,7 +226,7 @@ static inline void op_idiv32(int64_t dividend, uint32_t divisor) {
     CPU_EDX = (uint32_t)(int32_t)remainder;
 }
 
-static __not_in_flash() void op_grp3_32(uint8_t rmval) {
+static __not_in_flash() void op_grp3_32(uint8_t rmval, uint32_t fault_ip) {
     uint32_t value = readrm32(rmval);
     switch (reg) {
         case 0:
@@ -281,12 +281,12 @@ static __not_in_flash() void op_grp3_32(uint8_t rmval) {
         }
 
         case 6: /* DIV */
-            op_div32(((uint64_t)CPU_EDX << 32) | CPU_EAX, value);
+            op_div32(((uint64_t)CPU_EDX << 32) | CPU_EAX, value, fault_ip);
             break;
 
         case 7: { /* IDIV */
             int64_t dividend = ((int64_t)(int32_t)CPU_EDX << 32) | CPU_EAX;
-            op_idiv32(dividend, value);
+            op_idiv32(dividend, value, fault_ip);
             break;
         }
     }
@@ -744,7 +744,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* TEST/NOT/NEG/MUL/IMUL/DIV/IDIV r/m32 */
         case 0xF7:
             modregrm();
-            op_grp3_32(rm);
+            op_grp3_32(rm, fault_ip);
             return true;
 
         /* INC/DEC/CALL/JMP/PUSH r/m32 */
