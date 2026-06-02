@@ -7,7 +7,6 @@
 #define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
 #define CPU_LIMIT_SHIFT_COUNT
 #define CPU_NO_SALC
-//#define CPU_SET_HIGH_FLAGS
 #define CPU_286_STYLE_PUSH_SP
 #define R36SX_REP_BATCH_MAX 1024u
 #ifndef R36SX_CPU_COMPUTED_GOTO
@@ -118,6 +117,11 @@ uint32_t dwordregs[8];
 #define R36SX_EXCEPTION_GP 13u
 #define R36SX_EXCEPTION_PF 14u
 #define R36SX_EXCEPTION_X87_ERROR 16u
+#define R36SX_FLAGS_ALWAYS_ONE 0x0002u
+#define R36SX_FLAGS_STATUS_MASK 0x0fd5u
+#define R36SX_FLAGS_286_CONTROL_MASK 0x7000u
+#define R36SX_FLAGS_8086_FIXED_MASK 0xf000u
+#define R36SX_EFLAGS_386_MASK 0x00037fd5u
 
 typedef struct {
     uint16_t selector;
@@ -2188,11 +2192,7 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
         if (wide) {
             decodeflagsdword(target_flags);
         } else {
-#ifdef CPU_SET_HIGH_FLAGS
-            decodeflagsword((uint16_t)target_flags | 0xF000u);
-#else
-            decodeflagsword((uint16_t)target_flags & 0x0FFFu);
-#endif
+            decodeflagsword((uint16_t)target_flags);
         }
         return 1;
     }
@@ -2213,11 +2213,7 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
     if (wide) {
         decodeflagsdword(target_flags);
     } else {
-#ifdef CPU_SET_HIGH_FLAGS
-        decodeflagsword((uint16_t)target_flags | 0xF000u);
-#else
-        decodeflagsword((uint16_t)target_flags & 0x0FFFu);
-#endif
+        decodeflagsword((uint16_t)target_flags);
     }
     return 1;
 }
@@ -2291,25 +2287,60 @@ static INLINE void writerm8(uint8_t rmval, uint8_t value) {
     }
 }
 
+static INLINE uint16_t r36sx_cpu_flags_word_variable_mask(void) {
+    uint16_t mask = R36SX_FLAGS_STATUS_MASK;
+
+    /*
+     * 8086/80186 expose bits 12..15 as fixed ones.  80286 real mode exposes
+     * them as fixed zeros; protected mode and 80386 keep IOPL/NT in FLAGS.
+     */
+    if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+        return mask;
+    }
+    if (r36sx_cpu_protected_enabled() ||
+        r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        mask |= R36SX_FLAGS_286_CONTROL_MASK;
+    }
+    return mask;
+}
+
+static INLINE uint16_t r36sx_cpu_flags_word_fixed_bits(void) {
+    uint16_t fixed = R36SX_FLAGS_ALWAYS_ONE;
+    if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+        fixed |= R36SX_FLAGS_8086_FIXED_MASK;
+    }
+    return fixed;
+}
+
 static INLINE uint16_t makeflagsword(void) {
-#if CPU_386_EXTENDED_OPS
-    return (uint16_t)(2u | x86_flags.value);
-#else
-    return 2 | (x86_flags.value & 0b111111010101);
-#endif
+    return r36sx_cpu_flags_word_fixed_bits() |
+           (uint16_t)(x86_flags.value & r36sx_cpu_flags_word_variable_mask());
 }
 
 static INLINE void decodeflagsword(uint16_t x) {
-    x86_flags.value = x;
+    uint32_t preserved = 0;
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        /* 16-bit POPF/IRET updates FLAGS, not the high EFLAGS-only bits. */
+        preserved = x86_flags.value & (R36SX_EFLAGS_386_MASK & 0xffff0000u);
+    }
+    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | preserved |
+                      (x & r36sx_cpu_flags_word_variable_mask());
 }
 
 static INLINE uint32_t makeflagsdword(void) {
-    /* 80386 EFLAGS: expose 386-era status/control bits, but not 486+ AC or CPUID ID. */
-    return 2u | (x86_flags.value & 0x00037FD7u);
+    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        return makeflagsword();
+    }
+    /* 80386 EFLAGS: expose 386-era bits, but not 486+ AC or CPUID ID. */
+    return R36SX_FLAGS_ALWAYS_ONE | (x86_flags.value & R36SX_EFLAGS_386_MASK);
 }
 
 static INLINE void decodeflagsdword(uint32_t x) {
-    x86_flags.value = 2u | (x & 0x00037FD7u);
+    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        decodeflagsword((uint16_t)x);
+        return;
+    }
+    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | (x & R36SX_EFLAGS_386_MASK);
 }
 
 #define R36SX_BIOS_TEXT_BASE 0x8000u
@@ -5708,11 +5739,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                     decodeflagsdword(pop32());
                     break;
                 }
-#ifdef CPU_SET_HIGH_FLAGS
-                decodeflagsword(pop() | 0xF800);
-#else
-                decodeflagsword(pop() & 0x0FFF);
-#endif
+                decodeflagsword(pop());
                 break;
 
             case 0x9E:
@@ -6489,11 +6516,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
-#ifdef CPU_SET_HIGH_FLAGS
-                decodeflagsword(pop() | 0xF000);
-#else
-                decodeflagsword(pop() & 0x0FFF);
-#endif
+                decodeflagsword(pop());
 
 
                 /*

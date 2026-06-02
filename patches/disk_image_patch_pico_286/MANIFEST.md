@@ -37,6 +37,23 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 FWAIT and CPU-specific FLAGS masks
+
+`WAIT/FWAIT` is now wired into the CPU/FPU path instead of being a no-op.  It
+checks `CR0.MP && CR0.TS` for `#NM`, synchronizes the emulated x87 status word,
+and raises the x87 error exception for pending unmasked x87 faults.  `PUSHF`,
+`POPF`, and `IRET` now use explicit 8086/80286/80386 masks so 80286 real mode
+does not inherit 386-only flags.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `484632` bytes
+- SHA256:
+  `B704FF27A5D29755E62315AABF74E55F1937EF8B80838D0602A6A773D85DB22E`
+- Embedded screenshot `HASH8`: `83c6c3d8`.
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-02 divide-error fault IP
 
 `DIV`, `IDIV`, and `AAM 0` now raise `#DE` with IP restored to the address of

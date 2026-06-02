@@ -1,5 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-02 FWAIT and CPU-specific FLAGS masks
+
+Implemented the `WAIT/FWAIT` opcode path and tightened `FLAGS`/`EFLAGS`
+masking by configured CPU model.  `FWAIT` now checks `CR0.MP && CR0.TS` for
+`#NM`, synchronizes the emulated x87 status word, and raises the x87 error
+exception when an unmasked pending x87 fault is latched.  `PUSHF`, `POPF`, and
+`IRET` now use explicit 8086/80286/80386 masks so 80286 real mode cannot
+inherit stray 386-only bits.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `484632` bytes
+- `pico_286` SHA256:
+  `B704FF27A5D29755E62315AABF74E55F1937EF8B80838D0602A6A773D85DB22E`
+- Embedded screenshot `HASH8`: `83c6c3d8`.
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 14:25:50`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 divide-error fault IP
 
 Fixed the x86 `#DE` path for `DIV`, `IDIV`, and `AAM 0`.  These faults are
