@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-02 initial VM86 task entry
+
+Added the first virtual-8086 task-entry support for the 80386 protected-mode
+path.  A 32-bit TSS whose saved `EFLAGS` has `VM=1` now loads `CS`, `SS`,
+`DS`, `ES`, `FS`, and `GS` as real-mode segment values instead of validating
+them as protected descriptors.  In VM86 mode, segment linear addresses use
+`selector << 4`, segment reloads cache real-mode bases, and the effective CPL
+reported to paging and privilege helpers is 3.
+
+This is intentionally not a complete VM86 monitor yet.  I/O bitmap checks,
+interrupt reflection, and full DOS-extender services still need their own
+follow-up items.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `535908` bytes
+- `pico_286` SHA256:
+  `2314D0DA5972D8DAC6C02F5CE8D62311DD2B9380989701057FF405B2DCEF323B`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 hardware task switching
 
 Implemented the first hardware task-switching layer for 286/386 protected

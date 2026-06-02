@@ -147,7 +147,14 @@ static inline uint8_t r36sx_selector_rpl(uint16_t selector)
 
 static inline uint8_t r36sx_cpu_cpl(void)
 {
-    return r36sx_cpu_protected_enabled() ? (uint8_t)(CPU_CS & 3u) : 0u;
+    if (!r36sx_cpu_protected_enabled()) {
+        return 0u;
+    }
+    /*
+     * Virtual-8086 tasks run with protected mode enabled, but the processor
+     * treats their current privilege level as 3 regardless of the low CS bits.
+     */
+    return r36sx_cpu_v86_enabled() ? 3u : (uint8_t)(CPU_CS & 3u);
 }
 
 static inline uint8_t r36sx_priv_max(uint8_t a, uint8_t b)
@@ -556,6 +563,12 @@ static uint8_t r36sx_cpu_segment_valid_for_load(
 static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
 {
     if (!r36sx_cpu_protected_enabled()) {
+        putsegreg(segid, selector);
+        r36sx_cpu_real_cache_segment(segid);
+        return 1;
+    }
+
+    if (r36sx_cpu_v86_enabled()) {
         putsegreg(segid, selector);
         r36sx_cpu_real_cache_segment(segid);
         return 1;

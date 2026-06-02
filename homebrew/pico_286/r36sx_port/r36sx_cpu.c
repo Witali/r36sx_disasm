@@ -162,6 +162,9 @@ uint32_t dwordregs[8];
 #define R36SX_FLAGS_NT_MASK 0x4000u
 #define R36SX_FLAGS_286_CONTROL_MASK 0x7000u
 #define R36SX_FLAGS_8086_FIXED_MASK 0xf000u
+/* 80386-only EFLAGS bits kept by POPFD/IRETD and 32-bit task switches. */
+#define R36SX_EFLAGS_RF_MASK 0x00010000u
+#define R36SX_EFLAGS_VM_MASK 0x00020000u
 #define R36SX_EFLAGS_386_MASK 0x00037fd5u
 
 typedef struct {
@@ -185,6 +188,17 @@ static uint16_t r36sx_ldtr_selector;
 static uint16_t r36sx_tr_selector;
 static r36sx_segment_cache_t r36sx_ldtr_cache;
 static r36sx_segment_cache_t r36sx_tr_cache;
+
+static inline uint8_t r36sx_cpu_v86_enabled(void)
+{
+#if R36SX_ENABLE_PROTECTED_MODE
+    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+           (r36sx_cr0 & R36SX_CR0_PE) != 0 &&
+           (x86_flags.value & R36SX_EFLAGS_VM_MASK) != 0;
+#else
+    return 0;
+#endif
+}
 
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
@@ -354,7 +368,7 @@ static uint8_t r36sx_cpu_segment_linear_checked(
     uint8_t execute_access,
     uint32_t *linear)
 {
-    if (!r36sx_cpu_protected_enabled()) {
+    if (!r36sx_cpu_protected_enabled() || r36sx_cpu_v86_enabled()) {
         *linear = ((uint32_t)selector << 4) + offset;
         return 1;
     }
@@ -2247,6 +2261,36 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
 
     if (!r36sx_cpu_load_ldtr(new_ldtr, CPU_IP)) {
         return 0;
+    }
+
+    if (is_32 &&
+        r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+        (new_flags & R36SX_EFLAGS_VM_MASK)) {
+        /*
+         * VM86 task state is loaded by a protected-mode task switch, but the
+         * visible segment registers are real-mode segment values.  Descriptor
+         * validation has already happened for the TSS and LDTR above; CS/SS
+         * and data segments must therefore be cached as selector << 4 bases.
+         */
+        r36sx_tr_selector = selector & 0xfffcu;
+        r36sx_tr_cache = *cache;
+        r36sx_cpu_load_task_flags(new_flags, is_32);
+        putsegreg(regcs, new_cs);
+        r36sx_cpu_real_cache_segment(regcs);
+        putsegreg(regss, new_ss);
+        r36sx_cpu_real_cache_segment(regss);
+        putsegreg(reges, new_es);
+        r36sx_cpu_real_cache_segment(reges);
+        putsegreg(regds, new_ds);
+        r36sx_cpu_real_cache_segment(regds);
+        putsegreg(regfs, new_fs);
+        r36sx_cpu_real_cache_segment(regfs);
+        putsegreg(reggs, new_gs);
+        r36sx_cpu_real_cache_segment(reggs);
+        r36sx_cpu_set_ip(new_ip);
+        r36sx_cpu_set_stack_pointer(new_sp);
+        r36sx_cr0 |= R36SX_CR0_TS;
+        return 1;
     }
 
     uint8_t new_cpl = r36sx_selector_rpl(new_cs);

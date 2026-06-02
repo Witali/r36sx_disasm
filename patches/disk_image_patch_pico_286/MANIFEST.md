@@ -624,7 +624,7 @@ pico_286.dsp SHA256: 5BEA04BE036B91D9C30F16C3B8D255EFF2E6924984A682A40D81B0B6B1C
 ## 2026-05-31 BIOS VGA mode reset and GCC primary build
 
 The current `pico_286` binary is built with the WSL/Linux
-`mips-mti-linux-gnu-gcc` toolchain using `-march=mips32r2 -mtune=74kc -O3`
+`mips-mti-linux-gnu-gcc` toolchain using `-march=74kf -mtune=74kf -O3`
 and `mips-mti-linux-gnu-strip`.
 
 The BIOS `INT 10h AH=00h` set-video-mode handler now reloads standard VGA

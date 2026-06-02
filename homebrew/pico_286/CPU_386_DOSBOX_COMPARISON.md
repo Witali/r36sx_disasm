@@ -16,13 +16,15 @@ multiple decoder cores, so this is not a wholesale CPU core import.
 | `MOV CR3`/`MOV Rd,CR3` | Preserved low 12 bits. | DOSBox exposes CR3 as a page-directory base. | CR3 writes and reads now keep only the page-directory-aligned upper bits. |
 | Far protected transfers | Far `CALL`/`JMP`/`RET`/`IRET` mostly loaded a new `CS:IP`. | DOSBox validates protected descriptors, gates, and privilege transitions. | Immediate and indirect far forms now validate code descriptors, support 16/32-bit call gates, and use TSS stack slots for call-gate privilege switches. |
 | Hardware task switching | TSS descriptors and task gates were rejected. | DOSBox supports task switches through TSS descriptors, task gates, nested-task returns, and descriptor busy-bit updates. | Far `CALL`/`JMP` and IDT task gates now switch to 16-bit or 32-bit TSS images; `IRET` with `NT` follows the backlink; `LTR`, task `CALL`/`JMP`/`IRET`, backlink, busy-bit, `CR3`, `LDTR`, segment selectors, and `CR0.TS` are updated. |
+| Initial VM86 task entry | A task switch into a 32-bit TSS with `EFLAGS.VM=1` still tried to load `CS`/`SS` as protected descriptors. | DOSBox treats VM86 tasks as CPL 3 real-mode-style segment contexts while keeping protected paging/privilege machinery around them. | 32-bit TSS task loads with `VM=1` now cache visible segments as `selector << 4`, report CPL 3, and use real-mode segment linear addresses. |
 
 ## Deferred
 
 - Full DOSBox protected-mode privilege model for every CPU path and exception.
 - Paging and page faults.
 - More task-switch conformance work around invalid TSS/error-code edge cases.
-- v86 mode.
+- Full v86 monitor behavior: I/O bitmap checks, interrupt reflection, and
+  return-to-protected-mode edge cases.
 - A full replacement decoder based on DOSBox `core_normal` or `core_full`.
 
 Those are larger architectural changes and should be ported only behind focused
