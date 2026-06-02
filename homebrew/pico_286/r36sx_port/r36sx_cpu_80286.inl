@@ -237,7 +237,7 @@ static inline void r36sx_cpu_add_ip(int32_t delta)
     r36sx_cpu_set_ip(ip32 + (uint32_t)delta);
 }
 
-#if DEBUG
+#if R36SX_DEBUG_PM_DIAG
 static uint8_t r36sx_pm_diag_first_fault_logged;
 static uint32_t r36sx_pm_diag_int31_logs;
 static uint32_t r36sx_pm_diag_int67_logs;
@@ -362,7 +362,7 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
 
     uint32_t descriptor_offset = selector & R36SX_SELECTOR_INDEX_MASK;
     if (descriptor_offset + 7u > table_limit) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode %s limit fault selector=%04x table=%08lx:%08lx",
             table_name, selector, (unsigned long)table_base,
@@ -403,7 +403,7 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
 
     if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
         if (!r36sx_ldtr_cache.valid) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
             r36sx_pico286_debug_log(
                 "[CPU] protected mode LDT selector without loaded LDTR selector=%04x",
                 selector);
@@ -531,7 +531,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
 
     if ((selector & 0xfffcu) == 0) {
         if (segid == regcs || segid == regss) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
             r36sx_pico286_debug_log(
                 "[CPU] protected mode null selector rejected seg=%u selector=%04x",
                 segid, selector);
@@ -550,7 +550,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
         uint8_t exc = segid == regss ? R36SX_EXCEPTION_STACK :
                       cache.access ? R36SX_EXCEPTION_NOT_PRESENT :
                       R36SX_EXCEPTION_GP;
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode failed to load present segment seg=%u selector=%04x access=%02x flags=%02x exc=%u",
             segid, selector, cache.access, cache.flags, exc);
@@ -564,7 +564,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
 
     if (!r36sx_cpu_segment_valid_for_load(segid, &cache) ||
         !r36sx_cpu_segment_privilege_ok(segid, selector, &cache)) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode failed to load segment seg=%u selector=%04x access=%02x flags=%02x cpl=%u dpl=%u rpl=%u",
             segid, selector, cache.access, cache.flags,
@@ -591,7 +591,7 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
     }
 
     if (selector & R36SX_SELECTOR_TABLE_INDICATOR) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode LLDT selector must be in GDT selector=%04x",
             selector);
@@ -605,7 +605,7 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
         r36sx_descriptor_is_code_data(&cache) ||
         r36sx_descriptor_type(&cache) != R36SX_DESCRIPTOR_TYPE_LDT) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode LLDT rejected selector=%04x access=%02x flags=%02x",
             selector, cache.access, cache.flags);
@@ -622,7 +622,7 @@ static uint8_t r36sx_cpu_load_tr(uint16_t selector)
 {
     if ((selector & 0xfffcu) == 0 ||
         (selector & R36SX_SELECTOR_TABLE_INDICATOR)) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode LTR rejected selector=%04x", selector);
 #endif
@@ -634,7 +634,7 @@ static uint8_t r36sx_cpu_load_tr(uint16_t selector)
     if (!r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
         !r36sx_descriptor_is_tss(&cache)) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode LTR rejected selector=%04x access=%02x flags=%02x",
             selector, cache.access, cache.flags);
@@ -676,7 +676,7 @@ static void r36sx_cpu_set_cr0(uint32_t value)
     (void)old_cr0;
 
     if (old_pe != new_pe) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log("[CPU] protected mode %s CR0=%08lx",
                                 new_pe ? "entered" : "left",
                                 (unsigned long)r36sx_cr0);

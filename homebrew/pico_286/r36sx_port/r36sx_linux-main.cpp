@@ -12,6 +12,7 @@
 #include "emu8950.h"
 #include "linux-audio.h"
 #include "r36sx_app_stats.h"
+#include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
 #include "r36sx_profile.h"
@@ -251,7 +252,7 @@ extern "C" int r36sx_pico286_video_active_height(void) {
 
 extern "C" void _putchar(char character) {
     putchar(character);
-#if DEBUG
+#if R36SX_DEBUG_STDOUT_CAPTURE
     static char log_line[160];
     static int log_pos = 0;
     if (character == '\n' || character == '\r') {

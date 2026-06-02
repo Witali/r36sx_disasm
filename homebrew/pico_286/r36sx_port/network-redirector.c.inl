@@ -1,10 +1,10 @@
 // For linux build use https://github.com/MathieuTurcotte/findfirst
 // Forward declaration for the network redirector handler
 #pragma once
-// #define DEBUG_2F
 #include <ctype.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include "r36sx_debug_config.h"
 #if defined(R36SX_PICO286_HOST_DRIVE_CONFIG)
 #include "r36sx_disk_config.h"
 #endif
@@ -16,13 +16,13 @@
 #define HOST_BASE_DIR "/tmp/"
 #include "findfirst.h"
 #endif
-#if defined(DEBUG_2F)
+#if R36SX_DEBUG_REDIRECTOR_TRACE
 #define debug_log(...) printf(__VA_ARGS__)
 #else
-#define debug_log(...)
+#define debug_log(...) ((void)0)
 #endif
 
-#if defined(R36SX_PICO286_HOST_DRIVE_CONFIG)
+#if defined(R36SX_PICO286_HOST_DRIVE_CONFIG) && R36SX_DEBUG_REDIRECTOR_ERRORS
 #define redirector_error_log(...) r36sx_pico286_debug_log(__VA_ARGS__)
 #else
 #define redirector_error_log(...) ((void)0)

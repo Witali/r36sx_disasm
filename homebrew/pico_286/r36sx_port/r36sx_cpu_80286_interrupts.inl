@@ -10,7 +10,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
 {
     uint32_t gate_offset = (uint32_t)intnum * 8u;
     if (gate_offset + 7u > r36sx_idtr_limit) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected interrupt IDT limit fault int=%02x idtr=%08lx:%04x",
             intnum, (unsigned long)r36sx_idtr_base, r36sx_idtr_limit);
@@ -28,7 +28,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     if ((access & R36SX_DESCRIPTOR_PRESENT) == 0 ||
         !(type == 0x06u || type == 0x07u ||
           type == 0x0eu || type == 0x0fu)) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected interrupt unsupported gate int=%02x access=%02x",
             intnum, access);
@@ -46,7 +46,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     memset(&target_cs, 0, sizeof(target_cs));
     if (!r36sx_cpu_decode_descriptor(selector, &target_cs) ||
         !r36sx_descriptor_is_code(&target_cs)) {
-#if DEBUG && !PICO_ON_DEVICE
+#if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected interrupt invalid target CS int=%02x selector=%04x access=%02x",
             intnum, selector, target_cs.access);

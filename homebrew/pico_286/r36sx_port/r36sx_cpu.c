@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "emulator.h"
+#include "r36sx_debug_config.h"
 
 #define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
 #define CPU_LIMIT_SHIFT_COUNT
@@ -11,9 +12,6 @@
 #define R36SX_REP_BATCH_MAX 1024u
 #ifndef R36SX_CPU_COMPUTED_GOTO
 #define R36SX_CPU_COMPUTED_GOTO 0
-#endif
-#ifndef R36SX_ENABLE_PROTECTED_MODE
-#define R36SX_ENABLE_PROTECTED_MODE 1
 #endif
 #if R36SX_CPU_COMPUTED_GOTO && !defined(__GNUC__) && !defined(__clang__)
 #error R36SX_CPU_COMPUTED_GOTO requires GNU labels-as-values support.
@@ -58,7 +56,7 @@ bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
 
-#if DEBUG
+#if R36SX_DEBUG_PM_DIAG
 #define R36SX_PM_DIAG_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
 #else
 #define R36SX_PM_DIAG_LOG(...) ((void)0)
@@ -3353,7 +3351,7 @@ void reset86() {
     r36sx_idtr_limit = 0x03ffu;
     r36sx_ldtr_selector = 0;
     r36sx_tr_selector = 0;
-#if DEBUG
+#if R36SX_DEBUG_PM_DIAG
     r36sx_pm_diag_first_fault_logged = 0;
     r36sx_pm_diag_int31_logs = 0;
     r36sx_pm_diag_int67_logs = 0;

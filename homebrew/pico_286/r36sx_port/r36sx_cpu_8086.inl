@@ -4,7 +4,7 @@
  * compiler can still inline hot interpreter paths.
  */
 
-#if DEBUG
+#if R36SX_DEBUG_INVALID_OPCODE_DUMP
 #define R36SX_INVALID_OPCODE_DUMP_BYTES 256u
 #define R36SX_INVALID_OPCODE_DUMP_HALF (R36SX_INVALID_OPCODE_DUMP_BYTES / 2u)
 
@@ -49,7 +49,7 @@ static inline void r36sx_cpu_log_invalid_opcode_dump(uint32_t fault_ip)
 static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
 {
     r36sx_pm_diag_log_first_fault("invalid opcode", fault_ip);
-#if DEBUG
+#if R36SX_DEBUG_INVALID_OPCODE_DUMP
     r36sx_pico286_debug_log(
         "[CPU] INT6 invalid opcode at %04X:%08lX bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
         CPU_CS, (unsigned long)fault_ip,

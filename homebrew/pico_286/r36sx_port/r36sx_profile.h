@@ -2,10 +2,7 @@
 #define R36SX_PROFILE_H
 
 #include <stdint.h>
-
-#ifndef R36SX_ENABLE_PROFILING
-#define R36SX_ENABLE_PROFILING 1
-#endif
+#include "r36sx_debug_config.h"
 
 #ifdef __cplusplus
 extern "C" {

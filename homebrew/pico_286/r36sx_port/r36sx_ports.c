@@ -1,6 +1,7 @@
 #pragma GCC optimize("Ofast")
 #include <time.h>
 #include "emulator.h"
+#include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #if PICO_ON_DEVICE
 #include <74hc595.h>
@@ -43,6 +44,18 @@ static int audio_covox_enabled = 1;
 
 extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
 
+#if R36SX_DEBUG_TEST_BIOS_TRACE
+#define R36SX_TEST_BIOS_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_TEST_BIOS_LOG(...) ((void)0)
+#endif
+
+#if R36SX_DEBUG_KEYBOARD_TRACE
+#define R36SX_KBD_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_KBD_LOG(...) ((void)0)
+#endif
+
 static uint8_t keyboard_queue[R36SX_KEYBOARD_QUEUE_CAPACITY];
 static uint8_t keyboard_queue_head;
 static uint8_t keyboard_queue_count;
@@ -59,7 +72,7 @@ static void r36sx_test386_ascii_out(uint8_t value) {
     if (value == '\n') {
         if (line_pos > 0) {
             line[line_pos] = 0;
-            r36sx_pico286_debug_log("test386: %s", line);
+            R36SX_TEST_BIOS_LOG("test386: %s", line);
             line_pos = 0;
         }
         return;
@@ -71,7 +84,7 @@ static void r36sx_test386_ascii_out(uint8_t value) {
 
 static void r36sx_test386_post_out(uint8_t value) {
     r36sx_pico286_post_code_out(R36SX_TEST386_POST_PORT, value);
-    r36sx_pico286_debug_log("test386: POST=0x%02x", value);
+    R36SX_TEST_BIOS_LOG("test386: POST=0x%02x", value);
 }
 
 static void r36sx_audio_ensure_flags(void)
@@ -130,8 +143,8 @@ void r36sx_keyboard_tick(void) {
     keyboard_output_full = 1;
     keyboard_next_ready_us = 0;
     r36sx_keyboard_refresh_status();
-    r36sx_pico286_debug_log("kbd: ready scancode=0x%02x count=%u",
-                            port60, (unsigned int)keyboard_queue_count);
+    R36SX_KBD_LOG("kbd: ready scancode=0x%02x count=%u",
+                  port60, (unsigned int)keyboard_queue_count);
     doirq(1);
 }
 
@@ -139,8 +152,7 @@ void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
     uint8_t was_idle = keyboard_queue_count == 0 && !keyboard_output_full;
 
     if (keyboard_queue_count >= R36SX_KEYBOARD_QUEUE_CAPACITY) {
-        r36sx_pico286_debug_log("kbd: queue full, drop scancode=0x%02x",
-                                scancode);
+        R36SX_KBD_LOG("kbd: queue full, drop scancode=0x%02x", scancode);
         return;
     }
 
@@ -148,8 +160,8 @@ void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
                    R36SX_KEYBOARD_QUEUE_CAPACITY] = scancode;
     keyboard_queue_count++;
     r36sx_keyboard_refresh_status();
-    r36sx_pico286_debug_log("kbd: enqueue scancode=0x%02x count=%u",
-                            scancode, (unsigned int)keyboard_queue_count);
+    R36SX_KBD_LOG("kbd: enqueue scancode=0x%02x count=%u",
+                  scancode, (unsigned int)keyboard_queue_count);
 
     if (was_idle) {
         keyboard_next_ready_us =
@@ -180,8 +192,8 @@ static INLINE uint8_t r36sx_keyboard_read_data(void) {
         keyboard_next_ready_us = keyboard_queue_count > 0 ?
             r36sx_keyboard_now_us() + R36SX_KEYBOARD_BYTE_DELAY_US : 0;
         r36sx_keyboard_refresh_status();
-        r36sx_pico286_debug_log("kbd: read scancode=0x%02x remaining=%u",
-                                data, (unsigned int)keyboard_queue_count);
+        R36SX_KBD_LOG("kbd: read scancode=0x%02x remaining=%u",
+                      data, (unsigned int)keyboard_queue_count);
     }
 
     return data;
