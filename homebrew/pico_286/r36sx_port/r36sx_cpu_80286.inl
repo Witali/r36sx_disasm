@@ -582,7 +582,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
     return 1;
 }
 
-static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
+static uint8_t r36sx_cpu_load_ldtr(uint16_t selector, uint32_t fault_ip)
 {
     if ((selector & 0xfffcu) == 0) {
         r36sx_ldtr_selector = selector;
@@ -596,13 +596,15 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
             "[CPU] protected mode LLDT selector must be in GDT selector=%04x",
             selector);
 #endif
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, fault_ip);
         return 0;
     }
 
     r36sx_segment_cache_t cache;
     memset(&cache, 0, sizeof(cache));
     if (!r36sx_cpu_decode_descriptor_from_table(
-            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 0) ||
         r36sx_descriptor_is_code_data(&cache) ||
         r36sx_descriptor_type(&cache) != R36SX_DESCRIPTOR_TYPE_LDT) {
 #if R36SX_DEBUG_PM_VERBOSE
@@ -610,6 +612,13 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
             "[CPU] protected mode LLDT rejected selector=%04x access=%02x flags=%02x",
             selector, cache.access, cache.flags);
 #endif
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, fault_ip);
+        return 0;
+    }
+    if (!cache.valid) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_NOT_PRESENT,
+                                  selector & 0xfffcu, 1, fault_ip);
         return 0;
     }
 
@@ -618,7 +627,7 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector)
     return 1;
 }
 
-static uint8_t r36sx_cpu_load_tr(uint16_t selector)
+static uint8_t r36sx_cpu_load_tr(uint16_t selector, uint32_t fault_ip)
 {
     if ((selector & 0xfffcu) == 0 ||
         (selector & R36SX_SELECTOR_TABLE_INDICATOR)) {
@@ -626,19 +635,28 @@ static uint8_t r36sx_cpu_load_tr(uint16_t selector)
         r36sx_pico286_debug_log(
             "[CPU] protected mode LTR rejected selector=%04x", selector);
 #endif
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, fault_ip);
         return 0;
     }
 
     r36sx_segment_cache_t cache;
     memset(&cache, 0, sizeof(cache));
     if (!r36sx_cpu_decode_descriptor_from_table(
-            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 1) ||
+            selector, r36sx_gdtr_base, r36sx_gdtr_limit, &cache, "GDT", 0) ||
         !r36sx_descriptor_is_tss(&cache)) {
 #if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected mode LTR rejected selector=%04x access=%02x flags=%02x",
             selector, cache.access, cache.flags);
 #endif
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, fault_ip);
+        return 0;
+    }
+    if (!cache.valid) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_NOT_PRESENT,
+                                  selector & 0xfffcu, 1, fault_ip);
         return 0;
     }
 

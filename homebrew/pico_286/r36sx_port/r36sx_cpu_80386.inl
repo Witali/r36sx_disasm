@@ -924,24 +924,28 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     writerm16(rm, r36sx_tr_selector);
                     return;
                 case 2: { /* LLDT Ew */
+                    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+                        return;
+                    }
                     uint16_t selector = readrm16(rm);
                     R36SX_PM_DIAG_LOG(
                         "[PM] LLDT selector=%04X cs:eip=%04X:%08lX",
                         selector, CPU_CS, (unsigned long)CPU_IP);
-                    if (!r36sx_cpu_load_ldtr(selector)) {
+                    if (!r36sx_cpu_load_ldtr(selector, fault_ip)) {
                         r36sx_pm_diag_log_first_fault("LLDT failed", fault_ip);
-                        r36sx_cpu_invalid_opcode(fault_ip);
                     }
                     return;
                 }
                 case 3: { /* LTR Ew */
+                    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+                        return;
+                    }
                     uint16_t selector = readrm16(rm);
                     R36SX_PM_DIAG_LOG(
                         "[PM] LTR selector=%04X cs:eip=%04X:%08lX",
                         selector, CPU_CS, (unsigned long)CPU_IP);
-                    if (!r36sx_cpu_load_tr(selector)) {
+                    if (!r36sx_cpu_load_tr(selector, fault_ip)) {
                         r36sx_pm_diag_log_first_fault("LTR failed", fault_ip);
-                        r36sx_cpu_invalid_opcode(fault_ip);
                     }
                     return;
                 }
@@ -994,6 +998,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                         r36sx_cpu_invalid_opcode(fault_ip);
                         return;
                     }
+                    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+                        return;
+                    }
                     getea(rm);
                     r36sx_cpu_load_descriptor_table(
                         ea, &r36sx_gdtr_limit, &r36sx_gdtr_base,
@@ -1008,6 +1015,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                 case 3: /* LIDT Ms */
                     if (mode == 3) {
                         r36sx_cpu_invalid_opcode(fault_ip);
+                        return;
+                    }
+                    if (!r36sx_cpu_require_cpl0(fault_ip)) {
                         return;
                     }
                     getea(rm);
@@ -1025,6 +1035,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                     writerm16(rm, (uint16_t)r36sx_cr0);
                     return;
                 case 6: /* LMSW Ew */
+                    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+                        return;
+                    }
                     r36sx_cpu_lmsw(readrm16(rm));
                     return;
             }
@@ -1069,6 +1082,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
         }
 
         case 0x06: /* CLTS */
+            if (!r36sx_cpu_require_cpl0(fault_ip)) {
+                return;
+            }
             r36sx_cr0 &= ~R36SX_CR0_TS;
             return;
 
