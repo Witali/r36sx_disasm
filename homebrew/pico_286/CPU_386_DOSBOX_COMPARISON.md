@@ -18,14 +18,15 @@ multiple decoder cores, so this is not a wholesale CPU core import.
 | Hardware task switching | TSS descriptors and task gates were rejected. | DOSBox supports task switches through TSS descriptors, task gates, nested-task returns, and descriptor busy-bit updates. | Far `CALL`/`JMP` and IDT task gates now switch to 16-bit or 32-bit TSS images; `IRET` with `NT` follows the backlink; `LTR`, task `CALL`/`JMP`/`IRET`, backlink, busy-bit, `CR3`, `LDTR`, segment selectors, and `CR0.TS` are updated. |
 | Initial VM86 task entry | A task switch into a 32-bit TSS with `EFLAGS.VM=1` still tried to load `CS`/`SS` as protected descriptors. | DOSBox treats VM86 tasks as CPL 3 real-mode-style segment contexts while keeping protected paging/privilege machinery around them. | 32-bit TSS task loads with `VM=1` now cache visible segments as `selector << 4`, report CPL 3, and use real-mode segment linear addresses. |
 | TSS I/O permission bitmap | `IN`/`OUT` only checked IOPL, while string I/O bypassed IOPL entirely. | DOSBox checks the 386 TSS I/O bitmap for VM86 or `CPL > IOPL` I/O instructions. | `IN`, `OUT`, `INSB`, `INSW`, `OUTSB`, and `OUTSW` now consult the current 32-bit TSS bitmap and raise `#GP(0)` when the port is denied or the bitmap is absent. |
+| Protected interrupt VM86 frames | Protected interrupts pushed only `FLAGS/CS/IP` on the current stack, so CPL transitions and VM86 interrupts had the wrong frame. | DOSBox switches stacks through the current TSS and uses the 386 VM86 interrupt/IRETD frame when entering and leaving VM86. | Interrupt/trap gates now switch to the inner stack for lower-CPL handlers; VM86 interrupts push `GS/FS/DS/ES`, outer `SS:ESP`, and the normal frame; `IRETD` with `VM=1` restores real-mode-style VM86 segments. |
 
 ## Deferred
 
 - Full DOSBox protected-mode privilege model for every CPU path and exception.
 - Paging and page faults.
 - More task-switch conformance work around invalid TSS/error-code edge cases.
-- Full v86 monitor behavior: interrupt reflection, virtual interrupt flags,
-  and return-to-protected-mode edge cases.
+- Full v86 monitor behavior: software interrupt reflection and virtual
+  interrupt-flag semantics.
 - A full replacement decoder based on DOSBox `core_normal` or `core_full`.
 
 Those are larger architectural changes and should be ported only behind focused

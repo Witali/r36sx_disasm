@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-06-02 protected interrupt VM86 frames
+
+Protected-mode interrupt/trap gates now switch to an inner-privilege stack
+from the current TSS when the target handler runs at a numerically lower CPL.
+Interrupts delivered while the guest is in VM86 mode now build the 386 VM86
+interrupt frame: `GS`, `FS`, `DS`, `ES`, outer `SS:ESP`, `EFLAGS`, `CS`, and
+`EIP`, plus an optional error code.  The handler entry clears `VM`/`RF`, clears
+the VM86 data-segment caches, and enters the protected target `CS:EIP`.
+
+`IRETD` with `EFLAGS.VM=1` can now consume that extended frame from ring 0 and
+restore the VM86 task's real-mode-style visible segments and stack.  This is
+still not a full VM86 monitor; software interrupt reflection and virtual
+interrupt-flag semantics remain follow-up items.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `539712` bytes
+- `pico_286` SHA256:
+  `DC37C17D464E6A803F25D5A5241A70F0568322F67D142DFCB4A7C52563CDB989`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 386 TSS I/O permission bitmap
 
 Added 80386 I/O permission checks for `IN`, `OUT`, `INSB`, `INSW`, `OUTSB`,

@@ -2810,6 +2810,44 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
         return 0;
     }
 
+    if (wide && (target_flags & R36SX_EFLAGS_VM_MASK)) {
+        if (old_cpl != 0u ||
+            !r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
+            return 0;
+        }
+
+        /*
+         * IRETD to VM86 consumes the extended frame produced by an interrupt
+         * from VM86: EIP, CS, EFLAGS, ESP, SS, ES, DS, FS, GS.  The visible
+         * segment selectors are real-mode values, so no descriptor lookup is
+         * performed when returning to the virtual-8086 task.
+         */
+        uint32_t new_sp = pop32();
+        uint16_t new_ss = (uint16_t)pop32();
+        uint16_t new_es = (uint16_t)pop32();
+        uint16_t new_ds = (uint16_t)pop32();
+        uint16_t new_fs = (uint16_t)pop32();
+        uint16_t new_gs = (uint16_t)pop32();
+
+        decodeflagsdword(target_flags);
+        putsegreg(regcs, target_cs);
+        r36sx_cpu_real_cache_segment(regcs);
+        r36sx_cpu_set_ip(target_ip);
+        CPU_ESP = new_sp;
+        putsegreg(regss, new_ss);
+        r36sx_cpu_real_cache_segment(regss);
+        putsegreg(reges, new_es);
+        r36sx_cpu_real_cache_segment(reges);
+        putsegreg(regds, new_ds);
+        r36sx_cpu_real_cache_segment(regds);
+        putsegreg(regfs, new_fs);
+        r36sx_cpu_real_cache_segment(regfs);
+        putsegreg(reggs, new_gs);
+        r36sx_cpu_real_cache_segment(reggs);
+        return 1;
+    }
+
     if (new_cpl < old_cpl ||
         !r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
                                         &target_cache)) {

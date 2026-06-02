@@ -299,14 +299,15 @@ emulates `CR0`, `CR2`, `CR3`, `GDTR`, `IDTR`, `LDTR`/`TR` selectors, basic
 GDT/LDT-backed segment descriptor caches, code/data/stack descriptor type
 checks, far `CALL`/`JMP`/`RET`/`IRET` segment reloads, protected-mode
 interrupt/trap gates, 16-bit and 32-bit call gates, call-gate privilege
-transitions with TSS-backed stack switching, 32-bit default operand/address
-size from CS descriptors, 32-bit `EIP` stepping for 386 code segments, 32-bit
-stack pointer updates for 32-bit SS descriptors, and the 386 system
-instructions `0F 00`, `0F 01`, `0F 20`, and `0F 22`.  Linear physical memory
-above 1 MB is backed by the same XMS buffer, so simple flat descriptors can
-access the configured extended RAM.  Paging, hardware task switching through
-task gates/TSS descriptors, v86 mode, and DOS extender services such as
-DPMI/VCPI are not complete yet, so keep `cpu_mode=real` for normal DOS use.
+transitions with TSS-backed stack switching, hardware task switches through
+task gates/TSS descriptors, initial VM86 task entry and VM86 interrupt/IRETD
+frames, 32-bit default operand/address size from CS descriptors, 32-bit `EIP`
+stepping for 386 code segments, 32-bit stack pointer updates for 32-bit SS
+descriptors, and the 386 system instructions `0F 00`, `0F 01`, `0F 20`, and
+`0F 22`.  Linear physical memory above 1 MB is backed by the same XMS buffer,
+so simple flat descriptors can access the configured extended RAM.  Paging,
+full VM86 monitor behavior, and DOS extender services such as DPMI/VCPI are
+not complete yet, so keep `cpu_mode=real` for normal DOS use.
 Protected-mode support can be compiled out with
 `R36SX_ENABLE_PROTECTED_MODE=0`.
 

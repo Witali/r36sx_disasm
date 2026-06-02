@@ -61,9 +61,11 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                       (gate32 ? (hi & 0xffff0000u) : 0u);
 
     r36sx_segment_cache_t target_cs;
-    memset(&target_cs, 0, sizeof(target_cs));
-    if (!r36sx_cpu_decode_descriptor(selector, &target_cs) ||
-        !r36sx_descriptor_is_code(&target_cs)) {
+    uint8_t old_cpl = r36sx_cpu_cpl();
+    uint8_t old_vm86 = r36sx_cpu_v86_enabled();
+    uint8_t new_cpl;
+    if (!r36sx_cpu_load_code_for_transfer(selector, offset, 1, 0,
+                                          &target_cs, &new_cpl)) {
 #if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected interrupt invalid target CS int=%02x selector=%04x access=%02x",
@@ -74,7 +76,43 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         return 0;
     }
 
+    uint16_t old_ss = CPU_SS;
+    uint32_t old_sp = r36sx_cpu_stack_pointer_value();
+    uint16_t old_es = CPU_ES;
+    uint16_t old_ds = CPU_DS;
+    uint16_t old_fs = CPU_FS;
+    uint16_t old_gs = CPU_GS;
+
+    if (old_vm86 || new_cpl < old_cpl) {
+        uint32_t new_sp;
+        uint16_t new_ss;
+        r36sx_segment_cache_t new_ss_cache;
+        if (!r36sx_cpu_tss_stack_for_level(new_cpl, &new_sp, &new_ss) ||
+            !r36sx_cpu_decode_stack_segment_for_level(
+                new_ss, new_cpl, &new_ss_cache,
+                R36SX_EXCEPTION_INVALID_TSS)) {
+            return 0;
+        }
+        r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
+        r36sx_cpu_set_stack_pointer(new_sp);
+    }
+
     if (gate32) {
+        /*
+         * A 386 interrupt from VM86 first saves the VM86 data segments, then
+         * the outer VM86 SS:ESP, before the normal EFLAGS/CS/EIP frame.
+         * IRETD with VM=1 consumes the same frame in the reverse order.
+         */
+        if (old_vm86) {
+            push32(old_gs);
+            push32(old_fs);
+            push32(old_ds);
+            push32(old_es);
+        }
+        if (old_vm86 || new_cpl < old_cpl) {
+            push32(old_ss);
+            push32(old_sp);
+        }
         push32(makeflagsdword());
         push32(CPU_CS);
         push32(CPU_IP);
@@ -82,6 +120,10 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
             push32(error_code);
         }
     } else {
+        if (new_cpl < old_cpl) {
+            push(old_ss);
+            push((uint16_t)old_sp);
+        }
         push(makeflagsword());
         push(CPU_CS);
         push(CPU_IP);
@@ -90,8 +132,14 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         }
     }
 
-    r36sx_cpu_commit_segment_cache(regcs, selector, &target_cs);
-    r36sx_cpu_set_ip(offset);
+    r36sx_cpu_commit_code_transfer(selector, &target_cs, new_cpl, offset);
+    x86_flags.value &= ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
+    if (old_vm86) {
+        r36sx_cpu_clear_segment_cache(reges, 0);
+        r36sx_cpu_clear_segment_cache(regds, 0);
+        r36sx_cpu_clear_segment_cache(regfs, 0);
+        r36sx_cpu_clear_segment_cache(reggs, 0);
+    }
     if (type == 0x06u || type == 0x0eu) {
         ifl = 0;
     }
