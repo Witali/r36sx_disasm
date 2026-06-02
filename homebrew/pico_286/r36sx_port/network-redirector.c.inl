@@ -3,6 +3,7 @@
 #pragma once
 // #define DEBUG_2F
 #include <ctype.h>
+#include <errno.h>
 #include <sys/stat.h>
 #if defined(R36SX_PICO286_HOST_DRIVE_CONFIG)
 #include "r36sx_disk_config.h"
@@ -19,6 +20,12 @@
 #define debug_log(...) printf(__VA_ARGS__)
 #else
 #define debug_log(...)
+#endif
+
+#if defined(R36SX_PICO286_HOST_DRIVE_CONFIG)
+#define redirector_error_log(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define redirector_error_log(...) ((void)0)
 #endif
 
 
@@ -285,6 +292,48 @@ static inline void guest_memory_error(void) {
     CPU_FL_CF = 1;
 }
 
+static inline uint16_t redirector_dos_error_from_errno(int err,
+                                                       int writing) {
+    // DOS redirector callbacks report failures as DOS error codes in AX.
+    switch (err) {
+        case 0:
+            return writing ? 0x1D : 0x1E; // write/read fault
+        case ENOENT:
+            return 2; // file not found
+        case ENOTDIR:
+            return 3; // path not found
+        case EMFILE:
+        case ENFILE:
+            return 4; // too many open files
+        case EACCES:
+        case EPERM:
+            return 5; // access denied
+        case EBADF:
+            return 6; // invalid handle
+        case EROFS:
+            return 19; // write protected
+        case EIO:
+            return writing ? 0x1D : 0x1E; // write/read fault
+        case ENOSPC:
+            return 0x27; // disk full
+        default:
+            return writing ? 0x1D : 0x1E;
+    }
+}
+
+static inline void redirector_sft_advance(sftstruct *sftptr, size_t bytes,
+                                          int update_size) {
+    uint64_t new_position = (uint64_t)sftptr->file_position + bytes;
+    if (new_position > 0xffffffffull) {
+        new_position = 0xffffffffull;
+    }
+    sftptr->file_position = (uint32_t)new_position;
+    // DOS expects the redirector to keep SFT position and size coherent.
+    if (update_size && sftptr->file_position > sftptr->file_size) {
+        sftptr->file_size = sftptr->file_position;
+    }
+}
+
 static inline bool redirector_handler() {
     char path[256];
     /*
@@ -381,8 +430,6 @@ static inline bool redirector_handler() {
         }
         break;
 
-        // Commit Remote File
-        case 0x1107:
         // Close Remote File
         case 0x1106: {
             sftstruct *sftptr = guest_sft_ptr();
@@ -392,7 +439,17 @@ static inline bool redirector_handler() {
             }
             const uint16_t file_handle = sftptr->file_handle;
             if (file_handle < MAX_FILES && open_files[file_handle]) {
-                fclose(open_files[file_handle]);
+                errno = 0;
+                if (fclose(open_files[file_handle]) != 0) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: close failed handle=%u err=%d",
+                        file_handle, err);
+                    open_files[file_handle] = NULL;
+                    CPU_AX = redirector_dos_error_from_errno(err, 1);
+                    CPU_FL_CF = 1;
+                    break;
+                }
                 sftptr->total_handles = 0xffff;
                 open_files[file_handle] = NULL;
                 CPU_AX = 0;
@@ -404,6 +461,36 @@ static inline bool redirector_handler() {
         }
         break;
 
+        // Commit Remote File
+        case 0x1107: {
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
+            const uint16_t file_handle = sftptr->file_handle;
+            if (file_handle < MAX_FILES && open_files[file_handle]) {
+                // INT 2Fh/1107h is commit-only; the handle must stay open.
+                errno = 0;
+                if (fflush(open_files[file_handle]) != 0) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: commit failed handle=%u pos=%lu size=%lu err=%d",
+                        file_handle,
+                        (unsigned long)sftptr->file_position,
+                        (unsigned long)sftptr->file_size, err);
+                    CPU_AX = redirector_dos_error_from_errno(err, 1);
+                    CPU_FL_CF = 1;
+                    break;
+                }
+                CPU_AX = 0;
+                CPU_FL_CF = 0;
+            } else {
+                CPU_AX = 6; // Invalid handle
+                CPU_FL_CF = 1;
+            }
+        }
+        break;
 
         // Read Remote File
         case 0x1108: {
@@ -431,11 +518,25 @@ static inline bool redirector_handler() {
                     guest_memory_error();
                     break;
                 }
+                errno = 0;
+                clearerr(open_files[file_handle]);
                 size_t bytes_read = fread(&RAM[dta_addr], 1, bytes_to_read, open_files[file_handle]);
+                if (ferror(open_files[file_handle])) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: read failed handle=%u requested=%u read=%lu pos=%lu err=%d",
+                        file_handle, bytes_to_read,
+                        (unsigned long)bytes_read,
+                        (unsigned long)sftptr->file_position, err);
+                    CPU_AX = redirector_dos_error_from_errno(err, 0);
+                    CPU_CX = bytes_read;
+                    CPU_FL_CF = 1;
+                    break;
+                }
                 debug_log("bytes read %i at offset %ld -> %x\n", (int) bytes_read, sftptr->file_position, dta_addr);
 
                 // Update file position in SFT
-                sftptr->file_position += bytes_read;
+                redirector_sft_advance(sftptr, bytes_read, 0);
                 CPU_AX = 0;
                 CPU_CX = bytes_read;
                 CPU_FL_CF = 0;
@@ -473,13 +574,45 @@ static inline bool redirector_handler() {
                     guest_memory_error();
                     break;
                 }
+                errno = 0;
+                clearerr(open_files[file_handle]);
                 size_t bytes_written = fwrite(&RAM[dta_addr], 1, bytes_to_write, open_files[file_handle]);
                 debug_log("bytes written %i at offset %ld\n", (int) bytes_written, sftptr->file_position);
 
                 // Update file position in SFT and force write to disk
-                sftptr->file_position += bytes_written;
-                fflush(open_files[file_handle]); // Ensure data is written to disk
+                redirector_sft_advance(sftptr, bytes_written, 1);
                 CPU_CX = bytes_written; // RBIL6: return bytes written in CX, not AX
+                // Short writes usually mean disk full; do not let DOS continue
+                // as if the destination accepted the whole buffer.
+                if (bytes_written != bytes_to_write || ferror(open_files[file_handle])) {
+                    int err = errno ? errno : EIO;
+                    if (bytes_written != bytes_to_write && err == EIO) {
+                        err = ENOSPC;
+                    }
+                    redirector_error_log(
+                        "redir: write failed handle=%u requested=%u written=%lu pos=%lu size=%lu err=%d",
+                        file_handle, bytes_to_write,
+                        (unsigned long)bytes_written,
+                        (unsigned long)sftptr->file_position,
+                        (unsigned long)sftptr->file_size, err);
+                    CPU_AX = redirector_dos_error_from_errno(err, 1);
+                    CPU_FL_CF = 1;
+                    break;
+                }
+                errno = 0;
+                // stdio may only discover ENOSPC/EIO while flushing the buffer.
+                if (fflush(open_files[file_handle]) != 0) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: write flush failed handle=%u bytes=%u pos=%lu size=%lu err=%d",
+                        file_handle, bytes_to_write,
+                        (unsigned long)sftptr->file_position,
+                        (unsigned long)sftptr->file_size, err);
+                    CPU_AX = redirector_dos_error_from_errno(err, 1);
+                    CPU_FL_CF = 1;
+                    break;
+                }
+                CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
                 CPU_AX = 6; // Invalid handle

@@ -1,5 +1,39 @@
 # pico-286 Build Log
 
+## 2026-06-02 host-drive commit and write-error handling
+
+Fixed the DOS network redirector path used by `MAPDRIVE.COM` when copying from
+an image-backed DOS drive to the host `H:` directory.
+
+- `INT 2Fh AX=1107h` is now a real commit operation: it flushes the host file
+  but keeps the SFT handle open. The old code shared the close path with
+  `AX=1106h`, which could close a destination file while DOS still expected to
+  keep writing it.
+- Remote writes now treat short `fwrite()` results and `fflush()` failures as
+  DOS errors instead of reporting success. This should surface SD-card full or
+  host I/O failures as destination-write errors instead of letting DOS continue
+  with inconsistent state.
+- Successful remote writes now keep the SFT file size in sync with the updated
+  file position.
+- Error-only redirector log messages were added for failed remote read/write,
+  commit, close, and flush paths. They are emitted only when the build uses
+  `DEBUG=1`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- `pico_286` size: `468844` bytes
+- `pico_286` SHA256:
+  `F7BB9242D3E92303EA4AB51358EF0832F2CAAB44C4456765DDF8CD2562ADFD7E`
+- Microsoft Defender scan: no threats found in the main, patch, and
+  `disk_image` copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 on-screen keyboard Scroll Lock LED
 
 Added a small green lock-state LED to the on-screen `SL` key in the
