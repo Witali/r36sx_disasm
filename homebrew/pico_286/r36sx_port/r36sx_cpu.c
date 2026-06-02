@@ -99,6 +99,8 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_FLAG_GRANULAR 0x08u
 #define R36SX_SELECTOR_TABLE_INDICATOR 0x0004u
 #define R36SX_SELECTOR_INDEX_MASK 0xfff8u
+/* ModR/M mod field value 11b: operand is a register, not memory. */
+#define R36SX_MODRM_MOD_REGISTER 0x03u
 #define R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK 0x0fu
 #define R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE 0x01u
 #define R36SX_DESCRIPTOR_TYPE_LDT 0x02u
@@ -108,6 +110,7 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_TYPE_CALL_GATE32 0x0cu
 #define R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE 0x09u
 #define R36SX_DESCRIPTOR_TYPE_TSS32_BUSY 0x0bu
+#define R36SX_EXCEPTION_BOUND 5u
 #define R36SX_EXCEPTION_INVALID_TSS 10u
 #define R36SX_EXCEPTION_NOT_PRESENT 11u
 #define R36SX_EXCEPTION_STACK 12u
@@ -847,7 +850,7 @@ __not_in_flash() void modregrm() {
 #ifdef CPU_386_EXTENDED_OPS
     if (addressSizeOverride) {
         // 32-?????? ?????
-        if (mode != 3 && rm == 4) {
+        if (mode != R36SX_MODRM_MOD_REGISTER && rm == 4) {
             sib = getmem8(CPU_CS, CPU_IP);
             StepIP(1);
         }
@@ -4820,15 +4823,22 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 }
                 modregrm();
 
+                /* Intel BOUND requires a memory bounds table operand. */
+                if (mode == R36SX_MODRM_MOD_REGISTER) {
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 getea(rm);
                 if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
                     break;
                 }
                 if (signext32(getreg16(reg)) < signext32(readw86(ea))) {
-                    intcall86(5); //bounds check exception
+                    r36sx_cpu_set_ip(firstip);
+                    intcall86(R36SX_EXCEPTION_BOUND);
                 } else {
                     if (signext32(getreg16(reg)) > signext32(readw86(ea + 2u))) {
-                        intcall86(5); //bounds check exception
+                        r36sx_cpu_set_ip(firstip);
+                        intcall86(R36SX_EXCEPTION_BOUND);
                     }
                 }
                 break;

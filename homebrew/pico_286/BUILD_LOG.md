@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-02 BOUND register operand fix
+
+Fixed the 80186+ `BOUND` instruction handling in the native Pico-286 CPU core.
+The ModR/M `mod=11b` register-operand case is now named
+`R36SX_MODRM_MOD_REGISTER` and rejected as an invalid opcode, because Intel
+`BOUND` requires a memory bounds table.  Bounds failures now reset IP to the
+start of the instruction before raising `R36SX_EXCEPTION_BOUND`, so INT 5 saves
+the faulting instruction address instead of the IP after ModR/M decoding.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `481080` bytes
+- `pico_286` SHA256:
+  `E3DE5792CB365F3509B0D723546B56AAD0DA208C070E72B3B54E74973E580646`
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 12:46:43`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 ENTER nesting frame fix
 
 Fixed the 80186+ `ENTER imm16, imm8` implementation in the native Pico-286
