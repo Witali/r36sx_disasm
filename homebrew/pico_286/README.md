@@ -536,7 +536,7 @@ This wrapper runs `build_pico_286_wsl.sh` inside WSL and uses the Linux
 `mips-mti-linux-gnu-gcc` / `g++` tools from the existing SF3000 SDK under
 `tools/mipsel-buildroot-linux-gnu_sdk-buildroot`.  The deployed executable is
 `homebrew/pico_286/pico_286`, built with
-`-march=mips32r2 -mtune=74kc -O3` and stripped by
+`-march=74kf -mtune=74kf -O3` and stripped by
 `mips-mti-linux-gnu-strip`.
 
 The WSL wrapper also accepts `-OptLevel O0|O1|O2|O3|Os|Og|Ofast`; the shell
@@ -568,7 +568,7 @@ wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && bash homebrew/pico_286/build_pico_2
 ```
 
 The Windows/Zig script remains only as a fallback build path.  Zig/LLVM's MIPS
-backend does not recognize `74kc` as a CPU name, and `zig objcopy --strip-all`
+backend does not recognize the GCC `74k*` CPU names, and `zig objcopy --strip-all`
 currently reports `error: unimplemented` for this MIPS ELF.
 
 ### Auxiliary Binary Builds

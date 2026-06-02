@@ -83,8 +83,8 @@ CFLAGS=(
     -mips32r2
     -mabi=32
     -mhard-float
-    -march=mips32r2
-    -mtune=74kc
+    -march=74kf
+    -mtune=74kf
     -O2
     -g0
     -fno-pic

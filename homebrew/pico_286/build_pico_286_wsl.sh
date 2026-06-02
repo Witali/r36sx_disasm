@@ -183,8 +183,8 @@ common_args=(
     "-EL"
     "-mips32r2"
     "-mabi=32"
-    "-march=mips32r2"
-    "-mtune=74kc"
+    "-march=74kf"
+    "-mtune=74kf"
     "-DPICO_RP2040=0"
     "-DPICO_RP2350=0"
     "-DDEBUG=$DEBUG_VALUE"
@@ -272,8 +272,8 @@ compile_asm() {
         -EL
         -mips32r2
         -mabi=32
-        -march=mips32r2
-        -mtune=74kc
+        -march=74kf
+        -mtune=74kf
         "-DR36SX_MIPS_DSP=$MIPS_DSP_VALUE"
     )
     obj="$(object_path_for "$src")"
