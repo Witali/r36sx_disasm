@@ -2134,8 +2134,8 @@ static void handle_hidden_buttons(uint32_t pressed)
         }
         return;
     }
-    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) pty_write_str("\033[A");
-    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) pty_write_str("\033[B");
+    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) term_scrollback_by_lines(1);
+    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) term_scrollback_by_lines(-1);
     if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0) pty_write_str("\033[D");
     if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0) pty_write_str("\033[C");
     if ((pressed & R36SX_RKGAME_KEY_A) != 0) pty_write_str("\r");

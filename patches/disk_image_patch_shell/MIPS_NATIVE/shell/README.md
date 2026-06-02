@@ -45,7 +45,7 @@ Physical USB keyboards should appear as `/dev/input/event*` and work directly
 after hotplug. The frontend scans for keyboard-like evdev devices every couple
 of seconds and sends key presses to the shell PTY.
 
-- `D-pad`: navigate the on-screen keyboard.
+- `D-pad`: navigate the on-screen keyboard; while hidden, Up/Down browse scrollback.
 - `A` or `START`: press the selected key.
 - `B`: Backspace.
 - `X`: Esc while keyboard is visible, Tab while hidden.
@@ -58,7 +58,8 @@ of seconds and sends key presses to the shell PTY.
 - `FN + D-pad Down`: return to live console output.
 - `FN + X`: exit the shell frontend.
 
-When the keyboard is hidden, the D-pad sends terminal arrow keys. If the child
+When the keyboard is hidden, D-pad Up/Down act like `Shift+Up`/`Shift+Down`
+for scrollback, and D-pad Left/Right send terminal arrow keys. If the child
 shell exits, hide the keyboard and press `START` to launch a new `/bin/sh`.
 USB and on-screen keyboards can also browse history with `Shift+Up`,
 `Shift+Down`, `Shift+PageUp`, and `Shift+PageDown`; `Ctrl+End` returns to the

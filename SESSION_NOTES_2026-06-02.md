@@ -242,3 +242,10 @@ homebrew/pico_286/pico_286.hardfloat.gcc
 - Каталог скриншотов теперь:
   `/mnt/sdcard/MIPS_NATIVE/shell/screenshots/`.
 - Имена BMP-скриншотов теперь начинаются с `shell_`.
+
+## Обновление shell: D-pad scrollback
+
+- При скрытой экранной клавиатуре D-pad `Up` / `Down` теперь ведут себя как
+  `Shift+Up` / `Shift+Down`: прокручивают scrollback на одну строку.
+- D-pad `Left` / `Right` при скрытой клавиатуре всё ещё отправляют обычные
+  terminal arrow keys в shell.

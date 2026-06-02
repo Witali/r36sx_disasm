@@ -37,7 +37,8 @@ Pico-286 shortcut. The frontend writes 24-bit BMP files under:
 
 Console output keeps 512 lines of scrollback. Use `FN+L` / `FN+R` for one-line
 history scrolling, `FN+D-pad Left` / `FN+D-pad Right` for page scrolling, and
-`FN+D-pad Down` to return to live output.
+`FN+D-pad Down` to return to live output. With the on-screen keyboard hidden,
+D-pad `Up` / `Down` act like `Shift+Up` / `Shift+Down` and scroll one line.
 
 shell redirection and pipes work normally, for example:
 
