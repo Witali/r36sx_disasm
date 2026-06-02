@@ -54,10 +54,16 @@ of seconds and sends key presses to the shell PTY.
 - `SELECT`: expand/collapse the keyboard while visible, show it while hidden.
 - `FN`: show/hide the keyboard.
 - `FN + D-pad Up`: save a screenshot.
+- `FN + L` / `FN + R`: scroll console history up/down by one text line.
+- `FN + D-pad Left` / `FN + D-pad Right`: scroll console history up/down by one page.
+- `FN + D-pad Down`: return to live console output.
 - `FN + X`: exit the shell frontend.
 
 When the keyboard is hidden, the D-pad sends terminal arrow keys. If the child
 shell exits, hide the keyboard and press `START` to launch a new `/bin/sh`.
+USB and on-screen keyboards can also browse history with `Shift+Up`,
+`Shift+Down`, `Shift+PageUp`, and `Shift+PageDown`; `Ctrl+End` returns to the
+live output.
 
 ## Notes
 
@@ -71,8 +77,8 @@ The renderer uses FreeType with the monospace fonts from
 `R36SX_SHELL_FONT=/path/to/font.ttf` before launching to override it. The
 terminal keeps a fixed 80-column grid and supports a small VT100/ANSI subset
 that is enough for BusyBox shell prompts, colors, cursor movement, clearing,
-and ordinary command output. Full ncurses compatibility and double-width CJK
-layout are not implemented.
+ordinary command output, and 512 lines of scrollback history. Full ncurses
+compatibility and double-width CJK layout are not implemented.
 
 `FN + D-pad Up` follows the Pico-286 shortcut and saves the current 640x480
 framebuffer as a 24-bit BMP in:

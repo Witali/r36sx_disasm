@@ -51,10 +51,13 @@ enum {
     TERM_FONT_BASELINE = 13,
     TERM_COLS = FB_WIDTH / FONT_W,
     TERM_MAX_ROWS = FB_HEIGHT / FONT_H,
+    TERM_SCROLLBACK_ROWS = 512,
     TERM_FONT_CACHE_SLOTS = 512,
     EVDEV_MAX_FDS = 16,
     EVDEV_RESCAN_USEC = 2000000,
     FRAME_USEC = 16666,
+    SCROLL_REPEAT_DELAY_USEC = 300000,
+    SCROLL_REPEAT_INTERVAL_USEC = 80000,
     CSI_BUF_LEN = 48,
     PTY_READ_BUF = 512,
     PIPE_LINE_MAX = 1024
@@ -95,9 +98,13 @@ struct cell {
 
 struct terminal_state {
     struct cell cells[TERM_MAX_ROWS][TERM_COLS];
+    struct cell history[TERM_SCROLLBACK_ROWS][TERM_COLS];
     int rows;
     int cursor_x;
     int cursor_y;
+    int history_start;
+    int history_count;
+    int scrollback_offset;
     uint8_t fg;
     uint8_t bg;
     uint8_t bright;
@@ -177,6 +184,8 @@ static struct term_font_state g_font;
 static struct r36sx_screen_keyboard g_keyboard;
 static uint16_t g_frame[FB_WIDTH * FB_HEIGHT];
 static uint32_t g_prev_buttons;
+static uint32_t g_fn_scroll_repeat_button;
+static uint64_t g_fn_scroll_repeat_at_us;
 static uint32_t g_screenshot_counter;
 static uint8_t g_screenshot_requested;
 static int g_running = 1;
@@ -493,6 +502,90 @@ static void term_clear_row(int row)
     }
 }
 
+static int term_history_index(int logical_row)
+{
+    int index = g_term.history_start + logical_row;
+    if (index >= TERM_SCROLLBACK_ROWS) {
+        index %= TERM_SCROLLBACK_ROWS;
+    }
+    return index;
+}
+
+static void term_clamp_scrollback(void)
+{
+    if (g_term.scrollback_offset < 0) {
+        g_term.scrollback_offset = 0;
+    }
+    if (g_term.scrollback_offset > g_term.history_count) {
+        g_term.scrollback_offset = g_term.history_count;
+    }
+}
+
+static void term_scrollback_live(void)
+{
+    g_term.scrollback_offset = 0;
+}
+
+static void term_scrollback_by_lines(int lines)
+{
+    g_term.scrollback_offset += lines;
+    term_clamp_scrollback();
+}
+
+static void term_scrollback_by_pages(int pages)
+{
+    int page_rows = g_term.rows > 1 ? g_term.rows - 1 : 1;
+    term_scrollback_by_lines(pages * page_rows);
+}
+
+static void term_history_clear(void)
+{
+    g_term.history_start = 0;
+    g_term.history_count = 0;
+    g_term.scrollback_offset = 0;
+}
+
+static void term_history_push_row(const struct cell *row)
+{
+    int dst;
+
+    if (!row || TERM_SCROLLBACK_ROWS <= 0) {
+        return;
+    }
+    if (g_term.history_count < TERM_SCROLLBACK_ROWS) {
+        dst = term_history_index(g_term.history_count);
+        g_term.history_count++;
+    } else {
+        dst = g_term.history_start;
+        g_term.history_start++;
+        if (g_term.history_start >= TERM_SCROLLBACK_ROWS) {
+            g_term.history_start = 0;
+        }
+    }
+    memcpy(g_term.history[dst], row, sizeof(g_term.history[dst]));
+    if (g_term.scrollback_offset > 0) {
+        g_term.scrollback_offset++;
+    }
+    term_clamp_scrollback();
+}
+
+static const struct cell *term_display_row(int row, int *screen_row)
+{
+    int logical = g_term.history_count - g_term.scrollback_offset + row;
+
+    if (screen_row) {
+        *screen_row = -1;
+    }
+    if (logical < g_term.history_count) {
+        return g_term.history[term_history_index(logical)];
+    }
+    logical -= g_term.history_count;
+    if (screen_row) {
+        *screen_row = logical;
+    }
+    return g_term.cells[logical];
+}
+
 static void term_clear(void)
 {
     for (int row = 0; row < TERM_MAX_ROWS; row++) {
@@ -500,6 +593,7 @@ static void term_clear(void)
     }
     g_term.cursor_x = 0;
     g_term.cursor_y = 0;
+    g_term.scrollback_offset = 0;
 }
 
 static void term_init(void)
@@ -530,12 +624,19 @@ static void term_set_rows(int rows)
     if (g_term.cursor_y >= g_term.rows) {
         g_term.cursor_y = g_term.rows - 1;
     }
+    term_clamp_scrollback();
 }
 
 static void term_scroll(void)
 {
-    memmove(g_term.cells[0], g_term.cells[1],
-            (size_t)(g_term.rows - 1) * sizeof(g_term.cells[0]));
+    if (g_term.rows <= 0) {
+        return;
+    }
+    term_history_push_row(g_term.cells[0]);
+    if (g_term.rows > 1) {
+        memmove(g_term.cells[0], g_term.cells[1],
+                (size_t)(g_term.rows - 1) * sizeof(g_term.cells[0]));
+    }
     term_clear_row(g_term.rows - 1);
     if (g_term.cursor_y > 0) {
         g_term.cursor_y--;
@@ -753,7 +854,9 @@ static void term_handle_csi(char final)
         break;
     }
     case 'J':
-        if (params[0] == 2) {
+        if (params[0] == 3) {
+            term_history_clear();
+        } else if (params[0] == 2) {
             term_clear();
         } else {
             term_clear_from_cursor();
@@ -1440,6 +1543,7 @@ static void pty_write_bytes(const char *bytes, size_t len)
     if (g_pty.write_fd < 0 || !bytes || len == 0) {
         return;
     }
+    term_scrollback_live();
     if (g_pty.pipe_mode) {
         pipe_write_interactive_bytes(bytes, len);
         return;
@@ -1673,6 +1777,20 @@ static void evdev_handle_key(int code, int value)
         return;
     }
 
+    if (g_evdev.shift) {
+        switch (code) {
+        case KEY_UP: term_scrollback_by_lines(1); return;
+        case KEY_DOWN: term_scrollback_by_lines(-1); return;
+        case KEY_PAGEUP: term_scrollback_by_pages(1); return;
+        case KEY_PAGEDOWN: term_scrollback_by_pages(-1); return;
+        default: break;
+        }
+    }
+    if (g_evdev.ctrl && code == KEY_END) {
+        term_scrollback_live();
+        return;
+    }
+
     switch (code) {
     case KEY_ENTER:
     case KEY_KPENTER: evdev_write_str("\r"); return;
@@ -1808,6 +1926,19 @@ static void emit_keycode(uint16_t keycode, int is_down)
     if (!is_down) {
         return;
     }
+    if (g_keys.shift) {
+        switch (keycode) {
+        case R36SX_SCREEN_KEY_UP: term_scrollback_by_lines(1); return;
+        case R36SX_SCREEN_KEY_DOWN: term_scrollback_by_lines(-1); return;
+        case R36SX_SCREEN_KEY_PRIOR: term_scrollback_by_pages(1); return;
+        case R36SX_SCREEN_KEY_NEXT: term_scrollback_by_pages(-1); return;
+        default: break;
+        }
+    }
+    if (g_keys.ctrl && keycode == R36SX_SCREEN_KEY_END) {
+        term_scrollback_live();
+        return;
+    }
     if (g_keys.alt) {
         pty_write_str("\033");
     }
@@ -1856,6 +1987,89 @@ static void osk_emit(void *user, uint16_t keycode, int is_down)
 {
     (void)user;
     emit_keycode(keycode, is_down);
+}
+
+static uint32_t shell_first_fn_scroll_button(uint32_t buttons)
+{
+    if ((buttons & R36SX_RKGAME_KEY_L) != 0) return R36SX_RKGAME_KEY_L;
+    if ((buttons & R36SX_RKGAME_KEY_R) != 0) return R36SX_RKGAME_KEY_R;
+    if ((buttons & R36SX_RKGAME_KEY_LEFT) != 0) return R36SX_RKGAME_KEY_LEFT;
+    if ((buttons & R36SX_RKGAME_KEY_RIGHT) != 0) return R36SX_RKGAME_KEY_RIGHT;
+    return 0;
+}
+
+static void shell_apply_fn_scroll_button(uint32_t button)
+{
+    switch (button) {
+    case R36SX_RKGAME_KEY_L:
+        term_scrollback_by_lines(1);
+        break;
+    case R36SX_RKGAME_KEY_R:
+        term_scrollback_by_lines(-1);
+        break;
+    case R36SX_RKGAME_KEY_LEFT:
+        term_scrollback_by_pages(1);
+        break;
+    case R36SX_RKGAME_KEY_RIGHT:
+        term_scrollback_by_pages(-1);
+        break;
+    default:
+        break;
+    }
+}
+
+static int shell_handle_fn_scroll(uint32_t pressed, uint32_t buttons)
+{
+    const uint32_t scroll_mask =
+        R36SX_RKGAME_KEY_L | R36SX_RKGAME_KEY_R |
+        R36SX_RKGAME_KEY_LEFT | R36SX_RKGAME_KEY_RIGHT;
+    uint32_t scroll_pressed = shell_first_fn_scroll_button(pressed & scroll_mask);
+    uint32_t scroll_held = shell_first_fn_scroll_button(buttons & scroll_mask);
+    uint64_t now = monotonic_us();
+
+    if (scroll_pressed != 0) {
+        shell_apply_fn_scroll_button(scroll_pressed);
+        g_fn_scroll_repeat_button = scroll_pressed;
+        g_fn_scroll_repeat_at_us = now + SCROLL_REPEAT_DELAY_USEC;
+        return 1;
+    }
+    if (scroll_held == 0) {
+        g_fn_scroll_repeat_button = 0;
+        return 0;
+    }
+    if (scroll_held != g_fn_scroll_repeat_button) {
+        g_fn_scroll_repeat_button = scroll_held;
+        g_fn_scroll_repeat_at_us = now + SCROLL_REPEAT_DELAY_USEC;
+        return 1;
+    }
+    if (now >= g_fn_scroll_repeat_at_us) {
+        shell_apply_fn_scroll_button(scroll_held);
+        g_fn_scroll_repeat_at_us = now + SCROLL_REPEAT_INTERVAL_USEC;
+    }
+    return 1;
+}
+
+static void shell_handle_fn_buttons(uint32_t pressed, uint32_t buttons)
+{
+    if ((pressed & R36SX_RKGAME_KEY_X) != 0) {
+        g_running = 0;
+        return;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
+        shell_request_screenshot();
+        return;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
+        term_scrollback_live();
+        return;
+    }
+    if (shell_handle_fn_scroll(pressed, buttons)) {
+        return;
+    }
+    if ((pressed & R36SX_RKGAME_KEY_FN) != 0) {
+        r36sx_screen_keyboard_set_visible(
+            &g_keyboard, !r36sx_screen_keyboard_is_visible(&g_keyboard));
+    }
 }
 
 static void handle_hidden_buttons(uint32_t pressed)
@@ -1964,10 +2178,14 @@ static void draw_frame(void)
 
     fill_rect(0, 0, FB_WIDTH, FB_HEIGHT, g_palette[0]);
     for (int row = 0; row < g_term.rows; row++) {
+        int screen_row = -1;
+        const struct cell *cells = term_display_row(row, &screen_row);
         for (int col = 0; col < TERM_COLS; col++) {
-            int cursor = (row == g_term.cursor_y && col == g_term.cursor_x &&
+            int cursor = (g_term.scrollback_offset == 0 &&
+                          screen_row == g_term.cursor_y &&
+                          col == g_term.cursor_x &&
                           !g_pty.child_exited);
-            draw_cell(col, row, &g_term.cells[row][col], cursor);
+            draw_cell(col, row, &cells[col], cursor);
         }
     }
     if (r36sx_screen_keyboard_is_visible(&g_keyboard)) {
@@ -1996,6 +2214,7 @@ int main(void)
         return 1;
     }
     term_write_text("Shell. SELECT shows keyboard, FN toggles it, FN+UP saves screenshot, FN+X exits.\r\n");
+    term_write_text("Scrollback: FN+L/R line, FN+Left/Right page, FN+Down live.\r\n");
     term_write_text("USB keyboards are accepted from /dev/input/event*.\r\n");
     term_write_text("Redirection works normally, e.g. ls / > /mnt/sdcard/root.txt\r\n\r\n");
     if (pty_spawn_shell() != 0) {
@@ -2006,16 +2225,10 @@ int main(void)
         uint32_t buttons = input_buttons();
         uint32_t pressed = buttons & ~g_prev_buttons;
 
-        if ((buttons & R36SX_RKGAME_KEY_FN) != 0 &&
-            (pressed & R36SX_RKGAME_KEY_X) != 0) {
-            g_running = 0;
-        } else if ((buttons & R36SX_RKGAME_KEY_FN) != 0 &&
-                   (pressed & R36SX_RKGAME_KEY_UP) != 0) {
-            shell_request_screenshot();
-        } else if ((pressed & R36SX_RKGAME_KEY_FN) != 0) {
-            r36sx_screen_keyboard_set_visible(
-                &g_keyboard, !r36sx_screen_keyboard_is_visible(&g_keyboard));
+        if ((buttons & R36SX_RKGAME_KEY_FN) != 0) {
+            shell_handle_fn_buttons(pressed, buttons);
         } else if (r36sx_screen_keyboard_is_visible(&g_keyboard)) {
+            g_fn_scroll_repeat_button = 0;
             r36sx_screen_keyboard_handle_buttons(
                 &g_keyboard,
                 pressed & ~R36SX_RKGAME_KEY_FN,
@@ -2023,6 +2236,7 @@ int main(void)
                 osk_emit,
                 NULL);
         } else {
+            g_fn_scroll_repeat_button = 0;
             handle_hidden_buttons(pressed);
         }
 
