@@ -31,10 +31,15 @@ be checked against the relevant specification and committed separately.
      `INT 31h` services without touching the generic `intcall86()` flow.
 
 2. Minimal `INT 31h` services for DOS extenders.
-   - Status: not implemented.
+   - Status: started.
    - Specification checkpoints: descriptor allocation/free, descriptor
      base/limit/access rights, version query, real-mode interrupt/procedure
      bridge, DOS memory allocate/free, exception/vector get/set, and terminate.
+   - Completed so far: the protected-mode `INT 31h` dispatcher now implements
+     selector increment (`AX=0003h`), version query (`AX=0400h`), and the
+     capabilities/vendor string query (`AX=0401h`) with conservative feature
+     flags.  The real-mode `AX=1687h` installation check still reports no host
+     until the mode-switch entry point exists.
    - Done when: common DOS extender probes can query DPMI version, allocate
      descriptors, configure flat 32-bit code/data descriptors, and return clean
      failure for unimplemented functions.

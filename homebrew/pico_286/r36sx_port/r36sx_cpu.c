@@ -159,6 +159,15 @@ uint32_t dwordregs[8];
 #define R36SX_EXCEPTION_X87_ERROR 16u
 #define R36SX_DPMI_INT2F_GET_CPU_MODE 0x1686u
 #define R36SX_DPMI_INT2F_INSTALLATION_CHECK 0x1687u
+#define R36SX_DPMI_FUNC_GET_SELECTOR_INCREMENT 0x0003u
+#define R36SX_DPMI_FUNC_GET_VERSION 0x0400u
+#define R36SX_DPMI_FUNC_GET_CAPABILITIES 0x0401u
+#define R36SX_DPMI_VERSION_MAJOR 1u
+#define R36SX_DPMI_VERSION_MINOR 0u
+#define R36SX_DPMI_SELECTOR_INCREMENT 8u
+#define R36SX_DPMI_PIC_MASTER_BASE 0x08u
+#define R36SX_DPMI_PIC_SLAVE_BASE 0x70u
+#define R36SX_DPMI_VERSION_FLAG_32BIT 0x0001u
 #define R36SX_DPMI_NOT_INSTALLED 0xffffu
 #define R36SX_DPMI_UNSUPPORTED_FUNCTION 0x8001u
 #define R36SX_FLAGS_ALWAYS_ONE 0x0002u
@@ -3737,11 +3746,83 @@ static int r36sx_bios_boot_configured_order(void)
 static inline uint8_t r36sx_dpmi_host_available(void)
 {
     /*
-     * DPMI Specification 1.0 client initialization starts with INT 2Fh
-     * AX=1687h.  Keep the host disabled until we have a real protected-mode
-     * entry point and enough INT 31h services to support a client safely.
+     * DPMI services are only callable after a client is already in protected
+     * mode.  INT 2Fh AX=1687h still stays disabled below until we have a real
+     * DPMI entry point that can perform the initial mode switch.
+     */
+    return r36sx_cpu_protected_enabled();
+}
+
+static inline uint8_t r36sx_dpmi_real_entry_available(void)
+{
+    /*
+     * The DPMI 1.0 installation check must return ES:DI pointing at a callable
+     * real-mode entry.  Advertising a host before that entry exists makes DOS
+     * extenders jump into garbage, so keep the installation check negative.
      */
     return 0;
+}
+
+static inline uint8_t r36sx_dpmi_processor_type(void)
+{
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        return 3u;
+    }
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286)) {
+        return 2u;
+    }
+    return 0u;
+}
+
+static inline void r36sx_dpmi_fail(uint16_t error)
+{
+    cf = 1;
+    CPU_AX = error;
+}
+
+static inline void r36sx_dpmi_succeed(void)
+{
+    cf = 0;
+}
+
+static void r36sx_dpmi_get_version(void)
+{
+    /*
+     * DPMI 1.0 INT 31h AX=0400h returns version, host flags, CPU type, and the
+     * protected-mode IRQ bases.  Keep the capability bits conservative until
+     * the mode-switch entry and real-mode callback bridge exist.
+     */
+    r36sx_dpmi_succeed();
+    CPU_AH = R36SX_DPMI_VERSION_MAJOR;
+    CPU_AL = R36SX_DPMI_VERSION_MINOR;
+    CPU_BX = r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)
+        ? R36SX_DPMI_VERSION_FLAG_32BIT
+        : 0u;
+    CPU_CL = r36sx_dpmi_processor_type();
+    CPU_DH = R36SX_DPMI_PIC_MASTER_BASE;
+    CPU_DL = R36SX_DPMI_PIC_SLAVE_BASE;
+}
+
+static void r36sx_dpmi_get_capabilities(void)
+{
+    /*
+     * INT 31h AX=0401h uses ES:(E)DI for a 128-byte vendor information buffer.
+     * The current scaffold exposes no optional capability bits, but writing a
+     * short vendor string helps diagnostics without promising unsupported DPMI
+     * features.
+     */
+    static const char vendor[] = "R36SX Pico-286 DPMI scaffold";
+    uint32_t offset = r36sx_cpu_code_default32() ? CPU_EDI : CPU_DI;
+
+    for (uint32_t i = 0; i < 128u; i++) {
+        uint8_t ch = i < (uint32_t)sizeof(vendor) ? (uint8_t)vendor[i] : 0u;
+        putmem8(CPU_ES, offset + i, ch);
+    }
+
+    r36sx_dpmi_succeed();
+    CPU_AX = 0;
+    CPU_CX = 0;
+    CPU_DX = 0;
 }
 
 static uint8_t r36sx_dpmi_int2f_handler(void)
@@ -3763,7 +3844,7 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
              * the protected-mode entry in ES:DI.  Until that entry exists,
              * report no host instead of returning garbage from the IVT path.
              */
-            if (!r36sx_dpmi_host_available()) {
+            if (!r36sx_dpmi_real_entry_available()) {
                 CPU_AX = R36SX_DPMI_NOT_INSTALLED;
                 return 1;
             }
@@ -3781,13 +3862,26 @@ static uint8_t r36sx_dpmi_int31_handler(void)
      * individual services are implemented.
      */
     if (!r36sx_dpmi_host_available()) {
-        cf = 1;
-        CPU_AX = R36SX_DPMI_UNSUPPORTED_FUNCTION;
+        r36sx_dpmi_fail(R36SX_DPMI_UNSUPPORTED_FUNCTION);
         return 1;
     }
 
-    cf = 1;
-    CPU_AX = R36SX_DPMI_UNSUPPORTED_FUNCTION;
+    switch (CPU_AX) {
+        case R36SX_DPMI_FUNC_GET_SELECTOR_INCREMENT:
+            r36sx_dpmi_succeed();
+            CPU_AX = R36SX_DPMI_SELECTOR_INCREMENT;
+            return 1;
+
+        case R36SX_DPMI_FUNC_GET_VERSION:
+            r36sx_dpmi_get_version();
+            return 1;
+
+        case R36SX_DPMI_FUNC_GET_CAPABILITIES:
+            r36sx_dpmi_get_capabilities();
+            return 1;
+    }
+
+    r36sx_dpmi_fail(R36SX_DPMI_UNSUPPORTED_FUNCTION);
     return 1;
 }
 

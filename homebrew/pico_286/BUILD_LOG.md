@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-06-02 DPMI INT 31h version scaffold
+
+Added the first protected-mode `INT 31h` services checked against the DPMI
+Committee Version 1.0 specification:
+
+- `AX=0003h`: get selector increment value.
+- `AX=0400h`: get DPMI version, host flags, CPU type, and IRQ bases.
+- `AX=0401h`: get capabilities and vendor information string.
+
+The real-mode `INT 2Fh AX=1687h` installation check still reports no host
+because the protected-mode entry point is not implemented yet.  This keeps DOS
+extenders from attempting a DPMI switch before the entry code and client state
+block exist.
+
+Reference checkpoints used:
+
+- DPMI 1.0 descriptor selector increment service.
+- DPMI 1.0 version/capabilities service return registers.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `541420` bytes
+- `pico_286` SHA256:
+  `4E4CAFB77756F6231A8101DD461E0520276AF05FF11F48BDE0CA31B1D3C3E9E3`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 DPMI probe and dispatcher groundwork
 
 Created the first DPMI host scaffold against the DPMI Committee Version 1.0
