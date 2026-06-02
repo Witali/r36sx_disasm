@@ -111,11 +111,13 @@ uint32_t dwordregs[8];
 #define R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE 0x09u
 #define R36SX_DESCRIPTOR_TYPE_TSS32_BUSY 0x0bu
 #define R36SX_EXCEPTION_BOUND 5u
+#define R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE 7u
 #define R36SX_EXCEPTION_INVALID_TSS 10u
 #define R36SX_EXCEPTION_NOT_PRESENT 11u
 #define R36SX_EXCEPTION_STACK 12u
 #define R36SX_EXCEPTION_GP 13u
 #define R36SX_EXCEPTION_PF 14u
+#define R36SX_EXCEPTION_X87_ERROR 16u
 
 typedef struct {
     uint16_t selector;
@@ -5673,7 +5675,16 @@ void __not_in_flash() exec86(uint32_t execloops) {
             r36sx_opcode_9B: ;
 #endif
                 /* 9B WAIT */
-                /// TODO:
+                if ((r36sx_cr0 & R36SX_CR0_MP) &&
+                    (r36sx_cr0 & R36SX_CR0_TS)) {
+                    r36sx_cpu_raise_exception(
+                        R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE, 0, 0, firstip);
+                    break;
+                }
+                if (OpFwait()) {
+                    r36sx_cpu_raise_exception(
+                        R36SX_EXCEPTION_X87_ERROR, 0, 0, firstip);
+                }
                 break;
 
             case 0x9C:

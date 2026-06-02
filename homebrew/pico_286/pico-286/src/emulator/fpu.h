@@ -150,6 +150,6 @@ void FpuPush(double);
 void FpuSetTag(unsigned, unsigned);
 void OpFinit();
 void OpFpu(u8 opcode);
-void OpFwait();
+int OpFwait(void);
 
 #endif

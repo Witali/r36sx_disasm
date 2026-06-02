@@ -1093,19 +1093,30 @@ void OpFinit() {
     fpu.tw = -1;
 }
 
-void OpFwait() {
-    int sw, cw;
-    sw = fpu.sw;
-    cw = fpu.cw;
-    if (((sw & kFpuSwIe) && !(cw & kFpuCwIm)) ||
+int OpFwait(void) {
+    int sw = fpu.sw;
+    int cw = fpu.cw;
+    int pending =
+        ((sw & kFpuSwIe) && !(cw & kFpuCwIm)) ||
         ((sw & kFpuSwDe) && !(cw & kFpuCwDm)) ||
         ((sw & kFpuSwZe) && !(cw & kFpuCwZm)) ||
         ((sw & kFpuSwOe) && !(cw & kFpuCwOm)) ||
         ((sw & kFpuSwUe) && !(cw & kFpuCwUm)) ||
         ((sw & kFpuSwPe) && !(cw & kFpuCwPm)) ||
-        ((sw & kFpuSwSf) && !(cw & kFpuCwIm))) {
-        //HaltMachine(kMachineFpuException); //TODO
+        ((sw & kFpuSwSf) && !(cw & kFpuCwIm));
+
+    /*
+     * The host executes x87 operations synchronously, so a lasting BUSY state
+     * would only confuse programs probing an 80287.  ES mirrors whether any
+     * currently latched exception is unmasked by the control word.
+     */
+    fpu.sw &= ~kFpuSwBf;
+    if (pending) {
+        fpu.sw |= kFpuSwEs;
+    } else {
+        fpu.sw &= ~kFpuSwEs;
     }
+    return pending ? 1 : 0;
 }
 
 int FpuGetTag(unsigned i) {

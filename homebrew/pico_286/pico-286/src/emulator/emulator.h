@@ -327,6 +327,7 @@ void vga_set_standard_mode(uint8_t mode);
 #define ega_vga_enabled (1)
 #endif
 
+int OpFwait(void);
 void OpFpu(uint8_t opcode);
 
 // Memory
