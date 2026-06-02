@@ -119,6 +119,7 @@ uint32_t dwordregs[8];
 #define R36SX_EXCEPTION_X87_ERROR 16u
 #define R36SX_FLAGS_ALWAYS_ONE 0x0002u
 #define R36SX_FLAGS_STATUS_MASK 0x0fd5u
+#define R36SX_FLAGS_IF_MASK 0x0200u
 #define R36SX_FLAGS_IOPL_MASK 0x3000u
 #define R36SX_FLAGS_IOPL_SHIFT 12u
 #define R36SX_FLAGS_286_CONTROL_MASK 0x7000u
@@ -2346,8 +2347,26 @@ static INLINE void decodeflagsword(uint16_t x) {
         /* 16-bit POPF/IRET updates FLAGS, not the high EFLAGS-only bits. */
         preserved = x86_flags.value & (R36SX_EFLAGS_386_MASK & 0xffff0000u);
     }
+    uint32_t next = x & r36sx_cpu_flags_word_variable_mask();
+
+    if (r36sx_cpu_protected_enabled()) {
+        uint8_t cpl = r36sx_cpu_cpl();
+        /*
+         * In protected mode, POPF/IRET cannot raise IOPL from non-ring-0
+         * code, and IF is writable only when CPL <= current IOPL.
+         */
+        if (cpl != 0u) {
+            next = (next & ~R36SX_FLAGS_IOPL_MASK) |
+                   (x86_flags.value & R36SX_FLAGS_IOPL_MASK);
+        }
+        if (cpl > r36sx_cpu_iopl()) {
+            next = (next & ~R36SX_FLAGS_IF_MASK) |
+                   (x86_flags.value & R36SX_FLAGS_IF_MASK);
+        }
+    }
+
     x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | preserved |
-                      (x & r36sx_cpu_flags_word_variable_mask());
+                      next;
 }
 
 static INLINE uint32_t makeflagsdword(void) {
@@ -2363,7 +2382,21 @@ static INLINE void decodeflagsdword(uint32_t x) {
         decodeflagsword((uint16_t)x);
         return;
     }
-    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | (x & R36SX_EFLAGS_386_MASK);
+    uint32_t next = x & R36SX_EFLAGS_386_MASK;
+
+    if (r36sx_cpu_protected_enabled()) {
+        uint8_t cpl = r36sx_cpu_cpl();
+        if (cpl != 0u) {
+            next = (next & ~R36SX_FLAGS_IOPL_MASK) |
+                   (x86_flags.value & R36SX_FLAGS_IOPL_MASK);
+        }
+        if (cpl > r36sx_cpu_iopl()) {
+            next = (next & ~R36SX_FLAGS_IF_MASK) |
+                   (x86_flags.value & R36SX_FLAGS_IF_MASK);
+        }
+    }
+
+    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | next;
 }
 
 #define R36SX_BIOS_TEXT_BASE 0x8000u
