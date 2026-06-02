@@ -18,14 +18,16 @@ after the full instruction.
 Rebuild command:
 
 ```powershell
-.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
 ```
 
 Result:
 
-- `pico_286.gcc` size: `538512` bytes
-- `pico_286.gcc` SHA256:
-  `A08054B64320D1A471A27E10E4DCC332E9F395C38A7C743883E7CE3644C595A9`
+- `pico_286` size: `538512` bytes
+- `pico_286` SHA256:
+  `E1B3348B6402002390736455B81AB8405808C4F3D485C9103FB18BABBC16B3FF`
+- Patch copy was updated with the same binary.
 - WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
   and audio helper code.
 - DSP side builds remain paused and were not rebuilt.
