@@ -22,7 +22,7 @@
     ; Flags
     CDSFLAG_PHY          equ 04000h
     CDSFLAG_NET          equ 08000h
-    CDSFLAG_NET_PHY      equ (CDSFLAG_PHY or CDSFLAG_NET)
+    CDSFLAG_NET_PHY      equ 0C000h    ; NET|PHY, NASM/FASM-compatible
 
     start:
         ; Get List of Lists: INT 21h, AH=52h -> ES:BX

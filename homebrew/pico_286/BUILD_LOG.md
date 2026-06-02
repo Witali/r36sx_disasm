@@ -1165,6 +1165,20 @@ With `total_memory_kb=8192`, automatic XMS/extended memory is now `8192 - 1024`
 `MEM` from reporting the extra 208 KB that came from ignoring the reserved
 `A0000h..FFFFFh` area.
 
+## 2026-06-02 MAPDRIVE.COM NASM build
+
+`test386.bin` is built with the local NASM 3.01 toolchain.  `tools/mapdrive.asm`
+was originally documented for FASM, but only the `NET|PHY` constant expression
+was not NASM-compatible.  Replaced that expression with the already-computed
+`0C000h` value so the same NASM executable can build it:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+```
+
+The generated `mapdrive.com` is 265 bytes and was copied to the Pico-286 patch
+folder and local `disk_image` copy.  Microsoft Defender scan found no threats.
+
 Rebuild commands:
 
 ```powershell
