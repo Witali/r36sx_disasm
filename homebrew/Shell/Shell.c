@@ -126,6 +126,9 @@ struct pty_state {
     int pipe_esc_state;
     char pipe_line[PIPE_LINE_MAX];
     size_t pipe_line_len;
+    int pipe_filter_tty_warning;
+    int pipe_filter_skip_eol;
+    size_t pipe_filter_pos;
 };
 
 struct key_state {
@@ -177,7 +180,12 @@ struct term_font_state {
 
 static struct driver_state g_driver;
 static struct terminal_state g_term;
-static struct pty_state g_pty = { -1, -1, -1, -1, 0, 0, 0, { 0 }, 0 };
+static struct pty_state g_pty = {
+    .master_fd = -1,
+    .read_fd = -1,
+    .write_fd = -1,
+    .child_pid = -1
+};
 static struct key_state g_keys;
 static struct evdev_keyboard_state g_evdev;
 static struct term_font_state g_font;
@@ -1238,13 +1246,13 @@ static void pty_prepare_devpts(void)
     if (stat("/dev/ptmx", &st) != 0 && errno == ENOENT) {
         if (mknod("/dev/ptmx", S_IFCHR | 0666, makedev(5, 2)) != 0 &&
             errno != EEXIST) {
-            term_write_errno_message("mknod /dev/ptmx failed", errno);
+            return;
         }
     }
 
     if (mount("devpts", "/dev/pts", "devpts", 0, "mode=620") != 0 &&
         errno != EBUSY) {
-        term_write_errno_message("mount devpts failed", errno);
+        return;
     }
 }
 
@@ -1269,6 +1277,9 @@ static void pty_close(void)
     g_pty.pipe_mode = 0;
     g_pty.pipe_esc_state = 0;
     g_pty.pipe_line_len = 0;
+    g_pty.pipe_filter_tty_warning = 0;
+    g_pty.pipe_filter_skip_eol = 0;
+    g_pty.pipe_filter_pos = 0;
 }
 
 static void pty_set_winsize(void)
@@ -1291,17 +1302,14 @@ static int pty_open_master(int *out_master, char **out_slave_name)
 {
     int master = posix_openpt(O_RDWR | O_NOCTTY);
     if (master < 0) {
-        term_write_errno_message("posix_openpt failed", errno);
         return -1;
     }
     if (grantpt(master) != 0 || unlockpt(master) != 0) {
-        term_write_errno_message("grantpt/unlockpt failed", errno);
         close(master);
         return -1;
     }
     char *slave_name = ptsname(master);
     if (!slave_name) {
-        term_write_errno_message("ptsname failed", errno);
         close(master);
         return -1;
     }
@@ -1376,8 +1384,9 @@ static int pipe_spawn_shell(void)
     g_pty.pipe_mode = 1;
     g_pty.pipe_esc_state = 0;
     g_pty.pipe_line_len = 0;
-    term_write_text("[PTY unavailable; using pipe shell fallback]\r\n");
-    term_write_text("[line editing is local; job control is unavailable]\r\n");
+    g_pty.pipe_filter_tty_warning = 1;
+    g_pty.pipe_filter_skip_eol = 0;
+    g_pty.pipe_filter_pos = 0;
     return 0;
 }
 
@@ -1387,12 +1396,10 @@ static int pty_spawn_shell(void)
     char *slave_name = NULL;
 
     if (pty_open_master(&master, &slave_name) != 0) {
-        term_write_text("[trying /dev/pts setup]\r\n");
         pty_prepare_devpts();
         if (pty_open_master(&master, &slave_name) != 0) {
             return pipe_spawn_shell();
         }
-        term_write_text("[PTY recovered after /dev/pts setup]\r\n");
     }
 
     pid_t pid = fork();
@@ -1428,6 +1435,9 @@ static int pty_spawn_shell(void)
     g_pty.pipe_mode = 0;
     g_pty.pipe_esc_state = 0;
     g_pty.pipe_line_len = 0;
+    g_pty.pipe_filter_tty_warning = 0;
+    g_pty.pipe_filter_skip_eol = 0;
+    g_pty.pipe_filter_pos = 0;
     fcntl(master, F_SETFL, fcntl(master, F_GETFL, 0) | O_NONBLOCK);
     g_last_winsize_rows = 0;
     pty_set_winsize();
@@ -1448,6 +1458,42 @@ static void pty_check_child(void)
     }
 }
 
+static void pipe_process_output_byte(uint8_t ch)
+{
+    static const char tty_warning[] =
+        "sh: can't access tty; job control turned off";
+
+    if (g_pty.pipe_filter_tty_warning) {
+        if (g_pty.pipe_filter_skip_eol) {
+            if (ch == '\r' || ch == '\n') {
+                return;
+            }
+            g_pty.pipe_filter_tty_warning = 0;
+            g_pty.pipe_filter_skip_eol = 0;
+            g_pty.pipe_filter_pos = 0;
+            term_process_byte(ch);
+            return;
+        }
+
+        if (ch == (uint8_t)tty_warning[g_pty.pipe_filter_pos]) {
+            g_pty.pipe_filter_pos++;
+            if (tty_warning[g_pty.pipe_filter_pos] == '\0') {
+                g_pty.pipe_filter_skip_eol = 1;
+            }
+            return;
+        }
+
+        for (size_t i = 0; i < g_pty.pipe_filter_pos; i++) {
+            term_process_byte((uint8_t)tty_warning[i]);
+        }
+        g_pty.pipe_filter_tty_warning = 0;
+        g_pty.pipe_filter_skip_eol = 0;
+        g_pty.pipe_filter_pos = 0;
+    }
+
+    term_process_byte(ch);
+}
+
 static void pty_read_available(void)
 {
     if (g_pty.read_fd < 0) {
@@ -1458,7 +1504,11 @@ static void pty_read_available(void)
         ssize_t n = read(g_pty.read_fd, buf, sizeof(buf));
         if (n > 0) {
             for (ssize_t i = 0; i < n; i++) {
-                term_process_byte(buf[i]);
+                if (g_pty.pipe_mode) {
+                    pipe_process_output_byte(buf[i]);
+                } else {
+                    term_process_byte(buf[i]);
+                }
             }
             continue;
         }

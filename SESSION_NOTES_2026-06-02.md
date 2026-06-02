@@ -219,3 +219,13 @@ homebrew/pico_286/pico_286.hardfloat.gcc
   - `Ctrl+End` - возврат к текущему выводу.
 - Ввод в shell автоматически возвращает отображение к live-выводу.
 - `ESC[3J` очищает scrollback, а обычная очистка экрана оставляет историю.
+
+## Обновление Shell: тихий fallback
+
+- Убраны видимые строки неудачных попыток PTY/devpts-подключения:
+  `posix_openpt failed`, `[trying /dev/pts setup]`, `mount devpts failed`,
+  `[PTY unavailable...]`.
+- Pipe fallback остаётся включённым, чтобы команды и редиректы продолжали
+  работать на прошивке без usable `/dev/ptmx`.
+- Одноразовая строка BusyBox `sh: can't access tty; job control turned off`
+  фильтруется из вывода fallback-shell, но stderr обычных команд сохраняется.

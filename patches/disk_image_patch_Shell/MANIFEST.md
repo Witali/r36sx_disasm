@@ -25,9 +25,8 @@ The frontend uses `driver.so` for the framebuffer, starts `/bin/sh -i` through
 a pseudo terminal, accepts the shared on-screen keyboard, and also scans
 `/dev/input/event*` for physical USB keyboards.
 
-If `/dev/ptmx`/`devpts` is missing on the stock firmware, Shell tries to prepare
-those device nodes and retries PTY startup. If PTY still cannot be opened, it
-uses a pipe-backed fallback shell so commands and redirection remain usable.
+If `/dev/ptmx`/`devpts` is missing on the stock firmware, Shell quietly uses a
+pipe-backed fallback shell so commands and redirection remain usable.
 
 Hold `FN` and press D-pad `Up` to save a framebuffer screenshot, matching the
 Pico-286 shortcut. Shell writes 24-bit BMP files under:
