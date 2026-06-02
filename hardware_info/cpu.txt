@@ -1,0 +1,19 @@
+system type		: Hichip HC16xx Board
+machine			: Hichip hc16xx
+processor		: 0
+cpu model		: MIPS 74Kc V4.12  FPU V0.0
+BogoMIPS		: 589.82
+wait instruction	: yes
+microsecond timers	: yes
+tlb_entries		: 32
+extra interrupt vector	: yes
+hardware watchpoint	: yes, count: 4, address/irw mask: [0x0ffc, 0x0ffc, 0x0ffb, 0x0ffb]
+isa			: mips1 mips2 mips32r1 mips32r2
+ASEs implemented	: mips16 dsp dsp2
+shadow register sets	: 1
+kscratch registers	: 0
+package			: 0
+core			: 1
+VCED exceptions		: not available
+VCEI exceptions		: not available
+
