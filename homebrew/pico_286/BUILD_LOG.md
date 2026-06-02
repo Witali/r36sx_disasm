@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-02 active combo key preset switching
+
+Changed native input handling so physical buttons with complex key preset
+bindings are mutually exclusive.  If `Ctrl+A` is held and another physical
+button mapped to `Alt+S` is pressed, Pico-286 now releases `Ctrl+A` before
+pressing `Alt+S` instead of merging them into `Ctrl+Alt+A+S`.  Single-key
+bindings still combine normally with other held single keys.  Side-specific
+Shift/Ctrl/Alt keys were also marked non-repeatable.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `480892` bytes
+- `pico_286` SHA256:
+  `6F67F1ACCE6D0E4169C6187E4CC42BB94D1B63BA6F169F709B15270AC025A806`
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 side-specific key preset modifiers
 
 Added distinct on-screen keyboard picker keycodes for left/right modifiers:

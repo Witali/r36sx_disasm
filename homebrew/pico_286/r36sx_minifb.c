@@ -97,6 +97,7 @@ struct r36sx_mfb_driver {
     uint64_t key_repeat_next_us[256];
     uint64_t last_present_us;
     uint32_t last_raw_keys;
+    uint32_t active_combo_mask;
     struct r36sx_screen_keyboard osk;
     struct r36sx_disk_menu disk_menu;
     struct r36sx_key_presets key_presets;
@@ -1174,14 +1175,21 @@ static void r36sx_mfb_release_all_keys(void)
         }
         g_mfb.key_repeat_next_us[code] = 0;
     }
+    g_mfb.active_combo_mask = 0;
 }
 
 static int r36sx_mfb_key_is_repeatable(uint16_t keycode)
 {
     switch (keycode) {
     case R36SX_SCREEN_KEY_SHIFT:
+    case R36SX_SCREEN_KEY_LSHIFT:
+    case R36SX_SCREEN_KEY_RSHIFT:
     case R36SX_SCREEN_KEY_CONTROL:
+    case R36SX_SCREEN_KEY_LCONTROL:
+    case R36SX_SCREEN_KEY_RCONTROL:
     case R36SX_SCREEN_KEY_MENU:
+    case R36SX_SCREEN_KEY_LMENU:
+    case R36SX_SCREEN_KEY_RMENU:
     case R36SX_SCREEN_KEY_LWIN:
     case R36SX_SCREEN_KEY_APPS:
         return 0;
@@ -2041,6 +2049,60 @@ static void r36sx_mfb_mark_binding_down(uint8_t *new_down, size_t count,
     r36sx_mfb_mark_key_down(new_down, count, binding.keycode);
 }
 
+static int r36sx_mfb_binding_is_combo(struct r36sx_key_binding binding)
+{
+    return binding.keycode != 0 && binding.mods != 0;
+}
+
+static uint32_t r36sx_mfb_select_combo_mask(const uint32_t *preset_masks,
+                                            size_t preset_mask_count,
+                                            uint32_t candidate_mask)
+{
+    uint32_t selected = 0;
+
+    for (size_t i = 0; i < preset_mask_count; i++) {
+        if ((candidate_mask & preset_masks[i]) != 0) {
+            struct r36sx_key_binding binding =
+                r36sx_key_presets_binding_for_mask(&g_mfb.key_presets,
+                                                   preset_masks[i]);
+            if (r36sx_mfb_binding_is_combo(binding)) {
+                selected = preset_masks[i];
+            }
+        }
+    }
+    return selected;
+}
+
+static void r36sx_mfb_update_active_combo_mask(const uint32_t *preset_masks,
+                                               size_t preset_mask_count,
+                                               uint32_t raw,
+                                               uint32_t pressed)
+{
+    uint32_t selected;
+
+    /* Complex preset bindings are synthetic chords.  Keep only one active
+       chord, otherwise Ctrl+A held together with Alt+S becomes Ctrl+Alt+A+S. */
+    selected = r36sx_mfb_select_combo_mask(preset_masks, preset_mask_count,
+                                           pressed);
+    if (selected != 0) {
+        g_mfb.active_combo_mask = selected;
+        return;
+    }
+
+    if (g_mfb.active_combo_mask != 0 &&
+        (raw & g_mfb.active_combo_mask) != 0) {
+        struct r36sx_key_binding binding =
+            r36sx_key_presets_binding_for_mask(&g_mfb.key_presets,
+                                               g_mfb.active_combo_mask);
+        if (r36sx_mfb_binding_is_combo(binding)) {
+            return;
+        }
+    }
+
+    g_mfb.active_combo_mask =
+        r36sx_mfb_select_combo_mask(preset_masks, preset_mask_count, raw);
+}
+
 static int r36sx_mfb_poll_input(void)
 {
     static const uint32_t preset_masks[] = {
@@ -2173,12 +2235,19 @@ static int r36sx_mfb_poll_input(void)
         return 0;
     }
 
+    r36sx_mfb_update_active_combo_mask(preset_masks,
+                                       R36SX_PICO286_ARRAY_COUNT(preset_masks),
+                                       raw, pressed);
     memset(new_down, 0, sizeof(new_down));
     for (size_t i = 0; i < R36SX_PICO286_ARRAY_COUNT(preset_masks); i++) {
         if ((raw & preset_masks[i]) != 0) {
             struct r36sx_key_binding binding =
                 r36sx_key_presets_binding_for_mask(&g_mfb.key_presets,
                                                    preset_masks[i]);
+            if (r36sx_mfb_binding_is_combo(binding) &&
+                preset_masks[i] != g_mfb.active_combo_mask) {
+                continue;
+            }
             r36sx_mfb_mark_binding_down(new_down, sizeof(new_down), binding);
         }
     }

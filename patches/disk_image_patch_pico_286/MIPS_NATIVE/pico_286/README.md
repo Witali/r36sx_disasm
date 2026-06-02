@@ -323,4 +323,6 @@ The default preset is stored in `keypresets.conf` next to the executable.
 Preset values can be single labels such as `A`, `ENTER`, and `F1`, or combos
 such as `CTRL+S`, `SHIFT+A`, and `CTRL+ALT+DEL`.  The key picker also supports
 side-specific modifier keys: `LSHIFT`, `RSHIFT`, `LCTRL`, `RCTRL`, `LALT`,
-and `RALT`.
+and `RALT`.  When two physical buttons with combo bindings are held together,
+the most recently pressed combo is sent to DOS; the previous combo is released
+first so the two bindings do not merge into one larger chord.
