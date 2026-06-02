@@ -249,3 +249,19 @@ homebrew/pico_286/pico_286.hardfloat.gcc
   `Shift+Up` / `Shift+Down`: прокручивают scrollback на одну строку.
 - D-pad `Left` / `Right` при скрытой клавиатуре всё ещё отправляют обычные
   terminal arrow keys в shell.
+
+## Скрипт сохранения MTD
+
+- Добавлен `homebrew/shell/dump_mtd.sh`.
+- При установке `shell` скрипт копируется в:
+  - `disk_image/MIPS_NATIVE/shell/dump_mtd.sh`
+  - `patches/disk_image_patch_shell/MIPS_NATIVE/shell/dump_mtd.sh`
+- На устройстве запуск:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/shell/dump_mtd.sh
+```
+
+- По умолчанию сохраняет все разделы из `/proc/mtd` под
+  `/mnt/sdcard/mtd-dump/YYYYMMDD_HHMMSS/`, вместе с `proc_mtd.txt`,
+  `mtd_map.tsv`, `dump.log` и checksum-файлом.

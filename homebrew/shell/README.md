@@ -34,6 +34,16 @@ dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 cat /mnt/sdcard/root.txt
 ```
 
+To save all MTD partitions to the SD card:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/shell/dump_mtd.sh
+```
+
+The optional first argument overrides the output root. By default, dumps are
+written under `/mnt/sdcard/mtd-dump/YYYYMMDD_HHMMSS/` with `/proc/mtd`, a TSV
+map, a log, and checksums.
+
 If the firmware has no usable `/dev/ptmx`/`devpts`, the frontend quietly falls back to
 a pipe-backed shell. Commands and redirection still work in that mode, but line
 editing is local to the frontend and job-control features from a real TTY are

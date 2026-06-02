@@ -10,6 +10,7 @@ preserving directories.
 ```text
 MIPS_NATIVE/shell/shell
 MIPS_NATIVE/shell/README.md
+MIPS_NATIVE/shell/dump_mtd.sh
 MIPS_NATIVE/common/fonts/
 ```
 
@@ -46,6 +47,16 @@ shell redirection and pipes work normally, for example:
 ls / > /mnt/sdcard/root.txt
 dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 ```
+
+To save all MTD partitions to the SD card:
+
+```sh
+/mnt/sdcard/MIPS_NATIVE/shell/dump_mtd.sh
+```
+
+The script writes `/proc/mtd`, a partition map, logs, checksums, and one
+`mtdN_name.bin` file per readable MTD partition under
+`/mnt/sdcard/mtd-dump/YYYYMMDD_HHMMSS/`.
 
 ## Notes
 

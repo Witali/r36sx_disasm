@@ -137,6 +137,10 @@ if [[ "$DO_INSTALL" -eq 1 ]]; then
         "$ROOT_DIR/disk_image/MIPS_NATIVE/shell/README.md"
     install -m 0644 "$SCRIPT_DIR/README.md" \
         "$PATCH_ROOT/MIPS_NATIVE/shell/README.md"
+    install -m 0755 "$SCRIPT_DIR/dump_mtd.sh" \
+        "$ROOT_DIR/disk_image/MIPS_NATIVE/shell/dump_mtd.sh"
+    install -m 0755 "$SCRIPT_DIR/dump_mtd.sh" \
+        "$PATCH_ROOT/MIPS_NATIVE/shell/dump_mtd.sh"
     cp -a "$ROOT_DIR/homebrew/common/fonts/." \
         "$ROOT_DIR/disk_image/MIPS_NATIVE/common/fonts/"
     cp -a "$ROOT_DIR/homebrew/common/fonts/." \
