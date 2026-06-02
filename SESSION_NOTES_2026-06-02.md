@@ -2,7 +2,7 @@
 
 Этот документ фиксирует, что было сделано в ходе текущего чата: разбор DTB/DTS,
 оценка загрузки Linux/Debian, проверка ABI/FPU и добавление native-программы
-`Shell` для устройства.
+`shell` для устройства.
 
 ## DTB/DTS
 
@@ -71,38 +71,38 @@
   - `cat /proc/cpuinfo`
   - `dmesg | grep -i fpu`
 - После проверки на железе в `dmesg` обнаружена строка про FPU. Поэтому
-  WSL/GCC-сборки `Shell` и Pico-286 переключены с 74Kc на 74Kf:
+  WSL/GCC-сборки `shell` и Pico-286 переключены с 74Kc на 74Kf:
   `-march=74kf -mtune=74kf`.
 
-## Shell
+## shell
 
-Добавлена новая native-программа `Shell` без префикса `r36sx`.
+Добавлена новая native-программа `shell` без префикса `r36sx`.
 
 Исходники и сборка:
 
 ```text
-homebrew/Shell/Shell.c
-homebrew/Shell/build_Shell_wsl.sh
-homebrew/Shell/README.md
+homebrew/shell/shell.c
+homebrew/shell/build_shell_wsl.sh
+homebrew/shell/README.md
 ```
 
 Собранные/установленные копии:
 
 ```text
-homebrew/Shell/Shell
-disk_image/MIPS_NATIVE/Shell/Shell
-patches/disk_image_patch_Shell/MIPS_NATIVE/Shell/Shell
+homebrew/shell/shell
+disk_image/MIPS_NATIVE/shell/shell
+patches/disk_image_patch_shell/MIPS_NATIVE/shell/shell
 ```
 
 Patch overlay:
 
 ```text
-patches/disk_image_patch_Shell/MANIFEST.md
-patches/disk_image_patch_Shell/MIPS_NATIVE/Shell/README.md
-patches/disk_image_patch_Shell/MIPS_NATIVE/common/fonts/
+patches/disk_image_patch_shell/MANIFEST.md
+patches/disk_image_patch_shell/MIPS_NATIVE/shell/README.md
+patches/disk_image_patch_shell/MIPS_NATIVE/common/fonts/
 ```
 
-Что делает `Shell`:
+Что делает `shell`:
 
 - Открывает `driver.so` и выводит RGB565 framebuffer через
   `video_driver_disp_frame`.
@@ -120,7 +120,7 @@ cat /mnt/sdcard/root.txt
 
 - Поддерживает простую VT100/ANSI-отрисовку: цвета, cursor movement, clear
   screen/line, printable UTF-8 через FreeType-глифы.
-- Если на прошивке не работает `/dev/ptmx`/`devpts`, `Shell` теперь пытается
+- Если на прошивке не работает `/dev/ptmx`/`devpts`, `shell` теперь пытается
   создать `/dev/ptmx`, смонтировать `devpts` на `/dev/pts`, повторить запуск
   PTY, а затем переходит в pipe-backed fallback. В fallback-режиме команды и
   редиректы работают, но полноценного TTY/job-control нет.
@@ -131,8 +131,8 @@ cat /mnt/sdcard/root.txt
   - `SELECT` - показать клавиатуру или expand/collapse.
   - При скрытой клавиатуре D-pad отправляет terminal arrow keys.
 - Скриншоты добавлены по той же комбинации, что в Pico 286:
-  `FN + D-pad Up`. В `Shell` они сохраняются как 24-bit BMP:
-  `/mnt/sdcard/MIPS_NATIVE/Shell/screenshots/Shell_YYYYMMDD_HHMMSS_NNN.bmp`.
+  `FN + D-pad Up`. В `shell` они сохраняются как 24-bit BMP:
+  `/mnt/sdcard/MIPS_NATIVE/shell/screenshots/shell_YYYYMMDD_HHMMSS_NNN.bmp`.
   Если SD-путь недоступен, используется локальный каталог `screenshots`.
 
 ## Физическая USB-клавиатура
@@ -150,7 +150,7 @@ cat /mnt/sdcard/root.txt
 - `mdev` включён через `/proc/sys/kernel/hotplug`, значит USB HID-клавиатура
   должна появляться как `/dev/input/event*`, если физический USB host-порт и
   питание работают.
-- В `Shell` добавлен evdev-мост:
+- В `shell` добавлен evdev-мост:
   - периодически сканирует `/dev/input/event*`;
   - фильтрует keyboard-like устройства по `EV_KEY`, `KEY_A`, `KEY_ENTER`;
   - мапит клавиши физической USB-клавиатуры в PTY `/bin/sh`;
@@ -163,7 +163,7 @@ dmesg
 ls /dev/input/event*
 ```
 
-При успешном подключении `Shell` должен вывести строку вида:
+При успешном подключении `shell` должен вывести строку вида:
 
 ```text
 [usb keyboard: /dev/input/eventX]
@@ -181,7 +181,7 @@ ls /dev/input/event*
 - В `homebrew/common/r36sx_screen_keyboard.c` добавлены пути к common
   monospace-шрифтам:
   `MIPS_NATIVE/common/fonts/*.ttf`.
-- Это позволяет экранной клавиатуре использовать те же шрифты, что `Shell`,
+- Это позволяет экранной клавиатуре использовать те же шрифты, что `shell`,
   `Tiny MC` и другие native-программы.
 
 ## Текущее состояние рабочей копии
@@ -190,8 +190,8 @@ ls /dev/input/event*
 
 ```text
 homebrew/common/r36sx_screen_keyboard.c
-homebrew/Shell/
-patches/disk_image_patch_Shell/
+homebrew/shell/
+patches/disk_image_patch_shell/
 ```
 
 Также в рабочей копии были несвязанные/старые untracked-артефакты, которые этот
@@ -202,11 +202,11 @@ disasm/
 homebrew/pico_286/pico_286.hardfloat.gcc
 ```
 
-Старые директории/пути `r36sx_shell` были переименованы в `Shell`.
+Старые директории/пути `r36sx_shell` были переименованы в `shell`.
 
-## Обновление Shell: scrollback
+## Обновление shell: scrollback
 
-- В `homebrew/Shell/Shell.c` добавлен кольцевой scrollback-буфер на 512 строк.
+- В `homebrew/shell/shell.c` добавлен кольцевой scrollback-буфер на 512 строк.
 - При терминальной прокрутке верхняя строка сохраняется в историю, а отрисовка
   может показывать как live-экран, так и прошлый вывод.
 - Управление на устройстве:
@@ -220,7 +220,7 @@ homebrew/pico_286/pico_286.hardfloat.gcc
 - Ввод в shell автоматически возвращает отображение к live-выводу.
 - `ESC[3J` очищает scrollback, а обычная очистка экрана оставляет историю.
 
-## Обновление Shell: тихий fallback
+## Обновление shell: тихий fallback
 
 - Убраны видимые строки неудачных попыток PTY/devpts-подключения:
   `posix_openpt failed`, `[trying /dev/pts setup]`, `mount devpts failed`,
@@ -229,3 +229,16 @@ homebrew/pico_286/pico_286.hardfloat.gcc
   работать на прошивке без usable `/dev/ptmx`.
 - Одноразовая строка BusyBox `sh: can't access tty; job control turned off`
   фильтруется из вывода fallback-shell, но stderr обычных команд сохраняется.
+
+## Переименование shell
+
+- Native-программа `shell` переименована в lowercase, как остальные
+  homebrew-программы.
+- Текущие пути:
+  - `homebrew/shell/shell.c`
+  - `homebrew/shell/build_shell_wsl.sh`
+  - `disk_image/MIPS_NATIVE/shell/shell`
+  - `patches/disk_image_patch_shell/MIPS_NATIVE/shell/shell`
+- Каталог скриншотов теперь:
+  `/mnt/sdcard/MIPS_NATIVE/shell/screenshots/`.
+- Имена BMP-скриншотов теперь начинаются с `shell_`.

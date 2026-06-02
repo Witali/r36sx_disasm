@@ -7,11 +7,11 @@ SDK_ROOT="$ROOT_DIR/tools/mipsel-buildroot-linux-gnu_sdk-buildroot"
 TOOLCHAIN_ROOT="$SDK_ROOT/opt/ext-toolchain"
 SYSROOT="$TOOLCHAIN_ROOT/sysroot/mipsel-r2-hard"
 FREETYPE_INCLUDE="$SDK_ROOT/mipsel-buildroot-linux-gnu/sysroot/usr/include/freetype2"
-PATCH_ROOT="$ROOT_DIR/patches/disk_image_patch_Shell"
+PATCH_ROOT="$ROOT_DIR/patches/disk_image_patch_shell"
 
 CC="${CC:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-gcc}"
 STRIP="${STRIP:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-strip}"
-OUT="$SCRIPT_DIR/Shell"
+OUT="$SCRIPT_DIR/shell"
 DO_INSTALL=0
 DO_STRIP=0
 
@@ -19,7 +19,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--install] [--strip] [--out PATH]
 
-Builds the Shell framebuffer terminal with the local MIPS GCC toolchain.
+Builds the shell framebuffer terminal with the local MIPS GCC toolchain.
 
   --install  copy binary and common fonts into disk_image/MIPS_NATIVE
   --strip    strip the output binary
@@ -112,12 +112,12 @@ LDFLAGS=(
     -L"$SYSROOT/usr/lib"
 )
 
-"$CC" "${CFLAGS[@]}" -c "$SCRIPT_DIR/Shell.c" \
-    -o "$OBJ_DIR/Shell.o"
+"$CC" "${CFLAGS[@]}" -c "$SCRIPT_DIR/shell.c" \
+    -o "$OBJ_DIR/shell.o"
 "$CC" "${CFLAGS[@]}" -c "$ROOT_DIR/homebrew/common/r36sx_screen_keyboard.c" \
     -o "$OBJ_DIR/r36sx_screen_keyboard.o"
 "$CC" "${CFLAGS[@]}" "${LDFLAGS[@]}" \
-    "$OBJ_DIR/Shell.o" "$OBJ_DIR/r36sx_screen_keyboard.o" \
+    "$OBJ_DIR/shell.o" "$OBJ_DIR/r36sx_screen_keyboard.o" \
     -o "$OUT" -ldl
 
 if [[ "$DO_STRIP" -eq 1 ]]; then
@@ -125,18 +125,18 @@ if [[ "$DO_STRIP" -eq 1 ]]; then
 fi
 
 if [[ "$DO_INSTALL" -eq 1 ]]; then
-    install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/Shell"
+    install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/shell"
     install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/common/fonts"
-    install -d "$PATCH_ROOT/MIPS_NATIVE/Shell"
+    install -d "$PATCH_ROOT/MIPS_NATIVE/shell"
     install -d "$PATCH_ROOT/MIPS_NATIVE/common/fonts"
     install -m 0755 "$OUT" \
-        "$ROOT_DIR/disk_image/MIPS_NATIVE/Shell/Shell"
+        "$ROOT_DIR/disk_image/MIPS_NATIVE/shell/shell"
     install -m 0755 "$OUT" \
-        "$PATCH_ROOT/MIPS_NATIVE/Shell/Shell"
+        "$PATCH_ROOT/MIPS_NATIVE/shell/shell"
     install -m 0644 "$SCRIPT_DIR/README.md" \
-        "$ROOT_DIR/disk_image/MIPS_NATIVE/Shell/README.md"
+        "$ROOT_DIR/disk_image/MIPS_NATIVE/shell/README.md"
     install -m 0644 "$SCRIPT_DIR/README.md" \
-        "$PATCH_ROOT/MIPS_NATIVE/Shell/README.md"
+        "$PATCH_ROOT/MIPS_NATIVE/shell/README.md"
     cp -a "$ROOT_DIR/homebrew/common/fonts/." \
         "$ROOT_DIR/disk_image/MIPS_NATIVE/common/fonts/"
     cp -a "$ROOT_DIR/homebrew/common/fonts/." \
@@ -146,6 +146,6 @@ fi
 file "$OUT"
 echo "Built: $OUT"
 if [[ "$DO_INSTALL" -eq 1 ]]; then
-    echo "Installed: $ROOT_DIR/disk_image/MIPS_NATIVE/Shell/Shell"
-    echo "Patch: $PATCH_ROOT/MIPS_NATIVE/Shell/Shell"
+    echo "Installed: $ROOT_DIR/disk_image/MIPS_NATIVE/shell/shell"
+    echo "Patch: $PATCH_ROOT/MIPS_NATIVE/shell/shell"
 fi

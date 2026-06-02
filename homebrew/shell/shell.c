@@ -38,7 +38,7 @@
 #include "../pico_286/pico-286/src/emulator/includes/font8x16.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
-#define SHELL_SCREENSHOT_DIR R36SX_MIPS_NATIVE_DIR "/Shell/screenshots"
+#define SHELL_SCREENSHOT_DIR R36SX_MIPS_NATIVE_DIR "/shell/screenshots"
 #define SHELL_SCREENSHOT_LOCAL_DIR "screenshots"
 #define SHELL_SCREENSHOT_PATH_MAX 512
 
@@ -1082,7 +1082,7 @@ static int shell_save_screenshot_to_dir(const char *dir,
     }
 
     seq = g_screenshot_counter++;
-    written = snprintf(path, sizeof(path), "%s/Shell_%s_%03u.bmp",
+    written = snprintf(path, sizeof(path), "%s/shell_%s_%03u.bmp",
                        dir, stamp, (unsigned)(seq % 1000u));
     if (written < 0 || (size_t)written >= sizeof(path)) {
         return -1;
@@ -1145,7 +1145,7 @@ static int display_open(void)
         }
     }
     if (!g_driver.handle) {
-        fprintf(stderr, "Shell: cannot open driver.so: %s\n", dlerror());
+        fprintf(stderr, "shell: cannot open driver.so: %s\n", dlerror());
         return -1;
     }
 
@@ -1156,7 +1156,7 @@ static int display_open(void)
     g_driver.cube_ioctl = (cube_ioctl_fn)dlsym(g_driver.handle, "cube_ioctl");
     if (!g_driver.setting || !g_driver.init || !g_driver.disp_frame ||
         !g_driver.deinit || !g_driver.cube_ioctl) {
-        fprintf(stderr, "Shell: driver.so symbols missing\n");
+        fprintf(stderr, "shell: driver.so symbols missing\n");
         return -1;
     }
 
@@ -1169,7 +1169,7 @@ static int display_open(void)
     };
     g_driver.setting(cfg);
     if (g_driver.init() < 0) {
-        fprintf(stderr, "Shell: video_drivers_init failed\n");
+        fprintf(stderr, "shell: video_drivers_init failed\n");
         return -1;
     }
     g_driver.active = 1;
@@ -2263,7 +2263,7 @@ int main(void)
         display_close();
         return 1;
     }
-    term_write_text("Shell. SELECT shows keyboard, FN toggles it, FN+UP saves screenshot, FN+X exits.\r\n");
+    term_write_text("shell. SELECT shows keyboard, FN toggles it, FN+UP saves screenshot, FN+X exits.\r\n");
     term_write_text("Scrollback: FN+L/R line, FN+Left/Right page, FN+Down live.\r\n");
     term_write_text("USB keyboards are accepted from /dev/input/event*.\r\n");
     term_write_text("Redirection works normally, e.g. ls / > /mnt/sdcard/root.txt\r\n\r\n");

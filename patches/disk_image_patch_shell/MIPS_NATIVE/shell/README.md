@@ -1,4 +1,4 @@
-# Shell
+# shell
 
 Small Linux shell frontend for the stock R36SX firmware. It uses `driver.so`
 for the RGB565 framebuffer, the shared R36SX on-screen keyboard, and a pseudo
@@ -10,20 +10,20 @@ through Linux evdev devices.
 From Windows PowerShell:
 
 ```powershell
-wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && ./homebrew/Shell/build_Shell_wsl.sh --strip --install"
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && ./homebrew/shell/build_shell_wsl.sh --strip --install"
 ```
 
 The `--install` option writes:
 
 ```text
-disk_image/MIPS_NATIVE/Shell/Shell
+disk_image/MIPS_NATIVE/shell/shell
 disk_image/MIPS_NATIVE/common/fonts/*.ttf
 ```
 
 ## Run on the device
 
 ```sh
-/mnt/sdcard/MIPS_NATIVE/Shell/Shell
+/mnt/sdcard/MIPS_NATIVE/shell/shell
 ```
 
 The terminal launches `/bin/sh -i`, so normal shell redirection and pipes work:
@@ -34,9 +34,9 @@ dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 cat /mnt/sdcard/root.txt
 ```
 
-If the firmware has no usable `/dev/ptmx`/`devpts`, Shell quietly falls back to
+If the firmware has no usable `/dev/ptmx`/`devpts`, the frontend quietly falls back to
 a pipe-backed shell. Commands and redirection still work in that mode, but line
-editing is local to Shell and job-control features from a real TTY are
+editing is local to the frontend and job-control features from a real TTY are
 unavailable.
 
 ## Controls
@@ -83,7 +83,7 @@ compatibility and double-width CJK layout are not implemented.
 framebuffer as a 24-bit BMP in:
 
 ```text
-/mnt/sdcard/MIPS_NATIVE/Shell/screenshots/Shell_YYYYMMDD_HHMMSS_NNN.bmp
+/mnt/sdcard/MIPS_NATIVE/shell/screenshots/shell_YYYYMMDD_HHMMSS_NNN.bmp
 ```
 
 If that SD-card path cannot be created, the frontend falls back to a local

@@ -1,6 +1,6 @@
-# disk_image_patch_Shell
+# disk_image_patch_shell
 
-This patch adds the native Shell framebuffer terminal.
+This patch adds the native shell framebuffer terminal.
 
 Copy the contents of this directory over the root of the original SD card,
 preserving directories.
@@ -8,8 +8,8 @@ preserving directories.
 ## Files
 
 ```text
-MIPS_NATIVE/Shell/Shell
-MIPS_NATIVE/Shell/README.md
+MIPS_NATIVE/shell/shell
+MIPS_NATIVE/shell/README.md
 MIPS_NATIVE/common/fonts/
 ```
 
@@ -18,28 +18,28 @@ MIPS_NATIVE/common/fonts/
 Run:
 
 ```sh
-/mnt/sdcard/MIPS_NATIVE/Shell/Shell
+/mnt/sdcard/MIPS_NATIVE/shell/shell
 ```
 
 The frontend uses `driver.so` for the framebuffer, starts `/bin/sh -i` through
 a pseudo terminal, accepts the shared on-screen keyboard, and also scans
 `/dev/input/event*` for physical USB keyboards.
 
-If `/dev/ptmx`/`devpts` is missing on the stock firmware, Shell quietly uses a
+If `/dev/ptmx`/`devpts` is missing on the stock firmware, the frontend quietly uses a
 pipe-backed fallback shell so commands and redirection remain usable.
 
 Hold `FN` and press D-pad `Up` to save a framebuffer screenshot, matching the
-Pico-286 shortcut. Shell writes 24-bit BMP files under:
+Pico-286 shortcut. The frontend writes 24-bit BMP files under:
 
 ```text
-/mnt/sdcard/MIPS_NATIVE/Shell/screenshots/
+/mnt/sdcard/MIPS_NATIVE/shell/screenshots/
 ```
 
 Console output keeps 512 lines of scrollback. Use `FN+L` / `FN+R` for one-line
 history scrolling, `FN+D-pad Left` / `FN+D-pad Right` for page scrolling, and
 `FN+D-pad Down` to return to live output.
 
-Shell redirection and pipes work normally, for example:
+shell redirection and pipes work normally, for example:
 
 ```sh
 ls / > /mnt/sdcard/root.txt
