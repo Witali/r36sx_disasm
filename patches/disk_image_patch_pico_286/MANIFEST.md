@@ -37,6 +37,22 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 neutral on-screen modifier labels
+
+The on-screen keyboard now draws side-specific modifier keys as neutral
+`SHIFT`, `CTRL`, and `ALT` labels.  The internal labels remain side-specific
+for the key preset picker and saved assignments: `LSHIFT`, `RSHIFT`, `LCTRL`,
+`RCTRL`, `LALT`, and `RALT`.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `482928` bytes
+- SHA256:
+  `D94D4F01C1FFB4D4B64DF9486BB5B2806F4D24CE6E68BE097C7691FAEE6EFD4A`
+- Embedded screenshot `HASH8`: `1d6d1704`.
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-02 screenshot build hash filenames
 
 `pico_286.conf` now has `screenshot_build_hash=1` in `[screenshot]`.

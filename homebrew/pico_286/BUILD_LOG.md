@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-02 neutral on-screen modifier labels
+
+Changed the shared on-screen keyboard renderer so side-specific modifier keys
+are drawn with neutral PC-style labels: `SHIFT`, `CTRL`, and `ALT`.  The
+underlying key entries still keep their assignment labels (`LSHIFT`,
+`RSHIFT`, `LCTRL`, `RCTRL`, `LALT`, `RALT`), so the key preset picker can still
+save side-specific modifiers.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `482928` bytes
+- `pico_286` SHA256:
+  `D94D4F01C1FFB4D4B64DF9486BB5B2806F4D24CE6E68BE097C7691FAEE6EFD4A`
+- Embedded screenshot `HASH8`: `1d6d1704`.
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 13:24:20`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 screenshot build hash filenames
 
 Added `screenshot_build_hash` to `[screenshot]` in `pico_286.conf`.  When it

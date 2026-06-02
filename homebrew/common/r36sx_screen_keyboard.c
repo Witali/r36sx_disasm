@@ -2164,6 +2164,23 @@ static const char *display_label_for_key(
     if (!keyboard || !key) {
         return "";
     }
+    /*
+     * Keep side-specific labels in key->label for key preset assignments, but
+     * draw the on-screen keyboard like a real keyboard: Shift/Ctrl/Alt.
+     */
+    switch (key->keycode) {
+    case R36SX_SCREEN_KEY_LSHIFT:
+    case R36SX_SCREEN_KEY_RSHIFT:
+        return "SHIFT";
+    case R36SX_SCREEN_KEY_LCONTROL:
+    case R36SX_SCREEN_KEY_RCONTROL:
+        return "CTRL";
+    case R36SX_SCREEN_KEY_LMENU:
+    case R36SX_SCREEN_KEY_RMENU:
+        return "ALT";
+    default:
+        break;
+    }
     if ((key->flags & R36SX_OSK_FLAG_SHIFTED) == 0 &&
         key->keycode >= 'A' && key->keycode <= 'Z' && scratch_size >= 2) {
         int upper = (keyboard->shift || keyboard->physical_shift) ^
