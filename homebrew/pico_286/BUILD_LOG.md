@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-02 R2 physical Alt for on-screen keyboard
+
+Added a third held physical modifier while the on-screen keyboard is visible:
+`R2` now sends PC `Alt` down while the trigger is held and releases it on
+trigger release, matching `L` for Shift and `R` for Ctrl.  The Alt keys on the
+keyboard also highlight while physical `R2` is held, and the fit-height header
+hint now includes `R2=ALT`.  Latched Shift/Ctrl/Alt no longer release an
+equivalent physically held modifier, so holding `R2` cannot be cancelled by a
+latched Alt keypress.  The context-menu key label was also expanded from `MNU`
+to `MENU`.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `483120` bytes
+- `pico_286` SHA256:
+  `968045A4CFDE3464566F86D1B3AD14CB4D84F2579F7149E7301766F5FBC2A356`
+- Embedded screenshot `HASH8`: `b46f459c`.
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 13:39:49`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 neutral on-screen modifier labels
 
 Changed the shared on-screen keyboard renderer so side-specific modifier keys

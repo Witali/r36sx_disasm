@@ -37,6 +37,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-02 R2 physical Alt for on-screen keyboard
+
+While the on-screen keyboard is visible, holding `R2` now holds PC `Alt`.
+This mirrors the existing held physical modifiers: `L` holds Shift and `R`
+holds Ctrl.  The on-screen Alt keys highlight while `R2` is held, and the
+keyboard header hint includes `R2=ALT`.  Latched Shift/Ctrl/Alt no longer
+release an equivalent physically held modifier.  The context-menu key now
+reads `MENU` instead of `MNU`.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `483120` bytes
+- SHA256:
+  `968045A4CFDE3464566F86D1B3AD14CB4D84F2579F7149E7301766F5FBC2A356`
+- Embedded screenshot `HASH8`: `b46f459c`.
+- Defender scan: no threats in the source binary or patch copy.
+
 ## 2026-06-02 neutral on-screen modifier labels
 
 The on-screen keyboard now draws side-specific modifier keys as neutral

@@ -205,7 +205,7 @@ static const struct r36sx_osk_key g_osk_row5[] = {
                    R36SX_OSK_UNIT_6),
     R36SX_OSK_WIDE("RALT", R36SX_SCREEN_KEY_RMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
+    R36SX_OSK_WIDE("MENU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("RCTRL", R36SX_SCREEN_KEY_RCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5)
 };
@@ -308,7 +308,7 @@ static const struct r36sx_osk_key g_osk_symbol_row5[] = {
                    R36SX_OSK_UNIT_6),
     R36SX_OSK_WIDE("RALT", R36SX_SCREEN_KEY_RMENU,
                    R36SX_OSK_FLAG_ALT_MOD, R36SX_OSK_UNIT_1_5),
-    R36SX_OSK_WIDE("MNU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
+    R36SX_OSK_WIDE("MENU", R36SX_SCREEN_KEY_APPS, 0, R36SX_OSK_UNIT_1_5),
     R36SX_OSK_WIDE("RCTRL", R36SX_SCREEN_KEY_RCONTROL,
                    R36SX_OSK_FLAG_CTRL_MOD, R36SX_OSK_UNIT_1_5)
 };
@@ -410,7 +410,7 @@ static const struct r36sx_osk_nav_cell g_osk_nav_grid[6][18] = {
         R36SX_OSK_NAV_EMPTY, R36SX_OSK_NAV_CURSOR(4, 1),
         R36SX_OSK_NAV_EMPTY
     },
-    /* CTRL x2, WIN, ALT, Space x6, ALT, MNU x2, CTRL x2, Left, Down, Right */
+    /* CTRL x2, WIN, ALT, Space x6, ALT, MENU x2, CTRL x2, Left, Down, Right */
     {
         R36SX_OSK_NAV_MAIN(5, 0), R36SX_OSK_NAV_MAIN(5, 0),
         R36SX_OSK_NAV_MAIN(5, 1), R36SX_OSK_NAV_MAIN(5, 2),
@@ -1163,17 +1163,20 @@ static void emit_key(struct r36sx_screen_keyboard *keyboard,
     int use_shift = force_shift || keyboard->shift;
     int use_ctrl = keyboard->ctrl;
     int use_alt = keyboard->alt;
+    int send_shift = use_shift && !keyboard->physical_shift;
+    int send_ctrl = use_ctrl && !keyboard->physical_ctrl;
+    int send_alt = use_alt && !keyboard->physical_alt;
 
     if (!emit) {
         return;
     }
-    if (use_ctrl) {
+    if (send_ctrl) {
         emit(emit_user, R36SX_SCREEN_KEY_CONTROL, 1);
     }
-    if (use_alt) {
+    if (send_alt) {
         emit(emit_user, R36SX_SCREEN_KEY_MENU, 1);
     }
-    if (use_shift) {
+    if (send_shift) {
         emit(emit_user, R36SX_SCREEN_KEY_SHIFT, 1);
     }
     emit(emit_user, keycode, 1);
@@ -1183,15 +1186,19 @@ static void emit_key(struct r36sx_screen_keyboard *keyboard,
     } else if (keycode == R36SX_SCREEN_KEY_SCROLL) {
         keyboard->scroll_lock ^= 1u;
     }
-    if (use_shift) {
+    if (send_shift) {
         emit(emit_user, R36SX_SCREEN_KEY_SHIFT, 0);
     }
     if (use_alt) {
-        emit(emit_user, R36SX_SCREEN_KEY_MENU, 0);
+        if (send_alt) {
+            emit(emit_user, R36SX_SCREEN_KEY_MENU, 0);
+        }
         keyboard->alt = 0;
     }
     if (use_ctrl) {
-        emit(emit_user, R36SX_SCREEN_KEY_CONTROL, 0);
+        if (send_ctrl) {
+            emit(emit_user, R36SX_SCREEN_KEY_CONTROL, 0);
+        }
         keyboard->ctrl = 0;
     }
 }
@@ -1385,7 +1392,7 @@ static int bottom_row_tail_extra_for_col(int col, int tail_extra)
 
     /*
      * Distribute the short bottom-row remainder along the PC-keyboard guide
-     * columns: spacebar right edge under comma, MNU left edge under =/F10/',
+     * columns: spacebar right edge under comma, MENU left edge under =/F10/',
      * and the final Ctrl edge under the rows above.
      */
     space_extra = tail_extra > 5 ? 5 : tail_extra;
@@ -1855,6 +1862,7 @@ static void handle_physical_modifiers(
 {
     uint8_t shift_down = (held & R36SX_RKGAME_KEY_L) != 0;
     uint8_t ctrl_down = (held & R36SX_RKGAME_KEY_R) != 0;
+    uint8_t alt_down = (held & R36SX_RKGAME_KEY_R2) != 0;
 
     if (!keyboard || !emit) {
         return;
@@ -1866,6 +1874,10 @@ static void handle_physical_modifiers(
     if (ctrl_down != keyboard->physical_ctrl) {
         emit(emit_user, R36SX_SCREEN_KEY_CONTROL, ctrl_down);
         keyboard->physical_ctrl = ctrl_down;
+    }
+    if (alt_down != keyboard->physical_alt) {
+        emit(emit_user, R36SX_SCREEN_KEY_MENU, alt_down);
+        keyboard->physical_alt = alt_down;
     }
 }
 
@@ -1884,6 +1896,10 @@ static void release_physical_modifiers(
     if (keyboard->physical_ctrl) {
         emit(emit_user, R36SX_SCREEN_KEY_CONTROL, 0);
         keyboard->physical_ctrl = 0;
+    }
+    if (keyboard->physical_alt) {
+        emit(emit_user, R36SX_SCREEN_KEY_MENU, 0);
+        keyboard->physical_alt = 0;
     }
 }
 
@@ -2220,7 +2236,8 @@ static void draw_key(const struct r36sx_screen_keyboard *keyboard,
          (keyboard->shift || keyboard->physical_shift)) ||
         ((key->flags & R36SX_OSK_FLAG_CTRL_MOD) &&
          (keyboard->ctrl || keyboard->physical_ctrl)) ||
-        ((key->flags & R36SX_OSK_FLAG_ALT_MOD) && keyboard->alt);
+        ((key->flags & R36SX_OSK_FLAG_ALT_MOD) &&
+         (keyboard->alt || keyboard->physical_alt));
 
     if (active_modifier) {
         bg = rgb565(40, 120, 78);
@@ -2303,6 +2320,7 @@ void r36sx_screen_keyboard_init(struct r36sx_screen_keyboard *keyboard)
     keyboard->alt = 0;
     keyboard->physical_shift = 0;
     keyboard->physical_ctrl = 0;
+    keyboard->physical_alt = 0;
     keyboard->caps_lock = 0;
     keyboard->scroll_lock = 0;
     keyboard->expanded = 1;
@@ -2361,6 +2379,7 @@ void r36sx_screen_keyboard_set_visible(
         keyboard->alt = 0;
         keyboard->physical_shift = 0;
         keyboard->physical_ctrl = 0;
+        keyboard->physical_alt = 0;
         keyboard->symbol_mode = 0;
         keyboard->scroll_y = 0;
         keyboard->press_buttons = 0;
@@ -2641,7 +2660,7 @@ void r36sx_screen_keyboard_draw(
                   panel_y + 1, panel_w - 2, header_h, header);
         draw_text(frame, width, height, stride_pixels, panel_x + 5,
                   panel_y + 3,
-                  "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  SEL=MIN",
+                  "A/START=TYPE  B=BACK  Y=ENTER  X=ESC  L=SHIFT  R=CTRL  R2=ALT  SEL=MIN",
                   text, 1);
     }
 

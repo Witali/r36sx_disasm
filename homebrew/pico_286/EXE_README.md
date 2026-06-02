@@ -56,12 +56,14 @@ each capture, the screen briefly shows `SCREENSHOT SAVED` or
 
 - D-pad: move between keys.
 - Hold D-pad: repeat movement after a short delay.
-- L or R: switch between the normal keyboard and symbol keyboard.
+- Hold L: hold PC Shift.
+- Hold R: hold PC Ctrl.
+- Hold R2: hold PC Alt.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.
 - Y: Enter.
-- Select: close the keyboard.
+- Select: toggle compact and fit-height keyboard panels.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
 The on-screen left/right Shift, Ctrl, and Alt keys act as latched modifiers

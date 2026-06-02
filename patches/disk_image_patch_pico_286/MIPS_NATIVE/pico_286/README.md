@@ -58,6 +58,7 @@ each capture, the screen briefly shows `SCREENSHOT SAVED` or
 - Hold D-pad: repeat movement after a short delay.
 - Hold L: hold PC Shift.
 - Hold R: hold PC Ctrl.
+- Hold R2: hold PC Alt.
 - A or Start: type the highlighted key.
 - B: Backspace.
 - X: Escape.
@@ -65,7 +66,7 @@ each capture, the screen briefly shows `SCREENSHOT SAVED` or
 - Select: toggle compact and fit-height keyboard panels.
 
 Holding A, Start, B, X, or Y repeats the emitted DOS key after a short delay.
-The physical L/R modifiers are held only while the physical trigger is held.
+The physical L/R/R2 modifiers are held only while the physical trigger is held.
 The on-screen left/right Shift, Ctrl, and Alt keys act as latched modifiers
 and can be picked separately for key presets.  The normal
 DOS keyboard uses a PC-style layout with Esc/F1-F12 on the top row and a
@@ -73,8 +74,8 @@ right-side block for Print Screen, Scroll Lock, Pause, Insert/Home/Page
 navigation, Delete/End/Page Down, and cursor arrows.  The main key rows are
 left-aligned so `ESC`, `TAB`, `CAPS`, left `SHIFT`, and left `CTRL` share the
 same left edge.  The bottom row includes `LCTRL WIN LALT`, a wide unlabeled
-spacebar, then `RALT MNU RCTRL`; `WIN`, `MNU`, `RCTRL`, and `RALT` send PC
-extended scancodes where appropriate.  `WIN` ends under `A`, the spacebar ends under comma, and `MNU`
+spacebar, then `RALT MENU RCTRL`; `WIN`, `MENU`, `RCTRL`, and `RALT` send PC
+extended scancodes where appropriate.  `WIN` ends under `A`, the spacebar ends under comma, and `MENU`
 starts under the `=`/`F10` guide column.  The function-key row keeps grouped
 gaps, with the late group
 nudged so the `F10`/`F11` split aligns with the `=`/Backspace split.  Shift

@@ -71,16 +71,16 @@ moving up from Left Arrow selects `DEL` instead of the Up Arrow key.
 
 The normal keyboard rows are left-aligned like a PC keyboard: `ESC`, `TAB`,
 `CAPS`, left `SHIFT`, and left `CTRL` share the same edge.  The bottom row
-includes `WIN`, an unlabeled stretched spacebar, and a context `MNU` key; host
+includes `WIN`, an unlabeled stretched spacebar, and a context `MENU` key; host
 applications can map these emitted Windows-like keycodes as needed.  The
 on-screen left/right modifier keys emit distinct picker keycodes: `LSHIFT`,
 `RSHIFT`, `LCTRL`, `RCTRL`, `LALT`, and `RALT`.  The last key in each row
 absorbs the row-width remainder so `F12`, Backspace, `\`, Enter, right
 `SHIFT`, and right `CTRL` share a clean visual right edge.  On the
 bottom row, the spacebar absorbs that remainder instead, keeping the visible
-gaps between `CTRL`, `WIN`, `ALT`, the spacebar, `MNU`, and right `CTRL`
+gaps between `CTRL`, `WIN`, `ALT`, the spacebar, `MENU`, and right `CTRL`
 consistent with the rows above.  The bottom-row remainder is split so `WIN`
-ends under `A`, the spacebar ends under comma, and `MNU` starts under the
+ends under `A`, the spacebar ends under comma, and `MENU` starts under the
 `=`/`F10` guide column.  The `CAPS` key includes a small green lock LED that
 follows the keyboard module's Caps Lock state.
 
@@ -88,7 +88,8 @@ Current physical button bindings while the keyboard is visible:
 
 - D-pad moves the highlighted key.
 - Holding a D-pad direction repeats movement after a short delay.
-- L holds Shift and R holds Ctrl while the physical trigger is held.
+- L holds Shift, R holds Ctrl, and R2 holds Alt while the physical trigger is
+  held.
 - A or Start types the highlighted key.
 - B sends Backspace immediately.
 - Y sends Enter immediately.

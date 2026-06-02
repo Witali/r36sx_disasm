@@ -186,7 +186,10 @@ On-screen keyboard controls:
 - B: Backspace.
 - X: Escape.
 - Y: Enter.
-- Select: close the keyboard.
+- Hold L: hold PC Shift.
+- Hold R: hold PC Ctrl.
+- Hold R2: hold PC Alt.
+- Select: toggle compact and fit-height keyboard panels.
 - Shift, Ctrl, and Alt keys on the keyboard act as latched modifiers.
 
 The keyboard includes letters, digits, Enter, Escape, Backspace, Tab, Space,
