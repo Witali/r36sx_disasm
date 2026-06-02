@@ -41,8 +41,11 @@ be checked against the relevant specification and committed separately.
      flags.  A small DPMI LDT-style descriptor pool now handles descriptor
      allocation/free (`AX=0000h/0001h`) plus base, limit, and access-rights
      updates (`AX=0006h/0007h/0008h/0009h`), and the CPU descriptor decoder can
-     resolve those selectors.  The real-mode `AX=1687h` installation check
-     still reports no host until the mode-switch entry point exists.
+     resolve those selectors.  Segment-to-descriptor mapping, alias
+     descriptors, and raw descriptor copy services (`AX=0002h/000Ah/000Bh/000Ch`)
+     are also scaffolded on the same pool.  The real-mode `AX=1687h`
+     installation check still reports no host until the mode-switch entry point
+     exists.
    - Done when: common DOS extender probes can query DPMI version, allocate
      descriptors, configure flat 32-bit code/data descriptors, and return clean
      failure for unimplemented functions.

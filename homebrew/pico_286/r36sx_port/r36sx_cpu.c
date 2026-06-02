@@ -162,11 +162,15 @@ uint32_t dwordregs[8];
 #define R36SX_DPMI_INT2F_INSTALLATION_CHECK 0x1687u
 #define R36SX_DPMI_FUNC_ALLOC_LDT_DESCRIPTORS 0x0000u
 #define R36SX_DPMI_FUNC_FREE_LDT_DESCRIPTOR 0x0001u
+#define R36SX_DPMI_FUNC_SEGMENT_TO_DESCRIPTOR 0x0002u
 #define R36SX_DPMI_FUNC_GET_SELECTOR_INCREMENT 0x0003u
 #define R36SX_DPMI_FUNC_GET_SEGMENT_BASE 0x0006u
 #define R36SX_DPMI_FUNC_SET_SEGMENT_BASE 0x0007u
 #define R36SX_DPMI_FUNC_SET_SEGMENT_LIMIT 0x0008u
 #define R36SX_DPMI_FUNC_SET_DESCRIPTOR_ACCESS 0x0009u
+#define R36SX_DPMI_FUNC_CREATE_ALIAS_DESCRIPTOR 0x000au
+#define R36SX_DPMI_FUNC_GET_DESCRIPTOR 0x000bu
+#define R36SX_DPMI_FUNC_SET_DESCRIPTOR 0x000cu
 #define R36SX_DPMI_FUNC_GET_VERSION 0x0400u
 #define R36SX_DPMI_FUNC_GET_CAPABILITIES 0x0401u
 #define R36SX_DPMI_LDT_INDEX_BASE 0x10u
@@ -3868,6 +3872,50 @@ static r36sx_segment_cache_t r36sx_dpmi_default_data_descriptor(
     return cache;
 }
 
+static uint8_t r36sx_dpmi_allocate_descriptor(
+    const r36sx_segment_cache_t *template_cache,
+    uint16_t *selector)
+{
+    for (uint8_t slot = 0; slot < R36SX_DPMI_MAX_DESCRIPTORS; slot++) {
+        if (r36sx_dpmi_descriptors[slot].allocated) {
+            continue;
+        }
+
+        *selector = r36sx_dpmi_slot_selector(slot);
+        r36sx_dpmi_descriptors[slot].allocated = 1;
+        r36sx_dpmi_descriptors[slot].cache = template_cache
+            ? *template_cache
+            : r36sx_dpmi_default_data_descriptor(*selector);
+        r36sx_dpmi_descriptors[slot].cache.selector = *selector;
+        return 1;
+    }
+
+    return 0;
+}
+
+static void r36sx_dpmi_descriptor_to_raw(const r36sx_segment_cache_t *cache,
+                                         uint32_t *lo,
+                                         uint32_t *hi)
+{
+    uint32_t raw_limit = cache->limit;
+    if (cache->flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
+        raw_limit >>= 12;
+    }
+
+    *lo = (raw_limit & 0x0000ffffu) |
+          ((cache->base & 0x0000ffffu) << 16);
+    *hi = ((cache->base >> 16) & 0x000000ffu) |
+          ((uint32_t)cache->access << 8) |
+          (raw_limit & 0x000f0000u) |
+          ((uint32_t)(cache->flags & 0x0fu) << 20) |
+          (cache->base & 0xff000000u);
+}
+
+static uint32_t r36sx_dpmi_client_offset(void)
+{
+    return r36sx_cpu_code_default32() ? CPU_EDI : CPU_DI;
+}
+
 static void r36sx_dpmi_reload_loaded_selector(uint16_t selector)
 {
     const uint16_t key = selector & 0xfffcu;
@@ -3979,6 +4027,36 @@ static void r36sx_dpmi_free_ldt_descriptor(void)
     r36sx_dpmi_succeed();
 }
 
+static void r36sx_dpmi_segment_to_descriptor(void)
+{
+    uint32_t base = (uint32_t)CPU_BX << 4;
+
+    for (uint8_t slot = 0; slot < R36SX_DPMI_MAX_DESCRIPTORS; slot++) {
+        const r36sx_segment_cache_t *cache =
+            &r36sx_dpmi_descriptors[slot].cache;
+        if (r36sx_dpmi_descriptors[slot].allocated &&
+            cache->base == base && cache->limit == 0xffffu &&
+            r36sx_descriptor_is_writable_data(cache)) {
+            r36sx_dpmi_succeed();
+            CPU_AX = r36sx_dpmi_slot_selector(slot);
+            return;
+        }
+    }
+
+    uint16_t selector;
+    r36sx_segment_cache_t cache =
+        r36sx_dpmi_default_data_descriptor(r36sx_dpmi_slot_selector(0));
+    cache.base = base;
+    cache.limit = 0xffffu;
+    if (!r36sx_dpmi_allocate_descriptor(&cache, &selector)) {
+        r36sx_dpmi_fail(R36SX_DPMI_DESCRIPTOR_UNAVAILABLE);
+        return;
+    }
+
+    r36sx_dpmi_succeed();
+    CPU_AX = selector;
+}
+
 static void r36sx_dpmi_get_segment_base(void)
 {
     uint8_t slot;
@@ -4054,6 +4132,70 @@ static void r36sx_dpmi_set_descriptor_access(void)
     cache->access = CPU_CL;
     cache->flags = flags;
     cache->valid = (CPU_CL & R36SX_DESCRIPTOR_PRESENT) != 0;
+    r36sx_dpmi_reload_loaded_selector(CPU_BX);
+    r36sx_dpmi_succeed();
+}
+
+static void r36sx_dpmi_create_alias_descriptor(void)
+{
+    r36sx_segment_cache_t source;
+    if (!r36sx_cpu_decode_descriptor_any(CPU_BX, &source) ||
+        (CPU_BX & 0xfffcu) == 0) {
+        r36sx_dpmi_fail(R36SX_DPMI_INVALID_SELECTOR);
+        return;
+    }
+
+    uint16_t selector;
+    r36sx_segment_cache_t alias =
+        r36sx_dpmi_default_data_descriptor(r36sx_dpmi_slot_selector(0));
+    alias.base = source.base;
+    alias.limit = source.limit;
+    alias.flags = source.flags & R36SX_DESCRIPTOR_FLAG_GRANULAR;
+    if (!r36sx_dpmi_allocate_descriptor(&alias, &selector)) {
+        r36sx_dpmi_fail(R36SX_DPMI_DESCRIPTOR_UNAVAILABLE);
+        return;
+    }
+
+    r36sx_dpmi_succeed();
+    CPU_AX = selector;
+}
+
+static void r36sx_dpmi_get_descriptor(void)
+{
+    uint8_t slot;
+    if (!r36sx_dpmi_get_slot(CPU_BX, &slot)) {
+        return;
+    }
+
+    uint32_t lo;
+    uint32_t hi;
+    r36sx_dpmi_descriptor_to_raw(&r36sx_dpmi_descriptors[slot].cache, &lo, &hi);
+    uint32_t offset = r36sx_dpmi_client_offset();
+    putmem32(CPU_ES, offset, lo);
+    putmem32(CPU_ES, offset + 4u, hi);
+    r36sx_dpmi_succeed();
+}
+
+static void r36sx_dpmi_set_descriptor(void)
+{
+    uint8_t slot;
+    if (!r36sx_dpmi_get_slot(CPU_BX, &slot)) {
+        return;
+    }
+
+    uint32_t offset = r36sx_dpmi_client_offset();
+    uint32_t lo = getmem32(CPU_ES, offset);
+    uint32_t hi = getmem32(CPU_ES, offset + 4u);
+    r36sx_segment_cache_t cache;
+    r36sx_cpu_fill_descriptor_cache(CPU_BX, lo, hi, &cache);
+
+    if (!r36sx_dpmi_access_valid(cache.access, cache.flags)) {
+        r36sx_dpmi_fail(R36SX_DPMI_INVALID_VALUE);
+        return;
+    }
+
+    r36sx_dpmi_descriptors[slot].cache = cache;
+    r36sx_dpmi_descriptors[slot].cache.selector = CPU_BX;
     r36sx_dpmi_reload_loaded_selector(CPU_BX);
     r36sx_dpmi_succeed();
 }
@@ -4148,6 +4290,10 @@ static uint8_t r36sx_dpmi_int31_handler(void)
             r36sx_dpmi_free_ldt_descriptor();
             return 1;
 
+        case R36SX_DPMI_FUNC_SEGMENT_TO_DESCRIPTOR:
+            r36sx_dpmi_segment_to_descriptor();
+            return 1;
+
         case R36SX_DPMI_FUNC_GET_SELECTOR_INCREMENT:
             r36sx_dpmi_succeed();
             CPU_AX = R36SX_DPMI_SELECTOR_INCREMENT;
@@ -4167,6 +4313,18 @@ static uint8_t r36sx_dpmi_int31_handler(void)
 
         case R36SX_DPMI_FUNC_SET_DESCRIPTOR_ACCESS:
             r36sx_dpmi_set_descriptor_access();
+            return 1;
+
+        case R36SX_DPMI_FUNC_CREATE_ALIAS_DESCRIPTOR:
+            r36sx_dpmi_create_alias_descriptor();
+            return 1;
+
+        case R36SX_DPMI_FUNC_GET_DESCRIPTOR:
+            r36sx_dpmi_get_descriptor();
+            return 1;
+
+        case R36SX_DPMI_FUNC_SET_DESCRIPTOR:
+            r36sx_dpmi_set_descriptor();
             return 1;
 
         case R36SX_DPMI_FUNC_GET_VERSION:

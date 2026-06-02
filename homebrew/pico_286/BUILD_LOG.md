@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-06-02 DPMI raw descriptor services
+
+Extended the DPMI descriptor scaffold with additional DPMI 1.0 selector
+services:
+
+- `AX=0002h`: map a real-mode segment to a descriptor.
+- `AX=000Ah`: create a data alias descriptor.
+- `AX=000Bh`: copy a descriptor into an 8-byte client buffer.
+- `AX=000Ch`: copy an 8-byte client buffer into a DPMI descriptor.
+
+The implementation converts between the emulator's descriptor cache and Intel's
+raw descriptor layout, and keeps all descriptors in the internal DPMI LDT-style
+pool added by the previous step.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `546792` bytes
+- `pico_286` SHA256:
+  `B9B575D8C929320ABBC28BDBF4F4FC8608042E617FB6F65FEC332FBC863DDE80`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 DPMI LDT descriptor services
 
 Added the first DPMI LDT-style descriptor pool and wired it into the protected
