@@ -114,34 +114,34 @@ The emulator expects the following file paths and names for the disk images:
 *   The disk type (floppy or hard disk) is determined by the drive number it is assigned to in the emulator, not by the filename itself.
 *   The emulator automatically determines the disk geometry (cylinders, heads, sectors) based on the size of the image file. Ensure your disk images have standard sizes for floppy disks (e.g., 360KB, 720KB, 1.2MB, 1.44MB) for proper detection. For hard disks, the geometry is calculated based on a standard CHS (Cylinder/Head/Sector) layout.
 
-### Host Filesystem Access (Drive H:)
+### Host Filesystem Access (Default Drive H:)
 
-For seamless file exchange, the emulator can map a directory from the host filesystem and present it as drive **H:** in the DOS environment. This feature is implemented through the standard **DOS network redirector interface (INT 2Fh, Function 11h)**.
+For seamless file exchange, the emulator can map a directory from the host filesystem and present it as a DOS drive. The default drive is **H:**, but `MAPDRIVE.COM` can register another letter. This feature is implemented through the standard **DOS network redirector interface (INT 2Fh, Function 11h)**.
 
 This is ideal for development, allowing you to edit files on your host machine and access them instantly within the emulator without modifying disk images.
 
 #### How It Works
 
-The emulator intercepts file operations for drive H: and translates them into commands for the host's filesystem. To enable this drive, you must run the `MAPDRIVE.COM` utility within the emulator.
+The emulator intercepts file operations for the mapped drive and translates them into commands for the host's filesystem. To enable this drive, you must run the `MAPDRIVE.COM` utility within the emulator.
 
 The mapped directory depends on the platform:
 
--   **On Windows builds:** Drive H: maps to the `C:\\FASM` directory by default.
--   **On Linux builds:** Drive H: maps to the `/tmp` directory by default.
--   **On Pico builds (RP2040/RP2350):** Drive H: maps to the `//XT//` directory on the SD card.
+-   **On Windows builds:** the mapped drive uses the `C:\\FASM` directory by default.
+-   **On Linux builds:** the mapped drive uses the `/tmp` directory by default.
+-   **On Pico builds (RP2040/RP2350):** the mapped drive uses the `//XT//` directory on the SD card.
 
 #### `MAPDRIVE.COM` Utility
 
-The `tools/mapdrive.asm` source file can be assembled into `MAPDRIVE.COM` using FASM. This utility registers drive H: with the DOS kernel as a network drive.
+The `tools/mapdrive.asm` source file can be assembled into `MAPDRIVE.COM` using FASM or NASM. This utility registers a drive letter with the DOS kernel as a network drive. With no argument it maps `H:`; `MAPDRIVE G:` or `MAPDRIVE G` maps another letter.
 
-**Prerequisite:** Before using `MAPDRIVE.COM`, ensure your `CONFIG.SYS` file contains the line `LASTDRIVE=H` (or higher, e.g., `LASTDRIVE=Z`). This tells DOS to allocate space for drive letters up to H:, allowing `MAPDRIVE.COM` to successfully create the new drive.
+**Prerequisite:** Before using `MAPDRIVE.COM`, ensure your `CONFIG.SYS` file contains `LASTDRIVE=` set to the selected drive letter or higher, for example `LASTDRIVE=H` or `LASTDRIVE=Z`. This tells DOS to allocate space for that drive letter, allowing `MAPDRIVE.COM` to successfully create the new drive.
 
 To use it:
 
 1.  Assemble `mapdrive.asm` to `mapdrive.com`.
 2.  Copy `mapdrive.com` to your boot disk image (e.g., `fdd0.img` or `hdd.img`).
-3.  Run `MAPDRIVE.COM` from the DOS command line.
-4.  Add `MAPDRIVE.COM` to your `AUTOEXEC.BAT` to automatically map the drive on boot.
+3.  Run `MAPDRIVE.COM` or `MAPDRIVE G:` from the DOS command line.
+4.  Add the chosen `MAPDRIVE` command to your `AUTOEXEC.BAT` to automatically map the drive on boot.
 
 
 ## 🔧 Hardware Configuration

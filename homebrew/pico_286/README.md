@@ -167,9 +167,11 @@ lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
 or A/Y on a drive row cycles through matching files found in the configured
 `image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
 `.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
-Drive `H:` is connected from inside DOS by running `MAPDRIVE.COM`; the emulator
-does not inject or launch the mapper from the disk menu.  `CONFIG.SYS` must
-contain `LASTDRIVE=H` or higher.
+The host drive is connected from inside DOS by running `MAPDRIVE.COM`; the
+emulator does not inject or launch the mapper from the disk menu.  With no
+argument it maps `H:`.  A different letter can be selected with
+`MAPDRIVE G:` or `MAPDRIVE G`; `CONFIG.SYS` must contain `LASTDRIVE=` set to
+that letter or higher.
 The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try
 the floppy or hard disk first.  The `OK` button writes current bindings and
 boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
@@ -403,12 +405,13 @@ between one-second statistics samples; direct-present frames restore small
 overlay rectangles on the next `mfb_update()` when the DOS frame was not
 rerendered.  Set it to `0` to disable the shortcut and overlay.
 
-`host_drive_path` is the R36SX host directory exposed to DOS as network drive
-`H:` through Pico-286's `INT 2Fh/11h` network redirector.  Relative paths are
-resolved next to `pico_286.conf`, so the default `host` means
-`MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM` after
-boot to register `H:`; `CONFIG.SYS` must contain `LASTDRIVE=H` or higher so
-DOS allocates a CDS entry for drive `H:`.
+`host_drive_path` is the R36SX host directory exposed to DOS through Pico-286's
+`INT 2Fh/11h` network redirector.  Relative paths are resolved next to
+`pico_286.conf`, so the default `host` means `MIPS_NATIVE/pico_286/host` on the
+SD card.  DOS must run `MAPDRIVE.COM` after boot to register the drive; it
+defaults to `H:` and accepts another letter as `MAPDRIVE G:` or `MAPDRIVE G`.
+`CONFIG.SYS` must contain `LASTDRIVE=` set to the selected letter or higher so
+DOS allocates the needed CDS entry.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,
@@ -579,6 +582,8 @@ Rebuild the optional CPU test floppy after rebuilding `test386.bin`:
 `mapdrive.com` is also assembled with the same NASM executable.  The source is
 `homebrew/pico_286/pico-286/tools/mapdrive.asm`; it is kept compatible with
 NASM by using the precomputed `0C000h` value for the DOS CDS `NET|PHY` flags.
+The command defaults to `H:` and also accepts a drive parameter such as
+`MAPDRIVE G:` or `MAPDRIVE G`.
 Build the patch copy with:
 
 ```powershell

@@ -114,8 +114,8 @@ static void get_full_path(char *dest, const char *guest_path) {
     guest_path = guest_path_copy;
 
     if (guest_path[1] == ':') {
-        // Absolute path with drive letter (e.g., "H:\file.txt" or "H:\TOOLS\file.txt")
-        const char *path_part = guest_path + 2; // Skip "H:"
+        // Absolute path with drive letter (e.g., "H:\file.txt" or "G:\TOOLS\file.txt")
+        const char *path_part = guest_path + 2; // Skip "X:"
         if (path_part[0] == '\\') {
             path_part++; // Skip leading backslash, so "\TOOLS\file.txt" becomes "TOOLS\file.txt"
         }

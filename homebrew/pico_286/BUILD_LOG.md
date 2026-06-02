@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-06-02 parameterized MAPDRIVE.COM
+
+Updated `homebrew/pico_286/pico-286/tools/mapdrive.asm` so the DOS mapper
+accepts an optional drive-letter argument.  `MAPDRIVE.COM` still defaults to
+`H:`, but `MAPDRIVE G:` and `MAPDRIVE G` now register the same host directory
+under another DOS drive letter.  Invalid arguments print a short usage message.
+Pico-286 was also rebuilt because the generated `pico_286.conf` host-drive
+comments are compiled string literals in `r36sx_disk_config.c`.
+
+MAPDRIVE build command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+```
+
+- `mapdrive.com` size: `445` bytes
+- `mapdrive.com` SHA256:
+  `1E13203134903B01E7C131D4A0B366F45336F519AA6A42BEC4D5B245AE76FA0E`
+- The rebuilt `.COM` was mirrored to
+  `disk_image/MIPS_NATIVE/pico_286/mapdrive.com`.
+- Microsoft Defender scan: no threats found in the patch and `disk_image`
+  copies.
+
+Pico-286 rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+```
+
+- `pico_286` size: `467716` bytes
+- `pico_286` SHA256:
+  `12B3F725F87E2F9A9D374E49EB1F5CFA8101F90568EFB55545482E55F3DFA4F0`
+- Microsoft Defender scan: no threats found in the main, patch, and
+  `disk_image` copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 remove embedded host-drive mapper launch
 
 Removed the R36SX-only embedded MAPDRIVE trampoline from Pico-286.  The disk

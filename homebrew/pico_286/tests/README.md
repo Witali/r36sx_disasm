@@ -55,9 +55,10 @@ the native executable.
 ## MAPDRIVE.COM
 
 `homebrew/pico_286/pico-286/tools/mapdrive.asm` is the standalone DOS utility
-source for registering drive `H:` as a network drive.  The R36SX native
-executable no longer embeds or launches a MAPDRIVE trampoline, so the patch
-folder keeps a real `.COM` copy for DOS-side mapping and testing.
+source for registering a host-backed network drive.  It defaults to `H:` and
+also accepts a drive parameter such as `MAPDRIVE G:` or `MAPDRIVE G`.  The
+R36SX native executable no longer embeds or launches a MAPDRIVE trampoline, so
+the patch folder keeps a real `.COM` copy for DOS-side mapping and testing.
 
 Build it with the same NASM 3.01 executable:
 

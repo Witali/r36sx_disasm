@@ -1660,9 +1660,10 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[stats]\n");
     fprintf(fp, "app_stats_enabled=%s\n\n", app_stats_enabled_text);
 
-    fprintf(fp, "# Host filesystem directory exposed to DOS as network drive H:.\n");
+    fprintf(fp, "# Host filesystem directory exposed to DOS by MAPDRIVE.COM.\n");
     fprintf(fp, "# Relative paths are resolved next to pico_286.conf.\n");
-    fprintf(fp, "# DOS must run MAPDRIVE.COM after boot; CONFIG.SYS needs LASTDRIVE=H or higher.\n");
+    fprintf(fp, "# MAPDRIVE.COM defaults to H: or accepts a drive parameter, e.g. MAPDRIVE G:.\n");
+    fprintf(fp, "# CONFIG.SYS needs LASTDRIVE set to the selected drive or higher.\n");
     fprintf(fp, "[host_drive]\n");
     fprintf(fp, "host_drive_path=%s\n\n", host_drive_value);
 

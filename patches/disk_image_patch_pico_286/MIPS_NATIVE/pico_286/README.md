@@ -276,10 +276,12 @@ legacy R36SX test386 POST port `190h`.  The rebuilt `test386.bin` writes POST
 codes to the standard `80h` port.  The embedded Turbo XT BIOS image has no
 obvious `OUT 80h` POST sequence, so the normal BIOS may not produce values.
 
-Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
+Set `host_drive_path` to the directory exposed to DOS by `MAPDRIVE.COM`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps
 to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
-after boot, and `CONFIG.SYS` needs `LASTDRIVE=H` or higher.
+after boot; with no argument it registers `H:`, and `MAPDRIVE G:` or
+`MAPDRIVE G` registers another letter.  `CONFIG.SYS` needs `LASTDRIVE=` set to
+the selected letter or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 Full-screen menus such as the disk menu and key preset editor draw directly into

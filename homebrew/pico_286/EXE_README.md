@@ -91,7 +91,8 @@ Open it with Fn+Select.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
-- Drive `H:` is mapped from inside DOS by running `MAPDRIVE.COM`.
+- The host drive is mapped from inside DOS by running `MAPDRIVE.COM`.  With no
+  argument it maps `H:`; use `MAPDRIVE G:` or `MAPDRIVE G` for another letter.
 - A or Y on `OK`: write current bindings to `pico_286.conf` and apply them.
 - A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 - A or Y on `CANCEL`: close the menu.
@@ -265,10 +266,12 @@ legacy R36SX test386 POST port `190h`.  The rebuilt `test386.bin` writes POST
 codes to the standard `80h` port.  The embedded Turbo XT BIOS image has no
 obvious `OUT 80h` POST sequence, so the normal BIOS may not produce values.
 
-Set `host_drive_path` to the directory exposed to DOS as network drive `H:`.
+Set `host_drive_path` to the directory exposed to DOS by `MAPDRIVE.COM`.
 Relative paths are resolved next to `pico_286.conf`; the default `host` maps
 to `MIPS_NATIVE/pico_286/host` on the SD card.  DOS must run `MAPDRIVE.COM`
-after boot to register `H:`.  `CONFIG.SYS` still needs `LASTDRIVE=H` or higher.
+after boot; with no argument it registers `H:`, and `MAPDRIVE G:` or
+`MAPDRIVE G` registers another letter.  `CONFIG.SYS` still needs `LASTDRIVE=`
+set to the selected letter or higher.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
 Full-screen menus such as the disk menu and key preset editor draw directly into

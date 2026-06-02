@@ -66,7 +66,7 @@ const char *r36sx_pico286_image_dir_value(void);
 // Return the directory that contains pico_286.conf, or an empty string.
 const char *r36sx_pico286_config_dir(void);
 
-// Return the host filesystem directory exposed through DOS network drive H:.
+// Return the host filesystem directory exposed through DOS by MAPDRIVE.COM.
 const char *r36sx_pico286_host_drive_path(void);
 
 // Return the configured host drive value as written to pico_286.conf.
