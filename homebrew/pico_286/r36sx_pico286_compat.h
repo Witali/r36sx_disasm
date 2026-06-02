@@ -27,6 +27,8 @@
 #define DEBUG 0
 #endif
 
+#include "r36sx_debug_config.h"
+
 #define R36SX_PICO286_LOG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log"
 #define R36SX_PICO286_FALLBACK_LOG_PATH "/mnt/sdcard/pico_286.log"
 
@@ -59,6 +61,18 @@ static inline void r36sx_pico286_debug_reset(void)
     unlink(R36SX_PICO286_LOG_PATH);
     unlink(R36SX_PICO286_FALLBACK_LOG_PATH);
     r36sx_pico286_debug_log("log reset");
+#endif
+}
+
+static inline void r36sx_pico286_debug_log_build_info(void)
+{
+#if R36SX_DEBUG_BUILD_INFO
+    r36sx_pico286_debug_log(
+        "build: git_commit=%s short=%s commit_object_sha256=%s dirty=%d",
+        R36SX_BUILD_GIT_COMMIT,
+        R36SX_BUILD_GIT_COMMIT_SHORT,
+        R36SX_BUILD_COMMIT_OBJECT_SHA256,
+        R36SX_BUILD_GIT_DIRTY);
 #endif
 }
 

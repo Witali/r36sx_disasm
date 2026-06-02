@@ -1492,6 +1492,7 @@ void *ticks_thread(void *arg) {
 
 int main() {
     r36sx_pico286_debug_reset();
+    r36sx_pico286_debug_log_build_info();
     r36sx_pico286_debug_log("main: start");
     r36sx_profile_init();
     signal(SIGINT, signal_handler);

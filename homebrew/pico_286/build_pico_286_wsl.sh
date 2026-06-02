@@ -125,6 +125,31 @@ for path in "$PICO_ROOT" "$PORT_ROOT" "$CC" "$CXX" "$LD" "$SYSROOT" "$TARGET_ZLI
     fi
 done
 
+cmacro_string() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '%s' "$value"
+}
+
+BUILD_GIT_COMMIT="unknown"
+BUILD_GIT_COMMIT_SHORT="unknown"
+BUILD_COMMIT_OBJECT_SHA256="unknown"
+BUILD_GIT_DIRTY=1
+
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    BUILD_GIT_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
+    BUILD_GIT_COMMIT_SHORT="$(git -C "$ROOT" rev-parse --short=12 HEAD)"
+    BUILD_COMMIT_OBJECT_SHA256="$(
+        git -C "$ROOT" cat-file commit HEAD | sha256sum | awk '{print $1}'
+    )"
+    BUILD_GIT_DIRTY=0
+    if ! git -C "$ROOT" diff --quiet --ignore-submodules -- . ||
+       ! git -C "$ROOT" diff --cached --quiet --ignore-submodules -- .; then
+        BUILD_GIT_DIRTY=1
+    fi
+fi
+
 OBJ_DIR_FULL="$(readlink -m "$OBJ_DIR")"
 EXPECTED_OBJ_DIR="$(readlink -m "$SCRIPT_DIR/obj-gcc")"
 if [[ "$OBJ_DIR_FULL" != "$EXPECTED_OBJ_DIR" ]]; then
@@ -156,6 +181,10 @@ common_args=(
     "-DPICO_RP2040=0"
     "-DPICO_RP2350=0"
     "-DDEBUG=$DEBUG_VALUE"
+    "-DR36SX_BUILD_GIT_COMMIT=\"$(cmacro_string "$BUILD_GIT_COMMIT")\""
+    "-DR36SX_BUILD_GIT_COMMIT_SHORT=\"$(cmacro_string "$BUILD_GIT_COMMIT_SHORT")\""
+    "-DR36SX_BUILD_COMMIT_OBJECT_SHA256=\"$(cmacro_string "$BUILD_COMMIT_OBJECT_SHA256")\""
+    "-DR36SX_BUILD_GIT_DIRTY=$BUILD_GIT_DIRTY"
     "-DR36SX_ENABLE_PROFILING=$PROFILING_VALUE"
     "-DR36SX_CPU_COMPUTED_GOTO=$COMPUTED_GOTO_VALUE"
     "-DR36SX_NATIVE_FAST_MEMORY=$FAST_MEMORY_VALUE"

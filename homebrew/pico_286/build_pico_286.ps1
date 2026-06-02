@@ -37,6 +37,50 @@ $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 $ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
 $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 $ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
+$RootPath = $Root.Path
+
+function ConvertTo-CMacroString {
+    param([string]$Value)
+    return (($Value -replace "\\", "\\") -replace '"', '\"')
+}
+
+function Get-GitText {
+    param([string[]]$Arguments)
+    $Output = & git @Arguments 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+    return (($Output -join "`n").TrimEnd("`r", "`n"))
+}
+
+$BuildGitCommit = "unknown"
+$BuildGitCommitShort = "unknown"
+$BuildCommitObjectSha256 = "unknown"
+$BuildGitDirty = "1"
+
+$InsideWorkTree = Get-GitText -Arguments @("-C", $RootPath, "rev-parse", "--is-inside-work-tree")
+if ($InsideWorkTree -eq "true") {
+    $BuildGitCommit = Get-GitText -Arguments @("-C", $RootPath, "rev-parse", "HEAD")
+    $BuildGitCommitShort = Get-GitText -Arguments @("-C", $RootPath, "rev-parse", "--short=12", "HEAD")
+
+    $CommitObjectLines = & git -C $RootPath cat-file commit HEAD 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $CommitObjectText = ($CommitObjectLines -join "`n") + "`n"
+        $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $HashBytes = $Sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($CommitObjectText))
+        $BuildCommitObjectSha256 = -join ($HashBytes | ForEach-Object { $_.ToString("x2") })
+    }
+
+    $BuildGitDirty = "0"
+    & git -C $RootPath diff --quiet --ignore-submodules -- . 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        $BuildGitDirty = "1"
+    }
+    & git -C $RootPath diff --cached --quiet --ignore-submodules -- . 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        $BuildGitDirty = "1"
+    }
+}
 
 if (!(Test-Path $PicoRoot)) {
     throw "Missing homebrew\pico_286\pico-286 source tree."
@@ -85,6 +129,10 @@ $CommonArgs = @(
     "-DPICO_RP2040=0",
     "-DPICO_RP2350=0",
     "-DDEBUG=$DebugValue",
+    ("-DR36SX_BUILD_GIT_COMMIT=""{0}""" -f (ConvertTo-CMacroString $BuildGitCommit)),
+    ("-DR36SX_BUILD_GIT_COMMIT_SHORT=""{0}""" -f (ConvertTo-CMacroString $BuildGitCommitShort)),
+    ("-DR36SX_BUILD_COMMIT_OBJECT_SHA256=""{0}""" -f (ConvertTo-CMacroString $BuildCommitObjectSha256)),
+    "-DR36SX_BUILD_GIT_DIRTY=$BuildGitDirty",
     "-DR36SX_ENABLE_PROFILING=$ProfilingValue",
     "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
     "-DR36SX_NATIVE_FAST_MEMORY=$FastMemoryValue",
