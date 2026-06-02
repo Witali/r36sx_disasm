@@ -1144,8 +1144,9 @@ no threats.
 ## 2026-05-31 total memory auto layout and flat extended RAM
 
 Added `total_memory_kb` to `pico_286.conf`.  When only the total is set, the
-runtime now distributes it as conventional memory first, then upper/UMB
-memory, then XMS/extended memory.  Explicit `conventional_kb`, `upper_kb`,
+runtime maps conventional and upper/UMB memory inside the first 1 MB PC address
+space, then maps XMS/extended memory above the 1 MB boundary.  Explicit
+`conventional_kb`, `upper_kb`,
 `xms_kb`, or `extended_kb` lines still override the automatic split.
 
 The R36SX memory backend now maps linear physical addresses from `0x100000`
@@ -1154,6 +1155,15 @@ flat 386 protected-mode descriptors can read and write configured RAM above
 1 MB instead of receiving `0xFF`/no-op accesses.  `extended_kb` defaults to
 the effective `xms_kb` value unless explicitly configured, keeping INT 15h
 and the XMS handler consistent for the default setup.
+
+## 2026-06-02 physical total memory accounting
+
+Fixed `total_memory_kb` auto-layout so the first megabyte is treated as the PC
+physical address space rather than only the sum of conventional RAM and UMB RAM.
+With `total_memory_kb=8192`, automatic XMS/extended memory is now `8192 - 1024`
+= 7168 KB instead of `8192 - 640 - 176` = 7376 KB.  This prevents FreeDOS
+`MEM` from reporting the extra 208 KB that came from ignoring the reserved
+`A0000h..FFFFFh` area.
 
 Rebuild commands:
 

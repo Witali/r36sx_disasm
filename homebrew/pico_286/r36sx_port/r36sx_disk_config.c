@@ -28,6 +28,8 @@
 #define R36SX_PICO286_MAX_CONVENTIONAL_KB 640UL
 #define R36SX_PICO286_MIN_UPPER_KB 0UL
 #define R36SX_PICO286_MAX_UPPER_KB 176UL
+#define R36SX_PICO286_FIRST_MB_KB 1024UL
+#define R36SX_PICO286_UMB_START_KB 832UL
 #define R36SX_PICO286_MIN_TOTAL_MEMORY_KB R36SX_PICO286_MIN_CONVENTIONAL_KB
 #define R36SX_PICO286_MAX_TOTAL_MEMORY_KB 16384UL
 #define R36SX_PICO286_MAX_LINEAR_EXTENDED_KB \
@@ -1100,25 +1102,39 @@ static void update_memory_texts(void)
 static void apply_automatic_memory_layout(void)
 {
     if (total_memory_configured) {
-        uint32_t remaining = total_memory_kb;
+        uint32_t first_mb_kb = min_u32(total_memory_kb,
+                                       R36SX_PICO286_FIRST_MB_KB);
+        uint32_t conventional_limit =
+            min_u32(first_mb_kb, R36SX_PICO286_MAX_CONVENTIONAL_KB);
+        uint32_t upper_limit = 0u;
+        uint32_t xms_limit = 0u;
 
         conventional_memory_kb = take_memory_kb(
             conventional_memory_configured ? conventional_memory_kb
                                            : R36SX_PICO286_MAX_CONVENTIONAL_KB,
-            R36SX_PICO286_MAX_CONVENTIONAL_KB,
-            &remaining);
+            conventional_limit,
+            &first_mb_kb);
+
+        if (total_memory_kb > R36SX_PICO286_UMB_START_KB) {
+            upper_limit = min_u32(total_memory_kb - R36SX_PICO286_UMB_START_KB,
+                                  R36SX_PICO286_MAX_UPPER_KB);
+        }
+        if (total_memory_kb > R36SX_PICO286_FIRST_MB_KB) {
+            xms_limit = min_u32(total_memory_kb - R36SX_PICO286_FIRST_MB_KB,
+                                R36SX_PICO286_MAX_XMS_KB);
+        }
 
         upper_memory_kb = take_memory_kb(
             upper_memory_configured ? upper_memory_kb
                                     : R36SX_PICO286_MAX_UPPER_KB,
-            R36SX_PICO286_MAX_UPPER_KB,
-            &remaining);
+            upper_limit,
+            &first_mb_kb);
 
         xms_memory_kb = take_memory_kb(
             xms_memory_configured ? xms_memory_kb
                                   : R36SX_PICO286_MAX_XMS_KB,
-            R36SX_PICO286_MAX_XMS_KB,
-            &remaining);
+            xms_limit,
+            &xms_limit);
 
         if (extended_memory_configured) {
             extended_memory_kb = min_u32(extended_memory_kb, xms_memory_kb);
@@ -1599,8 +1615,9 @@ int r36sx_pico286_save_config(void)
 
     fprintf(fp, "# Emulated memory sizes in KB, capped by the compiled buffers.\n");
     fprintf(fp, "# total_memory_kb is distributed automatically unless an area below\n");
-    fprintf(fp, "# is explicitly written without a leading '#'.  Automatic layout uses\n");
-    fprintf(fp, "# conventional first, then upper/UMB, then XMS/extended memory.\n");
+    fprintf(fp, "# is explicitly written without a leading '#'.  Automatic layout maps\n");
+    fprintf(fp, "# conventional and upper/UMB inside the first 1 MB address space,\n");
+    fprintf(fp, "# then maps XMS/extended memory above the 1 MB boundary.\n");
     fprintf(fp, "# Allowed ranges:\n");
     fprintf(fp, "# total_memory_kb: 64..16384.\n");
     fprintf(fp, "# conventional_kb: 64..640, reported through the BIOS Data Area.\n");

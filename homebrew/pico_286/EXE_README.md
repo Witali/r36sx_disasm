@@ -230,14 +230,17 @@ early `POST 01` branch/loop tests: `JCC8`, `JCC16`, `LOOP`, `LOOPZ`, and
 The disk image menu can switch the executable BIOS setting between `NORMAL`
 and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 
-The `[memory]` values are in KB.  `total_memory_kb` is split automatically:
-conventional memory first, then upper/UMB memory, then XMS/extended RAM.  The
-individual `conventional_kb`, `upper_kb`, `xms_kb`, and `extended_kb` keys are
-optional overrides.  The total-memory limit is 16 MB; with full conventional
-and upper memory enabled, `xms_kb`/`extended_kb` can reach 15568 KB.  `xms_kb`
-also backs linear physical RAM above 1 MB, while `extended_kb` is the value
-returned by `INT 15h AH=88h`.  The XMS High Memory Area is backed by the first
-64 KB minus 16 bytes above 1 MB; `REQUEST_HMA` reserves it and enables A20.
+The `[memory]` values are in KB.  `total_memory_kb` is the physical PC memory
+size.  Automatic layout maps conventional memory and upper/UMB memory inside
+the first 1 MB address space, then maps XMS/extended RAM above the 1 MB
+boundary.  The individual `conventional_kb`, `upper_kb`, `xms_kb`, and
+`extended_kb` keys are optional overrides.  The total-memory limit is 16 MB;
+with full conventional and upper memory enabled, `xms_kb`/`extended_kb` can
+reach 15360 KB through `total_memory_kb` or 15568 KB by explicit override.
+`xms_kb` also backs linear physical RAM above 1 MB, while `extended_kb` is the
+value returned by `INT 15h AH=88h`.  The XMS High Memory Area is backed by the
+first 64 KB minus 16 bytes above 1 MB; `REQUEST_HMA` reserves it and enables
+A20.
 
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
