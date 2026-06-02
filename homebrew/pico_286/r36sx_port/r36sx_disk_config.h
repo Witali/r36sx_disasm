@@ -81,6 +81,18 @@ uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 // Return the configured main loop target FPS.
 uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps);
 
+// Return the configured emulated RTC start time as Unix local-time seconds.
+int64_t r36sx_pico286_rtc_start_time_unix(void);
+
+// Return non-zero when emulated RTC/CMOS clock support is globally enabled.
+int r36sx_pico286_rtc_enabled(void);
+
+// Return non-zero when AT-compatible CMOS ports 70h/71h are enabled.
+int r36sx_pico286_rtc_at_enabled(void);
+
+// Return non-zero when XT-compatible RTC ports 240h..257h are enabled.
+int r36sx_pico286_rtc_xt_enabled(void);
+
 // Return the configured CPU compatibility model.
 r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void);
 

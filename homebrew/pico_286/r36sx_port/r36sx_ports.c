@@ -226,16 +226,348 @@ static INLINE uint8_t joystick_in() {
 }
 
 
-static INLINE uint8_t rtc_read(uint16_t addr) {
+#define R36SX_CMOS_REG_SECONDS 0x00u
+#define R36SX_CMOS_REG_SECONDS_ALARM 0x01u
+#define R36SX_CMOS_REG_MINUTES 0x02u
+#define R36SX_CMOS_REG_MINUTES_ALARM 0x03u
+#define R36SX_CMOS_REG_HOURS 0x04u
+#define R36SX_CMOS_REG_HOURS_ALARM 0x05u
+#define R36SX_CMOS_REG_DAY_OF_WEEK 0x06u
+#define R36SX_CMOS_REG_DAY_OF_MONTH 0x07u
+#define R36SX_CMOS_REG_MONTH 0x08u
+#define R36SX_CMOS_REG_YEAR 0x09u
+#define R36SX_CMOS_REG_STATUS_A 0x0Au
+#define R36SX_CMOS_REG_STATUS_B 0x0Bu
+#define R36SX_CMOS_REG_STATUS_C 0x0Cu
+#define R36SX_CMOS_REG_STATUS_D 0x0Du
+#define R36SX_CMOS_REG_CENTURY 0x32u
+#define R36SX_CMOS_STATUS_B_24H 0x02u
+#define R36SX_CMOS_STATUS_B_BINARY 0x04u
+#define R36SX_CMOS_STATUS_B_SET 0x80u
+
+static uint8_t cmos_index;
+static uint8_t cmos_nmi_disabled;
+static uint8_t cmos_ram[128];
+static int cmos_initialized;
+static time_t rtc_host_start;
+static time_t rtc_start;
+
+static uint8_t r36sx_rtc_to_bcd(uint8_t value)
+{
+    return (uint8_t)(((value / 10u) << 4) | (value % 10u));
+}
+
+static int r36sx_rtc_from_bcd(uint8_t value, uint8_t *decoded)
+{
+    uint8_t high = (value >> 4) & 0x0fu;
+    uint8_t low = value & 0x0fu;
+
+    if (high > 9u || low > 9u) {
+        return 0;
+    }
+
+    *decoded = (uint8_t)(high * 10u + low);
+    return 1;
+}
+
+static uint8_t r36sx_cmos_encode_value(uint8_t value)
+{
+    if (cmos_ram[R36SX_CMOS_REG_STATUS_B] & R36SX_CMOS_STATUS_B_BINARY) {
+        return value;
+    }
+    return r36sx_rtc_to_bcd(value);
+}
+
+static int r36sx_cmos_decode_value(uint8_t raw, uint8_t *value)
+{
+    if (cmos_ram[R36SX_CMOS_REG_STATUS_B] & R36SX_CMOS_STATUS_B_BINARY) {
+        *value = raw;
+        return 1;
+    }
+    return r36sx_rtc_from_bcd(raw, value);
+}
+
+static uint8_t r36sx_cmos_encode_hour(uint8_t hour)
+{
+    if (cmos_ram[R36SX_CMOS_REG_STATUS_B] & R36SX_CMOS_STATUS_B_24H) {
+        return r36sx_cmos_encode_value(hour);
+    }
+
+    uint8_t pm = hour >= 12u ? 0x80u : 0x00u;
+    uint8_t hour12 = (uint8_t)(hour % 12u);
+    if (hour12 == 0) {
+        hour12 = 12u;
+    }
+    return (uint8_t)(r36sx_cmos_encode_value(hour12) | pm);
+}
+
+static int r36sx_cmos_decode_hour(uint8_t raw, uint8_t *hour)
+{
+    uint8_t decoded;
+
+    if (cmos_ram[R36SX_CMOS_REG_STATUS_B] & R36SX_CMOS_STATUS_B_24H) {
+        if (!r36sx_cmos_decode_value(raw, &decoded) || decoded > 23u) {
+            return 0;
+        }
+        *hour = decoded;
+        return 1;
+    }
+
+    uint8_t pm = raw & 0x80u;
+    raw &= 0x7fu;
+    if (!r36sx_cmos_decode_value(raw, &decoded) ||
+        decoded < 1u || decoded > 12u) {
+        return 0;
+    }
+    if (decoded == 12u) {
+        decoded = 0u;
+    }
+    *hour = (uint8_t)(decoded + (pm ? 12u : 0u));
+    return 1;
+}
+
+static time_t r36sx_rtc_current_time_raw(void)
+{
+    time_t host_now;
+
+    if (time(&host_now) == (time_t)-1) {
+        return rtc_start;
+    }
+
+    return rtc_start + (host_now - rtc_host_start);
+}
+
+static int r36sx_cmos_time_register(uint8_t reg)
+{
+    return reg == R36SX_CMOS_REG_SECONDS ||
+           reg == R36SX_CMOS_REG_MINUTES ||
+           reg == R36SX_CMOS_REG_HOURS ||
+           reg == R36SX_CMOS_REG_DAY_OF_WEEK ||
+           reg == R36SX_CMOS_REG_DAY_OF_MONTH ||
+           reg == R36SX_CMOS_REG_MONTH ||
+           reg == R36SX_CMOS_REG_YEAR ||
+           reg == R36SX_CMOS_REG_CENTURY;
+}
+
+static int r36sx_rtc_update_in_progress(void)
+{
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+        return 0;
+    }
+
+    return ts.tv_nsec >= 999000000L;
+}
+
+static void r36sx_cmos_latch_time_regs(void)
+{
+    time_t rtc_now = r36sx_rtc_current_time_raw();
+    struct tm tm_buf;
+    struct tm *t = localtime_r(&rtc_now, &tm_buf);
+    int full_year;
+
+    if (!t) {
+        return;
+    }
+
+    full_year = t->tm_year + 1900;
+    cmos_ram[R36SX_CMOS_REG_SECONDS] =
+        r36sx_cmos_encode_value((uint8_t)t->tm_sec);
+    cmos_ram[R36SX_CMOS_REG_MINUTES] =
+        r36sx_cmos_encode_value((uint8_t)t->tm_min);
+    cmos_ram[R36SX_CMOS_REG_HOURS] =
+        r36sx_cmos_encode_hour((uint8_t)t->tm_hour);
+    cmos_ram[R36SX_CMOS_REG_DAY_OF_WEEK] =
+        r36sx_cmos_encode_value((uint8_t)(t->tm_wday + 1));
+    cmos_ram[R36SX_CMOS_REG_DAY_OF_MONTH] =
+        r36sx_cmos_encode_value((uint8_t)t->tm_mday);
+    cmos_ram[R36SX_CMOS_REG_MONTH] =
+        r36sx_cmos_encode_value((uint8_t)(t->tm_mon + 1));
+    cmos_ram[R36SX_CMOS_REG_YEAR] =
+        r36sx_cmos_encode_value((uint8_t)(full_year % 100));
+    cmos_ram[R36SX_CMOS_REG_CENTURY] =
+        r36sx_cmos_encode_value((uint8_t)(full_year / 100));
+}
+
+static void r36sx_cmos_init_once(void)
+{
+    if (cmos_initialized) {
+        return;
+    }
+
+    memset(cmos_ram, 0, sizeof(cmos_ram));
+    cmos_ram[R36SX_CMOS_REG_STATUS_A] = 0x26u;
+    cmos_ram[R36SX_CMOS_REG_STATUS_B] = R36SX_CMOS_STATUS_B_24H;
+    cmos_ram[R36SX_CMOS_REG_STATUS_D] = 0x80u;
+
+    if (time(&rtc_host_start) == (time_t)-1) {
+        rtc_host_start = 0;
+    }
+    rtc_start = (time_t)r36sx_pico286_rtc_start_time_unix();
+    cmos_initialized = 1;
+    r36sx_cmos_latch_time_regs();
+    r36sx_pico286_debug_log("rtc: start unix=%ld", (long)rtc_start);
+}
+
+static void r36sx_cmos_commit_time_regs(void)
+{
+    uint8_t second;
+    uint8_t minute;
+    uint8_t hour;
+    uint8_t day;
+    uint8_t month;
+    uint8_t year;
+    uint8_t century = 0;
+    int full_year;
+    struct tm tm_value;
+    time_t parsed;
+    time_t host_now;
+
+    if (!r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_SECONDS], &second) ||
+        !r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_MINUTES], &minute) ||
+        !r36sx_cmos_decode_hour(cmos_ram[R36SX_CMOS_REG_HOURS], &hour) ||
+        !r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_DAY_OF_MONTH], &day) ||
+        !r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_MONTH], &month) ||
+        !r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_YEAR], &year)) {
+        r36sx_pico286_debug_log("rtc: ignoring invalid CMOS time write");
+        return;
+    }
+
+    if (!r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_CENTURY],
+                                 &century) ||
+        century < 19u || century > 20u) {
+        full_year = year >= 80u ? 1900 + year : 2000 + year;
+    } else {
+        full_year = century * 100 + year;
+    }
+
+    if (full_year < 1980 || full_year > 2037 ||
+        month < 1u || month > 12u ||
+        day < 1u || day > 31u ||
+        hour > 23u || minute > 59u || second > 59u) {
+        r36sx_pico286_debug_log("rtc: ignoring out-of-range CMOS time write");
+        return;
+    }
+
+    memset(&tm_value, 0, sizeof(tm_value));
+    tm_value.tm_year = full_year - 1900;
+    tm_value.tm_mon = month - 1;
+    tm_value.tm_mday = day;
+    tm_value.tm_hour = hour;
+    tm_value.tm_min = minute;
+    tm_value.tm_sec = second;
+    tm_value.tm_isdst = -1;
+
+    parsed = mktime(&tm_value);
+    if (parsed == (time_t)-1 ||
+        tm_value.tm_year != full_year - 1900 ||
+        tm_value.tm_mon != month - 1 ||
+        tm_value.tm_mday != day ||
+        tm_value.tm_hour != hour ||
+        tm_value.tm_min != minute ||
+        tm_value.tm_sec != second) {
+        r36sx_pico286_debug_log("rtc: ignoring normalized CMOS time write");
+        return;
+    }
+
+    if (time(&host_now) == (time_t)-1) {
+        host_now = rtc_host_start;
+    }
+    rtc_host_start = host_now;
+    rtc_start = parsed;
+    r36sx_pico286_debug_log("rtc: set unix=%ld", (long)rtc_start);
+}
+
+static uint8_t r36sx_cmos_read(uint8_t reg)
+{
+    r36sx_cmos_init_once();
+    reg &= 0x7fu;
+
+    if (r36sx_cmos_time_register(reg) &&
+        !(cmos_ram[R36SX_CMOS_REG_STATUS_B] & R36SX_CMOS_STATUS_B_SET)) {
+        r36sx_cmos_latch_time_regs();
+    }
+
+    switch (reg) {
+        case R36SX_CMOS_REG_STATUS_A:
+            return (uint8_t)((cmos_ram[R36SX_CMOS_REG_STATUS_A] & 0x7fu) |
+                             (!(cmos_ram[R36SX_CMOS_REG_STATUS_B] &
+                                R36SX_CMOS_STATUS_B_SET) &&
+                              r36sx_rtc_update_in_progress() ? 0x80u : 0u));
+        case R36SX_CMOS_REG_STATUS_C: {
+            uint8_t value = cmos_ram[R36SX_CMOS_REG_STATUS_C];
+            cmos_ram[R36SX_CMOS_REG_STATUS_C] = 0;
+            return value;
+        }
+        case R36SX_CMOS_REG_STATUS_D:
+            return 0x80u;
+        default:
+            return cmos_ram[reg];
+    }
+}
+
+static void r36sx_cmos_write(uint8_t reg, uint8_t value)
+{
+    r36sx_cmos_init_once();
+    reg &= 0x7fu;
+
+    switch (reg) {
+        case R36SX_CMOS_REG_STATUS_A:
+            cmos_ram[R36SX_CMOS_REG_STATUS_A] = value & 0x7fu;
+            return;
+        case R36SX_CMOS_REG_STATUS_B: {
+            uint8_t old = cmos_ram[R36SX_CMOS_REG_STATUS_B];
+
+            if (!(old & R36SX_CMOS_STATUS_B_SET) &&
+                (value & R36SX_CMOS_STATUS_B_SET)) {
+                r36sx_cmos_latch_time_regs();
+            }
+
+            cmos_ram[R36SX_CMOS_REG_STATUS_B] = value;
+            if ((old & R36SX_CMOS_STATUS_B_SET) &&
+                !(value & R36SX_CMOS_STATUS_B_SET)) {
+                r36sx_cmos_commit_time_regs();
+            } else if (((old ^ value) &
+                        (R36SX_CMOS_STATUS_B_BINARY |
+                         R36SX_CMOS_STATUS_B_24H)) &&
+                       !(value & R36SX_CMOS_STATUS_B_SET)) {
+                r36sx_cmos_latch_time_regs();
+            }
+            return;
+        }
+        case R36SX_CMOS_REG_STATUS_C:
+        case R36SX_CMOS_REG_STATUS_D:
+            return;
+        default:
+            if (r36sx_cmos_time_register(reg) &&
+                !(cmos_ram[R36SX_CMOS_REG_STATUS_B] &
+                  R36SX_CMOS_STATUS_B_SET)) {
+                r36sx_cmos_latch_time_regs();
+                cmos_ram[reg] = value;
+                r36sx_cmos_commit_time_regs();
+            } else {
+                cmos_ram[reg] = value;
+            }
+            return;
+    }
+}
+
+static uint8_t r36sx_xt_rtc_read(uint16_t addr)
+{
     uint8_t ret = 0xFF;
-    struct tm tdata;
+    time_t rtc_now;
+    struct tm tm_buf;
+    struct tm *t;
 
-    time((time_t*)&tdata);
-    struct tm *t = localtime((const time_t*)&tdata);
+    r36sx_cmos_init_once();
+    rtc_now = r36sx_rtc_current_time_raw();
+    t = localtime_r(&rtc_now, &tm_buf);
+    if (!t) {
+        return ret;
+    }
 
-    t->tm_year = 24;
-    addr &= 0x1F;
-    switch (addr) {
+    switch (addr & 0x1Fu) {
         case 1:
             ret = 0;
             break;
@@ -262,14 +594,44 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
             break;
     }
 
-    if (ret != 0xFF) {
-        uint8_t rh, rl;
-        rh = (ret / 10) % 10;
-        rl = ret % 10;
-        ret = (rh << 4) | rl;
+    return ret == 0xFFu ? ret : r36sx_rtc_to_bcd(ret);
+}
+
+static void r36sx_xt_rtc_write(uint16_t addr, uint8_t value)
+{
+    uint8_t reg;
+
+    switch (addr & 0x1fu) {
+        case 2:
+            reg = R36SX_CMOS_REG_SECONDS;
+            break;
+        case 3:
+            reg = R36SX_CMOS_REG_MINUTES;
+            break;
+        case 4:
+            reg = R36SX_CMOS_REG_HOURS;
+            break;
+        case 5:
+            reg = R36SX_CMOS_REG_DAY_OF_WEEK;
+            break;
+        case 6:
+            reg = R36SX_CMOS_REG_DAY_OF_MONTH;
+            break;
+        case 7:
+            reg = R36SX_CMOS_REG_MONTH;
+            break;
+        case 9:
+            reg = R36SX_CMOS_REG_YEAR;
+            break;
+        default:
+            return;
     }
 
-    return ret;
+    r36sx_cmos_write(reg, value);
+}
+
+static INLINE uint8_t rtc_read(uint16_t addr) {
+    return r36sx_xt_rtc_read(addr);
 }
 
 void portout(uint16_t portnum, uint16_t value) {
@@ -333,6 +695,17 @@ void portout(uint16_t portnum, uint16_t value) {
             port64 = (uint8_t)value;
             r36sx_keyboard_refresh_status();
             break;
+        case 0x70: // AT CMOS index / NMI mask
+            if (r36sx_pico286_rtc_at_enabled()) {
+                cmos_index = (uint8_t)(value & 0x7fu);
+                cmos_nmi_disabled = (uint8_t)((value & 0x80u) != 0);
+            }
+            return;
+        case 0x71: // AT CMOS data
+            if (r36sx_pico286_rtc_at_enabled()) {
+                r36sx_cmos_write(cmos_index, (uint8_t)value);
+            }
+            return;
 // i8237 DMA
         case 0x81:
         case 0x82:
@@ -413,6 +786,34 @@ if (sound_chips_clock) {
             blaster_write(portnum, value);
 #endif
         return;
+        case 0x240:
+        case 0x241:
+        case 0x242:
+        case 0x243:
+        case 0x244:
+        case 0x245:
+        case 0x246:
+        case 0x247:
+        case 0x248:
+        case 0x249:
+        case 0x24A:
+        case 0x24B:
+        case 0x24C:
+        case 0x24D:
+        case 0x24E:
+        case 0x24F:
+        case 0x250:
+        case 0x251:
+        case 0x252:
+        case 0x253:
+        case 0x254:
+        case 0x255:
+        case 0x256:
+        case 0x257:
+            if (r36sx_pico286_rtc_xt_enabled()) {
+                r36sx_xt_rtc_write(portnum, (uint8_t)value);
+            }
+            return;
         case 0x260:
         case 0x261:
         case 0x262:
@@ -608,6 +1009,17 @@ uint16_t portin(uint16_t portnum) {
         case 0x64:
             r36sx_keyboard_refresh_status();
             return port64;
+        case 0x70:
+            if (r36sx_pico286_rtc_at_enabled()) {
+                return (uint8_t)(cmos_index |
+                                 (cmos_nmi_disabled ? 0x80u : 0u));
+            }
+            return 0xFF;
+        case 0x71:
+            if (r36sx_pico286_rtc_at_enabled()) {
+                return r36sx_cmos_read(cmos_index);
+            }
+            return 0xFF;
 // i8237 DMA Page Registers
         case 0x81:
         case 0x82:
@@ -669,7 +1081,7 @@ uint16_t portin(uint16_t portnum) {
         case 0x255:
         case 0x256:
         case 0x257:
-            return rtc_read(portnum);
+            return r36sx_pico286_rtc_xt_enabled() ? rtc_read(portnum) : 0xFF;
         case 0x27A: // Covox Speech Thing
             return 0;
         case 0x330:

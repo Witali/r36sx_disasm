@@ -8,10 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define R36SX_PICO286_CONFIG_PATH "pico_286.conf"
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
+#define R36SX_PICO286_DEFAULT_RTC_START_TIME "2024-01-01 00:00:00"
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 250.000
 #define R36SX_PICO286_MIN_CACHE_BUFFER_KB 0UL
@@ -87,6 +89,11 @@ static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char app_stats_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
+static char rtc_enabled_text[8] = "1";
+static char rtc_at_enabled_text[8] = "1";
+static char rtc_xt_enabled_text[8] = "1";
+static char rtc_start_time_text[32] =
+    R36SX_PICO286_DEFAULT_RTC_START_TIME;
 static char screenshot_format_text[8] = "png";
 static char scaling_filter_text[16] = "nearest";
 static char keyboard_mode_text[16] = "normal";
@@ -115,6 +122,11 @@ static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int app_stats_enabled = 1;
 static uint32_t target_fps = 60u;
+static int rtc_enabled = 1;
+static int rtc_at_enabled = 1;
+static int rtc_xt_enabled = 1;
+static int64_t rtc_start_time_unix = 0;
+static int rtc_start_time_valid = 0;
 static int audio_adlib_enabled = 1;
 static int audio_sound_blaster_enabled = 1;
 static int audio_cms_enabled = 1;
@@ -994,6 +1006,167 @@ static int set_timing_value(const char *key, const char *value, int line_no)
     return 0;
 }
 
+static int parse_rtc_start_time_text(const char *value,
+                                     int64_t *unix_time)
+{
+    char text[64];
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    char extra = '\0';
+    int fields;
+    char *trimmed;
+    struct tm tm_value;
+    time_t parsed;
+
+    snprintf(text, sizeof(text), "%s", value ? value : "");
+    for (char *cursor = text; *cursor; cursor++) {
+        if (*cursor == 'T' || *cursor == 't') {
+            *cursor = ' ';
+        }
+    }
+    trimmed = trim_space(text);
+
+    fields = sscanf(trimmed, "%d-%d-%d %d:%d:%d%c",
+                    &year, &month, &day,
+                    &hour, &minute, &second, &extra);
+    if (fields != 6) {
+        hour = 0;
+        minute = 0;
+        second = 0;
+        extra = '\0';
+        fields = sscanf(trimmed, "%d-%d-%d%c",
+                        &year, &month, &day, &extra);
+        if (fields != 3) {
+            return 0;
+        }
+    }
+
+    if (year < 1980 || year > 2037 ||
+        month < 1 || month > 12 ||
+        day < 1 || day > 31 ||
+        hour < 0 || hour > 23 ||
+        minute < 0 || minute > 59 ||
+        second < 0 || second > 59) {
+        return 0;
+    }
+
+    memset(&tm_value, 0, sizeof(tm_value));
+    tm_value.tm_year = year - 1900;
+    tm_value.tm_mon = month - 1;
+    tm_value.tm_mday = day;
+    tm_value.tm_hour = hour;
+    tm_value.tm_min = minute;
+    tm_value.tm_sec = second;
+    tm_value.tm_isdst = -1;
+
+    parsed = mktime(&tm_value);
+    if (parsed == (time_t)-1 ||
+        tm_value.tm_year != year - 1900 ||
+        tm_value.tm_mon != month - 1 ||
+        tm_value.tm_mday != day ||
+        tm_value.tm_hour != hour ||
+        tm_value.tm_min != minute ||
+        tm_value.tm_sec != second) {
+        return 0;
+    }
+
+    *unix_time = (int64_t)parsed;
+    return 1;
+}
+
+static int set_rtc_start_time(const char *key, const char *value, int line_no)
+{
+    int64_t parsed;
+
+    if (!(key_equals(key, "rtc_start_time") ||
+          key_equals(key, "rtc_time") ||
+          key_equals(key, "bios_start_time") ||
+          key_equals(key, "bios_time") ||
+          key_equals(key, "start_time"))) {
+        return 0;
+    }
+
+    if (!parse_rtc_start_time_text(value, &parsed)) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    rtc_start_time_unix = parsed;
+    rtc_start_time_valid = 1;
+    snprintf(rtc_start_time_text, sizeof(rtc_start_time_text), "%s", value);
+    r36sx_pico286_debug_log("diskcfg: rtc_start_time='%s'",
+                            rtc_start_time_text);
+    return 1;
+}
+
+static int set_rtc_bool_value(const char *key, const char *value,
+                              int line_no, const char *canonical_key,
+                              int *target, char *text, size_t text_size)
+{
+    int enabled;
+
+    if (!parse_bool_value(value, &enabled)) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    *target = enabled;
+    snprintf(text, text_size, "%d", enabled ? 1 : 0);
+    r36sx_pico286_debug_log("diskcfg: %s=%d", canonical_key, enabled);
+    return 1;
+}
+
+static int set_rtc_value(const char *key, const char *value, int line_no)
+{
+    if (set_rtc_start_time(key, value, line_no)) {
+        return 1;
+    }
+
+    if (key_equals(key, "rtc") ||
+        key_equals(key, "rtc_enabled") ||
+        key_equals(key, "clock_enabled") ||
+        key_equals(key, "cmos_rtc_enabled")) {
+        return set_rtc_bool_value(
+            key, value, line_no, "rtc_enabled",
+            &rtc_enabled, rtc_enabled_text, sizeof(rtc_enabled_text));
+    }
+
+    if (key_equals(key, "rtc_at") ||
+        key_equals(key, "rtc_at_enabled") ||
+        key_equals(key, "at_rtc") ||
+        key_equals(key, "at_rtc_enabled") ||
+        key_equals(key, "cmos_at") ||
+        key_equals(key, "cmos_at_enabled") ||
+        key_equals(key, "cmos_ports_enabled")) {
+        return set_rtc_bool_value(
+            key, value, line_no, "rtc_at_enabled",
+            &rtc_at_enabled, rtc_at_enabled_text,
+            sizeof(rtc_at_enabled_text));
+    }
+
+    if (key_equals(key, "rtc_xt") ||
+        key_equals(key, "rtc_xt_enabled") ||
+        key_equals(key, "xt_rtc") ||
+        key_equals(key, "xt_rtc_enabled") ||
+        key_equals(key, "xt_clock") ||
+        key_equals(key, "xt_clock_enabled")) {
+        return set_rtc_bool_value(
+            key, value, line_no, "rtc_xt_enabled",
+            &rtc_xt_enabled, rtc_xt_enabled_text,
+            sizeof(rtc_xt_enabled_text));
+    }
+
+    return 0;
+}
+
 static int set_memory_value(const char *key, const char *value, int line_no)
 {
     if (key_equals(key, "total_memory_kb") ||
@@ -1360,6 +1533,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_timing_value(key, value, line_no)) {
         return 1;
     }
+    if (set_rtc_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_memory_value(key, value, line_no)) {
         return 1;
     }
@@ -1581,6 +1757,19 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[timing]\n");
     fprintf(fp, "target_fps=%s\n\n", target_fps_text);
 
+    fprintf(fp, "# Emulated BIOS RTC/CMOS clock.\n");
+    fprintf(fp, "# rtc_enabled disables both AT and XT RTC interfaces when 0.\n");
+    fprintf(fp, "# rtc_at_enabled controls AT CMOS ports 70h/71h.\n");
+    fprintf(fp, "# rtc_xt_enabled controls XT-compatible ports 240h..257h.\n");
+    fprintf(fp, "# RTC start time is local time.\n");
+    fprintf(fp, "# Format: YYYY-MM-DD HH:MM:SS.  If omitted, the built-in\n");
+    fprintf(fp, "# default is %s.\n", R36SX_PICO286_DEFAULT_RTC_START_TIME);
+    fprintf(fp, "[rtc]\n");
+    fprintf(fp, "rtc_enabled=%s\n", rtc_enabled_text);
+    fprintf(fp, "rtc_at_enabled=%s\n", rtc_at_enabled_text);
+    fprintf(fp, "rtc_xt_enabled=%s\n", rtc_xt_enabled_text);
+    fprintf(fp, "rtc_start_time=%s\n\n", rtc_start_time_text);
+
     fprintf(fp, "# Scaling filter used when the DOS image is resized.\n");
     fprintf(fp, "# Supported scaling_filter values: nearest, bilinear.\n");
     fprintf(fp, "# keyboard_mode=normal resizes the DOS image above the keyboard.\n");
@@ -1706,6 +1895,40 @@ uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps)
     load_disk_config();
 
     return target_fps ? target_fps : fallback_fps;
+}
+
+int64_t r36sx_pico286_rtc_start_time_unix(void)
+{
+    load_disk_config();
+
+    if (!rtc_start_time_valid &&
+        !parse_rtc_start_time_text(rtc_start_time_text,
+                                   &rtc_start_time_unix)) {
+        return 0;
+    }
+    rtc_start_time_valid = 1;
+    return rtc_start_time_unix;
+}
+
+int r36sx_pico286_rtc_enabled(void)
+{
+    load_disk_config();
+
+    return rtc_enabled;
+}
+
+int r36sx_pico286_rtc_at_enabled(void)
+{
+    load_disk_config();
+
+    return rtc_enabled && rtc_at_enabled;
+}
+
+int r36sx_pico286_rtc_xt_enabled(void)
+{
+    load_disk_config();
+
+    return rtc_enabled && rtc_xt_enabled;
 }
 
 r36sx_pico286_cpu_model_t r36sx_pico286_cpu_model(void)
