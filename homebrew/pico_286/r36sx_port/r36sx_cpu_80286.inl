@@ -83,13 +83,55 @@ static inline uint8_t r36sx_descriptor_is_usable_data_segment(
            r36sx_descriptor_is_readable_code(cache);
 }
 
+static inline uint8_t r36sx_cpu_descriptor_uses_386_format(void)
+{
+    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386);
+}
+
+static void r36sx_cpu_fill_descriptor_cache(uint16_t selector,
+                                            uint32_t lo,
+                                            uint32_t hi,
+                                            r36sx_segment_cache_t *cache)
+{
+    uint32_t limit = lo & 0xffffu;
+    uint32_t base = ((lo >> 16) & 0xffffu) |
+                    ((hi & 0x000000ffu) << 16);
+    uint8_t flags = 0;
+
+    /*
+     * Intel 80286 descriptors have a 24-bit base and a 16-bit limit.  The
+     * upper limit bits, D/B, granularity, and high base byte are 80386-era
+     * extensions and must not leak into 286 mode.
+     */
+    if (r36sx_cpu_descriptor_uses_386_format()) {
+        limit |= hi & 0x000f0000u;
+        flags = (uint8_t)((hi >> 20) & 0x0fu);
+        if (flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
+            limit = (limit << 12) | 0x0fffu;
+        }
+        base |= hi & 0xff000000u;
+    }
+
+    cache->selector = selector;
+    cache->base = base;
+    cache->limit = limit;
+    cache->access = (uint8_t)((hi >> 8) & 0xffu);
+    cache->flags = flags;
+    cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
+}
+
 static inline uint8_t r36sx_descriptor_is_tss(
     const r36sx_segment_cache_t *cache)
 {
     uint8_t type = r36sx_descriptor_type(cache);
-    return !r36sx_descriptor_is_code_data(cache) &&
-           (type == R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE ||
-            type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE);
+    if (r36sx_descriptor_is_code_data(cache)) {
+        return 0;
+    }
+    if (type == R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE) {
+        return 1;
+    }
+    return r36sx_cpu_descriptor_uses_386_format() &&
+           type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE;
 }
 
 static inline uint8_t r36sx_descriptor_dpl(
@@ -209,7 +251,8 @@ static inline void r36sx_cpu_use_segment(uint8_t segid)
 
 static inline uint8_t r36sx_cpu_code_default32(void)
 {
-    return r36sx_cpu_protected_enabled() &&
+    return r36sx_cpu_descriptor_uses_386_format() &&
+           r36sx_cpu_protected_enabled() &&
            r36sx_seg_cache[regcs].valid &&
            r36sx_descriptor_is_code(&r36sx_seg_cache[regcs]) &&
            (r36sx_seg_cache[regcs].flags & R36SX_DESCRIPTOR_FLAG_DB);
@@ -217,7 +260,8 @@ static inline uint8_t r36sx_cpu_code_default32(void)
 
 static inline uint8_t r36sx_cpu_stack_default32(void)
 {
-    return r36sx_cpu_protected_enabled() &&
+    return r36sx_cpu_descriptor_uses_386_format() &&
+           r36sx_cpu_protected_enabled() &&
            r36sx_seg_cache[regss].valid &&
            (r36sx_seg_cache[regss].flags & R36SX_DESCRIPTOR_FLAG_DB);
 }
@@ -375,21 +419,7 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
     uint32_t addr = table_base + descriptor_offset;
     uint32_t lo = readdw86(addr);
     uint32_t hi = readdw86(addr + 4u);
-    uint32_t limit = (lo & 0xffffu) | (hi & 0x000f0000u);
-    uint8_t flags = (uint8_t)((hi >> 20) & 0x0fu);
-
-    if (flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
-        limit = (limit << 12) | 0x0fffu;
-    }
-
-    cache->selector = selector;
-    cache->base = ((lo >> 16) & 0xffffu) |
-                  ((hi & 0x000000ffu) << 16) |
-                  (hi & 0xff000000u);
-    cache->limit = limit;
-    cache->access = (uint8_t)((hi >> 8) & 0xffu);
-    cache->flags = flags;
-    cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
+    r36sx_cpu_fill_descriptor_cache(selector, lo, hi, cache);
     return require_present ? cache->valid : 1u;
 }
 
@@ -469,12 +499,13 @@ static uint8_t r36sx_cpu_descriptor_type_valid_for_lar(
         case R36SX_DESCRIPTOR_TYPE_TASK_GATE:
         case 0x06u: /* 80286 interrupt gate */
         case 0x07u: /* 80286 trap gate */
+            return 1;
         case R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE:
         case R36SX_DESCRIPTOR_TYPE_TSS32_BUSY:
         case 0x0cu: /* 80386 call gate */
         case 0x0eu: /* 80386 interrupt gate */
         case 0x0fu: /* 80386 trap gate */
-            return 1;
+            return r36sx_cpu_descriptor_uses_386_format();
     }
     return 0;
 }
@@ -490,9 +521,10 @@ static uint8_t r36sx_cpu_descriptor_type_valid_for_lsl(
         case R36SX_DESCRIPTOR_TYPE_TSS16_AVAILABLE:
         case R36SX_DESCRIPTOR_TYPE_LDT:
         case R36SX_DESCRIPTOR_TYPE_TSS16_BUSY:
+            return 1;
         case R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE:
         case R36SX_DESCRIPTOR_TYPE_TSS32_BUSY:
-            return 1;
+            return r36sx_cpu_descriptor_uses_386_format();
     }
     return 0;
 }

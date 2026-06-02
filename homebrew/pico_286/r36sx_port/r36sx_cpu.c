@@ -1698,21 +1698,7 @@ static uint8_t r36sx_cpu_decode_descriptor_raw(uint16_t selector,
     uint32_t addr = table_base + descriptor_offset;
     *lo = readdw86(addr);
     *hi = readdw86(addr + 4u);
-
-    uint32_t limit = (*lo & 0xffffu) | (*hi & 0x000f0000u);
-    uint8_t flags = (uint8_t)((*hi >> 20) & 0x0fu);
-    if (flags & R36SX_DESCRIPTOR_FLAG_GRANULAR) {
-        limit = (limit << 12) | 0x0fffu;
-    }
-
-    cache->selector = selector;
-    cache->base = ((*lo >> 16) & 0xffffu) |
-                  ((*hi & 0x000000ffu) << 16) |
-                  (*hi & 0xff000000u);
-    cache->limit = limit;
-    cache->access = (uint8_t)((*hi >> 8) & 0xffu);
-    cache->flags = flags;
-    cache->valid = (cache->access & R36SX_DESCRIPTOR_PRESENT) != 0;
+    r36sx_cpu_fill_descriptor_cache(selector, *lo, *hi, cache);
     return 1;
 }
 
@@ -1731,6 +1717,11 @@ static uint8_t r36sx_cpu_decode_call_gate(uint16_t selector,
     if (r36sx_descriptor_is_code_data(&gate_cache) ||
         !(type == R36SX_DESCRIPTOR_TYPE_CALL_GATE16 ||
           type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32)) {
+        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        return 0;
+    }
+    if (type == R36SX_DESCRIPTOR_TYPE_CALL_GATE32 &&
+        !r36sx_cpu_descriptor_uses_386_format()) {
         r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
         return 0;
     }
@@ -1899,6 +1890,11 @@ static uint8_t r36sx_cpu_tss_stack_for_level(uint8_t cpl,
 
     if (type == R36SX_DESCRIPTOR_TYPE_TSS32_AVAILABLE ||
         type == R36SX_DESCRIPTOR_TYPE_TSS32_BUSY) {
+        if (!r36sx_cpu_descriptor_uses_386_format()) {
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_TSS,
+                                      r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
+            return 0;
+        }
         offset = 4u + (uint32_t)cpl * 8u;
         needed_last = offset + 5u;
         if (needed_last > r36sx_tr_cache.limit) {
