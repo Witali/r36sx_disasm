@@ -16,6 +16,12 @@ be checked against the relevant specification and committed separately.
 
 ## Current Order
 
+0. 386 instruction-set audit.
+   - Status: started.
+   - Current audit file: `INTEL_386_INSTRUCTION_AUDIT.md`.
+   - Next target: implement the missing 386-only opcodes listed there before
+     expanding the higher-level DPMI/VCPI surface.
+
 1. Minimal DPMI host groundwork.
    - Status: started.
    - Specification checkpoints: DPMI client initialization, `INT 2Fh
