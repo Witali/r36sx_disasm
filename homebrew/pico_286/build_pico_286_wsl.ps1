@@ -20,15 +20,23 @@ $ScriptWin = ([IO.Path]::GetFullPath($Script)) -replace "\\", "/"
 $WslRoot = (& wsl wslpath -a $RootWin).Trim()
 $WslScript = (& wsl wslpath -a $ScriptWin).Trim()
 
+$EffectiveOptLevel = $OptLevel
+if ($DebugLog) {
+    if ($EffectiveOptLevel -ne "O2") {
+        Write-Warning "Debug build requested; forcing -OptLevel O2 instead of $EffectiveOptLevel"
+    }
+    $EffectiveOptLevel = "O2"
+}
+
 $ArgsList = @()
 if ($DebugLog) { $ArgsList += "--debug-log" }
 if ($DisableProfiling) { $ArgsList += "--disable-profiling" }
 if ($DisableComputedGoto) { $ArgsList += "--disable-computed-goto" }
 if ($DisableFastMemory) { $ArgsList += "--disable-fast-memory" }
 if ($DisableProtectedMode) { $ArgsList += "--disable-protected-mode" }
-if ($OptLevel) {
+if ($EffectiveOptLevel) {
     $ArgsList += "--opt-level"
-    $ArgsList += $OptLevel
+    $ArgsList += $EffectiveOptLevel
 }
 if ($EnableMipsDsp) { $ArgsList += "--enable-mips-dsp" }
 if ($Strip) { $ArgsList += "--strip" }

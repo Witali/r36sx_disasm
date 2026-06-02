@@ -8,7 +8,7 @@ Usage: bash homebrew/pico_286/build_pico_286_wsl.sh [options]
 Build Pico-286 under WSL with the Linux mips-mti-linux-gnu GCC toolchain.
 
 Options:
-  --debug-log              Build with DEBUG=1.
+  --debug-log              Build with DEBUG=1 and force -O2.
   --disable-profiling      Compile out runtime profiling helpers.
   --disable-computed-goto  Use the switch opcode dispatcher.
   --disable-fast-memory    Use indirect memory function pointers in CPU code.
@@ -117,6 +117,13 @@ while (($#)); do
             ;;
     esac
 done
+
+if ((DEBUG_VALUE)); then
+    if [[ "$OPT_LEVEL" != "O2" ]]; then
+        echo "Debug build requested; forcing --opt-level O2 instead of $OPT_LEVEL" >&2
+    fi
+    OPT_LEVEL=O2
+fi
 
 for path in "$PICO_ROOT" "$PORT_ROOT" "$CC" "$CXX" "$LD" "$SYSROOT" "$TARGET_ZLIB"; do
     if [[ ! -e "$path" ]]; then

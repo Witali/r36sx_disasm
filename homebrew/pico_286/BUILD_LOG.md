@@ -1,5 +1,26 @@
 # pico-286 Build Log
 
+## 2026-06-02 debug builds force O2
+
+Updated the WSL GCC build scripts so any `DEBUG=1`/debug-log build forces
+`-O2`.  This applies both to the Windows wrapper and to the WSL shell script,
+so an accidental `-DebugLog -OptLevel O3` or `--debug-log --opt-level O3`
+is downgraded to `O2` before compilation.  Release builds can still use `O3`.
+
+Verification command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --debug-log --opt-level O3 --strip --out .tmp/pico_286_debug_o2_test
+```
+
+Result:
+
+- Build succeeded.
+- The script printed: `Debug build requested; forcing --opt-level O2 instead of O3`.
+- The normal release `homebrew/pico_286/pico_286` binary was not rebuilt by this
+  change.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 host-drive commit and write-error handling
 
 Fixed the DOS network redirector path used by `MAPDRIVE.COM` when copying from
