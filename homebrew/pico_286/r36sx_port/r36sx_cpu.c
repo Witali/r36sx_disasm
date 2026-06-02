@@ -67,7 +67,7 @@ static const uint8_t __not_in_flash("cpu.regt") byteregtable[8] = {
 };
 
 uint8_t nestlev;
-uint16_t saveip, savecs, oper1, oper2, res16, temp16, dummy, stacksize, frametemp;
+uint16_t saveip, savecs, oper1, oper2, res16, temp16, dummy, stacksize;
 uint32_t disp32;
 #define disp16 (*(uint16_t*)&disp32)
 uint32_t ea;
@@ -1598,6 +1598,32 @@ static INLINE void decodeflagsdword(uint32_t x);
 static inline uint32_t r36sx_cpu_stack_pointer_value(void)
 {
     return r36sx_cpu_stack_default32() ? CPU_ESP : CPU_SP;
+}
+
+static INLINE void r36sx_cpu_enter16(uint16_t frame_size,
+                                     uint8_t nesting_level)
+{
+    uint16_t frame_ptr;
+
+    nesting_level &= 0x1Fu;
+    push(CPU_BP);
+    frame_ptr = CPU_SP;
+
+    /* ENTER copies saved frame-pointer values from the caller's frame chain.
+       It must not push BP addresses; nested block-structured languages depend
+       on the copied display words matching Intel ENTER imm16, imm8 semantics. */
+    if (nesting_level != 0) {
+        uint16_t source_bp = CPU_BP;
+
+        for (uint8_t level = 1; level < nesting_level; level++) {
+            source_bp = (uint16_t)(source_bp - 2u);
+            push(getmem16(CPU_SS, source_bp));
+        }
+        push(frame_ptr);
+    }
+
+    CPU_BP = frame_ptr;
+    CPU_SP = (uint16_t)(CPU_SP - frame_size);
 }
 
 static inline void r36sx_cpu_raise_selector_fault(uint8_t exception,
@@ -6357,22 +6383,7 @@ void __not_in_flash() exec86(uint32_t execloops) {
                 StepIP(2);
                 nestlev = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                push(CPU_BP);
-                frametemp = CPU_SP;
-                if (nestlev) {
-                    for (
-                        temp16 = 1;
-                        temp16 < nestlev;
-                        ++temp16) {
-                        CPU_BP = CPU_BP - 2;
-                        push(CPU_BP);
-                    }
-
-                    push(frametemp); //CPU_SP);
-                }
-
-                CPU_BP = frametemp;
-                CPU_SP = CPU_BP - stacksize;
+                r36sx_cpu_enter16(stacksize, nestlev);
 
                 break;
 

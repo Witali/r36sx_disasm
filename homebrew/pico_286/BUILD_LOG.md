@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-02 ENTER nesting frame fix
+
+Fixed the 80186+ `ENTER imm16, imm8` implementation in the native Pico-286
+CPU core.  The nesting level is now masked to five bits, and nested ENTER
+copies saved frame-pointer words from the caller's frame chain instead of
+pushing BP addresses.  Plain `ENTER n,0` keeps its previous behavior, while
+nested block-structured stack frames now match Intel's 16-bit ENTER semantics.
+
+Rebuild command:
+
+```powershell
+wsl.exe --cd /mnt/c/Work/r36sx_disasm bash homebrew/pico_286/build_pico_286_wsl.sh --opt-level O3 --strip --out homebrew/pico_286/pico_286
+Copy-Item -LiteralPath 'homebrew\pico_286\pico_286' -Destination 'patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286' -Force
+```
+
+Result:
+
+- `pico_286` size: `480920` bytes
+- `pico_286` SHA256:
+  `9C01097017292A334D01D244837642D10ED8C2F6EA63B7D7A29F57B0C02FA21E`
+- Patch config `[rtc] rtc_start_time` updated to `2026-06-02 12:35:04`.
+- Microsoft Defender scan: no threats found in the main and patch copies.
+- DSP side builds remain paused and were not rebuilt.
+
 ## 2026-06-02 active combo key preset switching
 
 Changed native input handling so physical buttons with complex key preset

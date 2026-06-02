@@ -83,3 +83,14 @@ a consistent escape hatch independent of app-specific controls. `Fn` may remain
 as a secondary hardware escape when it is already supported or useful for device
 testing, but new native app behavior should not depend on `Fn` as the only exit
 path.
+
+## Pico-286 Patch RTC Rule
+
+Rule: whenever a rebuilt `homebrew/pico_286/pico_286` executable is copied into
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`, update the
+same patch directory's `pico_286.conf` so `[rtc] rtc_start_time` is set to the
+current local build/copy time in `YYYY-MM-DD HH:MM:SS` format.
+
+This keeps device-test patches from booting DOS with a stale synthetic RTC
+date after the console's Linux environment starts without real-time clock
+hardware.
