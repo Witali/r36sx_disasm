@@ -922,6 +922,34 @@ static __not_in_flash() void r36sx_cpu_exec_double_shift(uint8_t shift_right,
     }
 }
 
+static __not_in_flash() void r36sx_cpu_load_far_data_pointer(uint8_t segid,
+                                                             uint32_t fault_ip)
+{
+    if (mode == R36SX_MODRM_MOD_REGISTER) {
+        /* LSS/LFS/LGS load a far pointer from memory, never from a register. */
+        r36sx_cpu_invalid_opcode(fault_ip);
+        return;
+    }
+
+    getea(rm);
+    uint8_t pointer_size = operandSizeOverride ? 6u : 4u;
+    if (!r36sx_cpu_check_segment_access(ea - useseg_base, pointer_size, 0)) {
+        return;
+    }
+
+    uint32_t offset = operandSizeOverride ? readdw86(ea) : readw86(ea);
+    uint16_t selector = readw86(ea + (operandSizeOverride ? 4u : 2u));
+    if (!r36sx_cpu_load_segment(segid, selector)) {
+        return;
+    }
+
+    if (operandSizeOverride) {
+        putreg32(reg, offset);
+    } else {
+        putreg16(reg, (uint16_t)offset);
+    }
+}
+
 static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 {
     uint8_t op2 = getmem8(CPU_CS, CPU_IP);
@@ -1266,6 +1294,21 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             }
             return;
         }
+
+        case 0xB2: /* LSS Gv,Mp */
+            modregrm();
+            r36sx_cpu_load_far_data_pointer(regss, fault_ip);
+            return;
+
+        case 0xB4: /* LFS Gv,Mp */
+            modregrm();
+            r36sx_cpu_load_far_data_pointer(regfs, fault_ip);
+            return;
+
+        case 0xB5: /* LGS Gv,Mp */
+            modregrm();
+            r36sx_cpu_load_far_data_pointer(reggs, fault_ip);
+            return;
 
         case 0xB3: /* BTR Ev,Gv */
             modregrm();

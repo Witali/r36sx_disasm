@@ -7,9 +7,9 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 - [x] `0F A4` / `0F A5`: `SHLD r/m16|32, r16|32, imm8|CL`.
 - [x] `0F AC` / `0F AD`: `SHRD r/m16|32, r16|32, imm8|CL`.
-- [ ] `0F B2`: `LSS r16|32, m16:16|32`.
-- [ ] `0F B4`: `LFS r16|32, m16:16|32`.
-- [ ] `0F B5`: `LGS r16|32, m16:16|32`.
+- [x] `0F B2`: `LSS r16|32, m16:16|32`.
+- [x] `0F B4`: `LFS r16|32, m16:16|32`.
+- [x] `0F B5`: `LGS r16|32, m16:16|32`.
 - [ ] `0F 21` / `0F 23`: `MOV r32, DRx` and `MOV DRx, r32`.
 - [ ] `0F 24` / `0F 26`: `MOV r32, TR6|TR7` and `MOV TR6|TR7, r32`.
 
