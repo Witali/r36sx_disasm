@@ -107,19 +107,23 @@ keyboard state changes.
 Open it with Fn+Select.
 
 - D-pad Up/Down: select a row.
-- Left/Right: change the selected disk image, boot order, or BIOS mode.
+- Left/Right: change the selected disk image, boot order, CPU, frequency, or BIOS mode.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
+- A or Y on `CPU`: switch between `8086`, `80286`, and `80386`.
+- Left/Right on `FREQUENCY`: decrease/increase by 1 MHz from 1 to 30 MHz.
+- A or Y on `FREQUENCY`: press the `+` button.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
-- A or Y on `SAVE/APPLY`: write current bindings to `pico_286.conf` and apply them.
+- A or Y on `OK`: write current bindings to `pico_286.conf` and apply them.
 - A or Y on `EXIT APP`: exit Pico-286 so hard-disk changes can be seen after restart.
 - A or Y on `CANCEL`: close the menu.
 - B or X: cancel and close the menu.
 
 The menu searches the configured `image_dir` by drive type.  Floppy rows accept
 `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and `.dsk`; hard-disk rows accept
-`.hdd`, `.hd`, `.hdi`, and `.raw`.  If the BIOS mode changes, `SAVE/APPLY`
-also requests a soft reset so the selected ROM starts.
+`.hdd`, `.hd`, `.hdi`, and `.raw`.  If the BIOS or CPU model changes, `OK`
+also requests a soft reset so the selected ROM/CPU model starts cleanly.
+Frequency-only changes are saved and applied to the runtime quantum.
 
 ## Disk Image Cache
 

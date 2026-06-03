@@ -1812,6 +1812,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# CPU speed knob is converted to exec86 instructions/sec using\n");
     fprintf(fp, "# round historical throughput: 8086=75k, 80286=150k,\n");
     fprintf(fp, "# 80386=300k instructions/sec per MHz.\n");
+    fprintf(fp, "# The disk menu edits cpu_mhz from 1 to 30 MHz in 1 MHz steps.\n");
     fprintf(fp, "[cpu]\n");
     fprintf(fp, "cpu_model=%s\n", cpu_model_text);
     fprintf(fp, "cpu_mode=%s\n", cpu_mode_text);
@@ -2019,6 +2020,51 @@ const char *r36sx_pico286_cpu_model_name(void)
     load_disk_config();
 
     return cpu_model_text;
+}
+
+int r36sx_pico286_set_cpu_model(r36sx_pico286_cpu_model_t model)
+{
+    load_disk_config();
+
+    switch (model) {
+        case R36SX_PICO286_CPU_8086:
+            return set_cpu_model("8086", 0);
+        case R36SX_PICO286_CPU_80286:
+            return set_cpu_model("80286", 0);
+        case R36SX_PICO286_CPU_80386:
+            return set_cpu_model("80386", 0);
+        default:
+            return 0;
+    }
+}
+
+uint32_t r36sx_pico286_cpu_frequency_mhz(void)
+{
+    uint32_t mhz;
+
+    load_disk_config();
+
+    mhz = (uint32_t)(cpu_mhz_value + 0.5);
+    if (mhz < 1u) {
+        mhz = 1u;
+    } else if (mhz > 30u) {
+        mhz = 30u;
+    }
+    return mhz;
+}
+
+int r36sx_pico286_set_cpu_frequency_mhz(uint32_t mhz)
+{
+    char text[16];
+
+    load_disk_config();
+
+    if (mhz < 1u || mhz > 30u) {
+        return 0;
+    }
+
+    snprintf(text, sizeof(text), "%lu.0", (unsigned long)mhz);
+    return set_cpu_mhz(text, 0);
 }
 
 r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void)

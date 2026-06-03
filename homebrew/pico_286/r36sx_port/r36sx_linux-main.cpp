@@ -1586,9 +1586,9 @@ int main() {
     r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=%d",
                             sound_thread_rc, ticks_thread_rc);
 
-    const uint32_t cpu_exec_loops_per_ms =
+    uint32_t cpu_exec_loops_per_ms =
         r36sx_pico286_cpu_exec_loops(32768u);
-    const uint32_t cpu_exec_loops_per_frame_max =
+    uint32_t cpu_exec_loops_per_frame_max =
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms,
                                        main_loop_frame_us);
     uint32_t cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
@@ -1616,6 +1616,31 @@ int main() {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
             R36SX_PROFILE_END(R36SX_PROFILE_SOFT_RESET, profile_soft_reset);
+        }
+        {
+            uint32_t updated_loops_per_ms =
+                r36sx_pico286_cpu_exec_loops(32768u);
+            uint32_t updated_frame_max =
+                r36sx_pico286_frame_exec_loops(updated_loops_per_ms,
+                                               main_loop_frame_us);
+
+            if (updated_frame_max != cpu_exec_loops_per_frame_max) {
+                int was_at_max =
+                    cpu_exec_loops_per_frame >= cpu_exec_loops_per_frame_max;
+
+                r36sx_pico286_debug_log(
+                    "main: cpu timing changed loops_per_ms=%u->%u frame_max=%u->%u",
+                    cpu_exec_loops_per_ms,
+                    updated_loops_per_ms,
+                    cpu_exec_loops_per_frame_max,
+                    updated_frame_max);
+                cpu_exec_loops_per_ms = updated_loops_per_ms;
+                cpu_exec_loops_per_frame_max = updated_frame_max;
+                if (was_at_max ||
+                    cpu_exec_loops_per_frame > cpu_exec_loops_per_frame_max) {
+                    cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
+                }
+            }
         }
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_keyboard_tick();

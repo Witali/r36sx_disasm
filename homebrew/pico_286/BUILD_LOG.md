@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-06-03 disk menu CPU and frequency controls
+
+Added CPU controls to the Pico-286 disk menu.  The menu now includes:
+
+- `CPU`: cycles between `8086`, `80286`, and `80386`.
+- `FREQUENCY`: shows a row like `[-] 20MHZ [+]` and edits `cpu_mhz` from 1 to
+  30 MHz in 1 MHz steps.
+
+`OK` writes the selected values back to `pico_286.conf`.  CPU model changes
+request a soft reset so opcode gating and BIOS startup use the new model.
+Frequency-only changes update the runtime `exec86()` quantum without restarting
+the app.  The config API now exposes setters for CPU model and whole-MHz
+frequency, and the main loop refreshes the CPU timing cap when those values
+change.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Build succeeded.  Remaining warnings are the existing FPU/VGA/XMS/audio
+warnings; the new disk-menu signed-compare warning was fixed before this build.
+
+- `homebrew/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+- size: `564128` bytes
+- SHA256:
+  `E937E6CD0EB1A548D050E7A967970ABFD8DBD39ADF21E559EFCF626CA6804518`
+
 ## 2026-06-03 real/protected interpreter memory split
 
 Split the hot x86 interpreter memory model into separate real-mode and

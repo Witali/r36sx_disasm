@@ -108,6 +108,15 @@ int r36sx_pico286_cpu_model_at_least(r36sx_pico286_cpu_model_t model);
 // Return the configured CPU model text used when rewriting config.
 const char *r36sx_pico286_cpu_model_name(void);
 
+// Update the configured CPU compatibility model. Call save_config to persist.
+int r36sx_pico286_set_cpu_model(r36sx_pico286_cpu_model_t model);
+
+// Return the configured CPU frequency rounded to an integer MHz value.
+uint32_t r36sx_pico286_cpu_frequency_mhz(void);
+
+// Update the configured CPU frequency in whole MHz. Call save_config to persist.
+int r36sx_pico286_set_cpu_frequency_mhz(uint32_t mhz);
+
 // Return the configured initial CPU execution mode.
 r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void);
 

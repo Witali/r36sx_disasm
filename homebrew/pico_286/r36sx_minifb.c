@@ -1152,7 +1152,7 @@ static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
         g_mfb.exit_requested = 1;
     }
     if ((result & R36SX_DISK_MENU_RESULT_RESET_PC) != 0) {
-        r36sx_pico286_debug_log("minifb: disk menu BIOS change reset");
+        r36sx_pico286_debug_log("minifb: disk menu requested reset");
         r36sx_mfb_disk_menu_set_visible(0);
         r36sx_pico286_request_soft_reset();
     }

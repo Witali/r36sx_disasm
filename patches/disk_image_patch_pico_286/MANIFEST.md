@@ -38,6 +38,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 disk menu CPU and frequency controls
+
+The disk menu now has CPU controls in addition to drive, boot order, BIOS,
+exit, OK, and Cancel rows:
+
+- `CPU`: switch between `8086`, `80286`, and `80386`.
+- `FREQUENCY`: edit `cpu_mhz` from 1 to 30 MHz in 1 MHz steps through
+  `[-]` and `[+]`.
+
+`OK` saves both values into `pico_286.conf`.  CPU model changes request a soft
+reset; frequency-only changes are applied to the runtime execution quantum.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `564128` bytes
+- SHA256:
+  `E937E6CD0EB1A548D050E7A967970ABFD8DBD39ADF21E559EFCF626CA6804518`
+
 ## 2026-06-03 real/protected interpreter memory split
 
 The normal `pico_286` binary now routes `exec86()` through separate real-mode
