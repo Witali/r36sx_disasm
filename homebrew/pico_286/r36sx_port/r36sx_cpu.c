@@ -1166,6 +1166,20 @@ static inline void r36sx_rep_set_count(uint32_t count)
     }
 }
 
+static inline uint32_t r36sx_loop_get_count(void)
+{
+    return addressSizeOverride ? CPU_ECX : CPU_CX;
+}
+
+static inline void r36sx_loop_set_count(uint32_t count)
+{
+    if (addressSizeOverride) {
+        CPU_ECX = count;
+    } else {
+        CPU_CX = (uint16_t)count;
+    }
+}
+
 static inline uint32_t r36sx_src_index(void)
 {
     return addressSizeOverride ? CPU_ESI : CPU_SI;
@@ -10770,9 +10784,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* E0 LOOPNZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
-                CPU_CX = CPU_CX - 1;
-                if ((CPU_CX) && !zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                {
+                    uint32_t count = r36sx_loop_get_count() - 1u;
+                    r36sx_loop_set_count(count);
+                    if (count && !zf) {
+                        r36sx_cpu_add_ip((int16_t)temp16);
+                    }
                 }
                 break;
 
@@ -10783,9 +10800,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* E1 LOOPZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
-                CPU_CX = CPU_CX - 1;
-                if (CPU_CX && (zf == 1)) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                {
+                    uint32_t count = r36sx_loop_get_count() - 1u;
+                    r36sx_loop_set_count(count);
+                    if (count && (zf == 1)) {
+                        r36sx_cpu_add_ip((int16_t)temp16);
+                    }
                 }
                 break;
 
@@ -10796,9 +10816,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* E2 LOOP Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
-                CPU_CX = CPU_CX - 1;
-                if (CPU_CX) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                {
+                    uint32_t count = r36sx_loop_get_count() - 1u;
+                    r36sx_loop_set_count(count);
+                    if (count) {
+                        r36sx_cpu_add_ip((int16_t)temp16);
+                    }
                 }
                 break;
 
@@ -10806,10 +10829,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_E3: ;
 #endif
-                /* E3 JCXZ Jb */
+                /* E3 JCXZ/JECXZ Jb */
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
-                if (!CPU_CX) {
+                if (!r36sx_loop_get_count()) {
                     r36sx_cpu_add_ip((int16_t)temp16);
                 }
                 break;
