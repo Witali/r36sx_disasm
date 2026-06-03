@@ -4,7 +4,7 @@
 
 #include "r36sx_screenshot.h"
 #include "hardware.h"
-#include "r36sx_screenshot_png.h"
+#include "r36sx_screenshot_module.h"
 
 #include <ctype.h>
 #include <dlfcn.h>
@@ -126,37 +126,37 @@ static int r36sx_screenshot_write_bmp24(const char *path,
     return ok ? 0 : -1;
 }
 
-static r36sx_screenshot_png_write_rgb565_fn r36sx_screenshot_load_png_writer(
+static r36sx_screenshot_module_write_rgb565_fn r36sx_screenshot_load_writer(
     void)
 {
     static int attempted;
     static void *module;
-    static r36sx_screenshot_png_write_rgb565_fn write_png;
+    static r36sx_screenshot_module_write_rgb565_fn write_screenshot;
     const char *env_path;
     const char *paths[4];
 
     if (attempted) {
-        return write_png;
+        return write_screenshot;
     }
     attempted = 1;
 
-    env_path = getenv("R36SX_SCREENSHOT_PNG_SO");
+    env_path = getenv("R36SX_SCREENSHOT_SO");
     if (env_path && env_path[0]) {
         module = dlopen(env_path, RTLD_NOW);
         if (module) {
-            write_png = (r36sx_screenshot_png_write_rgb565_fn)dlsym(
-                module, R36SX_SCREENSHOT_PNG_WRITE_RGB565_SYMBOL);
-            if (write_png) {
-                return write_png;
+            write_screenshot = (r36sx_screenshot_module_write_rgb565_fn)dlsym(
+                module, R36SX_SCREENSHOT_MODULE_WRITE_RGB565_SYMBOL);
+            if (write_screenshot) {
+                return write_screenshot;
             }
             dlclose(module);
             module = NULL;
         }
     }
 
-    paths[0] = R36SX_SCREENSHOT_PNG_SO_PATH;
-    paths[1] = R36SX_SCREENSHOT_PNG_SO_LOCAL_PATH;
-    paths[2] = R36SX_SCREENSHOT_PNG_SO_NAME;
+    paths[0] = R36SX_SCREENSHOT_SO_PATH;
+    paths[1] = R36SX_SCREENSHOT_SO_LOCAL_PATH;
+    paths[2] = R36SX_SCREENSHOT_SO_NAME;
     paths[3] = NULL;
 
     for (size_t i = 0; paths[i]; i++) {
@@ -166,10 +166,10 @@ static r36sx_screenshot_png_write_rgb565_fn r36sx_screenshot_load_png_writer(
         if (!module) {
             continue;
         }
-        write_png = (r36sx_screenshot_png_write_rgb565_fn)dlsym(
-            module, R36SX_SCREENSHOT_PNG_WRITE_RGB565_SYMBOL);
-        if (write_png) {
-            return write_png;
+        write_screenshot = (r36sx_screenshot_module_write_rgb565_fn)dlsym(
+            module, R36SX_SCREENSHOT_MODULE_WRITE_RGB565_SYMBOL);
+        if (write_screenshot) {
+            return write_screenshot;
         }
 
         dlclose(module);
@@ -179,18 +179,19 @@ static r36sx_screenshot_png_write_rgb565_fn r36sx_screenshot_load_png_writer(
     return NULL;
 }
 
-static int r36sx_screenshot_write_png_file(const char *path,
-                                           const uint16_t *pixels,
-                                           int width,
-                                           int height)
+static int r36sx_screenshot_write_module_file(const char *path,
+                                              const uint16_t *pixels,
+                                              int width,
+                                              int height,
+                                              r36sx_screenshot_format_t format)
 {
-    r36sx_screenshot_png_write_rgb565_fn write_png =
-        r36sx_screenshot_load_png_writer();
+    r36sx_screenshot_module_write_rgb565_fn write_screenshot =
+        r36sx_screenshot_load_writer();
 
-    if (!write_png) {
+    if (!write_screenshot) {
         return -1;
     }
-    return write_png(path, pixels, width, height);
+    return write_screenshot(path, pixels, width, height, (int)format);
 }
 
 int r36sx_screenshot_write_rgb565_file(const char *path,
@@ -199,9 +200,15 @@ int r36sx_screenshot_write_rgb565_file(const char *path,
                                        int height,
                                        r36sx_screenshot_format_t format)
 {
-    if (format == R36SX_SCREENSHOT_FORMAT_PNG) {
-        return r36sx_screenshot_write_png_file(path, pixels, width, height);
+    if (r36sx_screenshot_write_module_file(path, pixels, width, height,
+                                           format) == 0) {
+        return 0;
     }
+    if (format == R36SX_SCREENSHOT_FORMAT_PNG) {
+        return -1;
+    }
+
+    // Keep BMP usable even when old installs do not yet have screenshot.so.
     return r36sx_screenshot_write_bmp24(path, pixels, width, height);
 }
 

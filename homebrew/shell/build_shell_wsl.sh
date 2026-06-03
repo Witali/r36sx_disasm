@@ -8,6 +8,7 @@ TOOLCHAIN_ROOT="$SDK_ROOT/opt/ext-toolchain"
 SYSROOT="$TOOLCHAIN_ROOT/sysroot/mipsel-r2-hard"
 FREETYPE_INCLUDE="$SDK_ROOT/mipsel-buildroot-linux-gnu/sysroot/usr/include/freetype2"
 PATCH_ROOT="$ROOT_DIR/patches/disk_image_patch_shell"
+SCREENSHOT_SO="$ROOT_DIR/homebrew/common/screenshot.so"
 
 CC="${CC:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-gcc}"
 STRIP="${STRIP:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-strip}"
@@ -127,6 +128,9 @@ if [[ "$DO_STRIP" -eq 1 ]]; then
     "$STRIP" "$OUT"
 fi
 
+bash "$ROOT_DIR/homebrew/common/build_screenshot_so_wsl.sh" --strip \
+    --out "$SCREENSHOT_SO"
+
 if [[ "$DO_INSTALL" -eq 1 ]]; then
     install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/shell"
     install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/common/fonts"
@@ -148,6 +152,10 @@ if [[ "$DO_INSTALL" -eq 1 ]]; then
         "$ROOT_DIR/disk_image/MIPS_NATIVE/common/fonts/"
     cp -a "$ROOT_DIR/homebrew/common/fonts/." \
         "$PATCH_ROOT/MIPS_NATIVE/common/fonts/"
+    install -m 0755 "$SCREENSHOT_SO" \
+        "$ROOT_DIR/disk_image/MIPS_NATIVE/common/screenshot.so"
+    install -m 0755 "$SCREENSHOT_SO" \
+        "$PATCH_ROOT/MIPS_NATIVE/common/screenshot.so"
 fi
 
 file "$OUT"

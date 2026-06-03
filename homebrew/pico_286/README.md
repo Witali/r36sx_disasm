@@ -396,11 +396,11 @@ payload that must be loaded at physical `F0000h` by the emulator to execute.
 The native executable can also load `test386.bin` directly when the disk menu
 BIOS option is switched from `NORMAL` to `TEST386`.
 
-`screenshot_format=png` saves compressed screenshots through the optional
-`/mnt/sdcard/MIPS_NATIVE/common/r36sx_screenshot_png.so` module.  That module
-contains the zlib PNG writer so the main `pico_286` executable can start
-without linking zlib directly.  `screenshot_format=bmp` keeps the built-in
-uncompressed 24-bit BMP path and does not need the module.
+`screenshot_format=png` and `screenshot_format=bmp` are passed to the optional
+`/mnt/sdcard/MIPS_NATIVE/common/screenshot.so` module.  That module contains
+the zlib PNG writer and the BMP writer, so the main `pico_286` executable can
+start without linking zlib directly.  If the module is missing, BMP still uses
+the built-in fallback writer; PNG saves fail cleanly.
 With `screenshot_build_hash=1`, screenshot names include the first 8 hex
 digits of the embedded build commit-object SHA-256:
 `pico_286_YYYYMMDD_HHMMSS_HASH8_NNN.png`.  Set it to `0` to keep the older

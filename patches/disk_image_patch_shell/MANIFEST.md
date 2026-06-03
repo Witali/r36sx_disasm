@@ -12,6 +12,7 @@ MIPS_NATIVE/shell/shell
 MIPS_NATIVE/shell/README.md
 MIPS_NATIVE/shell/dump_mtd.sh
 MIPS_NATIVE/common/fonts/
+MIPS_NATIVE/common/screenshot.so
 ```
 
 ## Launch
@@ -31,7 +32,8 @@ pipe-backed fallback shell so commands and redirection remain usable.
 
 Hold `FN` and press D-pad `Up` to save a framebuffer screenshot, matching the
 Pico-286 shortcut. The frontend writes 24-bit BMP files through the shared
-`homebrew/common/r36sx_screenshot.*` helper under:
+`homebrew/common/r36sx_screenshot.*` helper and `MIPS_NATIVE/common/screenshot.so`
+under:
 
 ```text
 /mnt/sdcard/MIPS_NATIVE/shell/screenshots/
@@ -42,7 +44,11 @@ Current WSL/GCC stripped binary:
 - `MIPS_NATIVE/shell/shell`
 - size: `58700` bytes
 - SHA256:
-  `CA3768CE02571F852CF995B86421E5045A940CED1B4FAF92FC3C0DE51163A943`
+  `D9E619E2C406334E9BAF4082FDCC00412686416D0F3D6BFEF684797F9B88435A`
+- `MIPS_NATIVE/common/screenshot.so`
+- size: `6232` bytes
+- SHA256:
+  `FA4DC587DB3788B67AFAAFD53AE8B2C612D057BAEA0CC8C0F5DF097BC86D267E`
 
 Console output keeps 512 lines of scrollback. Use `FN+L` / `FN+R` for one-line
 history scrolling, `FN+D-pad Left` / `FN+D-pad Right` for page scrolling, and

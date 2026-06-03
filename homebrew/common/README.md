@@ -13,7 +13,8 @@ runtime `.conf` file loading instead of local hand-written line parsers.
 
 `r36sx_screenshot.h` / `r36sx_screenshot.c` save RGB565 framebuffers to disk
 with the shared filename and directory fallback logic used by native projects.
-`r36sx_screenshot_png.c` is an optional shared-object PNG backend.
+`r36sx_screenshot_module.c` builds the optional `screenshot.so` backend for
+the actual file encoding work.
 
 The caller supplies:
 
@@ -24,22 +25,23 @@ The caller supplies:
 - optional build SHA-256 string for the eight-character build hash suffix;
 - output format, currently BMP or PNG.
 
-BMP output is always available and writes uncompressed 24-bit BMP files from
-inside the main application.  PNG output is loaded lazily from:
+The helper loads the encoder module lazily from:
 
 ```text
-/mnt/sdcard/MIPS_NATIVE/common/r36sx_screenshot_png.so
+/mnt/sdcard/MIPS_NATIVE/common/screenshot.so
 ```
 
-The `R36SX_SCREENSHOT_PNG_SO` environment variable can override that path, and
-the helper also tries `./r36sx_screenshot_png.so` for local tests.  Keeping PNG
-in a separate shared object removes zlib from the main Pico-286 executable; if
-the module is absent, PNG screenshot saves fail cleanly while BMP still works.
+The `R36SX_SCREENSHOT_SO` environment variable can override that path, and the
+helper also tries `./screenshot.so` for local tests.  The module receives the
+requested format as a parameter and currently writes both BMP and PNG.  Keeping
+the encoder in a separate shared object removes zlib from the main Pico-286
+executable.  If the module is absent, BMP falls back to the small built-in
+writer; PNG screenshot saves fail cleanly.
 
 Build the module with:
 
 ```sh
-bash homebrew/common/build_screenshot_png_wsl.sh --strip
+bash homebrew/common/build_screenshot_so_wsl.sh --strip
 ```
 
 The Pico-286 WSL build script also rebuilds this module automatically.

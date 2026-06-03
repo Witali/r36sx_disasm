@@ -24,10 +24,10 @@
 #define R36SX_MIPS_NATIVE_COMMON_FONTS_DIR "/mnt/sdcard/MIPS_NATIVE/common/fonts"
 #define R36SX_DEFAULT_MONO_FONT_PATH \
     "/mnt/sdcard/MIPS_NATIVE/common/fonts/JetBrainsMonoNL-Regular.ttf"
-#define R36SX_SCREENSHOT_PNG_SO_NAME "r36sx_screenshot_png.so"
-#define R36SX_SCREENSHOT_PNG_SO_PATH \
-    R36SX_MIPS_NATIVE_COMMON_DIR "/" R36SX_SCREENSHOT_PNG_SO_NAME
-#define R36SX_SCREENSHOT_PNG_SO_LOCAL_PATH "./r36sx_screenshot_png.so"
+#define R36SX_SCREENSHOT_SO_NAME "screenshot.so"
+#define R36SX_SCREENSHOT_SO_PATH \
+    R36SX_MIPS_NATIVE_COMMON_DIR "/" R36SX_SCREENSHOT_SO_NAME
+#define R36SX_SCREENSHOT_SO_LOCAL_PATH "./screenshot.so"
 #define R36SX_DRIVER_SO_PATH "/mnt/sdcard/cubegm/driver.so"
 #define R36SX_DRIVER_SO_LOCAL_PATH "./driver.so"
 #define R36SX_DRIVER_SO_NAME "driver.so"

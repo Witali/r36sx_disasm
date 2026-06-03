@@ -10,19 +10,19 @@ BUILDROOT_SYSROOT="$SDK_ROOT/mipsel-buildroot-linux-gnu/sysroot"
 CC="$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-gcc"
 STRIP="$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-strip"
 TARGET_ZLIB="$BUILDROOT_SYSROOT/usr/lib/libz.so.1.2.11"
-OUT="$SCRIPT_DIR/r36sx_screenshot_png.so"
-OBJ_DIR="$SCRIPT_DIR/.build-screenshot-png"
+OUT="$SCRIPT_DIR/screenshot.so"
+OBJ_DIR="$SCRIPT_DIR/.build-screenshot-so"
 PATCHED_LIB_DIR="$OBJ_DIR/sysroot-lib"
 DO_STRIP=0
 
 usage() {
     cat <<'USAGE'
-Usage: bash homebrew/common/build_screenshot_png_wsl.sh [options]
+Usage: bash homebrew/common/build_screenshot_so_wsl.sh [options]
 
-Build the optional RGB565-to-PNG screenshot shared object for R36SX homebrew.
+Build the optional RGB565 screenshot shared object for R36SX homebrew.
 
 Options:
-  --out PATH  Output .so path. Default: homebrew/common/r36sx_screenshot_png.so
+  --out PATH  Output .so path. Default: homebrew/common/screenshot.so
   --strip     Strip the output shared object.
   --help      Show this help.
 USAGE
@@ -86,13 +86,13 @@ sed \
     -L"$SYSROOT/lib" \
     -L"$SYSROOT/usr/lib" \
     -Wl,--hash-style=sysv \
-    -Wl,-soname,r36sx_screenshot_png.so \
+    -Wl,-soname,screenshot.so \
     -Wl,-rpath-link,"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" \
     -I"$SCRIPT_DIR" \
     -isystem "$SYSROOT/usr/include" \
     -isystem "$BUILDROOT_SYSROOT/usr/include" \
-    "$SCRIPT_DIR/r36sx_screenshot_png.c" \
+    "$SCRIPT_DIR/r36sx_screenshot_module.c" \
     "$TARGET_ZLIB" \
     -o "$OUT"
 
@@ -101,4 +101,4 @@ if ((DO_STRIP)); then
 fi
 
 file "$OUT"
-echo "Built PNG screenshot module: $OUT"
+echo "Built screenshot module: $OUT"

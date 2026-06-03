@@ -18,6 +18,7 @@ The `--install` option writes:
 ```text
 disk_image/MIPS_NATIVE/shell/shell
 disk_image/MIPS_NATIVE/common/fonts/*.ttf
+disk_image/MIPS_NATIVE/common/screenshot.so
 ```
 
 ## Run on the device
@@ -91,7 +92,7 @@ ordinary command output, and 512 lines of scrollback history. Full ncurses
 compatibility and double-width CJK layout are not implemented.
 
 `FN + D-pad Up` follows the Pico-286 shortcut and saves the current 640x480
-framebuffer as a 24-bit BMP in:
+framebuffer as a 24-bit BMP through `MIPS_NATIVE/common/screenshot.so` in:
 
 ```text
 /mnt/sdcard/MIPS_NATIVE/shell/screenshots/shell_YYYYMMDD_HHMMSS_NNN.bmp

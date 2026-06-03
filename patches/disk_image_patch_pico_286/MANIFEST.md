@@ -21,7 +21,7 @@ Copy this patch over the original SD-card filesystem root.  It installs:
 - `MIPS_NATIVE/pico_286/images/sopwith.img`
 - `MIPS_NATIVE/pico_286/images/hdd.hdd`
 - `MIPS_NATIVE/pico_286/images/hdd2.hdd`
-- `MIPS_NATIVE/common/r36sx_screenshot_png.so`
+- `MIPS_NATIVE/common/screenshot.so`
 
 Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 The `pico_286.dsp` binary is an older experimental MIPS DSP Rev2 build kept
@@ -38,28 +38,29 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
-## 2026-06-03 PNG screenshot shared object
+## 2026-06-03 screenshot shared object
 
-PNG screenshot writing now lives in the optional common runtime module:
+Screenshot writing now lives in the optional common runtime module:
 
-- `MIPS_NATIVE/common/r36sx_screenshot_png.so`
+- `MIPS_NATIVE/common/screenshot.so`
 
-The main `pico_286` executable still writes BMP screenshots by itself, but
-`screenshot_format=png` now loads this module with `dlopen()` and calls its
-`r36sx_screenshot_png_write_rgb565()` entry point.  This removes zlib from the
-main executable and keeps PNG support replaceable without rebuilding the
-emulator binary.
+The main `pico_286` executable passes the requested screenshot format to this
+module with `dlopen()` and the `r36sx_screenshot_write_rgb565()` entry point.
+Format `0` writes BMP and format `1` writes PNG.  This removes zlib from the
+main executable and keeps screenshot encoding replaceable without rebuilding
+the emulator binary.  BMP still has a small built-in fallback if the module is
+missing.
 
-Rebuilt normal WSL/GCC `-O3` binary and PNG module:
+Rebuilt normal WSL/GCC `-O3` binary and screenshot module:
 
 - `MIPS_NATIVE/pico_286/pico_286`
-- size: `557816` bytes
+- size: `557824` bytes
 - SHA256:
-  `F4C2BAF6DBFDE894FBFCD130C9A3F83A5D794E0B8BDFD5858173DAB861AC5009`
-- `MIPS_NATIVE/common/r36sx_screenshot_png.so`
-- size: `5456` bytes
+  `6D235F5CC1189B635C2DE6729318E91CE831E7836D01A1009672D8CDC83BEBC3`
+- `MIPS_NATIVE/common/screenshot.so`
+- size: `6232` bytes
 - SHA256:
-  `404C7430E081A6737C9F8D708D58E528402202EF07BBF663E605F1E4BFDBD0DD`
+  `FA4DC587DB3788B67AFAAFD53AE8B2C612D057BAEA0CC8C0F5DF097BC86D267E`
 
 ## 2026-06-03 shared screenshot helper
 

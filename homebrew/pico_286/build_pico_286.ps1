@@ -24,7 +24,7 @@ $CppInclude = Join-Path $ToolchainRoot "mips-mti-linux-gnu\include\c++\6.3.0"
 $CppTargetInclude = Join-Path $CppInclude "mips-mti-linux-gnu"
 $GccLib = Join-Path $ToolchainRoot "lib\gcc\mips-mti-linux-gnu\6.3.0\mipsel-r2-hard\lib"
 $TargetZlib = Join-Path $SysrootUsrLib "libz.so.1.2.11"
-$PngSoOut = Join-Path $Root "homebrew\common\r36sx_screenshot_png.so"
+$ScreenshotSoOut = Join-Path $Root "homebrew\common\screenshot.so"
 $Out = Join-Path $PSScriptRoot "pico_286"
 $ObjDir = Join-Path $PSScriptRoot "obj"
 $Crt1 = Join-Path $Sysroot "usr\lib\crt1.o"
@@ -286,11 +286,11 @@ Invoke-Checked { & $Zig cc `
     "-I$(Join-Path $Root "homebrew\common")" `
     "-isystem$SysrootInclude" `
     "-Wl,--hash-style=sysv" `
-    "-Wl,-soname,r36sx_screenshot_png.so" `
-    (Join-Path $Root "homebrew\common\r36sx_screenshot_png.c") `
+    "-Wl,-soname,screenshot.so" `
+    (Join-Path $Root "homebrew\common\r36sx_screenshot_module.c") `
     $TargetZlib `
     "-o" `
-    $PngSoOut }
+    $ScreenshotSoOut }
 
 Write-Host "Built $Out"
-Write-Host "Built $PngSoOut"
+Write-Host "Built $ScreenshotSoOut"
