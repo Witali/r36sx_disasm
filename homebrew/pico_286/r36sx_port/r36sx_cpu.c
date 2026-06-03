@@ -261,7 +261,12 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_CR0_386_RESERVED_READ_MASK 0x7ffffff0u
 #define R36SX_CR3_PAGE_DIRECTORY_MASK 0xfffff000u
 #define R36SX_DR6_RESET 0xffff0ff0u
+#define R36SX_DR6_B0_MASK 0x00000001u
+#define R36SX_DR6_BS_MASK 0x00004000u
 #define R36SX_DR7_RESET 0x00000400u
+#define R36SX_DR7_ENABLE_MASK(slot) (0x03u << ((slot) * 2u))
+#define R36SX_DR7_RW_FIELD(slot) (((slot) * 4u) + 16u)
+#define R36SX_DR7_RW_EXECUTE 0x00u
 #define R36SX_386_REGISTER_COUNT 8u
 #define R36SX_386_TEST_REGISTER_FIRST 6u
 #define R36SX_386_TEST_REGISTER_LAST 7u
@@ -334,6 +339,7 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_TSS32_MIN_LIMIT 0x67u
 #define R36SX_IO_PORT_COUNT 0x10000u
 #define R36SX_IO_PERMISSION_BITS_PER_BYTE 8u
+#define R36SX_EXCEPTION_DEBUG 1u
 #define R36SX_EXCEPTION_BOUND 5u
 #define R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE 7u
 #define R36SX_EXCEPTION_INVALID_TSS 10u
@@ -517,6 +523,9 @@ static uint32_t r36sx_cr2;
 static uint32_t r36sx_cr3;
 static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
+static uint16_t r36sx_debug_resume_cs;
+static uint32_t r36sx_debug_resume_ip;
+static uint8_t r36sx_debug_resume_valid;
 static uint32_t r36sx_gdtr_base;
 static uint32_t r36sx_idtr_base;
 static uint16_t r36sx_gdtr_limit;
@@ -908,6 +917,62 @@ static uint8_t r36sx_cpu_segment_linear_checked(
     }
 
     *linear = cache->base + offset;
+    return 1;
+}
+
+static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
+{
+    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        return 0;
+    }
+
+    if (r36sx_debug_resume_valid &&
+        r36sx_debug_resume_cs == CPU_CS &&
+        r36sx_debug_resume_ip == fault_ip) {
+        r36sx_debug_resume_valid = 0;
+        return 0;
+    }
+
+    if (x86_flags.value & R36SX_EFLAGS_RF_MASK) {
+        x86_flags.value &= ~R36SX_EFLAGS_RF_MASK;
+        return 0;
+    }
+
+    uint32_t dr7 = r36sx_dr[7];
+    if ((dr7 & 0xffu) == 0) {
+        return 0;
+    }
+
+    uint32_t linear;
+    if (!r36sx_cpu_segment_linear_checked(CPU_CS, fault_ip, 1u, 0, 1,
+                                          &linear)) {
+        return 1;
+    }
+
+    uint32_t hits = 0;
+    for (uint8_t slot = 0; slot < 4u; slot++) {
+        uint32_t rw = (dr7 >> R36SX_DR7_RW_FIELD(slot)) & 0x03u;
+        if ((dr7 & R36SX_DR7_ENABLE_MASK(slot)) &&
+            rw == R36SX_DR7_RW_EXECUTE &&
+            r36sx_dr[slot] == linear) {
+            hits |= R36SX_DR6_B0_MASK << slot;
+        }
+    }
+
+    if (!hits) {
+        return 0;
+    }
+
+    /*
+     * 386 execution breakpoints are debug faults before the instruction
+     * executes.  Data read/write watchpoints need hooks in every memory access
+     * path, so they stay tracked separately in TODO_386_INSTRUCTIONS.md.
+     */
+    r36sx_dr[6] |= R36SX_DR6_RESET | hits;
+    r36sx_debug_resume_cs = CPU_CS;
+    r36sx_debug_resume_ip = fault_ip;
+    r36sx_debug_resume_valid = 1;
+    r36sx_cpu_raise_exception(R36SX_EXCEPTION_DEBUG, 0, 0, fault_ip);
     return 1;
 }
 
@@ -7355,6 +7420,9 @@ void reset86() {
     memset(r36sx_tr, 0, sizeof(r36sx_tr));
     r36sx_dr[6] = R36SX_DR6_RESET;
     r36sx_dr[7] = R36SX_DR7_RESET;
+    r36sx_debug_resume_valid = 0;
+    r36sx_debug_resume_cs = 0;
+    r36sx_debug_resume_ip = 0;
     r36sx_gdtr_base = 0;
     r36sx_gdtr_limit = 0;
     r36sx_idtr_base = 0;
@@ -7440,6 +7508,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
         uint8_t prefix_exception = 0;
         firstip = CPU_IP;
         register uint8_t opcode;
+
+        if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {
+            continue;
+        }
 
         while (!docontinue) {
             ///         CPU_CS &= 0xFFFF;
@@ -11245,7 +11317,8 @@ r36sx_opcode_done:
         }
         if (was_TF) {
             was_TF = false;
-            intcall86(1);
+            r36sx_dr[6] |= R36SX_DR6_RESET | R36SX_DR6_BS_MASK;
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_DEBUG, 0, 0, CPU_IP);
         }
         if (tf) {
             was_TF = true;

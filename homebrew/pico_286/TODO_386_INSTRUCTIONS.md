@@ -29,8 +29,9 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 - [ ] Recheck x87 `WAIT/FWAIT` and `ESC D8..DF` behavior against 80386+80387
       after the integer core is closer to complete.
-- [ ] Emulate debug-register breakpoint side effects (`DR0..DR3`, `DR6`,
-      `DR7`) and `#DB`; current `MOV DRx` support only stores and reports the
-      register state.
+- [x] Emulate `DR0..DR3` execute-breakpoint `#DB` delivery and `DR6` `B0..B3`
+      / `BS` status for instruction breakpoints and single-step traps.
+- [ ] Emulate `DR0..DR3` data read/write watchpoints; this needs hooks in the
+      memory access paths, not only the instruction fetch path.
 - [ ] Add small instruction-level DOS tests for the fixed opcodes, especially
       flags and protected-mode exception paths.
