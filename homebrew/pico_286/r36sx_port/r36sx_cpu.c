@@ -9786,8 +9786,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A0: ;
 #endif
                 /* A0 MOV CPU_AL Ob */
-                CPU_AL = getmem8(useseg, getmem16(CPU_CS, CPU_IP));
-                StepIP(2);
+                CPU_AL = getmem8(useseg, r36sx_read_moffs());
                 break;
 
             case 0xA1:
@@ -9795,8 +9794,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A1: ;
 #endif
                 /* A1 MOV eAX Ov */
-                oper1 = getmem16(useseg, getmem16(CPU_CS, CPU_IP));
-                StepIP(2);
+                oper1 = getmem16(useseg, r36sx_read_moffs());
                 CPU_AX = oper1;
                 break;
 
@@ -9805,8 +9803,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A2: ;
 #endif
                 /* A2 MOV Ob CPU_AL */
-                putmem8(useseg, getmem16(CPU_CS, CPU_IP), CPU_AL);
-                StepIP(2);
+                putmem8(useseg, r36sx_read_moffs(), CPU_AL);
                 break;
 
             case 0xA3:
@@ -9814,8 +9811,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A3: ;
 #endif
                 /* A3 MOV Ov eAX */
-                putmem16(useseg, getmem16(CPU_CS, CPU_IP), CPU_AX);
-                StepIP(2);
+                putmem16(useseg, r36sx_read_moffs(), CPU_AX);
                 break;
 
             case 0xA4:

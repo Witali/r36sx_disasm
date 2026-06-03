@@ -19,7 +19,7 @@ Intel 80386 Programmer's Reference Manual instruction set.
 - [x] `LDS` / `LES`: add `r32, m16:32` forms for operand-size 32.
 - [x] `CMPSD`: implement `A7` as dword compare when operand-size is 32.
 - [x] `INS` / `OUTS`: implement `INSD` and `OUTSD` when operand-size is 32.
-- [ ] `MOV moffs`: make `A0..A3` use address-size for offset width and
+- [x] `MOV moffs`: make `A0..A3` use address-size for offset width and
       operand-size for 16/32-bit accumulator forms.
 - [ ] `XLAT`: use `EBX + AL` when address-size is 32.
 - [ ] `LOOP` / `LOOPcc` / `JCXZ`: use `ECX` for address-size 32, including
