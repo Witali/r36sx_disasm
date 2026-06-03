@@ -439,6 +439,11 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DPMI_UNSUPPORTED_FUNCTION 0x8001u
 #define R36SX_VCPI_VERSION_MAJOR 1u
 #define R36SX_VCPI_VERSION_MINOR 0u
+/*
+ * Keep VCPI hidden while validating the raw 80386 protected-mode CPU path.
+ * VCPI code stays compiled so it can be re-enabled after the CPU core is solid.
+ */
+#define R36SX_VCPI_HOST_ENABLED 0u
 #define R36SX_VCPI_FUNC_INSTALLATION_CHECK 0x00u
 #define R36SX_VCPI_FUNC_GET_PM_INTERFACE 0x01u
 #define R36SX_VCPI_FUNC_GET_MAX_PHYSICAL_PAGE 0x02u
@@ -4521,6 +4526,7 @@ static inline uint8_t r36sx_vcpi_available(void)
      * raw protected-mode test path where DPMI is deliberately hidden.
      */
     return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+           R36SX_VCPI_HOST_ENABLED &&
            !r36sx_pico286_dpmi_host_enabled();
 }
 
