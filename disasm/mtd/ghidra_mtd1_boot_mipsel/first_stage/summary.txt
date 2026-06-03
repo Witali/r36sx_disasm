@@ -1,0 +1,11 @@
+PROGRAM	mtd1_boot.bin
+PROFILE	first
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00000000
+CODE_RANGE	bfe00800	bfe02e4f
+MIN_ADDRESS	bfe00000
+MAX_ADDRESS	bfe02fff
+
+MEMORY_BLOCKS
+ram	bfe00000	bfe02fff	R=true	W=true	X=true

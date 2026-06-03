@@ -32,8 +32,10 @@ The same layout is described in `hardware_info/dtb/dtb.dts` under the RTOS
 | `mtd1_boot.mipsel.disasm` | MIPS32r2 little-endian disassembly of the boot partition. |
 | `mtd1_boot.mmio_hits.txt` | Compact list of notable MMIO constants found in the little-endian disassembly. |
 | `mtd1_boot.strings.txt` | Raw string extraction from the boot partition. |
+| `ghidra_mtd1_boot_mipsel/` | Ghidra C-like decompile, disassembly, symbol table, and annotated function notes for the MTD boot partition. |
 | `mtd2_eromfs.files.txt` | Parsed ROMFS file list. |
 | `mtd2_eromfs.strings.txt` | Raw string extraction from the ROMFS partition. |
+| `mtd2_eromfs_extracted/` | Extracted ROMFS gzip bitmap resources and decompressed BMP files. |
 | `mtd3_persistentmem.strings.txt` | Raw string extraction from persistent memory. |
 | `mtd_magic_scan.txt` | Search for common uImage, FDT, gzip, ROMFS, and SquashFS signatures. |
 
@@ -46,6 +48,12 @@ and uses KSEG1/MMIO constants such as `0xb882...`, `0xb884...`, `0xb880...`,
 from DTS, while the DTS SD/MMC controller is at physical `0x1884c000`, mirrored
 as KSEG1 `0xb884c000`.
 
+`ghidra_mtd1_boot_mipsel/` decompiles the boot code as two raw-load profiles:
+the NOR first stage at `0xbfe00000` and the RAM second stage at `0x89eb0000`
+from file offset `0x3000`. The exported `decompiled_all.c` files include short
+comments before functions, and `functions.tsv` is the fastest way to scan the
+current function names and confidence notes.
+
 The boot partition does not contain obvious ASCII paths such as `cubegm`,
 `dtb.bin`, `vmlinux.uImage`, `FAT`, or `mmcblk`. The magic scan also did not find
 a Linux `uImage`, FDT/DTB, SquashFS, or gzip payload in `mtd1_boot.bin`.
@@ -57,6 +65,11 @@ gzip-compressed bitmap resources:
 popup.bmp.gz
 batterylow.bmp.gz
 ```
+
+They were extracted from ROMFS and decompressed into
+`mtd2_eromfs_extracted/popup.bmp` and
+`mtd2_eromfs_extracted/batterylow.bmp`. Both decode as 640x480, 32-bit Windows
+BMP files.
 
 `mtd3_persistentmem.bin` is persistent settings/data. The readable strings include
 media paths such as `/media/mmc/Movie/sample.mp4`, `/media/mmc/Ebook/...`, and

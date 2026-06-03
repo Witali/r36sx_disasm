@@ -1,0 +1,2 @@
+378ae082fbb6c2b52a9cfeac3e8f6ebb4248a2436f4cadc41110b98c9cc79680  disasm/mtd/stage3_89da0000.lzma  size=0x62f4f (405327)
+b9a9d1ae074bcd68109161c1219fe98b8c4f7e3fd70045b394dd9aa4ab15981d  disasm/mtd/stage3_89da0000.bin  size=0x10e33c (1106748)

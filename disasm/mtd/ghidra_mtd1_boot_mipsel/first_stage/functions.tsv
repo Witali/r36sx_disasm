@@ -1,0 +1,99 @@
+entry	name	body_start	body_end	note
+bfe00800	first_stage_entry_copy_and_init	bfe00800	bfe0089b	High confidence: NOR entry. Checks a boot magic at 0xbfe00014; if missing, copies code/data from the flash alias around 0xafc02000 to 0xbfe02000, then calls low-level init routines.
+bfe0089c	sub_bfe0089c	bfe0089c	bfe008a7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe008a8	sub_bfe008a8	bfe008a8	bfe008bf	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00db4	FUN_bfe00db4	bfe00db4	bfe00e1f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e20	sub_bfe00e20	bfe00e20	bfe00e2b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e2c	FUN_bfe00e2c	bfe00e2c	bfe00e3b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e3c	FUN_bfe00e3c	bfe00e3c	bfe00e57	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e58	sub_bfe00e58	bfe00e58	bfe00e63	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e64	FUN_bfe00e64	bfe00e64	bfe00e6b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00e6c	FUN_bfe00e6c	bfe00e6c	bfe00ecf	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe00ed0	sub_bfe00ed0	bfe00ed0	bfe0100b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0100c	sub_bfe0100c	bfe0100c	bfe01027	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01028	sub_bfe01028	bfe01028	bfe0102b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0102c	sub_bfe0102c	bfe0102c	bfe0103b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0103c	FUN_bfe0103c	bfe0103c	bfe0115f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01160	sub_bfe01160	bfe01160	bfe0117f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01180	FUN_bfe01180	bfe01180	bfe011a3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe011a4	FUN_bfe011a4	bfe011a4	bfe01273	References 0xb882... registers, likely SPI/SF or clock-controller MMIO.
+bfe01274	sub_bfe01274	bfe01274	bfe01277	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01278	first_stage_spi_nor_command_path	bfe01278	bfe013a3	Medium confidence: talks to the SPI/SF controller registers around 0xb882e0c8 and prepares small command buffers on the stack.
+bfe013a4	FUN_bfe013a4	bfe013a4	bfe013e3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe013e4	sub_bfe013e4	bfe013e4	bfe013e7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe013e8	FUN_bfe013e8	bfe013e8	bfe013ef	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe013f0	FUN_bfe013f0	bfe013f0	bfe01417	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01418	sub_bfe01418	bfe01418	bfe01467	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01468	sub_bfe01468	bfe01468	bfe014cf	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe014d0	FUN_bfe014d0	bfe014d0	bfe01587	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01518	sub_bfe01518	bfe01518	bfe0157f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01588	FUN_bfe01588	bfe01588	bfe015cf	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe015d0	sub_bfe015d0	bfe015d0	bfe015d3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe015d4	first_stage_peripheral_gate_for_usb_blocks	bfe015d4	bfe015e3	Medium confidence: compares the argument with 0xb8844000 and 0xb8850000, matching the DTS USB host controller MMIO windows, then toggles bits in 0xb8800080.
+bfe015e4	sub_bfe015e4	bfe015e4	bfe0162b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0162c	sub_bfe0162c	bfe0162c	bfe0162f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01630	sub_bfe01630	bfe01630	bfe01647	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01648	first_stage_peripheral_reset_sequence	bfe01648	bfe0164f	Medium confidence: writes several control/status registers in the selected MMIO window after gating the peripheral clock/reset.
+bfe01650	sub_bfe01650	bfe01650	bfe0169b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0169c	sub_bfe0169c	bfe0169c	bfe0169f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe016a0	FUN_bfe016a0	bfe016a0	bfe017bf	References 0xb884... registers, likely USB/MMC-side peripheral MMIO.
+bfe016f0	sub_bfe016f0	bfe016f0	bfe017a7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe017a8	sub_bfe017a8	bfe017a8	bfe017ab	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe017ac	sub_bfe017ac	bfe017ac	bfe017b7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe017c0	FUN_bfe017c0	bfe017c0	bfe017c3	References 0xb884... registers, likely USB/MMC-side peripheral MMIO.
+bfe017c4	sub_bfe017c4	bfe017c4	bfe017ff	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01800	sub_bfe01800	bfe01800	bfe01803	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01804	FUN_bfe01804	bfe01804	bfe01813	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01814	sub_bfe01814	bfe01814	bfe018b7	References 0xb884... registers, likely USB/MMC-side peripheral MMIO.
+bfe018b8	sub_bfe018b8	bfe018b8	bfe018c3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe018c4	sub_bfe018c4	bfe018c4	bfe018c7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe018c8	FUN_bfe018c8	bfe018c8	bfe018cb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe018cc	sub_bfe018cc	bfe018cc	bfe0193b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe0193c	sub_bfe0193c	bfe0193c	bfe0193f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01940	sub_bfe01940	bfe01940	bfe0195f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01960	FUN_bfe01960	bfe01960	bfe019c3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe019c4	sub_bfe019c4	bfe019c4	bfe01a17	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01a18	FUN_bfe01a18	bfe01a18	bfe01c8f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01a30	sub_bfe01a30	bfe01a30	bfe01a63	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01a64	sub_bfe01a64	bfe01a64	bfe01a67	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01a68	sub_bfe01a68	bfe01a68	bfe01c87	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01ba4	sub_bfe01ba4	bfe01ba4	bfe01c13	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01c90	FUN_bfe01c90	bfe01c90	bfe01cc3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01cc4	FUN_bfe01cc4	bfe01cc4	bfe01cd7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01cd8	FUN_bfe01cd8	bfe01cd8	bfe01cdb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01cdc	sub_bfe01cdc	bfe01cdc	bfe01d5b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01d5c	sub_bfe01d5c	bfe01d5c	bfe01d5f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01d60	FUN_bfe01d60	bfe01d60	bfe01d87	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01d88	FUN_bfe01d88	bfe01d88	bfe01d8b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01d8c	sub_bfe01d8c	bfe01d8c	bfe01ebb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01ebc	sub_bfe01ebc	bfe01ebc	bfe01ebf	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe01ec0	sub_bfe01ec0	bfe01ec0	bfe02257	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02258	FUN_bfe02258	bfe02258	bfe02343	References 0xb884... registers, likely USB/MMC-side peripheral MMIO.
+bfe02344	sub_bfe02344	bfe02344	bfe02347	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02348	sub_bfe02348	bfe02348	bfe02433	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02434	FUN_bfe02434	bfe02434	bfe0246f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02470	sub_bfe02470	bfe02470	bfe024e7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe024e8	sub_bfe024e8	bfe024e8	bfe024f3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe024f4	FUN_bfe024f4	bfe024f4	bfe025db	References 0xb884... registers, likely USB/MMC-side peripheral MMIO.
+bfe025dc	sub_bfe025dc	bfe025dc	bfe025df	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe025e0	sub_bfe025e0	bfe025e0	bfe02603	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02604	FUN_bfe02604	bfe02604	bfe02613	References 0xb882... registers, likely SPI/SF or clock-controller MMIO.
+bfe02614	sub_bfe02614	bfe02614	bfe0277f	References 0xb882... registers, likely SPI/SF or clock-controller MMIO.
+bfe02780	sub_bfe02780	bfe02780	bfe02783	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02784	sub_bfe02784	bfe02784	bfe0284b	References 0xb882... registers, likely SPI/SF or clock-controller MMIO.
+bfe0284c	FUN_bfe0284c	bfe0284c	bfe028ab	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe028ac	sub_bfe028ac	bfe028ac	bfe028af	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe028b0	FUN_bfe028b0	bfe028b0	bfe029c3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe029c4	sub_bfe029c4	bfe029c4	bfe029c7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe029c8	FUN_bfe029c8	bfe029c8	bfe029cb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe029cc	sub_bfe029cc	bfe029cc	bfe02aef	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02af0	sub_bfe02af0	bfe02af0	bfe02af3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02af4	sub_bfe02af4	bfe02af4	bfe02ba3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02ba4	FUN_bfe02ba4	bfe02ba4	bfe02c17	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02c18	sub_bfe02c18	bfe02c18	bfe02c3f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02c40	FUN_bfe02c40	bfe02c40	bfe02c47	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02c48	sub_bfe02c48	bfe02c48	bfe02d1b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02d1c	sub_bfe02d1c	bfe02d1c	bfe02d1f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02d20	first_stage_clock_or_pll_select	bfe02d20	bfe02d7f	Medium confidence: adjusts 0xb882e004/0xb882e094 and 0xb880007c based on a frequency-like argument.
+bfe02d80	sub_bfe02d80	bfe02d80	bfe02db3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+bfe02db4	first_stage_sfspi_transfer_setup	bfe02db4	bfe02e4f	Medium confidence: programs the SPI/SF controller registers around 0xb882e058 and starts a transfer/status wait loop.

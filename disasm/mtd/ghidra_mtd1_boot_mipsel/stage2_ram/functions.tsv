@@ -1,0 +1,55 @@
+entry	name	body_start	body_end	note
+89eb0000	stage2_entry_cp0_cache_and_handoff	89eb0000	89eb00d7	High confidence: RAM-resident stage2 entry. Saves boot arguments, edits CP0 config registers, clears a small BSS-like range, sets stack/return trampoline, and jumps onward.
+89eb00d8	sub_89eb00d8	89eb00d8	89eb00f3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0118	stage2_jump_to_cached_alias	89eb0118	89eb012f	Medium confidence: builds a KSEG0/cached alias using 0xa0000000 masking and jumps through it.
+89eb0130	stage2_cache_probe_and_invalidate	89eb0130	89eb0297	Medium confidence: reads CP0 Config1, derives cache geometry, and uses MIPS cache operations over the cache ways/sets.
+89eb0298	FUN_89eb0298	89eb0298	89eb02f7	Touches CP0/cache state.
+89eb02f8	sub_89eb02f8	89eb02f8	89eb02fb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb02fc	sub_89eb02fc	89eb02fc	89eb0307	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0308	sub_89eb0308	89eb0308	89eb030f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0310	sub_89eb0310	89eb0310	89eb0317	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0318	sub_89eb0318	89eb0318	89eb032b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb032c	stage2_main_handoff_wrapper	89eb032c	89eb0347	Medium confidence: main wrapper after cache setup. Prepares stack locals and calls deeper loader/decompressor routines.
+89eb0348	sub_89eb0348	89eb0348	89eb03db	References 0x89da..., likely handoff or external image entry/data.
+89eb03dc	sub_89eb03dc	89eb03dc	89eb03df	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb03e0	sub_89eb03e0	89eb03e0	89eb03e7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb03e8	FUN_89eb03e8	89eb03e8	89eb0403	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0404	sub_89eb0404	89eb0404	89eb0413	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0420	FUN_89eb0420	89eb0420	89eb042f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb0430	sub_89eb0430	89eb0430	89eb043b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb043c	FUN_89eb043c	89eb043c	89eb04c7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb04c8	sub_89eb04c8	89eb04c8	89eb04f7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb04f8	FUN_89eb04f8	89eb04f8	89eb1b67	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb1b68	sub_89eb1b68	89eb1b68	89eb1b6b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb1b6c	sub_89eb1b6c	89eb1b6c	89eb1c3f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb1c40	FUN_89eb1c40	89eb1c40	89eb1dc3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb1dc4	sub_89eb1dc4	89eb1dc4	89eb21c7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb21c8	sub_89eb21c8	89eb1efc	89eb236f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb23a4	stage2_stream_context_prepare	89eb23a4	89eb23c7	Low/medium confidence: prepares a stream/context object used by the packed payload processing code.
+89eb23c8	stage2_stream_copy_or_decode_loop	89eb23c8	89eb2547	Low/medium confidence: loop over input/output counters; appears to move or decode packed payload data.
+89eb2548	sub_89eb2548	89eb2548	89eb254b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb254c	sub_89eb254c	89eb254c	89eb275b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb275c	sub_89eb275c	89eb275c	89eb288b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb288c	sub_89eb288c	89eb288c	89eb288f	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2890	stage2_stream_context_release	89eb2890	89eb28c3	Low/medium confidence: calls a function pointer from a context and clears a stream buffer pointer.
+89eb28c4	sub_89eb28c4	89eb28c4	89eb28c7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb28c8	FUN_89eb28c8	89eb28c8	89eb2953	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2954	sub_89eb2954	89eb2954	89eb2957	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2958	FUN_89eb2958	89eb2958	89eb2997	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2998	sub_89eb2998	89eb2998	89eb299b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb299c	FUN_89eb299c	89eb299c	89eb29af	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb29b0	sub_89eb29b0	89eb29b0	89eb2a27	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2a28	stage2_payload_header_parse	89eb2a28	89eb2a87	Medium confidence: parses a small packed-payload header into size/type fields and validates ranges.
+89eb2a88	sub_89eb2a88	89eb2a88	89eb2a8b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2a8c	FUN_89eb2a8c	89eb2a8c	89eb2b77	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2b78	sub_89eb2b78	89eb2b78	89eb2b7b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2b7c	sub_89eb2b7c	89eb2b7c	89eb2b97	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2b98	stage2_payload_decode_dispatch	89eb2b98	89eb2c9f	Low/medium confidence: higher-level packed-payload decode dispatcher; checks mode/status values and invokes decode helpers.
+89eb2ca0	sub_89eb2ca0	89eb2ca0	89eb2ca3	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2ca4	sub_89eb2ca4	89eb2ca4	89eb2cab	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2cb4	stage2_payload_size_probe	89eb2cb4	89eb2cb7	Low/medium confidence: helper used to probe or return decoded payload size/status.
+89eb2cb8	sub_89eb2cb8	89eb2cb8	89eb2dc7	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2dc8	sub_89eb2dc8	89eb2dc8	89eb2dcb	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2dcc	FUN_89eb2dcc	89eb2dcc	89eb2e27	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2e28	sub_89eb2e28	89eb2e28	89eb2e2b	No strong automatic classification; name and body are generated from raw MIPS control flow.
+89eb2e2c	sub_89eb2e2c	89eb2e2c	89eb2e2f	No strong automatic classification; name and body are generated from raw MIPS control flow.
