@@ -334,6 +334,24 @@ static inline void redirector_sft_advance(sftstruct *sftptr, size_t bytes,
     }
 }
 
+static inline void redirector_close_find_search(intptr_t *find_handle,
+                                                sdbstruct **find_dta) {
+    if (!find_handle) {
+        return;
+    }
+    /*
+     * The Linux _findfirst shim mallocs a handle and opens a DIR stream.
+     * Close it as soon as a DOS search is replaced or exhausted.
+     */
+    if (*find_handle != -1) {
+        _findclose(*find_handle);
+        *find_handle = -1;
+    }
+    if (find_dta) {
+        *find_dta = NULL;
+    }
+}
+
 static inline bool redirector_handler() {
     char path[256];
     /*
@@ -863,9 +881,7 @@ static inline bool redirector_handler() {
             debug_log("find first file: '%s'\n", path);
 
 
-            if (handle) {
-                _findclose(handle);
-            }
+            redirector_close_find_search(&handle, &dta_ptr);
 
             if ((handle = _findfirst(path, &fileinfo)) != -1) {
                 // Set actual DTA pointer
@@ -888,6 +904,7 @@ static inline bool redirector_handler() {
                 CPU_FL_CF = 0;
             } else {
                 debug_log("error finding file: '%s'\n", path);
+                dta_ptr = NULL;
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
             }
@@ -913,6 +930,7 @@ static inline bool redirector_handler() {
                 CPU_FL_CF = 0;
             } else {
                 debug_log("no more files for: '%s'\n", path);
+                redirector_close_find_search(&handle, &dta_ptr);
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
             }
