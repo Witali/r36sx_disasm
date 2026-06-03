@@ -1,12 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-03 disk menu frequency row cleanup
+
+Removed the old visual decrement/increment markers from the disk menu frequency
+row. The row now shows only the current value, for example
+`FREQUENCY  20MHZ`; Left/Right still decrease/increase `cpu_mhz` in 1 MHz
+steps.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- size: `564128` bytes
+- SHA256:
+  `5528A16B21DF119C2C5F978CE0DCF97DDF2CE276BAD197C88A0A53ABC23B1C34`
+
 ## 2026-06-03 disk menu CPU and frequency controls
 
 Added CPU controls to the Pico-286 disk menu.  The menu now includes:
 
 - `CPU`: cycles between `8086`, `80286`, and `80386`.
-- `FREQUENCY`: shows a row like `[-] 20MHZ [+]` and edits `cpu_mhz` from 1 to
-  30 MHz in 1 MHz steps.
+- `FREQUENCY`: shows the current value, for example `20MHZ`, and edits
+  `cpu_mhz` from 1 to 30 MHz in 1 MHz steps.
 
 `OK` writes the selected values back to `pico_286.conf`.  CPU model changes
 request a soft reset so opcode gating and BIOS startup use the new model.
@@ -30,7 +49,7 @@ warnings; the new disk-menu signed-compare warning was fixed before this build.
 - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
 - size: `564128` bytes
 - SHA256:
-  `E937E6CD0EB1A548D050E7A967970ABFD8DBD39ADF21E559EFCF626CA6804518`
+  `5528A16B21DF119C2C5F978CE0DCF97DDF2CE276BAD197C88A0A53ABC23B1C34`
 
 ## 2026-06-03 real/protected interpreter memory split
 

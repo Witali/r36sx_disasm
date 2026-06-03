@@ -46,8 +46,11 @@ The disk menu now has CPU controls in addition to drive, boot order, BIOS,
 exit, OK, and Cancel rows:
 
 - `CPU`: switch between `8086`, `80286`, and `80386`.
-- `FREQUENCY`: edit `cpu_mhz` from 1 to 30 MHz in 1 MHz steps through
-  `[-]` and `[+]`.
+- `FREQUENCY`: edit `cpu_mhz` from 1 to 30 MHz in 1 MHz steps with
+  Left/Right.
+- The frequency row now shows only the current value, for example
+  `FREQUENCY  20MHZ`; the older visual decrement/increment markers were
+  removed.
 
 `OK` saves both values into `pico_286.conf`.  CPU model changes request a soft
 reset; frequency-only changes are applied to the runtime execution quantum.
@@ -57,7 +60,7 @@ Rebuilt normal WSL/GCC `-O3` binary:
 - `MIPS_NATIVE/pico_286/pico_286`
 - size: `564128` bytes
 - SHA256:
-  `E937E6CD0EB1A548D050E7A967970ABFD8DBD39ADF21E559EFCF626CA6804518`
+  `5528A16B21DF119C2C5F978CE0DCF97DDF2CE276BAD197C88A0A53ABC23B1C34`
 
 ## 2026-06-03 real/protected interpreter memory split
 

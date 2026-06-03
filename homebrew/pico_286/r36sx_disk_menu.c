@@ -840,7 +840,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_CPU, x, y, full_w, row_h, line);
     y += row_h + gap;
-    snprintf(line, sizeof(line), "FREQUENCY  [-] %uMHZ [+]",
+    snprintf(line, sizeof(line), "FREQUENCY  %uMHZ",
              (unsigned int)menu->cpu_frequency_mhz);
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_FREQUENCY, x, y, full_w, row_h, line);
