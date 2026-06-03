@@ -5291,7 +5291,12 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
                          ? R36SX_DPMI_VERSION_FLAG_32BIT
                          : 0u;
             CPU_CL = r36sx_dpmi_processor_type();
-            CPU_DX = 0; /* no host-private real-mode data block required */
+            /*
+             * DPMI 1.0 returns the binary major/minor version in DH:DL.
+             * The private real-mode data area size is reported separately in SI.
+             */
+            CPU_DH = R36SX_DPMI_VERSION_MAJOR;
+            CPU_DL = R36SX_DPMI_VERSION_MINOR;
             CPU_SI = 0;
             r36sx_cpu_load_segment(reges, R36SX_DPMI_ENTRY_CS);
             CPU_DI = R36SX_DPMI_ENTRY_IP;

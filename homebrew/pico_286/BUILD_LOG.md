@@ -16,6 +16,9 @@ Fixed two entry-path issues:
   instead of directly setting the bit.  This switches the interpreter to the
   protected memory path before the entry stub returns through protected `RETF`
   and pops from a selector-based stack.
+- `INT 2Fh AX=1687h` now returns the DPMI version in `DH:DL`; `SI` remains the
+  zero-sized host private data area.  The previous `DX=0` made the host look
+  like DPMI 0.0 even though `INT 31h AX=0400h` reports DPMI 1.0.
 
 Rebuilt with:
 
