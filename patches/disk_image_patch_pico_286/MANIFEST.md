@@ -40,6 +40,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 strict documented 8086 opcode filtering
+
+The normal `pico_286` binary now rejects additional undocumented or invalid
+forms when running the documented CPU model:
+
+- invalid ModR/M forms for `LEA`, `LES`, `LDS`, `POP Ev`, `MOV r/m,imm`,
+  `INC/DEC byte`, and `FF` group far control transfers;
+- undocumented compatibility aliases `D6h` and `F6/F7 /1`.
+
+The existing CPU-model gates already reject 80186+ and 80386-only opcodes when
+`cpu_model=8086`.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `567456` bytes
+- SHA256:
+  `A14013A8B176F11F20A428C8468E57EDDF938C12FEC674E57E83E4D1FA47165A`
+
 ## 2026-06-03 runtime x87 coprocessor switch
 
 The patch now exposes the emulated x87 math coprocessor as a runtime setting:

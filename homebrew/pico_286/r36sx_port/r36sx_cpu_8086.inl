@@ -555,10 +555,17 @@ static inline void op_idiv16(uint32_t valdiv, uint16_t divisor, uint32_t fault_i
 
 static __not_in_flash() void op_grp3_16(uint32_t fault_ip) {
     switch (reg) {
-        case 0:
-        case 1: /* TEST */
+        case 0: /* TEST */
             flag_log16(oper1 & getmem16(CPU_CS, CPU_IP));
             StepIP(2);
+            break;
+
+        case 1:
+            /*
+             * F7 /1 is an undocumented TEST alias on some 8086-family chips.
+             * Treat it as invalid for the documented CPU compatibility mode.
+             */
+            r36sx_cpu_invalid_opcode(fault_ip);
             break;
 
         case 2: /* NOT */

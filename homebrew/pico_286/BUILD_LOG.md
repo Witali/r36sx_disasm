@@ -1,5 +1,35 @@
 # pico-286 Build Log
 
+## 2026-06-03 strict documented 8086 opcode filtering
+
+Audited the `cpu_model=8086` decoder against Intel's documented 8086/8088
+instruction set and the later 80186 additions.  The generation gates were
+already present for the main 80186+ opcodes (`PUSHA/POPA`, `BOUND`,
+`PUSH imm`, immediate `IMUL`, `INS/OUTS`, `ENTER/LEAVE`, `C0/C1` shifts) and
+for 80386 prefixes/opcodes (`FS/GS`, `66h/67h`, and the `0Fh` extended map).
+
+Tightened invalid ModR/M forms that were still accepted:
+
+- `8D mod=3` (`LEA` requires a memory addressing form).
+- `8F /1..7` (`POP Ev` is only `/0`).
+- `C4/C5 mod=3` (`LES/LDS` require a memory far pointer).
+- `C6/C7 /1..7` (`MOV r/m,imm` is only `/0`).
+- `D6h`, `F6/F7 /1` undocumented compatibility aliases.
+- `FE /2..7` (`INC/DEC byte` are only `/0` and `/1`).
+- `FF /7`, plus far `CALL/JMP` with register ModR/M operands.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- size: `567456` bytes
+- SHA256:
+  `A14013A8B176F11F20A428C8468E57EDDF938C12FEC674E57E83E4D1FA47165A`
+
 ## 2026-06-03 runtime x87 coprocessor switch
 
 Added a runtime-configurable x87 math-coprocessor presence flag:

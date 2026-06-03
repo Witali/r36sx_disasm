@@ -7994,6 +7994,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 8D LEA Gv M */
                 modregrm();
+                if (mode == R36SX_MODRM_MOD_REGISTER) {
+                    /* Intel LEA takes a memory addressing form, not a register. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 getea(rm);
                 putreg16(reg, ea
@@ -8025,6 +8030,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 8F POP Ev */
                 modregrm();
+                if (reg != 0) {
+                    /* 8F is a group opcode; only /0 is documented as POP Ev. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 writerm16(rm, pop()
                 );
@@ -8828,6 +8838,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* C4 LES Gv Mp */
                 modregrm();
+                if (mode == R36SX_MODRM_MOD_REGISTER) {
+                    /* LES loads a far pointer from memory. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 getea(rm);
                 if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
@@ -8843,6 +8858,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* C5 LDS Gv Mp */
                 modregrm();
+                if (mode == R36SX_MODRM_MOD_REGISTER) {
+                    /* LDS loads a far pointer from memory. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 getea(rm);
                 if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
@@ -8858,6 +8878,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* C6 MOV Eb Ib */
                 modregrm();
+                if (reg != 0) {
+                    /* C6 is a group opcode; only /0 is documented as MOV Eb,Ib. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 writerm8(rm, getmem8(CPU_CS, CPU_IP)
                 );
@@ -8870,6 +8895,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* C7 MOV Ev Iv */
                 modregrm();
+                if (reg != 0) {
+                    /* C7 is a group opcode; only /0 is documented as MOV Ev,Iv. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 writerm16(rm, getmem16(CPU_CS, CPU_IP)
                 );
@@ -9073,7 +9103,13 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 CPU_AL = CPU_FL_CF ? 0xFF : 0x00;
                 break;
 #else
-                /* Undefined on 80286; documented as a no-op compatibility hole. */
+                /*
+                 * D6 is outside Intel's documented 8086/8088 instruction set.
+                 * Some chips execute undocumented SALC here; the strict CPU
+                 * model reports it through the same invalid-opcode path as
+                 * other non-documented opcode bytes.
+                 */
+                r36sx_cpu_invalid_opcode(firstip);
                 break;
 #endif
 
@@ -9369,10 +9405,18 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 oper1b = readrm8(rm);
                 oper1 = signext(oper1b);
                 switch (reg) {
-                    case 0:
-                    case 1: /* TEST */
+                    case 0: /* TEST */
                         flag_log8(oper1b & getmem8(CPU_CS, CPU_IP));
                         StepIP(1);
+                        break;
+
+                    case 1:
+                        /*
+                         * Some 8086-class chips alias F6 /1 to TEST, but
+                         * Intel documents only F6 /0.  Keep strict CPU-model
+                         * filtering consistent with the official opcode map.
+                         */
+                        r36sx_cpu_invalid_opcode(firstip);
                         break;
 
                     case 2: /* NOT */
@@ -9514,6 +9558,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* FE GRP4 Eb */
                 modregrm();
+                if (reg > 1) {
+                    /* FE is a group opcode; only /0 INC and /1 DEC are valid. */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
                 oper1b = readrm8(rm);
                 oper2b = 1;
                 if (!reg) {
@@ -9536,6 +9585,16 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* FF GRP5 Ev */
                 modregrm();
+                if (reg == 7 ||
+                    ((reg == 3 || reg == 5) &&
+                     mode == R36SX_MODRM_MOD_REGISTER)) {
+                    /*
+                     * FF /7 is undefined, and far CALL/JMP (/3,/5) require
+                     * a memory far pointer rather than a register operand.
+                     */
+                    r36sx_cpu_invalid_opcode(firstip);
+                    break;
+                }
 
                 oper1 = readrm16(rm);
                 op_grp5();
