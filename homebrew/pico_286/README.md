@@ -5,6 +5,13 @@ This directory contains the first native R36SX/SF3000-style port layer for
 licensed and is vendored locally under `homebrew/pico_286/pico-286` without
 the upstream `.git` repository metadata.
 
+The captured R36SX-style target itself is a Hichip HC16xx board with a
+MIPS 74Kc V4.12 CPU.  Linux reports MIPS32r2 plus `mips16`, `dsp`, and `dsp2`
+ASEs, `wait instruction: yes`, and 32 TLB entries.  The captured `/proc/meminfo`
+sample reports `MemTotal: 43164 kB` and `SwapTotal: 131068 kB`; the raw samples
+are stored in the repository under `hardware_info/cpu.txt` and
+`hardware_info/mem.txt`.
+
 The port reuses the upstream Linux/host emulator core and replaces only the host
 integration pieces:
 
@@ -557,13 +564,14 @@ test build that leaves the normal executable untouched:
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286.gcc.o3
 ```
 
-The experimental MIPS DSP Rev2 build is currently paused.  Normal Pico-286
-rebuilds should update only `pico_286`; do not rebuild, copy, refresh, or scan
-`pico_286.dsp` together with the regular executable.  The DSP path remains in
-the source tree for explicit hardware experiments only.  When it is explicitly
-requested, it enables `-mdspr2`, defines `R36SX_MIPS_DSP=1`, and routes hot
-RGB565 framebuffer and audio buffer copies through shared helpers with
-portable fallbacks:
+The captured target reports `ASEs implemented: mips16 dsp dsp2`, so the
+hardware should be able to execute MIPS DSP Rev2 instructions.  The
+experimental DSP build is still paused: normal Pico-286 rebuilds should update
+only `pico_286`; do not rebuild, copy, refresh, or scan `pico_286.dsp` together
+with the regular executable.  The DSP path remains in the source tree for
+explicit hardware experiments only.  When it is explicitly requested, it
+enables `-mdspr2`, defines `R36SX_MIPS_DSP=1`, and routes hot RGB565 framebuffer
+and audio buffer copies through shared helpers with portable fallbacks:
 
 ```powershell
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -EnableMipsDsp -Strip -Out .\homebrew\pico_286\pico_286.dsp

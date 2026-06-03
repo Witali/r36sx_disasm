@@ -33,11 +33,22 @@ Win32DiskImager.  Work on copies of that image whenever possible.
 Important platform facts:
 
 - Main userspace architecture: ELF32 little-endian MIPS, O32 ABI.
-- CPU string from the device tree: `MIPS 74Kc`.
+- Runtime CPU info from the device confirms `system type: Hichip HC16xx
+  Board`, `machine: Hichip hc16xx`, CPU `MIPS 74Kc V4.12`, `FPU V0.0`, and
+  `BogoMIPS: 589.82`.
+- CPU ISA/ASEs reported by Linux: `mips1`, `mips2`, `mips32r1`, `mips32r2`,
+  plus `mips16`, `dsp`, and `dsp2`.  The CPU has 32 TLB entries, 4 hardware
+  watchpoints, microsecond timers, and reports `wait instruction: yes`.
 - Board/platform strings: `Hichip HC16xx`, `Hichip,1600`, `hc1600a@dbE3100v20`.
+- Runtime memory from Linux: `MemTotal: 43164 kB` (about 42.2 MiB visible to
+  Linux), `MemAvailable: 32288 kB` in the captured sample, and
+  `SwapTotal: 131068 kB`.
 - Root filesystem base: Buildroot `2021.05-rc2`.
 - Game environment: `cubegm`, launched through `icube`, with `rkgame` loading
   emulator cores from `cubegm/cores`.
+
+The raw captured `/proc/cpuinfo` and `/proc/meminfo` samples are stored in
+`hardware_info/cpu.txt` and `hardware_info/mem.txt`.
 
 The most important summary file is:
 

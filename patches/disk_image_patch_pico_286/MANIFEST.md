@@ -27,7 +27,9 @@ Launch it from TinyMC by opening `MIPS_NATIVE/pico_286/pico_286`.
 The `pico_286.dsp` binary is an older experimental MIPS DSP Rev2 build kept
 only for manual side-by-side testing.  DSP rebuilds are currently paused; do
 not refresh this file together with the normal `pico_286` binary unless DSP
-testing is explicitly requested.
+testing is explicitly requested.  The captured target reports MIPS `dsp` and
+`dsp2` ASE support in the repository's `hardware_info/cpu.txt`, but the DSP
+binary is not kept in sync with normal rebuilds.
 
 The default binary is built with `DEBUG=0`.  Builds made with
 `build_pico_286.ps1 -DebugLog` write a startup/runtime log to:
@@ -703,9 +705,9 @@ also accelerates screenshot `RGB565 -> RGB24/BGR24` row conversion with
 `shrl.ph` / `shll.ph` and emits packed-byte `addu.qb` from the probe for
 objdump verification.
 
-The default `pico_286` binary remains the non-DSP GCC build.  Test
-`pico_286.dsp` only on hardware expected to support MIPS DSP ASE Rev2; a CPU
-without DSP support may raise an illegal-instruction fault.
+The default `pico_286` binary remains the non-DSP GCC build.  The captured
+target reports MIPS `dsp` and `dsp2` ASE support, but `pico_286.dsp` is still a
+manual side-by-side experiment and is not refreshed with normal rebuilds.
 
 pico_286 size: 418436 bytes
 pico_286 SHA256: 637193DE3D0CCD038AE1B2C9E5C5EF95E0CCF0DFAB1F0594B9D4BA816F43921C
