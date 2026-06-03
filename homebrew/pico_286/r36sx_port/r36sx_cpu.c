@@ -545,6 +545,7 @@ static r36sx_dpmi_memory_block_t
 static uint8_t r36sx_dpmi_client_active;
 static uint8_t r36sx_dpmi_client_32bit;
 #if R36SX_DEBUG_PM_DIAG
+static uint32_t r36sx_dpmi_entry_logs;
 static uint32_t r36sx_dpmi_fail_logs;
 static uint32_t r36sx_dpmi_reflect_logs;
 #endif
@@ -5012,6 +5013,9 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
     if ((entry_flags & (uint16_t)~R36SX_DPMI_ENTRY_FLAG_32BIT) != 0 ||
         (client32 &&
          !r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386))) {
+        R36SX_PM_DIAG_LOG(
+            "[PM] DPMI entry rejected flags=%04X client32=%u cs:eip=%04X:%04lX",
+            entry_flags, client32, CPU_CS, (unsigned long)CPU_IP);
         r36sx_dpmi_entry_fail(R36SX_DPMI_INVALID_VALUE);
         return 0xcbu;
     }
@@ -5023,6 +5027,18 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
     uint16_t real_ds = CPU_DS;
     uint16_t psp_segment = real_ds;
     uint8_t big_data = client32 ? R36SX_DESCRIPTOR_FLAG_DB : 0;
+
+#if R36SX_DEBUG_PM_DIAG
+    uint32_t entry_log_index = r36sx_dpmi_entry_logs;
+    if (entry_log_index < 64u) {
+        r36sx_pico286_debug_log(
+            "[PM] DPMI entry start flags=%04X client32=%u "
+            "return=%04X:%04X ss:sp=%04X:%04X ds=%04X es=%04X",
+            entry_flags, client32, return_cs, return_ip, real_ss, real_sp,
+            real_ds, CPU_ES);
+    }
+    r36sx_dpmi_entry_logs++;
+#endif
 
     memset(r36sx_dpmi_descriptors, 0, sizeof(r36sx_dpmi_descriptors));
     memset(r36sx_dpmi_pm_interrupt_vectors, 0,
@@ -5103,6 +5119,15 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
 
     (void)return_ip;
     cf = 0;
+#if R36SX_DEBUG_PM_DIAG
+    if (entry_log_index < 64u) {
+        r36sx_pico286_debug_log(
+            "[PM] DPMI entry ready cs_sel=%04X ds_sel=%04X ss_sel=%04X "
+            "psp_sel=%04X env_sel=%04X patched_return=%04X:%04X",
+            cs_selector, ds_selector, ss_selector, psp_selector, env_selector,
+            cs_selector, return_ip);
+    }
+#endif
     return 0xcbu;
 }
 
@@ -5858,6 +5883,7 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
             CPU_AX = r36sx_cpu_native_protected_enabled()
                 ? 0u
                 : R36SX_DPMI_NOT_INSTALLED;
+            cf = 0;
             return 1;
 
         case R36SX_DPMI_INT2F_INSTALLATION_CHECK:
@@ -5868,6 +5894,7 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
              */
             if (!r36sx_dpmi_real_entry_available()) {
                 CPU_AX = R36SX_DPMI_NOT_INSTALLED;
+                cf = 1;
                 return 1;
             }
             CPU_AX = 0;
@@ -5885,6 +5912,11 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
             CPU_SI = 0;
             r36sx_cpu_load_segment(reges, R36SX_DPMI_ENTRY_CS);
             CPU_DI = R36SX_DPMI_ENTRY_IP;
+            cf = 0;
+            R36SX_PM_DIAG_LOG(
+                "[PM] DPMI probe returns entry=%04X:%04X flags=%04X "
+                "cpu=%u version=%u.%u private_paras=%u",
+                CPU_ES, CPU_DI, CPU_BX, CPU_CL, CPU_DH, CPU_DL, CPU_SI);
             return 1;
     }
 
@@ -6579,6 +6611,7 @@ void reset86() {
     r36sx_pm_diag_first_fault_logged = 0;
     r36sx_pm_diag_int31_logs = 0;
     r36sx_pm_diag_int67_logs = 0;
+    r36sx_dpmi_entry_logs = 0;
     r36sx_dpmi_fail_logs = 0;
     r36sx_dpmi_reflect_logs = 0;
 #endif
