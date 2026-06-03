@@ -55,6 +55,7 @@ bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
 static uint8_t r36sx_cpu_interpreter_protected;
+static uint8_t r36sx_cpu_current_cpl;
 static uint8_t r36sx_cpu_strict_8086_mode;
 
 static inline uint8_t r36sx_cpu_x87_present(void)
@@ -2435,6 +2436,7 @@ static void r36sx_cpu_commit_code_transfer(uint16_t selector,
     r36sx_segment_cache_t committed = *cache;
     committed.selector = loaded_selector;
     r36sx_cpu_commit_segment_cache(regcs, loaded_selector, &committed);
+    r36sx_cpu_current_cpl = cpl & 3u;
     r36sx_cpu_set_ip(offset);
 }
 
@@ -4485,20 +4487,25 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
      */
     putmem16(real_ss, (uint16_t)(real_sp + 2u), cs_selector);
 
-    r36sx_cr0 |= R36SX_CR0_PE;
+    if (!r36sx_dpmi_lookup_descriptor(ss_selector, &ss_cache) ||
+        !r36sx_dpmi_lookup_descriptor(ds_selector, &ds_cache) ||
+        !r36sx_dpmi_lookup_descriptor(psp_selector, &psp_cache)) {
+        r36sx_dpmi_entry_fail(R36SX_DPMI_DESCRIPTOR_UNAVAILABLE);
+        return 0xcbu;
+    }
+
+    /*
+     * Use the normal CR0 path, not a raw bit set.  The entry returns through a
+     * protected RETF immediately afterwards; the interpreter must switch to
+     * checked protected memory before that RETF pops the selector-based stack.
+     */
+    r36sx_cpu_set_cr0(r36sx_cr0 | R36SX_CR0_PE);
     r36sx_dpmi_client_active = 1;
     r36sx_dpmi_client_32bit = client32;
     CPU_ESP = CPU_SP;
 
     if (client32) {
         CPU_ESP &= 0x0000ffffu;
-    }
-
-    if (!r36sx_dpmi_lookup_descriptor(ss_selector, &ss_cache) ||
-        !r36sx_dpmi_lookup_descriptor(ds_selector, &ds_cache) ||
-        !r36sx_dpmi_lookup_descriptor(psp_selector, &psp_cache)) {
-        r36sx_dpmi_entry_fail(R36SX_DPMI_DESCRIPTOR_UNAVAILABLE);
-        return 0xcbu;
     }
 
     r36sx_cpu_commit_stack_segment(ss_selector, &ss_cache);
@@ -5895,6 +5902,7 @@ void reset86() {
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
+    r36sx_cpu_current_cpl = 0;
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
     r36sx_cr3 = 0;

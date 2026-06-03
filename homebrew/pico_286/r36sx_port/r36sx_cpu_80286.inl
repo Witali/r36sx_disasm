@@ -21,9 +21,17 @@ static inline void r36sx_cpu_real_cache_segment(uint8_t segid)
     r36sx_seg_cache[segid].selector = selector;
     r36sx_seg_cache[segid].base = base;
     r36sx_seg_cache[segid].limit = 0xffffu;
+    /*
+     * Intel 80386 keeps the real-mode linear base in the hidden segment cache
+     * after CR0.PE is set; CPL starts at zero and the first far JMP/CALL/RET
+     * then reloads CS from a protected descriptor.  Model the transient CS as
+     * executable so that the mandatory post-PE transfer can be fetched.
+     */
     r36sx_seg_cache[segid].access =
         R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
-        R36SX_DESCRIPTOR_READABLE | R36SX_DESCRIPTOR_WRITABLE;
+        (segid == regcs
+             ? (R36SX_DESCRIPTOR_EXECUTABLE | R36SX_DESCRIPTOR_READABLE)
+             : R36SX_DESCRIPTOR_WRITABLE);
     r36sx_seg_cache[segid].flags = 0;
     r36sx_seg_cache[segid].valid = 1;
     segbase32[segid] = base;
@@ -154,7 +162,7 @@ static inline uint8_t r36sx_cpu_cpl(void)
      * Virtual-8086 tasks run with protected mode enabled, but the processor
      * treats their current privilege level as 3 regardless of the low CS bits.
      */
-    return r36sx_cpu_v86_enabled() ? 3u : (uint8_t)(CPU_CS & 3u);
+    return r36sx_cpu_v86_enabled() ? 3u : (r36sx_cpu_current_cpl & 3u);
 }
 
 static inline uint8_t r36sx_priv_max(uint8_t a, uint8_t b)
@@ -763,7 +771,15 @@ static void r36sx_cpu_set_cr0(uint32_t value)
                                 new_pe ? "entered" : "left",
                                 (unsigned long)r36sx_cr0);
 #endif
-        if (!new_pe) {
+        if (new_pe) {
+            /*
+             * Intel 80386 defines CPL as zero immediately after CR0.PE is set.
+             * A later protected far transfer will load the normal CS selector
+             * and update CPL from the destination descriptor/RPL.
+             */
+            r36sx_cpu_current_cpl = 0;
+        } else {
+            r36sx_cpu_current_cpl = 0;
             r36sx_cpu_real_cache_all_segments();
         }
     }

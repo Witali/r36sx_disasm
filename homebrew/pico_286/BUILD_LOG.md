@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-03 386 real-to-protected entry fix
+
+Audited the Intel 80386 real-to-protected transition path against the Intel
+80386 Programmer's Reference Manual and DPMI 0.9 entry rules while investigating
+DOS/4GW hangs with only a blinking cursor.
+
+Fixed two entry-path issues:
+
+- Real-mode CS hidden-cache entries are now modeled as executable while CR0.PE
+  has just been set and before the mandatory protected far transfer reloads CS.
+  Intel documents that after setting PE the segment registers still point to the
+  same linear addresses and CPL starts at zero.
+- The DPMI real-to-protected entry now enables PE through `r36sx_cpu_set_cr0()`
+  instead of directly setting the bit.  This switches the interpreter to the
+  protected memory path before the entry stub returns through protected `RETF`
+  and pops from a selector-based stack.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip
+```
+
 ## 2026-06-03 strict 8086 address space and AT-memory gating
 
 Audited the `cpu_model=8086` path against Intel 8086/8088 documentation and
