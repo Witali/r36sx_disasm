@@ -16,8 +16,16 @@ tools/*
 !tools/scan-download.ps1
 !tools/create_fat12_floppy.py
 !tools/create_fat16_hdd.py
+!tools/install_debian12_mipsel_sd_wsl.sh
+!tools/build_debian12_mipsel_sd_image_wsl.sh
+!tools/build_debian12_mipsel_essential_image_wsl.sh
+!tools/repack_debian12_bootonly_image_wsl.sh
+!tools/repack_debian12_mtdfat_image_wsl.sh
+!tools/verify_r36sx_sd_image_wsl.sh
+!tools/verify_r36sx_bootonly_image_wsl.sh
 
 # Build outputs and caches
+local_artifacts/
 *.o
 *.obj
 *.a
