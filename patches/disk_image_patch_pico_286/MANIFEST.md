@@ -38,6 +38,20 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 real/protected interpreter memory split
+
+The normal `pico_286` binary now routes `exec86()` through separate real-mode
+and protected-mode interpreter entries.  Real mode uses direct `segment << 4`
+translation and physical memory access; protected mode keeps descriptor, VM86,
+and paging checks.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `562468` bytes
+- SHA256:
+  `E9D19700FDDE4EC583E9BAC76D64FCED92F2E8A0DA9AA0ED5633CC519D14ED45`
+
 ## 2026-06-03 screenshot shared object
 
 Screenshot writing now lives in the optional common runtime module:

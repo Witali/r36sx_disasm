@@ -54,6 +54,7 @@ x86_flags_t x86_flags;
 bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
+static uint8_t r36sx_cpu_interpreter_protected;
 
 #if R36SX_DEBUG_PM_DIAG
 #define R36SX_PM_DIAG_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
@@ -765,21 +766,142 @@ static inline void r36sx_cpu_putmem32_checked(uint16_t selector,
     r36sx_cpu_write_linear32(linear, value);
 }
 
+/* 80386 interpreter memory models: fast real mode and checked protected mode. */
+#include "r36sx_cpu_80386_real.inl"
+#include "r36sx_cpu_80386_protected.inl"
+
+static inline uint8_t r36sx_cpu_interpreter_getmem8(uint16_t selector,
+                                                    uint32_t offset)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_getmem8(selector, offset);
+    }
+    return r36sx_cpu_protected_getmem8(selector, offset);
+}
+
+static inline uint16_t r36sx_cpu_interpreter_getmem16(uint16_t selector,
+                                                      uint32_t offset)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_getmem16(selector, offset);
+    }
+    return r36sx_cpu_protected_getmem16(selector, offset);
+}
+
+static inline uint32_t r36sx_cpu_interpreter_getmem32(uint16_t selector,
+                                                      uint32_t offset)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_getmem32(selector, offset);
+    }
+    return r36sx_cpu_protected_getmem32(selector, offset);
+}
+
+static inline void r36sx_cpu_interpreter_putmem8(uint16_t selector,
+                                                 uint32_t offset,
+                                                 uint8_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_putmem8(selector, offset, value);
+        return;
+    }
+    r36sx_cpu_protected_putmem8(selector, offset, value);
+}
+
+static inline void r36sx_cpu_interpreter_putmem16(uint16_t selector,
+                                                  uint32_t offset,
+                                                  uint16_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_putmem16(selector, offset, value);
+        return;
+    }
+    r36sx_cpu_protected_putmem16(selector, offset, value);
+}
+
+static inline void r36sx_cpu_interpreter_putmem32(uint16_t selector,
+                                                  uint32_t offset,
+                                                  uint32_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_putmem32(selector, offset, value);
+        return;
+    }
+    r36sx_cpu_protected_putmem32(selector, offset, value);
+}
+
+static inline uint8_t r36sx_cpu_interpreter_read8(uint32_t linear)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_read8(linear);
+    }
+    return r36sx_cpu_protected_read8(linear);
+}
+
+static inline uint16_t r36sx_cpu_interpreter_read16(uint32_t linear)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_read16(linear);
+    }
+    return r36sx_cpu_protected_read16(linear);
+}
+
+static inline uint32_t r36sx_cpu_interpreter_read32(uint32_t linear)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        return r36sx_cpu_real_read32(linear);
+    }
+    return r36sx_cpu_protected_read32(linear);
+}
+
+static inline void r36sx_cpu_interpreter_write8(uint32_t linear,
+                                                uint8_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_write8(linear, value);
+        return;
+    }
+    r36sx_cpu_protected_write8(linear, value);
+}
+
+static inline void r36sx_cpu_interpreter_write16(uint32_t linear,
+                                                 uint16_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_write16(linear, value);
+        return;
+    }
+    r36sx_cpu_protected_write16(linear, value);
+}
+
+static inline void r36sx_cpu_interpreter_write32(uint32_t linear,
+                                                 uint32_t value)
+{
+    if (likely(!r36sx_cpu_interpreter_protected)) {
+        r36sx_cpu_real_write32(linear, value);
+        return;
+    }
+    r36sx_cpu_protected_write32(linear, value);
+}
+
 #undef getmem8
 #undef getmem16
 #undef getmem32
 #undef putmem8
 #undef putmem16
 #undef putmem32
-#define getmem8(x, y) r36sx_cpu_getmem8_checked((uint16_t)(x), (uint32_t)(y))
-#define getmem16(x, y) r36sx_cpu_getmem16_checked((uint16_t)(x), (uint32_t)(y))
-#define getmem32(x, y) r36sx_cpu_getmem32_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem8(x, y) \
+    r36sx_cpu_interpreter_getmem8((uint16_t)(x), (uint32_t)(y))
+#define getmem16(x, y) \
+    r36sx_cpu_interpreter_getmem16((uint16_t)(x), (uint32_t)(y))
+#define getmem32(x, y) \
+    r36sx_cpu_interpreter_getmem32((uint16_t)(x), (uint32_t)(y))
 #define putmem8(x, y, z) \
-    r36sx_cpu_putmem8_checked((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
+    r36sx_cpu_interpreter_putmem8((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
 #define putmem16(x, y, z) \
-    r36sx_cpu_putmem16_checked((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
+    r36sx_cpu_interpreter_putmem16((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
 #define putmem32(x, y, z) \
-    r36sx_cpu_putmem32_checked((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
+    r36sx_cpu_interpreter_putmem32((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
 
 static inline uint8_t r36sx_cpu_pending_maskable_irq(void)
 {
@@ -1884,21 +2006,27 @@ static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value)
     r36sx_cpu_write_linear16((uint32_t)(address), (uint16_t)(value))
 #define writedw86(address, value) \
     r36sx_cpu_write_linear32((uint32_t)(address), (uint32_t)(value))
-#define getmem8(x, y) r36sx_cpu_getmem8_checked((uint16_t)(x), (uint32_t)(y))
-#define getmem16(x, y) r36sx_cpu_getmem16_checked((uint16_t)(x), (uint32_t)(y))
-#define getmem32(x, y) r36sx_cpu_getmem32_checked((uint16_t)(x), (uint32_t)(y))
+#define getmem8(x, y) \
+    r36sx_cpu_interpreter_getmem8((uint16_t)(x), (uint32_t)(y))
+#define getmem16(x, y) \
+    r36sx_cpu_interpreter_getmem16((uint16_t)(x), (uint32_t)(y))
+#define getmem32(x, y) \
+    r36sx_cpu_interpreter_getmem32((uint16_t)(x), (uint32_t)(y))
 #define putmem8(x, y, z) \
-    r36sx_cpu_putmem8_checked((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
+    r36sx_cpu_interpreter_putmem8((uint16_t)(x), (uint32_t)(y), (uint8_t)(z))
 #define putmem16(x, y, z) \
-    r36sx_cpu_putmem16_checked((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
+    r36sx_cpu_interpreter_putmem16((uint16_t)(x), (uint32_t)(y), (uint16_t)(z))
 #define putmem32(x, y, z) \
-    r36sx_cpu_putmem32_checked((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
+    r36sx_cpu_interpreter_putmem32((uint16_t)(x), (uint32_t)(y), (uint32_t)(z))
 
 static uint8_t r36sx_cpu_check_segment_access(uint32_t offset,
                                               uint32_t bytes,
                                               uint8_t write_access)
 {
     uint32_t linear;
+    if (likely(!r36sx_cpu_interpreter_protected) || bytes == 0u) {
+        return 1;
+    }
     return r36sx_cpu_segment_linear_checked(useseg, offset, bytes,
                                             write_access, 0, &linear);
 }
@@ -3180,7 +3308,7 @@ static INLINE uint32_t readrm32(uint8_t rmval) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
             return 0xffffffffu;
         }
-        return readdw86(ea);
+        return r36sx_cpu_interpreter_read32(ea);
     }
     return getreg32(rmval);
 }
@@ -3191,7 +3319,7 @@ static INLINE uint16_t readrm16(uint8_t rmval) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 2u, 0)) {
             return 0xffffu;
         }
-        return readw86(ea);
+        return r36sx_cpu_interpreter_read16(ea);
     }
     return getreg16(rmval);
 }
@@ -3202,7 +3330,7 @@ static INLINE uint8_t readrm8(uint8_t rmval) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 1u, 0)) {
             return 0xffu;
         }
-        return read86(ea);
+        return r36sx_cpu_interpreter_read8(ea);
     }
     return getreg8(rmval);
 }
@@ -3213,7 +3341,7 @@ static INLINE void writerm16(uint8_t rmval, uint16_t value) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 2u, 1)) {
             return;
         }
-        writew86(ea, value);
+        r36sx_cpu_interpreter_write16(ea, value);
     } else {
         putreg16(rmval, value);
     }
@@ -3225,7 +3353,7 @@ static INLINE void writerm32(uint8_t rmval, uint32_t value) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 1)) {
             return;
         }
-        writedw86(ea, value);
+        r36sx_cpu_interpreter_write32(ea, value);
     } else {
         putreg32(rmval, value);
     }
@@ -3237,7 +3365,7 @@ static INLINE void writerm8(uint8_t rmval, uint8_t value) {
         if (!r36sx_cpu_check_segment_access(ea - useseg_base, 1u, 1)) {
             return;
         }
-        write86(ea, value);
+        r36sx_cpu_interpreter_write8(ea, value);
     } else {
         putreg8(rmval, value);
     }
@@ -5728,7 +5856,7 @@ void reset86() {
 extern volatile int16_t last_sb_sample;
 extern volatile bool ask_to_blast;
 
-void __not_in_flash() exec86(uint32_t execloops) {
+static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
     static uint32_t firstip;
     static bool was_TF;
     uint32_t loopcount = 0;
@@ -9410,4 +9538,25 @@ r36sx_opcode_done:
         }
     }
     r36sx_app_stats_record_x86(loopcount);
+}
+
+static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops)
+{
+    r36sx_cpu_interpreter_protected = 0;
+    r36sx_cpu_exec86_core(execloops);
+}
+
+static void __not_in_flash() r36sx_cpu_exec86_protected(uint32_t execloops)
+{
+    r36sx_cpu_interpreter_protected = 1;
+    r36sx_cpu_exec86_core(execloops);
+}
+
+void __not_in_flash() exec86(uint32_t execloops)
+{
+    if (unlikely(r36sx_cpu_protected_enabled())) {
+        r36sx_cpu_exec86_protected(execloops);
+        return;
+    }
+    r36sx_cpu_exec86_real(execloops);
 }

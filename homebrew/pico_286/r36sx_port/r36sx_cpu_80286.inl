@@ -747,6 +747,7 @@ static void r36sx_cpu_set_cr0(uint32_t value)
     r36sx_cr0 = (value & ~R36SX_CR0_PE) | R36SX_CR0_ET;
 #endif
     uint8_t new_pe = r36sx_cpu_protected_enabled();
+    r36sx_cpu_interpreter_protected = new_pe;
 
     R36SX_PM_DIAG_LOG(
         "[PM] CR0 write old=%08lX requested=%08lX new=%08lX pe=%u->%u "

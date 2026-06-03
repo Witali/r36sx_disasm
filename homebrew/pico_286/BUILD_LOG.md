@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-06-03 real/protected interpreter memory split
+
+Split the hot x86 interpreter memory model into separate real-mode and
+protected-mode include files:
+
+- `homebrew/pico_286/r36sx_port/r36sx_cpu_80386_real.inl`
+- `homebrew/pico_286/r36sx_port/r36sx_cpu_80386_protected.inl`
+
+`exec86()` is now a small router.  It calls the real-mode interpreter entry
+while `CR0.PE=0`, and the protected-mode entry while PE is set.  The real-mode
+path translates `segment:offset` directly as `segment << 4` and uses the
+physical memory backend, avoiding descriptor-limit and paging checks for normal
+DOS/BIOS execution.  The protected path keeps descriptor access checks, VM86
+handling, and paging translation.  `r36sx_cpu_set_cr0()` updates the active
+interpreter memory model immediately when guest code changes PE during an
+instruction stream.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+```
+
+Updated binaries:
+
+- `homebrew/pico_286/pico_286`
+- `disk_image/MIPS_NATIVE/pico_286/pico_286`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
+Result:
+
+- `pico_286` size: `562468` bytes
+- `pico_286` SHA256:
+  `E9D19700FDDE4EC583E9BAC76D64FCED92F2E8A0DA9AA0ED5633CC519D14ED45`
+- WSL/GCC build succeeded.  The compiler still reports the existing warning
+  set in FPU, XMS, renderer, audio/helper code, and the old dispatch `res8`
+  maybe-uninitialized warning.
+
 ## 2026-06-03 screenshot shared object and static archive
 
 Moved screenshot file encoding out of the main Pico-286 executable into one
