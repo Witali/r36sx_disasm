@@ -1,5 +1,27 @@
 # pico-286 Build Log
 
+## 2026-06-03 DPMI real-mode bridge
+
+Implemented the first useful DPMI real-mode translation services:
+
+- `INT 31h AX=0300h` now simulates a real-mode interrupt from the DPMI
+  register block.
+- `INT 31h AX=0301h` now calls a real-mode procedure that returns with `RETF`.
+- `INT 31h AX=0302h` now calls a real-mode procedure that returns with `IRET`;
+  `RETF 2` is also accepted for the documented flags-word discard case.
+- Protected-mode software interrupts now try installed DPMI protected vectors
+  first, then fall back to default real-mode reflection before raw protected
+  IDT delivery.
+
+`AX=0303h..0306h` are handled explicitly but still return unsupported until
+real-mode callback stubs and raw mode-switch entry points are implemented.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip
+```
+
 ## 2026-06-03 386 real-to-protected entry fix
 
 Audited the Intel 80386 real-to-protected transition path against the Intel

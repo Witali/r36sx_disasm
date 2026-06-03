@@ -32,9 +32,13 @@ be checked against the relevant specification and committed separately.
      initial CS/SS/DS/ES descriptors and a converted PSP environment pointer.
      Protected-mode `INT 31h` is intercepted before IDT delivery.  Protected
      interrupt vectors installed through `INT 31h AX=0205h` are now dispatched
-     before the raw IDT fallback.
-   - Next target: add the real-mode interrupt/procedure bridge and callback
-     services (`INT 31h AX=0300h..0306h`).
+     before the raw IDT fallback.  The real-mode translation bridge now
+     implements `INT 31h AX=0300h..0302h`, including host-supplied real-mode
+     stack fallback, DPMI register-block import/export, and default interrupt
+     reflection when no protected interrupt vector is installed.
+   - Next target: add real-mode callback services and raw mode-switch stubs
+     (`INT 31h AX=0303h..0306h`), or continue with DOS memory block services
+     if DOS4GW trips over `AX=0100h..0102h` first.
    - Done when: the code has a clean DPMI probe/dispatch structure, debug logs
      identify all required client-entry values, and later commits can add real
      `INT 31h` services without touching the generic `intcall86()` flow.
@@ -53,14 +57,14 @@ be checked against the relevant specification and committed separately.
      (`AX=0002h`), alias descriptors (`AX=000Ah`), raw descriptor copy
      (`AX=000Bh/000Ch`), allocate-specific selector (`AX=000Dh`), and
      get/set-multiple descriptors (`AX=000Eh/000Fh`).  Vector services
-     (`AX=0200h..0205h`, `AX=0210h..0213h`), committed linear memory
-     allocation/free/resize (`AX=0500h..0503h`), and page-size query
-     (`AX=0604h`) are scaffolded.
+     (`AX=0200h..0205h`, `AX=0210h..0213h`), real-mode interrupt/procedure
+     simulation (`AX=0300h..0302h`), committed linear memory allocation/free/
+     resize (`AX=0500h..0503h`), and page-size query (`AX=0604h`) are
+     scaffolded.
    - Missing: DOS memory block services (`AX=0100h..0102h`), real-mode
-     interrupt/procedure simulation (`AX=0300h..0302h`), callbacks
-     (`AX=0303h/0304h`), state-save/raw switch addresses (`AX=0305h/0306h`),
-     lock/unlock/page mapping APIs, and default interrupt reflection back to
-     real mode when no protected-mode vector is installed.
+     callbacks (`AX=0303h/0304h`), state-save/raw switch addresses
+     (`AX=0305h/0306h`), lock/unlock/page mapping APIs, and conformance testing
+     of the new default interrupt reflection path.
    - Done when: common DOS extender probes can query DPMI version, allocate
      descriptors, configure flat 32-bit code/data descriptors, and return clean
      failure for unimplemented functions.

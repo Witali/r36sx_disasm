@@ -366,6 +366,13 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DPMI_FUNC_GET_EXT_EXCEPTION_RM_VECTOR 0x0211u
 #define R36SX_DPMI_FUNC_SET_EXT_EXCEPTION_PM_VECTOR 0x0212u
 #define R36SX_DPMI_FUNC_SET_EXT_EXCEPTION_RM_VECTOR 0x0213u
+#define R36SX_DPMI_FUNC_SIMULATE_RM_INTERRUPT 0x0300u
+#define R36SX_DPMI_FUNC_CALL_RM_RETF 0x0301u
+#define R36SX_DPMI_FUNC_CALL_RM_IRET 0x0302u
+#define R36SX_DPMI_FUNC_ALLOC_RM_CALLBACK 0x0303u
+#define R36SX_DPMI_FUNC_FREE_RM_CALLBACK 0x0304u
+#define R36SX_DPMI_FUNC_GET_STATE_SAVE_RESTORE 0x0305u
+#define R36SX_DPMI_FUNC_GET_RAW_MODE_SWITCH 0x0306u
 #define R36SX_DPMI_FUNC_GET_VERSION 0x0400u
 #define R36SX_DPMI_FUNC_GET_CAPABILITIES 0x0401u
 #define R36SX_DPMI_FUNC_GET_FREE_MEMORY_INFO 0x0500u
@@ -386,6 +393,28 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DPMI_PIC_MASTER_BASE 0x08u
 #define R36SX_DPMI_PIC_SLAVE_BASE 0x70u
 #define R36SX_DPMI_VERSION_FLAG_32BIT 0x0001u
+#define R36SX_DPMI_RM_REGISTER_BLOCK_SIZE 0x32u
+#define R36SX_DPMI_RM_REG_EDI 0x00u
+#define R36SX_DPMI_RM_REG_ESI 0x04u
+#define R36SX_DPMI_RM_REG_EBP 0x08u
+#define R36SX_DPMI_RM_REG_EBX 0x10u
+#define R36SX_DPMI_RM_REG_EDX 0x14u
+#define R36SX_DPMI_RM_REG_ECX 0x18u
+#define R36SX_DPMI_RM_REG_EAX 0x1cu
+#define R36SX_DPMI_RM_REG_FLAGS 0x20u
+#define R36SX_DPMI_RM_REG_ES 0x22u
+#define R36SX_DPMI_RM_REG_DS 0x24u
+#define R36SX_DPMI_RM_REG_FS 0x26u
+#define R36SX_DPMI_RM_REG_GS 0x28u
+#define R36SX_DPMI_RM_REG_IP 0x2au
+#define R36SX_DPMI_RM_REG_CS 0x2cu
+#define R36SX_DPMI_RM_REG_SP 0x2eu
+#define R36SX_DPMI_RM_REG_SS 0x30u
+#define R36SX_DPMI_RM_STACK_SEG 0x7000u
+#define R36SX_DPMI_RM_STACK_TOP 0xfffeu
+#define R36SX_DPMI_RM_STACK_COPY_MAX_WORDS 64u
+#define R36SX_DPMI_RM_BRIDGE_CHUNK_LOOPS 4096u
+#define R36SX_DPMI_RM_BRIDGE_MAX_LOOPS 2000000u
 #define R36SX_DPMI_NOT_INSTALLED 0xffffu
 #define R36SX_DPMI_DESCRIPTOR_UNAVAILABLE 0x8011u
 #define R36SX_DPMI_LINEAR_MEMORY_UNAVAILABLE 0x8012u
@@ -448,6 +477,61 @@ typedef struct {
     uint8_t allocated;
 } r36sx_dpmi_memory_block_t;
 
+typedef enum {
+    R36SX_DPMI_RM_BRIDGE_NONE = 0,
+    R36SX_DPMI_RM_BRIDGE_RETF,
+    R36SX_DPMI_RM_BRIDGE_IRET
+} r36sx_dpmi_rm_bridge_return_t;
+
+typedef struct {
+    uint32_t dwordregs[8];
+    uint32_t ip32;
+    uint32_t flags;
+    uint32_t cr0;
+    uint32_t cr2;
+    uint32_t cr3;
+    uint32_t gdtr_base;
+    uint32_t idtr_base;
+    uint16_t gdtr_limit;
+    uint16_t idtr_limit;
+    uint16_t ldtr_selector;
+    uint16_t tr_selector;
+    r36sx_segment_cache_t seg_cache[6];
+    r36sx_segment_cache_t ldtr_cache;
+    r36sx_segment_cache_t tr_cache;
+    uint32_t segment_values[6];
+    uint16_t segselectors[6];
+    uint32_t segbases[6];
+    uint16_t useseg;
+    uint16_t oldsp;
+    uint32_t useseg_base;
+    uint8_t segoverride;
+    uint8_t reptype;
+    uint8_t tempcf;
+    uint8_t oldcf;
+    uint8_t mode;
+    uint8_t reg;
+    uint8_t rm;
+    uint8_t sib;
+    uint8_t hltstate;
+    uint8_t interpreter_protected;
+    uint8_t current_cpl;
+    uint8_t strict_8086_mode;
+    uint8_t nestlev;
+    uint16_t saveip;
+    uint16_t savecs;
+    uint16_t oper1;
+    uint16_t oper2;
+    uint16_t res16;
+    uint16_t temp16;
+    uint16_t dummy;
+    uint16_t stacksize;
+    uint32_t disp32;
+    uint32_t ea;
+    bool operand_size_override;
+    bool address_size_override;
+} r36sx_cpu_snapshot_t;
+
 static r36sx_dpmi_descriptor_t
     r36sx_dpmi_descriptors[R36SX_DPMI_MAX_DESCRIPTORS];
 static r36sx_dpmi_vector_t
@@ -460,6 +544,11 @@ static r36sx_dpmi_memory_block_t
     r36sx_dpmi_memory_blocks[R36SX_DPMI_MAX_MEMORY_BLOCKS];
 static uint8_t r36sx_dpmi_client_active;
 static uint8_t r36sx_dpmi_client_32bit;
+static uint8_t r36sx_dpmi_rm_bridge_active;
+static uint8_t r36sx_dpmi_rm_bridge_done;
+static r36sx_dpmi_rm_bridge_return_t r36sx_dpmi_rm_bridge_return;
+static uint16_t r36sx_dpmi_rm_bridge_return_ss;
+static uint32_t r36sx_dpmi_rm_bridge_return_sp;
 static uint8_t r36sx_dpmi_lookup_descriptor(uint16_t selector,
                                             r36sx_segment_cache_t *cache);
 
@@ -498,6 +587,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
 static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
 void intcall86(uint8_t intnum);
 static void r36sx_cpu_software_interrupt(uint8_t intnum);
+static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops);
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
@@ -4220,6 +4310,112 @@ static inline void r36sx_dpmi_succeed(void)
     cf = 0;
 }
 
+static void r36sx_cpu_save_snapshot(r36sx_cpu_snapshot_t *snapshot)
+{
+    memcpy(snapshot->dwordregs, dwordregs, sizeof(snapshot->dwordregs));
+    snapshot->ip32 = ip32;
+    snapshot->flags = x86_flags.value;
+    snapshot->cr0 = r36sx_cr0;
+    snapshot->cr2 = r36sx_cr2;
+    snapshot->cr3 = r36sx_cr3;
+    snapshot->gdtr_base = r36sx_gdtr_base;
+    snapshot->idtr_base = r36sx_idtr_base;
+    snapshot->gdtr_limit = r36sx_gdtr_limit;
+    snapshot->idtr_limit = r36sx_idtr_limit;
+    snapshot->ldtr_selector = r36sx_ldtr_selector;
+    snapshot->tr_selector = r36sx_tr_selector;
+    memcpy(snapshot->seg_cache, r36sx_seg_cache,
+           sizeof(snapshot->seg_cache));
+    snapshot->ldtr_cache = r36sx_ldtr_cache;
+    snapshot->tr_cache = r36sx_tr_cache;
+    memcpy(snapshot->segment_values, segregs32,
+           sizeof(snapshot->segment_values));
+    memcpy(snapshot->segselectors, segselector16,
+           sizeof(snapshot->segselectors));
+    memcpy(snapshot->segbases, segbase32, sizeof(snapshot->segbases));
+    snapshot->useseg = useseg;
+    snapshot->oldsp = oldsp;
+    snapshot->useseg_base = useseg_base;
+    snapshot->segoverride = segoverride;
+    snapshot->reptype = reptype;
+    snapshot->tempcf = tempcf;
+    snapshot->oldcf = oldcf;
+    snapshot->mode = mode;
+    snapshot->reg = reg;
+    snapshot->rm = rm;
+    snapshot->sib = sib;
+    snapshot->hltstate = hltstate;
+    snapshot->interpreter_protected = r36sx_cpu_interpreter_protected;
+    snapshot->current_cpl = r36sx_cpu_current_cpl;
+    snapshot->strict_8086_mode = r36sx_cpu_strict_8086_mode;
+    snapshot->nestlev = nestlev;
+    snapshot->saveip = saveip;
+    snapshot->savecs = savecs;
+    snapshot->oper1 = oper1;
+    snapshot->oper2 = oper2;
+    snapshot->res16 = res16;
+    snapshot->temp16 = temp16;
+    snapshot->dummy = dummy;
+    snapshot->stacksize = stacksize;
+    snapshot->disp32 = disp32;
+    snapshot->ea = ea;
+    snapshot->operand_size_override = operandSizeOverride;
+    snapshot->address_size_override = addressSizeOverride;
+}
+
+static void r36sx_cpu_restore_snapshot(const r36sx_cpu_snapshot_t *snapshot)
+{
+    memcpy(dwordregs, snapshot->dwordregs, sizeof(snapshot->dwordregs));
+    ip32 = snapshot->ip32;
+    x86_flags.value = snapshot->flags;
+    r36sx_cr0 = snapshot->cr0;
+    r36sx_cr2 = snapshot->cr2;
+    r36sx_cr3 = snapshot->cr3;
+    r36sx_gdtr_base = snapshot->gdtr_base;
+    r36sx_idtr_base = snapshot->idtr_base;
+    r36sx_gdtr_limit = snapshot->gdtr_limit;
+    r36sx_idtr_limit = snapshot->idtr_limit;
+    r36sx_ldtr_selector = snapshot->ldtr_selector;
+    r36sx_tr_selector = snapshot->tr_selector;
+    memcpy(r36sx_seg_cache, snapshot->seg_cache,
+           sizeof(snapshot->seg_cache));
+    r36sx_ldtr_cache = snapshot->ldtr_cache;
+    r36sx_tr_cache = snapshot->tr_cache;
+    memcpy(segregs32, snapshot->segment_values,
+           sizeof(snapshot->segment_values));
+    memcpy(segselector16, snapshot->segselectors,
+           sizeof(snapshot->segselectors));
+    memcpy(segbase32, snapshot->segbases, sizeof(snapshot->segbases));
+    useseg = snapshot->useseg;
+    oldsp = snapshot->oldsp;
+    useseg_base = snapshot->useseg_base;
+    segoverride = snapshot->segoverride;
+    reptype = snapshot->reptype;
+    tempcf = snapshot->tempcf;
+    oldcf = snapshot->oldcf;
+    mode = snapshot->mode;
+    reg = snapshot->reg;
+    rm = snapshot->rm;
+    sib = snapshot->sib;
+    hltstate = snapshot->hltstate;
+    r36sx_cpu_interpreter_protected = snapshot->interpreter_protected;
+    r36sx_cpu_current_cpl = snapshot->current_cpl;
+    r36sx_cpu_strict_8086_mode = snapshot->strict_8086_mode;
+    nestlev = snapshot->nestlev;
+    saveip = snapshot->saveip;
+    savecs = snapshot->savecs;
+    oper1 = snapshot->oper1;
+    oper2 = snapshot->oper2;
+    res16 = snapshot->res16;
+    temp16 = snapshot->temp16;
+    dummy = snapshot->dummy;
+    stacksize = snapshot->stacksize;
+    disp32 = snapshot->disp32;
+    ea = snapshot->ea;
+    operandSizeOverride = snapshot->operand_size_override;
+    addressSizeOverride = snapshot->address_size_override;
+}
+
 static uint8_t r36sx_dpmi_selector_slot(uint16_t selector, uint8_t *slot)
 {
     if (!r36sx_cpu_protected_enabled() ||
@@ -4389,6 +4585,333 @@ static uint8_t r36sx_dpmi_valid_code_handler(uint16_t selector,
         offset > cache.limit) {
         return 0;
     }
+    return 1;
+}
+
+static uint8_t r36sx_dpmi_rm_register_block_linear(uint32_t *linear)
+{
+    uint32_t offset = r36sx_dpmi_client_offset();
+
+    if (!r36sx_cpu_segment_linear_checked(
+            CPU_ES, offset, R36SX_DPMI_RM_REGISTER_BLOCK_SIZE, 1, 0,
+            linear)) {
+        r36sx_dpmi_fail(R36SX_DPMI_INVALID_VALUE);
+        return 0;
+    }
+    return 1;
+}
+
+static uint8_t r36sx_dpmi_read_pm_stack_words(uint16_t count,
+                                              uint16_t *words)
+{
+    if (count > R36SX_DPMI_RM_STACK_COPY_MAX_WORDS) {
+        r36sx_dpmi_fail(R36SX_DPMI_INVALID_VALUE);
+        return 0;
+    }
+
+    uint32_t sp = r36sx_cpu_stack_pointer_value();
+    for (uint16_t i = 0; i < count; i++) {
+        words[i] = getmem16(CPU_SS, sp + (uint32_t)i * 2u);
+    }
+    return 1;
+}
+
+static void r36sx_dpmi_load_real_mode_register_block(uint32_t block_linear,
+                                                     uint16_t *target_cs,
+                                                     uint16_t *target_ip,
+                                                     uint16_t *real_ss,
+                                                     uint16_t *real_sp)
+{
+    CPU_EDI = readdw86(block_linear + R36SX_DPMI_RM_REG_EDI);
+    CPU_ESI = readdw86(block_linear + R36SX_DPMI_RM_REG_ESI);
+    CPU_EBP = readdw86(block_linear + R36SX_DPMI_RM_REG_EBP);
+    CPU_EBX = readdw86(block_linear + R36SX_DPMI_RM_REG_EBX);
+    CPU_EDX = readdw86(block_linear + R36SX_DPMI_RM_REG_EDX);
+    CPU_ECX = readdw86(block_linear + R36SX_DPMI_RM_REG_ECX);
+    CPU_EAX = readdw86(block_linear + R36SX_DPMI_RM_REG_EAX);
+    decodeflagsword(readw86(block_linear + R36SX_DPMI_RM_REG_FLAGS));
+
+    r36sx_cpu_load_segment(reges,
+        readw86(block_linear + R36SX_DPMI_RM_REG_ES));
+    r36sx_cpu_load_segment(regds,
+        readw86(block_linear + R36SX_DPMI_RM_REG_DS));
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        r36sx_cpu_load_segment(regfs,
+            readw86(block_linear + R36SX_DPMI_RM_REG_FS));
+        r36sx_cpu_load_segment(reggs,
+            readw86(block_linear + R36SX_DPMI_RM_REG_GS));
+    }
+
+    *target_ip = readw86(block_linear + R36SX_DPMI_RM_REG_IP);
+    *target_cs = readw86(block_linear + R36SX_DPMI_RM_REG_CS);
+    *real_sp = readw86(block_linear + R36SX_DPMI_RM_REG_SP);
+    *real_ss = readw86(block_linear + R36SX_DPMI_RM_REG_SS);
+    if (*real_ss == 0 && *real_sp == 0) {
+        /*
+         * DPMI allows SS:SP=0 to request a host-supplied real-mode stack.  The
+         * host stack is intentionally small and private to bridge calls; real
+         * handlers must return with the stack balanced.
+         */
+        *real_ss = R36SX_DPMI_RM_STACK_SEG;
+        *real_sp = R36SX_DPMI_RM_STACK_TOP;
+    }
+}
+
+static void r36sx_dpmi_store_real_mode_register_block(uint32_t block_linear)
+{
+    writedw86(block_linear + R36SX_DPMI_RM_REG_EDI, CPU_EDI);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_ESI, CPU_ESI);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_EBP, CPU_EBP);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_EBX, CPU_EBX);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_EDX, CPU_EDX);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_ECX, CPU_ECX);
+    writedw86(block_linear + R36SX_DPMI_RM_REG_EAX, CPU_EAX);
+    writew86(block_linear + R36SX_DPMI_RM_REG_FLAGS, makeflagsword());
+    writew86(block_linear + R36SX_DPMI_RM_REG_ES, CPU_ES);
+    writew86(block_linear + R36SX_DPMI_RM_REG_DS, CPU_DS);
+    writew86(block_linear + R36SX_DPMI_RM_REG_FS, CPU_FS);
+    writew86(block_linear + R36SX_DPMI_RM_REG_GS, CPU_GS);
+    writew86(block_linear + R36SX_DPMI_RM_REG_IP, (uint16_t)CPU_IP);
+    writew86(block_linear + R36SX_DPMI_RM_REG_CS, CPU_CS);
+    writew86(block_linear + R36SX_DPMI_RM_REG_SP, CPU_SP);
+    writew86(block_linear + R36SX_DPMI_RM_REG_SS, CPU_SS);
+}
+
+static void r36sx_dpmi_enter_real_mode_from_snapshot(void)
+{
+    /*
+     * Do not use r36sx_cpu_set_cr0() here: this is a temporary DPMI bridge,
+     * and the protected client's hidden segment caches must be restored
+     * exactly from the saved snapshot after the real-mode handler returns.
+     */
+    r36sx_cr0 = (r36sx_cr0 & ~R36SX_CR0_PE) | R36SX_CR0_ET;
+    r36sx_cpu_interpreter_protected = 0;
+    r36sx_cpu_current_cpl = 0;
+    hltstate = 0;
+    x86_flags.value &= ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
+}
+
+static void r36sx_dpmi_push_copied_stack_words(const uint16_t *words,
+                                               uint16_t count)
+{
+    for (uint16_t i = count; i > 0; i--) {
+        push(words[i - 1u]);
+    }
+}
+
+static uint8_t r36sx_dpmi_bridge_retf_matches(uint16_t adjust)
+{
+    if (!r36sx_dpmi_rm_bridge_active ||
+        r36sx_cpu_protected_enabled() ||
+        CPU_SS != r36sx_dpmi_rm_bridge_return_ss ||
+        r36sx_cpu_stack_pointer_value() != r36sx_dpmi_rm_bridge_return_sp) {
+        return 0;
+    }
+
+    if (r36sx_dpmi_rm_bridge_return == R36SX_DPMI_RM_BRIDGE_RETF) {
+        return 1;
+    }
+
+    /*
+     * INT 31h AX=0302h is documented as IRET-returning, but DPMI explicitly
+     * allows real-mode code to discard the flags word with RETF 2.
+     */
+    return r36sx_dpmi_rm_bridge_return == R36SX_DPMI_RM_BRIDGE_IRET &&
+           adjust == 2u;
+}
+
+static uint8_t r36sx_dpmi_bridge_iret_matches(void)
+{
+    return r36sx_dpmi_rm_bridge_active &&
+           !r36sx_cpu_protected_enabled() &&
+           r36sx_dpmi_rm_bridge_return == R36SX_DPMI_RM_BRIDGE_IRET &&
+           CPU_SS == r36sx_dpmi_rm_bridge_return_ss &&
+           r36sx_cpu_stack_pointer_value() == r36sx_dpmi_rm_bridge_return_sp;
+}
+
+static uint8_t r36sx_dpmi_run_real_mode_bridge(
+    r36sx_dpmi_rm_bridge_return_t return_kind)
+{
+    r36sx_dpmi_rm_bridge_active = 1;
+    r36sx_dpmi_rm_bridge_done = 0;
+    r36sx_dpmi_rm_bridge_return = return_kind;
+
+    uint32_t loops = 0;
+    while (!r36sx_dpmi_rm_bridge_done &&
+           loops < R36SX_DPMI_RM_BRIDGE_MAX_LOOPS) {
+        r36sx_cpu_exec86_real(R36SX_DPMI_RM_BRIDGE_CHUNK_LOOPS);
+        loops += R36SX_DPMI_RM_BRIDGE_CHUNK_LOOPS;
+        if (hltstate) {
+            break;
+        }
+    }
+
+    uint8_t done = r36sx_dpmi_rm_bridge_done;
+    r36sx_dpmi_rm_bridge_active = 0;
+    r36sx_dpmi_rm_bridge_done = 0;
+    r36sx_dpmi_rm_bridge_return = R36SX_DPMI_RM_BRIDGE_NONE;
+    return done;
+}
+
+static void r36sx_dpmi_simulate_real_mode_common(uint16_t call_kind)
+{
+    uint8_t intnum = CPU_BL;
+    uint8_t flags = CPU_BH;
+    uint16_t copy_words = CPU_CX;
+    uint32_t block_linear;
+    uint16_t copied_words[R36SX_DPMI_RM_STACK_COPY_MAX_WORDS];
+
+    if (flags != 0 ||
+        !r36sx_dpmi_rm_register_block_linear(&block_linear) ||
+        !r36sx_dpmi_read_pm_stack_words(copy_words, copied_words)) {
+        return;
+    }
+
+    r36sx_cpu_snapshot_t snapshot;
+    r36sx_cpu_save_snapshot(&snapshot);
+
+    uint16_t target_cs;
+    uint16_t target_ip;
+    uint16_t real_ss;
+    uint16_t real_sp;
+
+    r36sx_dpmi_enter_real_mode_from_snapshot();
+    r36sx_dpmi_load_real_mode_register_block(block_linear, &target_cs,
+                                             &target_ip, &real_ss, &real_sp);
+    r36sx_cpu_load_segment(regss, real_ss);
+    CPU_SP = real_sp;
+    r36sx_dpmi_push_copied_stack_words(copied_words, copy_words);
+    r36sx_cpu_load_segment(regcs, target_cs);
+    r36sx_cpu_set_ip(target_ip);
+
+    uint8_t ok = 0;
+    r36sx_dpmi_rm_bridge_return_t return_kind = R36SX_DPMI_RM_BRIDGE_IRET;
+    if (call_kind == R36SX_DPMI_FUNC_SIMULATE_RM_INTERRUPT) {
+        uint16_t before_ss = CPU_SS;
+        uint32_t before_sp = r36sx_cpu_stack_pointer_value();
+        uint16_t before_cs = CPU_CS;
+        uint32_t before_ip = CPU_IP;
+        intcall86(intnum);
+        if (CPU_SS == before_ss &&
+            r36sx_cpu_stack_pointer_value() == before_sp &&
+            CPU_CS == before_cs &&
+            CPU_IP == before_ip) {
+            /*
+             * Some BIOS services are emulated by C handlers inside intcall86()
+             * and therefore complete without building a real IRET frame.
+             */
+            ok = 1;
+        } else {
+            r36sx_dpmi_rm_bridge_return_ss = CPU_SS;
+            r36sx_dpmi_rm_bridge_return_sp = r36sx_cpu_stack_pointer_value();
+            ok = r36sx_dpmi_run_real_mode_bridge(return_kind);
+        }
+    } else if (call_kind == R36SX_DPMI_FUNC_CALL_RM_RETF) {
+        push(CPU_CS);
+        push((uint16_t)CPU_IP);
+        return_kind = R36SX_DPMI_RM_BRIDGE_RETF;
+        r36sx_dpmi_rm_bridge_return_ss = CPU_SS;
+        r36sx_dpmi_rm_bridge_return_sp = r36sx_cpu_stack_pointer_value();
+        r36sx_cpu_load_segment(regcs, target_cs);
+        r36sx_cpu_set_ip(target_ip);
+        ifl = 0;
+        tf = 0;
+        ok = r36sx_dpmi_run_real_mode_bridge(return_kind);
+    } else {
+        push(makeflagsword());
+        push(CPU_CS);
+        push((uint16_t)CPU_IP);
+        r36sx_dpmi_rm_bridge_return_ss = CPU_SS;
+        r36sx_dpmi_rm_bridge_return_sp = r36sx_cpu_stack_pointer_value();
+        r36sx_cpu_load_segment(regcs, target_cs);
+        r36sx_cpu_set_ip(target_ip);
+        ifl = 0;
+        tf = 0;
+        ok = r36sx_dpmi_run_real_mode_bridge(return_kind);
+    }
+
+    if (ok) {
+        r36sx_dpmi_store_real_mode_register_block(block_linear);
+    }
+
+    r36sx_cpu_restore_snapshot(&snapshot);
+    if (ok) {
+        r36sx_dpmi_succeed();
+    } else {
+        r36sx_dpmi_fail(R36SX_DPMI_INVALID_STATE);
+    }
+}
+
+static uint16_t r36sx_dpmi_reflection_real_segment(uint8_t segid)
+{
+    const r36sx_segment_cache_t *cache = &r36sx_seg_cache[segid];
+
+    if (cache->valid &&
+        cache->base <= 0x000ffff0u &&
+        (cache->base & 0x0fu) == 0) {
+        return (uint16_t)(cache->base >> 4);
+    }
+
+    return 0;
+}
+
+static uint8_t r36sx_dpmi_reflect_real_mode_interrupt(uint8_t intnum)
+{
+    if (!r36sx_dpmi_host_available() || r36sx_dpmi_rm_bridge_active) {
+        return 0;
+    }
+
+    r36sx_cpu_snapshot_t snapshot;
+    r36sx_cpu_save_snapshot(&snapshot);
+
+    r36sx_dpmi_enter_real_mode_from_snapshot();
+    r36sx_cpu_load_segment(regcs, 0);
+    r36sx_cpu_set_ip(0);
+    r36sx_cpu_load_segment(regss, R36SX_DPMI_RM_STACK_SEG);
+    CPU_SP = R36SX_DPMI_RM_STACK_TOP;
+    r36sx_cpu_load_segment(regds,
+        r36sx_dpmi_reflection_real_segment(regds));
+    r36sx_cpu_load_segment(reges,
+        r36sx_dpmi_reflection_real_segment(reges));
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        r36sx_cpu_load_segment(regfs,
+            r36sx_dpmi_reflection_real_segment(regfs));
+        r36sx_cpu_load_segment(reggs,
+            r36sx_dpmi_reflection_real_segment(reggs));
+    }
+
+    uint16_t before_ss = CPU_SS;
+    uint32_t before_sp = r36sx_cpu_stack_pointer_value();
+    uint16_t before_cs = CPU_CS;
+    uint32_t before_ip = CPU_IP;
+    intcall86(intnum);
+
+    uint8_t ok;
+    if (CPU_SS == before_ss &&
+        r36sx_cpu_stack_pointer_value() == before_sp &&
+        CPU_CS == before_cs &&
+        CPU_IP == before_ip) {
+        ok = 1;
+    } else {
+        r36sx_dpmi_rm_bridge_return_ss = CPU_SS;
+        r36sx_dpmi_rm_bridge_return_sp = r36sx_cpu_stack_pointer_value();
+        ok = r36sx_dpmi_run_real_mode_bridge(R36SX_DPMI_RM_BRIDGE_IRET);
+    }
+
+    uint32_t returned_regs[8];
+    uint32_t returned_flags = makeflagsword();
+    if (ok) {
+        memcpy(returned_regs, dwordregs, sizeof(returned_regs));
+    }
+
+    r36sx_cpu_restore_snapshot(&snapshot);
+    if (!ok) {
+        return 0;
+    }
+
+    memcpy(dwordregs, returned_regs, sizeof(returned_regs));
+    x86_flags.value = (x86_flags.value & 0xffff0000u) |
+                      (returned_flags & 0x0000ffffu);
     return 1;
 }
 
@@ -5404,6 +5927,25 @@ static uint8_t r36sx_dpmi_int31_handler(void)
             r36sx_dpmi_set_pm_interrupt_vector();
             return 1;
 
+        case R36SX_DPMI_FUNC_SIMULATE_RM_INTERRUPT:
+        case R36SX_DPMI_FUNC_CALL_RM_RETF:
+        case R36SX_DPMI_FUNC_CALL_RM_IRET:
+            r36sx_dpmi_simulate_real_mode_common(CPU_AX);
+            return 1;
+
+        case R36SX_DPMI_FUNC_ALLOC_RM_CALLBACK:
+        case R36SX_DPMI_FUNC_FREE_RM_CALLBACK:
+        case R36SX_DPMI_FUNC_GET_STATE_SAVE_RESTORE:
+        case R36SX_DPMI_FUNC_GET_RAW_MODE_SWITCH:
+            /*
+             * These services require host-owned callback stubs or raw mode
+             * switch entry points.  Keep them as explicit unsupported services
+             * until the callback/mode-switch stubs exist; callers using the
+             * higher-level 0300h..0302h bridge now have a functional path.
+             */
+            r36sx_dpmi_fail(R36SX_DPMI_UNSUPPORTED_FUNCTION);
+            return 1;
+
         case R36SX_DPMI_FUNC_GET_EXT_EXCEPTION_RM_VECTOR:
             r36sx_dpmi_get_exception_vector(
                 r36sx_dpmi_rm_exception_vectors);
@@ -5916,6 +6458,9 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum)
             return;
         }
         if (r36sx_dpmi_dispatch_pm_interrupt(intnum)) {
+            return;
+        }
+        if (r36sx_dpmi_reflect_real_mode_interrupt(intnum)) {
             return;
         }
         (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1);
@@ -9068,6 +9613,13 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     r36sx_cpu_protected_retf(oper1, 0);
                     break;
                 }
+                if (r36sx_dpmi_bridge_retf_matches(oper1)) {
+                    r36sx_cpu_set_ip(pop());
+                    r36sx_cpu_load_segment(regcs, pop());
+                    r36sx_cpu_adjust_stack(oper1);
+                    r36sx_dpmi_rm_bridge_done = 1;
+                    break;
+                }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
                 r36sx_cpu_adjust_stack(oper1);
@@ -9080,6 +9632,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* CB RETF */
                 if (r36sx_cpu_protected_enabled()) {
                     r36sx_cpu_protected_retf(0, 0);
+                    break;
+                }
+                if (r36sx_dpmi_bridge_retf_matches(0)) {
+                    r36sx_cpu_set_ip(pop());
+                    r36sx_cpu_load_segment(regcs, pop());
+                    r36sx_dpmi_rm_bridge_done = 1;
                     break;
                 }
                 r36sx_cpu_set_ip(pop());
@@ -9127,6 +9685,13 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 }
                 if (r36sx_cpu_protected_enabled()) {
                     r36sx_cpu_protected_iret(0);
+                    break;
+                }
+                if (r36sx_dpmi_bridge_iret_matches()) {
+                    r36sx_cpu_set_ip(pop());
+                    r36sx_cpu_load_segment(regcs, pop());
+                    decodeflagsword(pop());
+                    r36sx_dpmi_rm_bridge_done = 1;
                     break;
                 }
                 r36sx_cpu_set_ip(pop());
@@ -9738,6 +10303,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 break;
         }
 r36sx_opcode_done:
+        if (unlikely(r36sx_dpmi_rm_bridge_done)) {
+            r36sx_app_stats_record_x86(loopcount + 1u);
+            return;
+        }
         if (was_TF) {
             was_TF = false;
             intcall86(1);
