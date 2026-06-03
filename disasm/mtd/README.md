@@ -30,7 +30,6 @@ The same layout is described in `hardware_info/dtb/dtb.dts` under the RTOS
 | File | Purpose |
 | --- | --- |
 | `mtd1_boot.mipsel.disasm` | MIPS32r2 little-endian disassembly of the boot partition. |
-| `mtd1_boot.mipseb.disasm` | Big-endian comparison disassembly; little-endian is the useful one. |
 | `mtd1_boot.mmio_hits.txt` | Compact list of notable MMIO constants found in the little-endian disassembly. |
 | `mtd1_boot.strings.txt` | Raw string extraction from the boot partition. |
 | `mtd2_eromfs.files.txt` | Parsed ROMFS file list. |

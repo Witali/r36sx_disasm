@@ -1,0 +1,52 @@
+PROGRAM	icube
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00400000
+MIN_ADDRESS	00400000
+MAX_ADDRESS	_elfSectionHeaders::000006b7
+
+MEMORY_BLOCKS
+segment_4.1	00400000	00400153	R=true	W=false	X=false
+.interp	00400154	00400160	R=true	W=false	X=false
+.note.ABI-tag	00400164	00400183	R=true	W=false	X=false
+.MIPS.abiflags	00400188	0040019f	R=true	W=false	X=false
+.reginfo	004001a0	004001b7	R=true	W=false	X=false
+.dynamic	004001b8	004002b7	R=true	W=false	X=false
+.hash	004002b8	00400357	R=true	W=false	X=false
+.dynsym	00400358	004004a7	R=true	W=false	X=false
+.dynstr	004004a8	00400570	R=true	W=false	X=false
+.gnu.version	00400572	0040059b	R=true	W=false	X=false
+.gnu.version_r	0040059c	004005cb	R=true	W=false	X=false
+.rel.plt	004005cc	00400643	R=true	W=false	X=false
+.init	00400644	004006af	R=true	W=false	X=true
+.text	004006b0	00400caf	R=true	W=false	X=true
+.fini	00400cb0	00400ceb	R=true	W=false	X=true
+.rodata	00400cec	00400dc3	R=true	W=false	X=false
+.eh_frame	00400dc4	00400dc7	R=true	W=false	X=false
+.plt	00400de0	00400eef	R=true	W=false	X=true
+.ctors	00410ef0	00410ef7	R=true	W=true	X=false
+.dtors	00410ef8	00410eff	R=true	W=true	X=false
+.jcr	00410f00	00410f03	R=true	W=true	X=false
+.got.plt	00410f04	00410f47	R=true	W=false	X=false
+.data	00410f50	00410f6f	R=true	W=true	X=false
+.rld_map	00410f70	00410f73	R=true	W=true	X=false
+.got	00410f80	00410f97	R=true	W=false	X=false
+.sdata	00410f98	00410f9b	R=true	W=true	X=false
+.sbss	00410f9c	00410f9f	R=true	W=true	X=false
+.bss	00410fa0	00410fbf	R=true	W=true	X=false
+EXTERNAL	00411000	0041103f	R=true	W=true	X=false
+.comment	.comment::00000000	.comment::0000003e	R=false	W=false	X=false
+.debug_abbrev	.debug_abbrev::00000000	.debug_abbrev::00000178	R=false	W=false	X=false
+.debug_aranges	.debug_aranges::00000000	.debug_aranges::000000a7	R=false	W=false	X=false
+.debug_frame	.debug_frame::00000000	.debug_frame::0000004f	R=false	W=false	X=false
+.debug_info	.debug_info::00000000	.debug_info::00000259	R=false	W=false	X=false
+.debug_line	.debug_line::00000000	.debug_line::00000221	R=false	W=false	X=false
+.debug_loc	.debug_loc::00000000	.debug_loc::000000cd	R=false	W=false	X=false
+.debug_ranges	.debug_ranges::00000000	.debug_ranges::0000003f	R=false	W=false	X=false
+.debug_str	.debug_str::00000000	.debug_str::000002d5	R=false	W=false	X=false
+.gnu.attributes	.gnu.attributes::00000000	.gnu.attributes::0000000f	R=false	W=false	X=false
+.pdr	.pdr::00000000	.pdr::000000ff	R=false	W=false	X=false
+.shstrtab	.shstrtab::00000000	.shstrtab::00000184	R=false	W=false	X=false
+.strtab	.strtab::00000000	.strtab::000003d2	R=false	W=false	X=false
+.symtab	.symtab::00000000	.symtab::000006ef	R=false	W=false	X=false
+_elfSectionHeaders	_elfSectionHeaders::00000000	_elfSectionHeaders::000006b7	R=false	W=false	X=false

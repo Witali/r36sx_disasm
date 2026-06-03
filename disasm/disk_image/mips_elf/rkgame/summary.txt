@@ -1,0 +1,45 @@
+PROGRAM	rkgame
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00400000
+MIN_ADDRESS	00400000
+MAX_ADDRESS	_elfSectionHeaders::0000059f
+
+MEMORY_BLOCKS
+segment_3.1	00400000	00400153	R=true	W=false	X=false
+.interp	00400154	00400160	R=true	W=false	X=false
+.note.ABI-tag	00400164	00400183	R=true	W=false	X=false
+.MIPS.abiflags	00400188	0040019f	R=true	W=false	X=false
+.dynamic	004001a0	00400317	R=true	W=false	X=false
+.hash	00400318	00401593	R=true	W=false	X=false
+.dynsym	00401594	00403ed3	R=true	W=false	X=false
+.dynstr	00403ed4	00405f62	R=true	W=false	X=false
+.gnu.version	00405f64	0040648b	R=true	W=false	X=false
+.gnu.version_r	0040648c	0040657b	R=true	W=false	X=false
+.rel.dyn	0040657c	00406593	R=true	W=false	X=false
+.rel.plt	00406594	0040682b	R=true	W=false	X=false
+.init	0040682c	00406897	R=true	W=false	X=true
+.text	004068a0	004edbaf	R=true	W=false	X=true
+.MIPS.stubs	004edbb0	004edfff	R=true	W=false	X=true
+.fini	004ee000	004ee03b	R=true	W=false	X=true
+.rodata	004ee040	0050d5ff	R=true	W=false	X=false
+.eh_frame_hdr	0050d600	0050fa7b	R=true	W=false	X=false
+.eh_frame	0050fa7c	00519e7b	R=true	W=false	X=false
+.plt	00519e80	0051a3cf	R=true	W=false	X=true
+.fini_array	0052a3d0	0052a3d3	R=true	W=true	X=false
+.ctors	0052a3d4	0052a3db	R=true	W=true	X=false
+.dtors	0052a3dc	0052a3e3	R=true	W=true	X=false
+.jcr	0052a3e4	0052a3e7	R=true	W=true	X=false
+.data.rel.ro	0052a3e8	0052ac77	R=true	W=true	X=false
+.got.plt	0052ac78	0052adcb	R=true	W=false	X=false
+.data	0052add0	0052e9df	R=true	W=true	X=false
+.rld_map	0052e9e0	0052e9e3	R=true	W=true	X=false
+.got	0052e9f0	0052f53b	R=true	W=false	X=false
+.sdata	0052f53c	0052f53f	R=true	W=true	X=false
+.sbss	0052f540	0052f8db	R=true	W=true	X=false
+.bss	0052f8e0	0121df23	R=true	W=true	X=false
+EXTERNAL	0121e000	0121e167	R=true	W=true	X=false
+.comment	.comment::00000000	.comment::0000003e	R=false	W=false	X=false
+.gnu.attributes	.gnu.attributes::00000000	.gnu.attributes::0000000f	R=false	W=false	X=false
+.shstrtab	.shstrtab::00000000	.shstrtab::0000013c	R=false	W=false	X=false
+_elfSectionHeaders	_elfSectionHeaders::00000000	_elfSectionHeaders::0000059f	R=false	W=false	X=false

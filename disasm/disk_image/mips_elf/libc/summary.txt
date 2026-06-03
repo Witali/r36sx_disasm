@@ -1,0 +1,76 @@
+PROGRAM	libc.so.6
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00010000
+MIN_ADDRESS	00010000
+MAX_ADDRESS	_elfSectionHeaders::00000a77
+
+MEMORY_BLOCKS
+segment_4.1	00010000	000101b7	R=true	W=false	X=false
+.MIPS.abiflags	000101b8	000101cf	R=true	W=false	X=false
+.reginfo	000101d0	000101e7	R=true	W=false	X=false
+.dynamic	000101e8	000102f7	R=true	W=false	X=false
+.note.ABI-tag	000102f8	00010317	R=true	W=false	X=false
+.hash	00010318	0001372f	R=true	W=false	X=false
+.dynsym	00013730	0001c77f	R=true	W=false	X=false
+.dynstr	0001c780	0002221b	R=true	W=false	X=false
+.gnu.version	0002221c	00023425	R=true	W=false	X=false
+.gnu.version_d	00023428	00023847	R=true	W=false	X=false
+.gnu.version_r	00023848	00023877	R=true	W=false	X=false
+.rel.dyn	00023878	0002604f	R=true	W=false	X=false
+segment_4.14	00026050	0002868f	R=true	W=false	X=false
+.text	00028690	0014af8f	R=true	W=false	X=true
+.MIPS.stubs	0014af90	0014afbf	R=true	W=false	X=true
+__libc_freeres_fn	0014afc0	0014c4f3	R=true	W=false	X=true
+__libc_thread_freeres_fn	0014c4f4	0014c7e3	R=true	W=false	X=true
+.rodata	0014c7f0	00168bb7	R=true	W=false	X=false
+.interp	00168bb8	00168bc7	R=true	W=false	X=false
+.eh_frame_hdr	00168bc8	0016adab	R=true	W=false	X=false
+.eh_frame	0016adac	0017518f	R=true	W=false	X=false
+.gcc_except_table	00186098	0018653b	R=true	W=false	X=false
+.tdata	0018653c	00186543	R=true	W=false	X=false
+.init_array	00186544	00186547	R=true	W=false	X=false
+__libc_subfreeres	00186548	001865c3	R=true	W=false	X=false
+__libc_atexit	001865c4	001865c7	R=true	W=false	X=false
+__libc_thread_subfreeres	001865c8	001865d7	R=true	W=false	X=false
+.data.rel.ro	001865d8	00188fff	R=true	W=false	X=false
+.data	00189000	00189e3f	R=true	W=true	X=false
+.got	00189e40	0018b1e7	R=true	W=false	X=false
+.sbss	0018b1e8	0018b30b	R=true	W=true	X=false
+.bss	0018b310	0018deff	R=true	W=true	X=false
+EXTERNAL	0018e000	0018e017	R=true	W=true	X=false
+.gnu.attributes	.gnu.attributes::00000000	.gnu.attributes::0000000f	R=false	W=false	X=false
+.gnu.warning.__gets_chk	.gnu.warning.__gets_chk::00000000	.gnu.warning.__gets_chk::0000003b	R=false	W=false	X=false
+.gnu.warning.chflags	.gnu.warning.chflags::00000000	.gnu.warning.chflags::0000002f	R=false	W=false	X=false
+.gnu.warning.fattach	.gnu.warning.fattach::00000000	.gnu.warning.fattach::0000002f	R=false	W=false	X=false
+.gnu.warning.fchflags	.gnu.warning.fchflags::00000000	.gnu.warning.fchflags::00000033	R=false	W=false	X=false
+.gnu.warning.fdetach	.gnu.warning.fdetach::00000000	.gnu.warning.fdetach::0000002f	R=false	W=false	X=false
+.gnu.warning.getpw	.gnu.warning.getpw::00000000	.gnu.warning.getpw::0000003b	R=false	W=false	X=false
+.gnu.warning.gets	.gnu.warning.gets::00000000	.gnu.warning.gets::0000003b	R=false	W=false	X=false
+.gnu.warning.getwd	.gnu.warning.getwd::00000000	.gnu.warning.getwd::00000077	R=false	W=false	X=false
+.gnu.warning.gtty	.gnu.warning.gtty::00000000	.gnu.warning.gtty::0000002f	R=false	W=false	X=false
+.gnu.warning.inet6_option_alloc	.gnu.warning.inet6_option_alloc::00000000	.gnu.warning.inet6_option_alloc::0000003b	R=false	W=false	X=false
+.gnu.warning.inet6_option_append	.gnu.warning.inet6_option_append::00000000	.gnu.warning.inet6_option_append::0000003f	R=false	W=false	X=false
+.gnu.warning.inet6_option_find	.gnu.warning.inet6_option_find::00000000	.gnu.warning.inet6_option_find::0000003b	R=false	W=false	X=false
+.gnu.warning.inet6_option_init	.gnu.warning.inet6_option_init::00000000	.gnu.warning.inet6_option_init::0000003b	R=false	W=false	X=false
+.gnu.warning.inet6_option_next	.gnu.warning.inet6_option_next::00000000	.gnu.warning.inet6_option_next::0000003b	R=false	W=false	X=false
+.gnu.warning.inet6_option_space	.gnu.warning.inet6_option_space::00000000	.gnu.warning.inet6_option_space::0000003b	R=false	W=false	X=false
+.gnu.warning.lchmod	.gnu.warning.lchmod::00000000	.gnu.warning.lchmod::0000002f	R=false	W=false	X=false
+.gnu.warning.llseek	.gnu.warning.llseek::00000000	.gnu.warning.llseek::0000003f	R=false	W=false	X=false
+.gnu.warning.mktemp	.gnu.warning.mktemp::00000000	.gnu.warning.mktemp::00000037	R=false	W=false	X=false
+.gnu.warning.re_max_failures	.gnu.warning.re_max_failures::00000000	.gnu.warning.re_max_failures::0000003f	R=false	W=false	X=false
+.gnu.warning.revoke	.gnu.warning.revoke::00000000	.gnu.warning.revoke::0000002f	R=false	W=false	X=false
+.gnu.warning.setlogin	.gnu.warning.setlogin::00000000	.gnu.warning.setlogin::00000033	R=false	W=false	X=false
+.gnu.warning.siggetmask	.gnu.warning.siggetmask::00000000	.gnu.warning.siggetmask::0000003b	R=false	W=false	X=false
+.gnu.warning.sigreturn	.gnu.warning.sigreturn::00000000	.gnu.warning.sigreturn::00000033	R=false	W=false	X=false
+.gnu.warning.sigstack	.gnu.warning.sigstack::00000000	.gnu.warning.sigstack::0000004f	R=false	W=false	X=false
+.gnu.warning.sstk	.gnu.warning.sstk::00000000	.gnu.warning.sstk::0000002f	R=false	W=false	X=false
+.gnu.warning.stty	.gnu.warning.stty::00000000	.gnu.warning.stty::0000002f	R=false	W=false	X=false
+.gnu.warning.sys_errlist	.gnu.warning.sys_errlist::00000000	.gnu.warning.sys_errlist::00000043	R=false	W=false	X=false
+.gnu.warning.sys_nerr	.gnu.warning.sys_nerr::00000000	.gnu.warning.sys_nerr::00000043	R=false	W=false	X=false
+.gnu.warning.tempnam	.gnu.warning.tempnam::00000000	.gnu.warning.tempnam::00000037	R=false	W=false	X=false
+.gnu.warning.tmpnam	.gnu.warning.tmpnam::00000000	.gnu.warning.tmpnam::00000037	R=false	W=false	X=false
+.gnu.warning.tmpnam_r	.gnu.warning.tmpnam_r::00000000	.gnu.warning.tmpnam_r::0000003b	R=false	W=false	X=false
+.pdr	.pdr::00000000	.pdr::0001681f	R=false	W=false	X=false
+.shstrtab	.shstrtab::00000000	.shstrtab::00000461	R=false	W=false	X=false
+_elfSectionHeaders	_elfSectionHeaders::00000000	_elfSectionHeaders::00000a77	R=false	W=false	X=false

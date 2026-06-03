@@ -1,0 +1,43 @@
+PROGRAM	hcprojector
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00400000
+MIN_ADDRESS	00400000
+MAX_ADDRESS	_elfSectionHeaders::0000054f
+
+MEMORY_BLOCKS
+segment_4.1	00400000	00400173	R=true	W=false	X=false
+.interp	00400174	00400180	R=true	W=false	X=false
+.note.ABI-tag	00400184	004001a3	R=true	W=false	X=false
+.MIPS.abiflags	004001a8	004001bf	R=true	W=false	X=false
+.reginfo	004001c0	004001d7	R=true	W=false	X=false
+.dynamic	004001d8	0040034f	R=true	W=false	X=false
+.hash	00400350	00400e0f	R=true	W=false	X=false
+.dynsym	00400e10	0040287f	R=true	W=false	X=false
+.dynstr	00402880	004045aa	R=true	W=false	X=false
+.gnu.version	004045ac	004048f9	R=true	W=false	X=false
+.gnu.version_r	004048fc	004049ab	R=true	W=false	X=false
+.rel.dyn	004049ac	00404a33	R=true	W=false	X=false
+.rel.plt	00404a34	00405663	R=true	W=false	X=false
+.init	00405664	004056cf	R=true	W=false	X=true
+.text	004056d0	0044eeef	R=true	W=false	X=true
+.fini	0044eef0	0044ef2b	R=true	W=false	X=true
+.rodata	0044ef40	011d7bdf	R=true	W=false	X=false
+.eh_frame_hdr	011d7be0	011d7bf3	R=true	W=false	X=false
+.eh_frame	011d7bf4	011d7c1f	R=true	W=false	X=false
+.plt	011d7c20	011d949f	R=true	W=false	X=true
+.ctors	011e94a0	011e94a7	R=true	W=true	X=false
+.dtors	011e94a8	011e94af	R=true	W=true	X=false
+.jcr	011e94b0	011e94b3	R=true	W=true	X=false
+.got.plt	011e94b4	011e9ad3	R=true	W=false	X=false
+.data	011e9ae0	0121677f	R=true	W=true	X=false
+.rld_map	01216780	01216783	R=true	W=true	X=false
+.got	01216790	012167ab	R=true	W=false	X=false
+.sdata	012167ac	012167af	R=true	W=true	X=false
+.sbss	012167b0	0121684f	R=true	W=true	X=false
+.bss	01216850	0121edfb	R=true	W=true	X=false
+EXTERNAL	0121f000	0121f617	R=true	W=true	X=false
+.gnu.attributes	.gnu.attributes::00000000	.gnu.attributes::0000000f	R=false	W=false	X=false
+.pdr	.pdr::00000000	.pdr::0000725f	R=false	W=false	X=false
+.shstrtab	.shstrtab::00000000	.shstrtab::0000011c	R=false	W=false	X=false
+_elfSectionHeaders	_elfSectionHeaders::00000000	_elfSectionHeaders::0000054f	R=false	W=false	X=false

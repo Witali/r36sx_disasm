@@ -1,0 +1,16 @@
+PROGRAM	chkdsk.exe
+LANGUAGE	x86:LE:64:default
+COMPILER	windows
+IMAGE_BASE	140000000
+MIN_ADDRESS	140000000
+MAX_ADDRESS	ff0000184f
+
+MEMORY_BLOCKS
+Headers	140000000	140000fff	R=true	W=false	X=false
+.text	140001000	140004fff	R=true	W=false	X=true
+.rdata	140005000	140007fff	R=true	W=false	X=false
+.data	140008000	140008fff	R=true	W=true	X=false
+.pdata	140009000	140009fff	R=true	W=false	X=false
+.rsrc	14000a000	14000afff	R=true	W=false	X=false
+.reloc	14000b000	14000bfff	R=true	W=false	X=false
+tdb	ff00000000	ff0000184f	R=true	W=true	X=false

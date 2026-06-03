@@ -1,0 +1,551 @@
+
+### FUNCTION _init @ 00400644
+00400644:	02 00 1c 3c	lui gp,0x2
+00400648:	2c 89 9c 27	addiu gp,gp,-0x76d4
+0040064c:	21 e0 99 03	addu gp,gp,t9
+00400650:	e0 ff bd 27	addiu sp,sp,-0x20
+00400654:	10 00 bc af	sw gp,0x10(sp)
+00400658:	1c 00 bf af	sw ra,0x1c(sp)
+0040065c:	24 80 82 8f	lw v0,-0x7fdc(gp)
+00400660:	04 00 40 10	beq v0,zero,0x00400674
+00400664:	00 00 00 00	_nop
+00400668:	24 80 99 8f	lw t9,-0x7fdc(gp)
+0040066c:	09 f8 20 03	jalr t9
+00400670:	00 00 00 00	_nop
+00400674:	01 00 11 04	bal 0x0040067c
+00400678:	00 00 00 00	_nop
+0040067c:	40 00 19 3c	lui t9,0x40
+00400680:	a4 09 39 27	addiu t9,t9,0x9a4
+00400684:	09 f8 20 03	jalr t9
+00400688:	00 00 00 00	_nop
+0040068c:	01 00 11 04	bal 0x00400694
+00400690:	00 00 00 00	_nop
+00400694:	40 00 19 3c	lui t9,0x40
+00400698:	50 0c 39 27	addiu t9,t9,0xc50
+0040069c:	09 f8 20 03	jalr t9
+004006a0:	00 00 00 00	_nop
+004006a4:	1c 00 bf 8f	lw ra,0x1c(sp)
+004006a8:	08 00 e0 03	jr ra
+004006ac:	20 00 bd 27	_addiu sp,sp,0x20
+
+### FUNCTION main @ 004006b0
+004006b0:	d0 ff bd 27	addiu sp,sp,-0x30
+004006b4:	40 00 04 3c	lui a0,0x40
+004006b8:	24 00 b2 af	sw s2,0x24(sp)
+004006bc:	41 00 12 3c	lui s2,0x41
+004006c0:	2c 00 bf af	sw ra,0x2c(sp)
+004006c4:	7c 0d 84 24	addiu a0,a0,0xd7c
+004006c8:	1c 00 b0 af	sw s0,0x1c(sp)
+004006cc:	20 00 b1 af	sw s1,0x20(sp)
+004006d0:	fe ff 11 24	li s1,-0x2
+004006d4:	a0 03 10 0c	jal 0x00400e80
+004006d8:	28 00 b3 af	_sw s3,0x28(sp)
+004006dc:	7c 02 10 0c	jal 0x004009f0
+004006e0:	00 00 00 00	_nop
+004006e4:	ff ff 02 24	li v0,-0x1
+004006e8:	b0 0f 50 8e	lw s0,0xfb0(s2)
+004006ec:	64 00 06 24	li a2,0x64
+004006f0:	25 28 00 00	or a1,zero,zero
+004006f4:	58 01 04 26	addiu a0,s0,0x158
+004006f8:	08 00 02 ae	sw v0,0x8(s0)
+004006fc:	24 01 11 ae	sw s1,0x124(s0)
+00400700:	28 01 11 ae	sw s1,0x128(s0)
+00400704:	2c 01 11 ae	sw s1,0x12c(s0)
+00400708:	30 01 11 ae	sw s1,0x130(s0)
+0040070c:	34 01 11 ae	sw s1,0x134(s0)
+00400710:	38 01 11 ae	sw s1,0x138(s0)
+00400714:	3c 01 11 ae	sw s1,0x13c(s0)
+00400718:	40 01 11 ae	sw s1,0x140(s0)
+0040071c:	44 01 11 ae	sw s1,0x144(s0)
+00400720:	48 01 11 ae	sw s1,0x148(s0)
+00400724:	4c 01 11 ae	sw s1,0x14c(s0)
+00400728:	50 01 11 ae	sw s1,0x150(s0)
+0040072c:	ac 03 10 0c	jal 0x00400eb0
+00400730:	54 01 11 ae	_sw s1,0x154(s0)
+00400734:	bc 01 11 ae	sw s1,0x1bc(s0)
+00400738:	b8 03 10 0c	jal 0x00400ee0
+0040073c:	c0 01 11 ae	_sw s1,0x1c0(s0)
+00400740:	32 00 40 04	bltz v0,0x0040080c
+00400744:	40 00 04 3c	_lui a0,0x40
+00400748:	1f 00 40 10	beq v0,zero,0x004007c8
+0040074c:	40 00 05 3c	_lui a1,0x40
+00400750:	06 00 04 24	li a0,0x6
+00400754:	40 00 11 3c	lui s1,0x40
+00400758:	88 03 10 0c	jal 0x00400e20
+0040075c:	40 00 13 3c	_lui s3,0x40
+00400760:	25 80 00 00	or s0,zero,zero
+00400764:	b4 0d 31 26	addiu s1,s1,0xdb4
+00400768:	03 00 00 10	b 0x00400778
+0040076c:	88 0d 73 26	_addiu s3,s3,0xd88
+00400770:	88 03 10 0c	jal 0x00400e20
+00400774:	01 00 04 24	_li a0,0x1
+00400778:	b0 0f 43 8e	lw v1,0xfb0(s2)
+0040077c:	25 20 20 02	or a0,s1,zero
+00400780:	04 00 62 8c	lw v0,0x4(v1)
+00400784:	03 00 02 12	beq s0,v0,0x00400794
+00400788:	00 00 60 ac	_sw zero,0x0(v1)
+0040078c:	f8 ff 40 14	bne v0,zero,0x00400770
+00400790:	25 80 40 00	_or s0,v0,zero
+00400794:	a4 03 10 0c	jal 0x00400e90
+00400798:	00 00 00 00	_nop
+0040079c:	b8 03 10 0c	jal 0x00400ee0
+004007a0:	00 00 00 00	_nop
+004007a4:	15 00 40 04	bltz v0,0x004007fc
+004007a8:	00 00 00 00	_nop
+004007ac:	06 00 40 10	beq v0,zero,0x004007c8
+004007b0:	40 00 05 3c	_lui a1,0x40
+004007b4:	06 00 04 24	li a0,0x6
+004007b8:	88 03 10 0c	jal 0x00400e20
+004007bc:	25 80 00 00	_or s0,zero,zero
+004007c0:	eb ff 00 10	b 0x00400770
+004007c4:	00 00 00 00	_nop
+004007c8:	40 00 04 3c	lui a0,0x40
+004007cc:	25 30 00 00	or a2,zero,zero
+004007d0:	bc 0d a5 24	addiu a1,a1,0xdbc
+004007d4:	b0 03 10 0c	jal 0x00400ec0
+004007d8:	98 0d 84 24	_addiu a0,a0,0xd98
+004007dc:	25 10 00 00	or v0,zero,zero
+004007e0:	1c 00 b0 8f	lw s0,0x1c(sp)
+004007e4:	20 00 b1 8f	lw s1,0x20(sp)
+004007e8:	24 00 b2 8f	lw s2,0x24(sp)
+004007ec:	28 00 b3 8f	lw s3,0x28(sp)
+004007f0:	2c 00 bf 8f	lw ra,0x2c(sp)
+004007f4:	08 00 e0 03	jr ra
+004007f8:	30 00 bd 27	_addiu sp,sp,0x30
+004007fc:	94 03 10 0c	jal 0x00400e50
+00400800:	25 20 60 02	_or a0,s3,zero
+00400804:	ec ff 00 10	b 0x004007b8
+00400808:	06 00 04 24	_li a0,0x6
+0040080c:	94 03 10 0c	jal 0x00400e50
+00400810:	88 0d 84 24	_addiu a0,a0,0xd88
+00400814:	cf ff 00 10	b 0x00400754
+00400818:	06 00 04 24	_li a0,0x6
+
+### FUNCTION __start @ 00400820
+00400820:	42 00 1c 3c	lui gp,0x42
+00400824:	70 8f 9c 27	addiu gp,gp,-0x7090
+00400828:	25 f8 00 00	or ra,zero,zero
+0040082c:	40 00 04 3c	lui a0,0x40
+00400830:	b0 06 84 24	addiu a0,a0,0x6b0
+00400834:	00 00 a5 8f	lw a1,0x0(sp)
+00400838:	04 00 a6 27	addiu a2,sp,0x4
+0040083c:	f8 ff 01 24	li at,-0x8
+00400840:	24 e8 a1 03	and sp,sp,at
+00400844:	e0 ff bd 27	addiu sp,sp,-0x20
+00400848:	40 00 07 3c	lui a3,0x40
+0040084c:	a0 0b e7 24	addiu a3,a3,0xba0
+00400850:	40 00 08 3c	lui t0,0x40
+00400854:	44 0c 08 25	addiu t0,t0,0xc44
+00400858:	10 00 a8 af	sw t0,0x10(sp)
+0040085c:	14 00 a2 af	sw v0,0x14(sp)
+00400860:	a8 03 10 0c	jal 0x00400ea0
+00400864:	18 00 bd af	_sw sp,0x18(sp)
+00400868:	ff ff 00 10	b 0x00400868
+0040086c:	00 00 00 00	_nop
+
+### FUNCTION deregister_tm_clones @ 00400870
+00400870:	41 00 04 3c	lui a0,0x41
+00400874:	41 00 02 3c	lui v0,0x41
+00400878:	74 0f 84 24	addiu a0,a0,0xf74
+0040087c:	77 0f 42 24	addiu v0,v0,0xf77
+00400880:	23 10 44 00	subu v0,v0,a0
+00400884:	07 00 42 2c	sltiu v0,v0,0x7
+00400888:	06 00 40 14	bne v0,zero,0x004008a4
+0040088c:	00 00 19 3c	_lui t9,0x0
+00400890:	00 00 39 27	addiu t9,t9,0x0
+00400894:	03 00 20 13	beq t9,zero,0x004008a4
+00400898:	00 00 00 00	_nop
+0040089c:	08 00 20 03	jr t9
+004008a0:	00 00 00 00	_nop
+004008a4:	08 00 e0 03	jr ra
+004008a8:	00 00 00 00	_nop
+
+### FUNCTION register_tm_clones @ 004008ac
+004008ac:	41 00 04 3c	lui a0,0x41
+004008b0:	41 00 05 3c	lui a1,0x41
+004008b4:	74 0f 84 24	addiu a0,a0,0xf74
+004008b8:	74 0f a5 24	addiu a1,a1,0xf74
+004008bc:	23 28 a4 00	subu a1,a1,a0
+004008c0:	83 28 05 00	sra a1,a1,0x2
+004008c4:	c2 17 05 00	srl v0,a1,0x1f
+004008c8:	21 28 45 00	addu a1,v0,a1
+004008cc:	43 28 05 00	sra a1,a1,0x1
+004008d0:	06 00 a0 10	beq a1,zero,0x004008ec
+004008d4:	00 00 19 3c	_lui t9,0x0
+004008d8:	00 00 39 27	addiu t9,t9,0x0
+004008dc:	03 00 20 13	beq t9,zero,0x004008ec
+004008e0:	00 00 00 00	_nop
+004008e4:	08 00 20 03	jr t9
+004008e8:	00 00 00 00	_nop
+004008ec:	08 00 e0 03	jr ra
+004008f0:	00 00 00 00	_nop
+
+### FUNCTION __do_global_dtors_aux @ 004008f4
+004008f4:	d0 ff bd 27	addiu sp,sp,-0x30
+004008f8:	28 00 b3 af	sw s3,0x28(sp)
+004008fc:	41 00 13 3c	lui s3,0x41
+00400900:	1c 00 b0 af	sw s0,0x1c(sp)
+00400904:	20 00 b1 af	sw s1,0x20(sp)
+00400908:	24 00 b2 af	sw s2,0x24(sp)
+0040090c:	2c 00 bf af	sw ra,0x2c(sp)
+00400910:	a0 0f 62 92	lbu v0,0xfa0(s3)
+00400914:	1c 00 40 14	bne v0,zero,0x00400988
+00400918:	41 00 11 3c	_lui s1,0x41
+0040091c:	41 00 10 3c	lui s0,0x41
+00400920:	f8 0e 22 26	addiu v0,s1,0xef8
+00400924:	41 00 11 3c	lui s1,0x41
+00400928:	fc 0e 31 26	addiu s1,s1,0xefc
+0040092c:	23 88 22 02	subu s1,s1,v0
+00400930:	41 00 02 3c	lui v0,0x41
+00400934:	83 88 11 00	sra s1,s1,0x2
+00400938:	f8 0e 52 24	addiu s2,v0,0xef8
+0040093c:	a4 0f 02 8e	lw v0,0xfa4(s0)
+00400940:	ff ff 31 26	addiu s1,s1,-0x1
+00400944:	2b 18 51 00	sltu v1,v0,s1
+00400948:	0b 00 60 10	beq v1,zero,0x00400978
+0040094c:	01 00 42 24	_addiu v0,v0,0x1
+00400950:	80 18 02 00	sll v1,v0,0x2
+00400954:	a4 0f 02 ae	sw v0,0xfa4(s0)
+00400958:	21 10 43 02	addu v0,s2,v1
+0040095c:	00 00 59 8c	lw t9,0x0(v0)
+00400960:	09 f8 20 03	jalr t9
+00400964:	00 00 00 00	_nop
+00400968:	a4 0f 02 8e	lw v0,0xfa4(s0)
+0040096c:	2b 18 51 00	sltu v1,v0,s1
+00400970:	f7 ff 60 14	bne v1,zero,0x00400950
+00400974:	01 00 42 24	_addiu v0,v0,0x1
+00400978:	1c 02 10 0c	jal 0x00400870
+0040097c:	00 00 00 00	_nop
+00400980:	01 00 02 24	li v0,0x1
+00400984:	a0 0f 62 a2	sb v0,0xfa0(s3)
+00400988:	1c 00 b0 8f	lw s0,0x1c(sp)
+0040098c:	20 00 b1 8f	lw s1,0x20(sp)
+00400990:	24 00 b2 8f	lw s2,0x24(sp)
+00400994:	28 00 b3 8f	lw s3,0x28(sp)
+00400998:	2c 00 bf 8f	lw ra,0x2c(sp)
+0040099c:	08 00 e0 03	jr ra
+004009a0:	30 00 bd 27	_addiu sp,sp,0x30
+
+### FUNCTION frame_dummy @ 004009a4
+004009a4:	41 00 02 3c	lui v0,0x41
+004009a8:	00 0f 44 24	addiu a0,v0,0xf00
+004009ac:	00 00 82 8c	lw v0,0x0(a0)
+004009b0:	03 00 40 14	bne v0,zero,0x004009c0
+004009b4:	00 00 19 3c	_lui t9,0x0
+004009b8:	2b 02 10 08	j 0x004008ac
+004009bc:	00 00 00 00	_nop
+004009c0:	00 00 39 27	addiu t9,t9,0x0
+004009c4:	fc ff 20 13	beq t9,zero,0x004009b8
+004009c8:	00 00 00 00	_nop
+004009cc:	e0 ff bd 27	addiu sp,sp,-0x20
+004009d0:	1c 00 bf af	sw ra,0x1c(sp)
+004009d4:	09 f8 20 03	jalr t9
+004009d8:	00 00 00 00	_nop
+004009dc:	1c 00 bf 8f	lw ra,0x1c(sp)
+004009e0:	2b 02 10 08	j 0x004008ac
+004009e4:	20 00 bd 27	_addiu sp,sp,0x20
+
+### FUNCTION ShareMemCreat @ 004009f0
+004009f0:	e0 ff bd 27	addiu sp,sp,-0x20
+004009f4:	b6 03 06 24	li a2,0x3b6
+004009f8:	18 00 b0 af	sw s0,0x18(sp)
+004009fc:	c4 01 05 24	li a1,0x1c4
+00400a00:	1c 00 bf af	sw ra,0x1c(sp)
+00400a04:	d2 04 04 24	li a0,0x4d2
+00400a08:	84 03 10 0c	jal 0x00400e10
+00400a0c:	ff ff 10 24	_li s0,-0x1
+00400a10:	41 00 03 3c	lui v1,0x41
+00400a14:	0f 00 50 10	beq v0,s0,0x00400a54
+00400a18:	9c 0f 62 ac	_sw v0,0xf9c(v1)
+00400a1c:	25 30 00 00	or a2,zero,zero
+00400a20:	25 28 00 00	or a1,zero,zero
+00400a24:	90 03 10 0c	jal 0x00400e40
+00400a28:	25 20 40 00	_or a0,v0,zero
+00400a2c:	41 00 03 3c	lui v1,0x41
+00400a30:	10 00 50 10	beq v0,s0,0x00400a74
+00400a34:	b0 0f 62 ac	_sw v0,0xfb0(v1)
+00400a38:	40 00 04 3c	lui a0,0x40
+00400a3c:	18 00 b0 8f	lw s0,0x18(sp)
+00400a40:	1c 00 bf 8f	lw ra,0x1c(sp)
+00400a44:	25 28 40 00	or a1,v0,zero
+00400a48:	10 0d 84 24	addiu a0,a0,0xd10
+00400a4c:	80 03 10 08	j 0x00400e00
+00400a50:	20 00 bd 27	_addiu sp,sp,0x20
+00400a54:	40 00 04 3c	lui a0,0x40
+00400a58:	a0 03 10 0c	jal 0x00400e80
+00400a5c:	f0 0c 84 24	_addiu a0,a0,0xcf0
+00400a60:	ff ff 02 24	li v0,-0x1
+00400a64:	18 00 b0 8f	lw s0,0x18(sp)
+00400a68:	1c 00 bf 8f	lw ra,0x1c(sp)
+00400a6c:	08 00 e0 03	jr ra
+00400a70:	20 00 bd 27	_addiu sp,sp,0x20
+00400a74:	40 00 04 3c	lui a0,0x40
+00400a78:	a0 03 10 0c	jal 0x00400e80
+00400a7c:	00 0d 84 24	_addiu a0,a0,0xd00
+00400a80:	ff ff 02 24	li v0,-0x1
+00400a84:	18 00 b0 8f	lw s0,0x18(sp)
+00400a88:	1c 00 bf 8f	lw ra,0x1c(sp)
+00400a8c:	08 00 e0 03	jr ra
+00400a90:	20 00 bd 27	_addiu sp,sp,0x20
+
+### FUNCTION ShareMemClose @ 00400a94
+00400a94:	d8 ff bd 27	addiu sp,sp,-0x28
+00400a98:	41 00 02 3c	lui v0,0x41
+00400a9c:	20 00 b1 af	sw s1,0x20(sp)
+00400aa0:	ff ff 11 24	li s1,-0x1
+00400aa4:	1c 00 b0 af	sw s0,0x1c(sp)
+00400aa8:	24 00 bf af	sw ra,0x24(sp)
+00400aac:	b4 03 10 0c	jal 0x00400ed0
+00400ab0:	b0 0f 44 8c	_lw a0,0xfb0(v0)
+00400ab4:	0e 00 51 10	beq v0,s1,0x00400af0
+00400ab8:	25 30 00 00	_or a2,zero,zero
+00400abc:	41 00 02 3c	lui v0,0x41
+00400ac0:	25 28 00 00	or a1,zero,zero
+00400ac4:	9c 03 10 0c	jal 0x00400e70
+00400ac8:	9c 0f 44 8c	_lw a0,0xf9c(v0)
+00400acc:	0e 00 51 10	beq v0,s1,0x00400b08
+00400ad0:	25 80 40 00	_or s0,v0,zero
+00400ad4:	25 80 00 00	or s0,zero,zero
+00400ad8:	25 10 00 02	or v0,s0,zero
+00400adc:	20 00 b1 8f	lw s1,0x20(sp)
+00400ae0:	1c 00 b0 8f	lw s0,0x1c(sp)
+00400ae4:	24 00 bf 8f	lw ra,0x24(sp)
+00400ae8:	08 00 e0 03	jr ra
+00400aec:	28 00 bd 27	_addiu sp,sp,0x28
+00400af0:	40 00 04 3c	lui a0,0x40
+00400af4:	25 80 40 00	or s0,v0,zero
+00400af8:	a0 03 10 0c	jal 0x00400e80
+00400afc:	28 0d 84 24	_addiu a0,a0,0xd28
+00400b00:	f6 ff 00 10	b 0x00400adc
+00400b04:	25 10 00 02	_or v0,s0,zero
+00400b08:	40 00 04 3c	lui a0,0x40
+00400b0c:	a0 03 10 0c	jal 0x00400e80
+00400b10:	38 0d 84 24	_addiu a0,a0,0xd38
+00400b14:	f1 ff 00 10	b 0x00400adc
+00400b18:	25 10 00 02	_or v0,s0,zero
+
+### FUNCTION get_old_file_time @ 00400b1c
+00400b1c:	41 00 02 3c	lui v0,0x41
+00400b20:	b0 0f 43 8c	lw v1,0xfb0(v0)
+00400b24:	04 00 62 8c	lw v0,0x4(v1)
+00400b28:	08 00 e0 03	jr ra
+00400b2c:	00 00 60 ac	_sw zero,0x0(v1)
+
+### FUNCTION wait4children @ 00400b30
+00400b30:	d8 ff bd 27	addiu sp,sp,-0x28
+00400b34:	24 00 bf af	sw ra,0x24(sp)
+00400b38:	8c 03 10 0c	jal 0x00400e30
+00400b3c:	18 00 a4 27	_addiu a0,sp,0x18
+00400b40:	24 00 bf 8f	lw ra,0x24(sp)
+00400b44:	08 00 e0 03	jr ra
+00400b48:	28 00 bd 27	_addiu sp,sp,0x28
+
+### FUNCTION read_childproc @ 00400b4c
+00400b4c:	d8 ff bd 27	addiu sp,sp,-0x28
+00400b50:	01 00 06 24	li a2,0x1
+00400b54:	24 00 bf af	sw ra,0x24(sp)
+00400b58:	18 00 a5 27	addiu a1,sp,0x18
+00400b5c:	98 03 10 0c	jal 0x00400e60
+00400b60:	ff ff 04 24	_li a0,-0x1
+00400b64:	18 00 a3 8f	lw v1,0x18(sp)
+00400b68:	7f 00 63 30	andi v1,v1,0x7f
+00400b6c:	0a 00 60 14	bne v1,zero,0x00400b98
+00400b70:	24 00 bf 8f	_lw ra,0x24(sp)
+00400b74:	40 00 04 3c	lui a0,0x40
+00400b78:	25 28 40 00	or a1,v0,zero
+00400b7c:	80 03 10 0c	jal 0x00400e00
+00400b80:	50 0d 84 24	_addiu a0,a0,0xd50
+00400b84:	40 00 04 3c	lui a0,0x40
+00400b88:	19 00 a5 93	lbu a1,0x19(sp)
+00400b8c:	80 03 10 0c	jal 0x00400e00
+00400b90:	68 0d 84 24	_addiu a0,a0,0xd68
+00400b94:	24 00 bf 8f	lw ra,0x24(sp)
+00400b98:	08 00 e0 03	jr ra
+00400b9c:	28 00 bd 27	_addiu sp,sp,0x28
+
+### FUNCTION __libc_csu_init @ 00400ba0
+00400ba0:	02 00 1c 3c	lui gp,0x2
+00400ba4:	d0 83 9c 27	addiu gp,gp,-0x7c30
+00400ba8:	21 e0 99 03	addu gp,gp,t9
+00400bac:	c8 ff bd 27	addiu sp,sp,-0x38
+00400bb0:	18 80 99 8f	lw t9,-0x7fe8(gp)
+00400bb4:	10 00 bc af	sw gp,0x10(sp)
+00400bb8:	1c 00 b0 af	sw s0,0x1c(sp)
+00400bbc:	24 00 b2 af	sw s2,0x24(sp)
+00400bc0:	28 00 b3 af	sw s3,0x28(sp)
+00400bc4:	25 98 80 00	or s3,a0,zero
+00400bc8:	2c 00 b4 af	sw s4,0x2c(sp)
+00400bcc:	25 a0 a0 00	or s4,a1,zero
+00400bd0:	30 00 b5 af	sw s5,0x30(sp)
+00400bd4:	20 00 b1 af	sw s1,0x20(sp)
+00400bd8:	34 00 bf af	sw ra,0x34(sp)
+00400bdc:	99 fe 11 04	bal 0x00400644
+00400be0:	25 a8 c0 00	_or s5,a2,zero
+00400be4:	10 00 bc 8f	lw gp,0x10(sp)
+00400be8:	1c 80 90 8f	lw s0,-0x7fe4(gp)
+00400bec:	1c 80 92 8f	lw s2,-0x7fe4(gp)
+00400bf0:	23 90 50 02	subu s2,s2,s0
+00400bf4:	83 90 12 00	sra s2,s2,0x2
+00400bf8:	09 00 40 12	beq s2,zero,0x00400c20
+00400bfc:	25 88 00 00	_or s1,zero,zero
+00400c00:	00 00 19 8e	lw t9,0x0(s0)
+00400c04:	01 00 31 26	addiu s1,s1,0x1
+00400c08:	25 30 a0 02	or a2,s5,zero
+00400c0c:	25 28 80 02	or a1,s4,zero
+00400c10:	09 f8 20 03	jalr t9
+00400c14:	25 20 60 02	_or a0,s3,zero
+00400c18:	f9 ff 51 16	bne s2,s1,0x00400c00
+00400c1c:	04 00 10 26	_addiu s0,s0,0x4
+00400c20:	1c 00 b0 8f	lw s0,0x1c(sp)
+00400c24:	20 00 b1 8f	lw s1,0x20(sp)
+00400c28:	24 00 b2 8f	lw s2,0x24(sp)
+00400c2c:	28 00 b3 8f	lw s3,0x28(sp)
+00400c30:	2c 00 b4 8f	lw s4,0x2c(sp)
+00400c34:	30 00 b5 8f	lw s5,0x30(sp)
+00400c38:	34 00 bf 8f	lw ra,0x34(sp)
+00400c3c:	08 00 e0 03	jr ra
+00400c40:	38 00 bd 27	_addiu sp,sp,0x38
+
+### FUNCTION __libc_csu_fini @ 00400c44
+00400c44:	08 00 e0 03	jr ra
+00400c48:	00 00 00 00	_nop
+
+### FUNCTION __do_global_ctors_aux @ 00400c50
+00400c50:	41 00 03 3c	lui v1,0x41
+00400c54:	ff ff 02 24	li v0,-0x1
+00400c58:	f0 0e 79 8c	lw t9,0xef0(v1)
+00400c5c:	0f 00 22 13	beq t9,v0,0x00400c9c
+00400c60:	00 00 00 00	_nop
+00400c64:	d8 ff bd 27	addiu sp,sp,-0x28
+00400c68:	1c 00 b0 af	sw s0,0x1c(sp)
+00400c6c:	f0 0e 70 24	addiu s0,v1,0xef0
+00400c70:	20 00 b1 af	sw s1,0x20(sp)
+00400c74:	ff ff 11 24	li s1,-0x1
+00400c78:	24 00 bf af	sw ra,0x24(sp)
+00400c7c:	09 f8 20 03	jalr t9
+00400c80:	fc ff 10 26	_addiu s0,s0,-0x4
+00400c84:	00 00 19 8e	lw t9,0x0(s0)
+00400c88:	fc ff 31 17	bne t9,s1,0x00400c7c
+00400c8c:	24 00 bf 8f	_lw ra,0x24(sp)
+00400c90:	1c 00 b0 8f	lw s0,0x1c(sp)
+00400c94:	20 00 b1 8f	lw s1,0x20(sp)
+00400c98:	28 00 bd 27	addiu sp,sp,0x28
+00400c9c:	08 00 e0 03	jr ra
+00400ca0:	00 00 00 00	_nop
+
+### FUNCTION _fini @ 00400cb0
+00400cb0:	02 00 1c 3c	lui gp,0x2
+00400cb4:	c0 82 9c 27	addiu gp,gp,-0x7d40
+00400cb8:	21 e0 99 03	addu gp,gp,t9
+00400cbc:	e0 ff bd 27	addiu sp,sp,-0x20
+00400cc0:	10 00 bc af	sw gp,0x10(sp)
+00400cc4:	1c 00 bf af	sw ra,0x1c(sp)
+00400cc8:	01 00 11 04	bal 0x00400cd0
+00400ccc:	00 00 00 00	_nop
+00400cd0:	40 00 19 3c	lui t9,0x40
+00400cd4:	f4 08 39 27	addiu t9,t9,0x8f4
+00400cd8:	09 f8 20 03	jalr t9
+00400cdc:	00 00 00 00	_nop
+00400ce0:	1c 00 bf 8f	lw ra,0x1c(sp)
+00400ce4:	08 00 e0 03	jr ra
+00400ce8:	20 00 bd 27	_addiu sp,sp,0x20
+
+### FUNCTION _PROCEDURE_LINKAGE_TABLE_ @ 00400de0
+00400de0:	41 00 1c 3c	lui gp,0x41
+00400de4:	04 0f 99 8f	lw t9,0xf04(gp)
+00400de8:	04 0f 9c 27	addiu gp,gp,0xf04
+00400dec:	23 c0 1c 03	subu t8,t8,gp
+00400df0:	25 78 e0 03	or t7,ra,zero
+00400df4:	82 c0 18 00	srl t8,t8,0x2
+00400df8:	09 f8 20 03	jalr t9
+00400dfc:	fe ff 18 27	_addiu t8,t8,-0x2
+
+### FUNCTION printf @ 00400e00
+00400e00:	41 00 0f 3c	lui t7,0x41
+00400e04:	0c 0f f9 8d	lw t9,0xf0c(t7)
+00400e08:	08 00 20 03	jr t9
+00400e0c:	0c 0f f8 25	_addiu t8,t7,0xf0c
+
+### FUNCTION shmget @ 00400e10
+00400e10:	41 00 0f 3c	lui t7,0x41
+00400e14:	10 0f f9 8d	lw t9,0xf10(t7)
+00400e18:	08 00 20 03	jr t9
+00400e1c:	10 0f f8 25	_addiu t8,t7,0xf10
+
+### FUNCTION sleep @ 00400e20
+00400e20:	41 00 0f 3c	lui t7,0x41
+00400e24:	14 0f f9 8d	lw t9,0xf14(t7)
+00400e28:	08 00 20 03	jr t9
+00400e2c:	14 0f f8 25	_addiu t8,t7,0xf14
+
+### FUNCTION wait @ 00400e30
+00400e30:	41 00 0f 3c	lui t7,0x41
+00400e34:	18 0f f9 8d	lw t9,0xf18(t7)
+00400e38:	08 00 20 03	jr t9
+00400e3c:	18 0f f8 25	_addiu t8,t7,0xf18
+
+### FUNCTION shmat @ 00400e40
+00400e40:	41 00 0f 3c	lui t7,0x41
+00400e44:	1c 0f f9 8d	lw t9,0xf1c(t7)
+00400e48:	08 00 20 03	jr t9
+00400e4c:	1c 0f f8 25	_addiu t8,t7,0xf1c
+
+### FUNCTION perror @ 00400e50
+00400e50:	41 00 0f 3c	lui t7,0x41
+00400e54:	20 0f f9 8d	lw t9,0xf20(t7)
+00400e58:	08 00 20 03	jr t9
+00400e5c:	20 0f f8 25	_addiu t8,t7,0xf20
+
+### FUNCTION waitpid @ 00400e60
+00400e60:	41 00 0f 3c	lui t7,0x41
+00400e64:	24 0f f9 8d	lw t9,0xf24(t7)
+00400e68:	08 00 20 03	jr t9
+00400e6c:	24 0f f8 25	_addiu t8,t7,0xf24
+
+### FUNCTION shmctl @ 00400e70
+00400e70:	41 00 0f 3c	lui t7,0x41
+00400e74:	28 0f f9 8d	lw t9,0xf28(t7)
+00400e78:	08 00 20 03	jr t9
+00400e7c:	28 0f f8 25	_addiu t8,t7,0xf28
+
+### FUNCTION puts @ 00400e80
+00400e80:	41 00 0f 3c	lui t7,0x41
+00400e84:	2c 0f f9 8d	lw t9,0xf2c(t7)
+00400e88:	08 00 20 03	jr t9
+00400e8c:	2c 0f f8 25	_addiu t8,t7,0xf2c
+
+### FUNCTION system @ 00400e90
+00400e90:	41 00 0f 3c	lui t7,0x41
+00400e94:	30 0f f9 8d	lw t9,0xf30(t7)
+00400e98:	08 00 20 03	jr t9
+00400e9c:	30 0f f8 25	_addiu t8,t7,0xf30
+
+### FUNCTION __libc_start_main @ 00400ea0
+00400ea0:	41 00 0f 3c	lui t7,0x41
+00400ea4:	34 0f f9 8d	lw t9,0xf34(t7)
+00400ea8:	08 00 20 03	jr t9
+00400eac:	34 0f f8 25	_addiu t8,t7,0xf34
+
+### FUNCTION memset @ 00400eb0
+00400eb0:	41 00 0f 3c	lui t7,0x41
+00400eb4:	38 0f f9 8d	lw t9,0xf38(t7)
+00400eb8:	08 00 20 03	jr t9
+00400ebc:	38 0f f8 25	_addiu t8,t7,0xf38
+
+### FUNCTION execl @ 00400ec0
+00400ec0:	41 00 0f 3c	lui t7,0x41
+00400ec4:	3c 0f f9 8d	lw t9,0xf3c(t7)
+00400ec8:	08 00 20 03	jr t9
+00400ecc:	3c 0f f8 25	_addiu t8,t7,0xf3c
+
+### FUNCTION shmdt @ 00400ed0
+00400ed0:	41 00 0f 3c	lui t7,0x41
+00400ed4:	40 0f f9 8d	lw t9,0xf40(t7)
+00400ed8:	08 00 20 03	jr t9
+00400edc:	40 0f f8 25	_addiu t8,t7,0xf40
+
+### FUNCTION fork @ 00400ee0
+00400ee0:	41 00 0f 3c	lui t7,0x41
+00400ee4:	44 0f f9 8d	lw t9,0xf44(t7)
+00400ee8:	08 00 20 03	jr t9
+00400eec:	44 0f f8 25	_addiu t8,t7,0xf44

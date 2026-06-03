@@ -1,0 +1,9 @@
+address	type	name
+1cfb:0004	Label	DAT_1cfb_0004
+1cfb:0006	Label	DAT_1cfb_0006
+1cfb:000c	Label	DAT_1cfb_000c
+1cfb:0010	Function	entry
+1cfb:0162	Label	DAT_1cfb_0162
+1cfb:0163	Label	DAT_1cfb_0163
+5000:5b9c	Label	DAT_5000_5b9c
+5000:5b9e	Label	DAT_5000_5b9e

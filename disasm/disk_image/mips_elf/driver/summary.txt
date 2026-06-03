@@ -1,0 +1,46 @@
+PROGRAM	driver.so
+LANGUAGE	MIPS:LE:32:default
+COMPILER	default
+IMAGE_BASE	00010000
+MIN_ADDRESS	00010000
+MAX_ADDRESS	_elfSectionHeaders::000005c7
+
+MEMORY_BLOCKS
+segment_2.1	00010000	000100f7	R=true	W=false	X=false
+.MIPS.abiflags	000100f8	0001010f	R=true	W=false	X=false
+.reginfo	00010110	00010127	R=true	W=false	X=false
+.dynamic	00010128	0001021f	R=true	W=false	X=false
+.hash	00010220	0001073f	R=true	W=false	X=false
+.dynsym	00010740	0001136f	R=true	W=false	X=false
+.dynstr	00011370	00011f07	R=true	W=false	X=false
+.gnu.version	00011f08	0001208d	R=true	W=false	X=false
+.gnu.version_r	00012090	0001214f	R=true	W=false	X=false
+.rel.dyn	00012150	00012457	R=true	W=false	X=false
+.init	00012458	000124db	R=true	W=false	X=true
+.text	000124e0	00020bff	R=true	W=false	X=true
+.MIPS.stubs	00020c00	00020f9f	R=true	W=false	X=true
+.fini	00020fa0	00020fe7	R=true	W=false	X=true
+.rodata	00020ff0	00022b97	R=true	W=false	X=false
+.eh_frame	00022b98	00022b9b	R=true	W=false	X=false
+.ctors	00033000	00033007	R=true	W=true	X=false
+.dtors	00033008	0003300f	R=true	W=true	X=false
+.jcr	00033010	00033013	R=true	W=true	X=false
+.data.rel.ro	00033014	0003326b	R=true	W=true	X=false
+.data	00033270	0003335f	R=true	W=true	X=false
+.got	00033360	000335d7	R=true	W=false	X=false
+.sdata	000335d8	000335db	R=true	W=true	X=false
+.bss	000335e0	00033cef	R=true	W=true	X=false
+EXTERNAL	00034000	00034017	R=true	W=true	X=false
+.comment	.comment::00000000	.comment::0000003e	R=false	W=false	X=false
+.debug_abbrev	.debug_abbrev::00000000	.debug_abbrev::00000023	R=false	W=false	X=false
+.debug_aranges	.debug_aranges::00000000	.debug_aranges::0000004f	R=false	W=false	X=false
+.debug_info	.debug_info::00000000	.debug_info::00000043	R=false	W=false	X=false
+.debug_line	.debug_line::00000000	.debug_line::000000c7	R=false	W=false	X=false
+.debug_ranges	.debug_ranges::00000000	.debug_ranges::0000003f	R=false	W=false	X=false
+.debug_str	.debug_str::00000000	.debug_str::0000007f	R=false	W=false	X=false
+.gnu.attributes	.gnu.attributes::00000000	.gnu.attributes::0000000f	R=false	W=false	X=false
+.pdr	.pdr::00000000	.pdr::000012ff	R=false	W=false	X=false
+.shstrtab	.shstrtab::00000000	.shstrtab::00000157	R=false	W=false	X=false
+.strtab	.strtab::00000000	.strtab::000015e7	R=false	W=false	X=false
+.symtab	.symtab::00000000	.symtab::0000172f	R=false	W=false	X=false
+_elfSectionHeaders	_elfSectionHeaders::00000000	_elfSectionHeaders::000005c7	R=false	W=false	X=false
