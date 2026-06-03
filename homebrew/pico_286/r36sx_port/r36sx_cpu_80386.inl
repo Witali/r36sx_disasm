@@ -544,6 +544,32 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             (*loopcount)++;
             return true;
 
+        /* CMPSD */
+        case 0xA7: {
+            if (reptype && r36sx_rep_get_count() == 0) {
+                return true;
+            }
+            uint32_t si = r36sx_src_index();
+            uint32_t di = r36sx_dst_index();
+            flag_sub32(getmem32(useseg, si), getmem32(CPU_ES, di));
+            r36sx_set_src_index(df ? si - 4 : si + 4);
+            r36sx_set_dst_index(df ? di - 4 : di + 4);
+            if (reptype) {
+                r36sx_rep_set_count(r36sx_rep_get_count() - 1);
+            }
+            if ((reptype == 1) && !zf) {
+                return true;
+            }
+            if ((reptype == 2) && zf) {
+                return true;
+            }
+            (*loopcount)++;
+            if (reptype) {
+                r36sx_cpu_set_ip(fault_ip);
+            }
+            return true;
+        }
+
         /* TEST EAX, imm32 */
         case 0xA9:
             flag_log32(CPU_EAX & getmem32(CPU_CS, CPU_IP));
