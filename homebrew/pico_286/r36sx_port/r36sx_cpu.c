@@ -10400,11 +10400,24 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 }
 
                 getea(rm);
-                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
-                    break;
+                {
+                    uint8_t pointer_size = operandSizeOverride ? 6u : 4u;
+                    if (!r36sx_cpu_check_segment_access(
+                            ea - useseg_base, pointer_size, 0)) {
+                        break;
+                    }
+                    uint32_t offset = operandSizeOverride ? readdw86(ea) :
+                                                            readw86(ea);
+                    uint16_t selector = readw86(ea + (operandSizeOverride ?
+                                                      4u : 2u));
+                    if (r36sx_cpu_load_segment(reges, selector)) {
+                        if (operandSizeOverride) {
+                            putreg32(reg, offset);
+                        } else {
+                            putreg16(reg, (uint16_t)offset);
+                        }
+                    }
                 }
-                putreg16(reg, readw86(ea));
-                r36sx_cpu_load_segment(reges, readw86(ea + 2u));
                 break;
 
             case 0xC5:
@@ -10420,11 +10433,24 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 }
 
                 getea(rm);
-                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
-                    break;
+                {
+                    uint8_t pointer_size = operandSizeOverride ? 6u : 4u;
+                    if (!r36sx_cpu_check_segment_access(
+                            ea - useseg_base, pointer_size, 0)) {
+                        break;
+                    }
+                    uint32_t offset = operandSizeOverride ? readdw86(ea) :
+                                                            readw86(ea);
+                    uint16_t selector = readw86(ea + (operandSizeOverride ?
+                                                      4u : 2u));
+                    if (r36sx_cpu_load_segment(regds, selector)) {
+                        if (operandSizeOverride) {
+                            putreg32(reg, offset);
+                        } else {
+                            putreg16(reg, (uint16_t)offset);
+                        }
+                    }
                 }
-                putreg16(reg, readw86(ea));
-                r36sx_cpu_load_segment(regds, readw86(ea + 2u));
                 break;
 
             case 0xC6:
