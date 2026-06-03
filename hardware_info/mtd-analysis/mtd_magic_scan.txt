@@ -1,0 +1,28 @@
+mtd0_nor.bin
+  uImage_27051956: none
+  FDT_d00dfeed: none
+  gzip_1f8b08: 0x6c080, 0x6e360
+  romfs_-rom1fs-: 0x6c000
+  squashfs_hsqs: none
+  squashfs_sqsh: none
+mtd1_boot.bin
+  uImage_27051956: none
+  FDT_d00dfeed: none
+  gzip_1f8b08: none
+  romfs_-rom1fs-: none
+  squashfs_hsqs: none
+  squashfs_sqsh: none
+mtd2_eromfs.bin
+  uImage_27051956: none
+  FDT_d00dfeed: none
+  gzip_1f8b08: 0x80, 0x2360
+  romfs_-rom1fs-: 0x0
+  squashfs_hsqs: none
+  squashfs_sqsh: none
+mtd3_persistentmem.bin
+  uImage_27051956: none
+  FDT_d00dfeed: none
+  gzip_1f8b08: none
+  romfs_-rom1fs-: none
+  squashfs_hsqs: none
+  squashfs_sqsh: none

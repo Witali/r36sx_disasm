@@ -1,0 +1,28 @@
+  32788 HC16E3100V20
+  33032  (( 
+  33120 12345678
+  33228 /media/mmc/Movie/sample.mp4
+  34268 /media/hdd/VID_20250722_150806_597.mp4.mov
+  35308 /media/hdd/VID_20250619_070920_355.mp4
+  36348 /media/hdd/VID_20250619_070859_726.mp4
+  37388 /media/mmc/Ebook/Little women.txt
+  42648 /media/mmc/Music/Westlife - En Ti Deje Mi Amor (Spanish Version of 'I Lay My Love On You' Single Remix).mp3
+  43696 /media/mmc/Music/
+  43728 .mp3
+  43733 e Mi Amor (Spanish Version of 'I Lay My Love On You' Single Remix).mp3
+  49431 X9&O
+  49650 6fjE0
+  49937 8z,|
+  50056 X9&O
+  50312 *)6D$
+  53145 8z,|
+  53225 8z,|
+  53290 *)6D$
+  53326 	[G#
+  53345 w&-h
+  56115 	[G#
+  56707 DvzN
+  56771 8z,|
+  56821 w&-h
+  58399 "*)6D$
+  58428 8z,|
