@@ -544,6 +544,10 @@ static r36sx_dpmi_memory_block_t
     r36sx_dpmi_memory_blocks[R36SX_DPMI_MAX_MEMORY_BLOCKS];
 static uint8_t r36sx_dpmi_client_active;
 static uint8_t r36sx_dpmi_client_32bit;
+#if R36SX_DEBUG_PM_DIAG
+static uint32_t r36sx_dpmi_fail_logs;
+static uint32_t r36sx_dpmi_reflect_logs;
+#endif
 static uint8_t r36sx_dpmi_rm_bridge_active;
 static uint8_t r36sx_dpmi_rm_bridge_done;
 static r36sx_dpmi_rm_bridge_return_t r36sx_dpmi_rm_bridge_return;
@@ -551,6 +555,7 @@ static uint16_t r36sx_dpmi_rm_bridge_return_ss;
 static uint32_t r36sx_dpmi_rm_bridge_return_sp;
 static uint8_t r36sx_dpmi_lookup_descriptor(uint16_t selector,
                                             r36sx_segment_cache_t *cache);
+static uint32_t r36sx_dpmi_client_offset(void);
 
 static inline uint8_t r36sx_cpu_v86_enabled(void)
 {
@@ -4301,6 +4306,19 @@ static inline uint8_t r36sx_dpmi_processor_type(void)
 
 static inline void r36sx_dpmi_fail(uint16_t error)
 {
+#if R36SX_DEBUG_PM_DIAG
+    uint16_t request_ax = CPU_AX;
+    if (r36sx_dpmi_fail_logs < 128u) {
+        r36sx_pico286_debug_log(
+            "[PM] DPMI fail AX=%04X err=%04X BX=%04X CX=%04X DX=%04X "
+            "ES:%sDI=%04X:%08lX cs:eip=%04X:%08lX",
+            request_ax, error, CPU_BX, CPU_CX, CPU_DX,
+            r36sx_dpmi_client_32bit ? "E" : "",
+            CPU_ES, (unsigned long)r36sx_dpmi_client_offset(),
+            CPU_CS, (unsigned long)CPU_IP);
+        r36sx_dpmi_fail_logs++;
+    }
+#endif
     cf = 1;
     CPU_AX = error;
 }
@@ -4784,6 +4802,12 @@ static void r36sx_dpmi_simulate_real_mode_common(uint16_t call_kind)
     r36sx_cpu_load_segment(regcs, target_cs);
     r36sx_cpu_set_ip(target_ip);
 
+    R36SX_PM_DIAG_LOG(
+        "[PM] DPMI bridge start AX=%04X int=%02X copy_words=%u "
+        "target=%04X:%04X stack=%04X:%04X flags=%04X block=%08lX",
+        call_kind, intnum, copy_words, target_cs, target_ip,
+        CPU_SS, CPU_SP, makeflagsword(), (unsigned long)block_linear);
+
     uint8_t ok = 0;
     r36sx_dpmi_rm_bridge_return_t return_kind = R36SX_DPMI_RM_BRIDGE_IRET;
     if (call_kind == R36SX_DPMI_FUNC_SIMULATE_RM_INTERRUPT) {
@@ -4831,7 +4855,17 @@ static void r36sx_dpmi_simulate_real_mode_common(uint16_t call_kind)
     }
 
     if (ok) {
+        R36SX_PM_DIAG_LOG(
+            "[PM] DPMI bridge done AX=%04X result=%04X:%04X "
+            "stack=%04X:%04X flags=%04X",
+            call_kind, CPU_CS, (uint16_t)CPU_IP, CPU_SS, CPU_SP,
+            makeflagsword());
         r36sx_dpmi_store_real_mode_register_block(block_linear);
+    } else {
+        R36SX_PM_DIAG_LOG(
+            "[PM] DPMI bridge timeout/fail AX=%04X last=%04X:%04X "
+            "stack=%04X:%04X hlt=%u",
+            call_kind, CPU_CS, (uint16_t)CPU_IP, CPU_SS, CPU_SP, hltstate);
     }
 
     r36sx_cpu_restore_snapshot(&snapshot);
@@ -4860,6 +4894,18 @@ static uint8_t r36sx_dpmi_reflect_real_mode_interrupt(uint8_t intnum)
     if (!r36sx_dpmi_host_available() || r36sx_dpmi_rm_bridge_active) {
         return 0;
     }
+
+#if R36SX_DEBUG_PM_DIAG
+    uint32_t reflect_log_index = r36sx_dpmi_reflect_logs;
+    if (reflect_log_index < 128u) {
+        r36sx_pico286_debug_log(
+            "[PM] reflect INT %02X start AX=%04X BX=%04X CX=%04X DX=%04X "
+            "cs:eip=%04X:%08lX",
+            intnum, CPU_AX, CPU_BX, CPU_CX, CPU_DX,
+            CPU_CS, (unsigned long)CPU_IP);
+    }
+    r36sx_dpmi_reflect_logs++;
+#endif
 
     r36sx_cpu_snapshot_t snapshot;
     r36sx_cpu_save_snapshot(&snapshot);
@@ -4906,12 +4952,27 @@ static uint8_t r36sx_dpmi_reflect_real_mode_interrupt(uint8_t intnum)
 
     r36sx_cpu_restore_snapshot(&snapshot);
     if (!ok) {
+#if R36SX_DEBUG_PM_DIAG
+        if (reflect_log_index < 128u) {
+            r36sx_pico286_debug_log(
+                "[PM] reflect INT %02X failed", intnum);
+        }
+#endif
         return 0;
     }
 
     memcpy(dwordregs, returned_regs, sizeof(returned_regs));
     x86_flags.value = (x86_flags.value & 0xffff0000u) |
                       (returned_flags & 0x0000ffffu);
+#if R36SX_DEBUG_PM_DIAG
+    if (reflect_log_index < 128u) {
+        r36sx_pico286_debug_log(
+            "[PM] reflect INT %02X done AX=%04X BX=%04X CX=%04X DX=%04X "
+            "flags=%04X",
+            intnum, CPU_AX, CPU_BX, CPU_CX, CPU_DX,
+            (uint16_t)returned_flags);
+    }
+#endif
     return 1;
 }
 
@@ -6517,6 +6578,8 @@ void reset86() {
     r36sx_pm_diag_first_fault_logged = 0;
     r36sx_pm_diag_int31_logs = 0;
     r36sx_pm_diag_int67_logs = 0;
+    r36sx_dpmi_fail_logs = 0;
+    r36sx_dpmi_reflect_logs = 0;
 #endif
     r36sx_cpu_real_cache_all_segments();
 

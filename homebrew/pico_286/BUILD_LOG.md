@@ -1,5 +1,51 @@
 # pico-286 Build Log
 
+## 2026-06-03 DPMI debug-log build
+
+Enabled extra protected-mode and DPMI diagnostics for tracking DOS/4GW and
+other extender failures.  The debug path now records DPMI service failures,
+real-mode bridge start/done/timeout events, and protected-to-real interrupt
+reflection results.  The counters are capped so a tight failure loop cannot
+fill the log immediately.
+
+Logs are written to:
+
+- `/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log`
+- fallback: `/mnt/sdcard/pico_286.log`
+
+Useful search markers in the log:
+
+- `[PM] DPMI fail`
+- `[PM] DPMI bridge start`
+- `[PM] DPMI bridge done`
+- `[PM] DPMI bridge timeout/fail`
+- `[PM] reflect INT`
+
+Rebuilt with debug logging enabled.  `-DebugLog` defines `DEBUG=1`; debug
+builds intentionally use `-O2` instead of the release `-O3`.
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -DebugLog -Strip -Out homebrew\pico_286\pico_286.debug
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.debug
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286.debug`
+- Size: 468,584 bytes
+- SHA256: `9D278CC4E1CE3424CCADB56DC01FCD1ECD3ACD9FA287EB70A09CB0CB2DFD4F29`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-06-03 DPMI real-mode bridge
 
 Implemented the first useful DPMI real-mode translation services:
