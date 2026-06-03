@@ -10715,7 +10715,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_D7: ;
 #endif
                 /* D7 XLAT */
-                CPU_AL = getmem8(useseg, (uint16_t)(CPU_BX + CPU_AL));
+                CPU_AL = getmem8(useseg,
+                                  (addressSizeOverride ? CPU_EBX : CPU_BX) +
+                                  CPU_AL);
                 break;
 
             case 0xD8:

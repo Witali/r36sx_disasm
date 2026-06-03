@@ -21,7 +21,7 @@ Intel 80386 Programmer's Reference Manual instruction set.
 - [x] `INS` / `OUTS`: implement `INSD` and `OUTSD` when operand-size is 32.
 - [x] `MOV moffs`: make `A0..A3` use address-size for offset width and
       operand-size for 16/32-bit accumulator forms.
-- [ ] `XLAT`: use `EBX + AL` when address-size is 32.
+- [x] `XLAT`: use `EBX + AL` when address-size is 32.
 - [ ] `LOOP` / `LOOPcc` / `JCXZ`: use `ECX` for address-size 32, including
       `JECXZ`.
 
