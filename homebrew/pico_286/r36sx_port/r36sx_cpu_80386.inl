@@ -315,6 +315,61 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
     uint8_t aluop = opcode >> 3;
 
     switch (opcode) {
+        /* INSD */
+        case 0x6D: {
+            if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return true;
+            }
+            if (reptype && r36sx_rep_get_count() == 0) {
+                return true;
+            }
+            if (!r36sx_cpu_require_io_permission(CPU_DX, 4u, fault_ip)) {
+                return true;
+            }
+            uint32_t di = r36sx_dst_index();
+            uint32_t value = (uint32_t)portin16(CPU_DX) |
+                             ((uint32_t)portin16((uint16_t)(CPU_DX + 2u))
+                              << 16);
+            putmem32(CPU_ES, di, value);
+            r36sx_set_dst_index(df ? di - 4 : di + 4);
+            if (reptype) {
+                r36sx_rep_set_count(r36sx_rep_get_count() - 1);
+            }
+            (*loopcount)++;
+            if (reptype) {
+                r36sx_cpu_set_ip(fault_ip);
+            }
+            return true;
+        }
+
+        /* OUTSD */
+        case 0x6F: {
+            if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return true;
+            }
+            if (reptype && r36sx_rep_get_count() == 0) {
+                return true;
+            }
+            if (!r36sx_cpu_require_io_permission(CPU_DX, 4u, fault_ip)) {
+                return true;
+            }
+            uint32_t si = r36sx_src_index();
+            uint32_t value = getmem32(useseg, si);
+            portout16(CPU_DX, (uint16_t)value);
+            portout16((uint16_t)(CPU_DX + 2u), (uint16_t)(value >> 16));
+            r36sx_set_src_index(df ? si - 4 : si + 4);
+            if (reptype) {
+                r36sx_rep_set_count(r36sx_rep_get_count() - 1);
+            }
+            (*loopcount)++;
+            if (reptype) {
+                r36sx_cpu_set_ip(fault_ip);
+            }
+            return true;
+        }
+
         /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP r/m32, r32 */
         case 0x01: case 0x09: case 0x11: case 0x19:
         case 0x21: case 0x29: case 0x31: case 0x39:
