@@ -299,7 +299,6 @@ static inline void r36sx_cpu_add_ip(int32_t delta)
 #if R36SX_DEBUG_PM_DIAG
 static uint8_t r36sx_pm_diag_first_fault_logged;
 static uint32_t r36sx_pm_diag_int31_logs;
-static uint32_t r36sx_pm_diag_int67_logs;
 
 static void r36sx_pm_diag_log_state(const char *event)
 {
@@ -365,17 +364,6 @@ static void r36sx_pm_diag_log_interrupt(uint8_t intnum)
         return;
     }
 
-    if (intnum == 0x67u && (CPU_AX & 0xFF00u) == 0xDE00u) {
-        if (r36sx_pm_diag_int67_logs < 32u) {
-            r36sx_pico286_debug_log(
-                "[PM] VCPI probe/service INT 67h AX=%04X BX=%04X CX=%04X "
-                "DX=%04X protected=%u cs:eip=%04X:%08lX",
-                CPU_AX, CPU_BX, CPU_CX, CPU_DX,
-                r36sx_cpu_protected_enabled(),
-                CPU_CS, (unsigned long)CPU_IP);
-            r36sx_pm_diag_int67_logs++;
-        }
-    }
 }
 #else
 static inline void r36sx_pm_diag_log_first_fault(const char *reason,

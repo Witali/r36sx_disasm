@@ -188,7 +188,3 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
     intcall86(intnum);
 }
 
-static uint8_t r36sx_cpu_handle_vcpi(void)
-{
-    return r36sx_vcpi_handle_interrupt();
-}

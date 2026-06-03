@@ -221,8 +221,10 @@ experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
 `LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
 protected interrupt gates, and access linear physical memory above 1 MB
 through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
-switching, call gates, and DOS extender services such as DPMI/VCPI are still
-incomplete, so keep `cpu_mode=real` for normal DOS use.
+switching, call gates, and the built-in DPMI service are still incomplete.
+VCPI is intentionally not implemented in the emulator core; if a program needs
+VCPI, provide it as a guest DOS driver or TSR that hooks `INT 67h`.  Keep
+`cpu_mode=real` for normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a
 model-specific, round historical throughput estimate: 8086 uses about

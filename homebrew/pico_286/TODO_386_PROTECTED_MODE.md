@@ -20,7 +20,8 @@ be checked against the relevant specification and committed separately.
    - Status: started.
    - Current audit file: `INTEL_386_INSTRUCTION_AUDIT.md`.
    - Next target: implement the missing 386-only opcodes listed there before
-     expanding the higher-level DPMI/VCPI surface.
+     expanding the built-in DPMI surface.  VCPI belongs in a guest DOS driver
+     or TSR, not in the emulator core.
 
 1. Minimal DPMI host groundwork.
    - Status: partial.

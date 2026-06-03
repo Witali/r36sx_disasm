@@ -216,9 +216,9 @@ can also switch to an inner TSS stack and `IRETD` can return through the 386
 VM86 frame.  VM86 `LOCK`, `PUSHF`, `POPF`, `INT imm8`, and `IRET/IRETD` now
 raise `#GP(0)` when `IOPL < 3` so a future protected monitor can emulate or
 reflect them, while protected descriptor instructions now raise `#UD` in VM86.
-Full VM86 monitor behavior, DOS extender services such as DPMI/VCPI, and some
-protected-mode edge cases are still incomplete, so keep `cpu_mode=real` for
-normal DOS use.
+Full VM86 monitor behavior, the built-in DPMI service, and some protected-mode
+edge cases are still incomplete.  VCPI is intentionally left to a guest DOS
+driver or TSR that hooks `INT 67h`, so keep `cpu_mode=real` for normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a
 model-specific, round historical throughput estimate: 8086 uses about

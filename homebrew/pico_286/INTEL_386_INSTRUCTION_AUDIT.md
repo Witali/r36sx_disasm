@@ -63,8 +63,10 @@ Implemented or substantially implemented:
 - Hardware task switching has 16-bit and 32-bit TSS save/load paths, busy-bit
   updates, backlink handling, `IRET` with `NT`, `CR3`, `LDTR`, segments, and
   `CR0.TS`.
-- DPMI/VCPI scaffolding exists, but it is intentionally conservative and still
-  does not expose a real DPMI protected-mode entry.
+- DPMI scaffolding exists, but it is intentionally conservative and still does
+  not expose a complete protected-mode host.  VCPI is intentionally not part of
+  the emulator core and should be provided by a guest DOS driver or TSR if
+  needed.
 
 ## Missing 386 Instructions
 
@@ -99,8 +101,8 @@ mode is strict and many edge cases still need tests:
   suites, not normal DOS games.
 - DPMI still reports no real host through `INT 2Fh AX=1687h`, so many
   DOS extenders will still reject protected mode before touching the CPU core.
-- VCPI currently reports "not present".  That is safer than advertising an
-  incomplete VCPI server, but it blocks extenders that only know VCPI.
+- VCPI is no longer implemented in the emulator core.  Programs that need VCPI
+  should load a guest DOS VCPI or EMS monitor that owns `INT 67h`.
 - `LOCK`, I/O privilege, VM86, interrupt reflection, and monitor behavior need
   conformance tests around every privileged path.
 - TSS and gate code is substantial, but still needs selector/error-code tests

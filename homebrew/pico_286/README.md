@@ -321,8 +321,10 @@ point a real monitor would use.  Protected descriptor instructions now raise
 `#UD` in VM86 instead of touching descriptor tables.  Linear physical memory
 above 1 MB is backed by the same XMS buffer, so simple flat descriptors can
 access the configured extended RAM.  Paging, full VM86 monitor behavior, and
-DOS extender services such as DPMI/VCPI are not complete yet, so keep
-`cpu_mode=real` for normal DOS use.
+the built-in DPMI service are not complete yet.  VCPI is intentionally not
+implemented in the emulator core; if a program needs VCPI, provide it as a
+guest DOS driver or TSR that hooks `INT 67h`.  Keep `cpu_mode=real` for normal
+DOS use.
 Protected-mode support can be compiled out with
 `R36SX_ENABLE_PROTECTED_MODE=0`.
 
