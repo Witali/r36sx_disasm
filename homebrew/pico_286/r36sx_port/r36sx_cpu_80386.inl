@@ -877,6 +877,51 @@ static __not_in_flash() void r36sx_cpu_exec_bit_test(uint8_t operation,
     }
 }
 
+static __not_in_flash() void r36sx_cpu_exec_double_shift(uint8_t shift_right,
+                                                         uint8_t count)
+{
+    uint8_t width = operandSizeOverride ? 32u : 16u;
+
+    count &= 0x1fu;
+    if (count == 0) {
+        return;
+    }
+
+    uint32_t dest = operandSizeOverride ? readrm32(rm) : readrm16(rm);
+    uint32_t source = operandSizeOverride ? getreg32(reg) : getreg16(reg);
+    uint32_t result;
+
+    /*
+     * Intel documents SHLD/SHRD counts greater than or equal to operand width
+     * as undefined. Keep the emulator deterministic and avoid C undefined
+     * shifts; normal software should use the count range below.
+     */
+    if (count >= width) {
+        uint8_t over = (uint8_t)(count - width);
+        if (shift_right) {
+            cf = (dest >> (width - 1u)) & 1u;
+            result = source >> over;
+        } else {
+            cf = dest & 1u;
+            result = source << over;
+        }
+    } else if (shift_right) {
+        cf = (dest >> (count - 1u)) & 1u;
+        result = (dest >> count) | (source << (width - count));
+    } else {
+        cf = (dest >> (width - count)) & 1u;
+        result = (dest << count) | (source >> (width - count));
+    }
+
+    if (operandSizeOverride) {
+        writerm32(rm, result);
+        flag_szp32(result);
+    } else {
+        writerm16(rm, (uint16_t)result);
+        flag_szp16((uint16_t)result);
+    }
+}
+
 static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 {
     uint8_t op2 = getmem8(CPU_CS, CPU_IP);
@@ -1166,10 +1211,36 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
                 0, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
             return;
 
+        case 0xA4: { /* SHLD Ev,Gv,Ib */
+            modregrm();
+            uint8_t count = getmem8(CPU_CS, CPU_IP);
+            StepIP(1);
+            r36sx_cpu_exec_double_shift(0, count);
+            return;
+        }
+
+        case 0xA5: /* SHLD Ev,Gv,CL */
+            modregrm();
+            r36sx_cpu_exec_double_shift(0, CPU_CL);
+            return;
+
         case 0xAB: /* BTS Ev,Gv */
             modregrm();
             r36sx_cpu_exec_bit_test(
                 1, operandSizeOverride ? getreg32(reg) : getreg16(reg), 1);
+            return;
+
+        case 0xAC: { /* SHRD Ev,Gv,Ib */
+            modregrm();
+            uint8_t count = getmem8(CPU_CS, CPU_IP);
+            StepIP(1);
+            r36sx_cpu_exec_double_shift(1, count);
+            return;
+        }
+
+        case 0xAD: /* SHRD Ev,Gv,CL */
+            modregrm();
+            r36sx_cpu_exec_double_shift(1, CPU_CL);
             return;
 
         case 0xAF: {

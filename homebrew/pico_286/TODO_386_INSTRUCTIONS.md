@@ -5,8 +5,8 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 ## Missing 80386 opcodes
 
-- [ ] `0F A4` / `0F A5`: `SHLD r/m16|32, r16|32, imm8|CL`.
-- [ ] `0F AC` / `0F AD`: `SHRD r/m16|32, r16|32, imm8|CL`.
+- [x] `0F A4` / `0F A5`: `SHLD r/m16|32, r16|32, imm8|CL`.
+- [x] `0F AC` / `0F AD`: `SHRD r/m16|32, r16|32, imm8|CL`.
 - [ ] `0F B2`: `LSS r16|32, m16:16|32`.
 - [ ] `0F B4`: `LFS r16|32, m16:16|32`.
 - [ ] `0F B5`: `LGS r16|32, m16:16|32`.
