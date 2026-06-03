@@ -56,6 +56,15 @@ bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
 static uint8_t r36sx_cpu_interpreter_protected;
 
+static inline uint8_t r36sx_cpu_x87_present(void)
+{
+#if PICO_ON_DEVICE
+    return 1u;
+#else
+    return r36sx_pico286_x87_enabled() ? 1u : 0u;
+#endif
+}
+
 #if R36SX_DEBUG_PM_DIAG
 #define R36SX_PM_DIAG_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
 #else
@@ -1406,6 +1415,16 @@ __not_in_flash() void modregrm() {
         default:
             disp16 = 0;
     }
+}
+
+static inline void r36sx_cpu_skip_x87_escape(void)
+{
+    /*
+     * ESC D8..DF still has a ModR/M byte and optional displacement even when
+     * no math coprocessor is present.  Decode those bytes so DOS x87 probes
+     * continue at the correct IP, but do not touch memory or FPU state.
+     */
+    modregrm();
 }
 
 #if 0
@@ -8136,6 +8155,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_9B: ;
 #endif
                 /* 9B WAIT */
+                if (!r36sx_cpu_x87_present()) {
+                    break;
+                }
                 if ((r36sx_cr0 & R36SX_CR0_MP) &&
                     (r36sx_cr0 & R36SX_CR0_TS)) {
                     r36sx_cpu_raise_exception(
@@ -9096,6 +9118,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_DF: ;
 #endif
                 /* escape to x87 FPU */
+                if (!r36sx_cpu_x87_present()) {
+                    r36sx_cpu_skip_x87_escape();
+                    break;
+                }
                 OpFpu(opcode);
                 break;
 

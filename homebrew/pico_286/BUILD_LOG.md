@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-03 runtime x87 coprocessor switch
+
+Added a runtime-configurable x87 math-coprocessor presence flag:
+
+- `pico_286.conf` now writes `[cpu] x87_enabled=1` by default.
+- The disk menu now has an `X87  ON/OFF` row.  Left/Right or A/Y toggles it.
+- Saving an X87 change requests a soft reset, matching BIOS/CPU model changes,
+  because most DOS software probes for a math coprocessor at startup.
+- When X87 is disabled, `WAIT/FWAIT` behaves as no-op and ESC opcodes
+  `D8h..DFh` only decode their ModR/M/displacement bytes without touching FPU
+  state or memory.  This lets DOS probes see a machine without a coprocessor.
+- Startup debug logging now includes `x87=on/off`.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- size: `567248` bytes
+- SHA256:
+  `B351EE887D9EC1D9090F47638FC21ECC54419B38C38D53F145A1B1EF9F595573`
+
 ## 2026-06-03 disk menu frequency row cleanup
 
 Removed the old visual decrement/increment markers from the disk menu frequency

@@ -92,12 +92,13 @@ keyboard state changes.
 Open it with Fn+Select.
 
 - D-pad Up/Down: select a row.
-- Left/Right: change the selected disk image, boot order, CPU, frequency, or BIOS mode.
+- Left/Right: change the selected disk image, boot order, CPU, frequency, X87, or BIOS mode.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
 - A or Y on `CPU`: switch between `8086`, `80286`, and `80386`.
 - Left/Right on `FREQUENCY`: decrease/increase by 1 MHz from 1 to 30 MHz.
-- A or Y on `FREQUENCY`: press the `+` button.
+- A or Y on `FREQUENCY`: increase by 1 MHz.
+- A or Y on `X87`: enable or disable the emulated math coprocessor.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
 - The host drive is mapped from inside DOS by running `MAPDRIVE.COM`.  With no
   argument it maps `H:`; use `MAPDRIVE G:` or `MAPDRIVE G` for another letter.
@@ -108,8 +109,9 @@ Open it with Fn+Select.
 
 The menu searches the configured `image_dir` by drive type.  Floppy rows accept
 `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and `.dsk`; hard-disk rows accept
-`.hdd`, `.hd`, `.hdi`, and `.raw`.  If the BIOS or CPU model changes, `OK`
-also requests a soft reset so the selected ROM/CPU model starts cleanly.
+`.hdd`, `.hd`, `.hdi`, and `.raw`.  If the BIOS, CPU model, or X87 setting
+changes, `OK` also requests a soft reset so the selected machine model starts
+cleanly.
 Frequency-only changes are saved and applied to the runtime quantum.
 
 ## Disk Image Cache
@@ -128,6 +130,7 @@ parameters.  Legacy CHS calls remain supported for older DOS software.
 cpu_model=80386
 cpu_mode=real
 cpu_mhz=10.0
+x87_enabled=1
 
 [timing]
 target_fps=60

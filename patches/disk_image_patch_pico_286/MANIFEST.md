@@ -40,6 +40,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 runtime x87 coprocessor switch
+
+The patch now exposes the emulated x87 math coprocessor as a runtime setting:
+
+- `[cpu] x87_enabled=1` is the default.
+- The disk menu has an `X87  ON/OFF` row.  Left/Right or A/Y toggles it.
+- Saving an X87 change requests a soft reset, because DOS software usually
+  probes for a math coprocessor during startup.
+- With X87 disabled, `WAIT/FWAIT` is a no-op and ESC opcodes `D8h..DFh` only
+  consume their ModR/M/displacement bytes, so DOS probes behave as if no math
+  coprocessor is installed.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `567248` bytes
+- SHA256:
+  `B351EE887D9EC1D9090F47638FC21ECC54419B38C38D53F145A1B1EF9F595573`
+
 ## 2026-06-03 disk menu CPU and frequency controls
 
 The disk menu now has CPU controls in addition to drive, boot order, BIOS,

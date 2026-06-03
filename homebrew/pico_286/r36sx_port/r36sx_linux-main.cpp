@@ -1593,9 +1593,10 @@ int main() {
                                        main_loop_frame_us);
     uint32_t cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_mode=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
+        "main: cpu_model=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
                             r36sx_pico286_cpu_model_name(),
                             r36sx_pico286_cpu_mode_name(),
+                            r36sx_pico286_x87_enabled() ? "on" : "off",
                             r36sx_pico286_bios_mode_name(),
                             cpu_exec_loops_per_ms,
                             target_fps,

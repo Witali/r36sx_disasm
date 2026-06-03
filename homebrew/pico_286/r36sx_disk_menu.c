@@ -14,11 +14,12 @@
 #define R36SX_DISK_MENU_ROW_BOOT_ORDER 4
 #define R36SX_DISK_MENU_ROW_CPU 5
 #define R36SX_DISK_MENU_ROW_FREQUENCY 6
-#define R36SX_DISK_MENU_ROW_BIOS 7
-#define R36SX_DISK_MENU_ROW_EXIT 8
-#define R36SX_DISK_MENU_ROW_OK 9
-#define R36SX_DISK_MENU_ROW_CANCEL 10
-#define R36SX_DISK_MENU_ROW_COUNT 11
+#define R36SX_DISK_MENU_ROW_X87 7
+#define R36SX_DISK_MENU_ROW_BIOS 8
+#define R36SX_DISK_MENU_ROW_EXIT 9
+#define R36SX_DISK_MENU_ROW_OK 10
+#define R36SX_DISK_MENU_ROW_CANCEL 11
+#define R36SX_DISK_MENU_ROW_COUNT 12
 
 #define R36SX_DISK_BOOT_ORDER_AC 0u
 #define R36SX_DISK_BOOT_ORDER_CA 1u
@@ -29,6 +30,9 @@
 #define R36SX_DISK_CPU_80386 2u
 #define R36SX_DISK_CPU_MIN_MHZ 1u
 #define R36SX_DISK_CPU_MAX_MHZ 30u
+
+#define R36SX_DISK_X87_OFF 0u
+#define R36SX_DISK_X87_ON 1u
 
 #define R36SX_DISK_BIOS_NORMAL 0u
 #define R36SX_DISK_BIOS_TEST386 1u
@@ -447,6 +451,10 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
         menu->cpu_frequency_mhz = R36SX_DISK_CPU_MAX_MHZ;
     }
     menu->cpu_frequency_changed = 0;
+
+    menu->x87_choice = r36sx_pico286_x87_enabled() ?
+        R36SX_DISK_X87_ON : R36SX_DISK_X87_OFF;
+    menu->x87_changed = 0;
 }
 
 static void cycle_image(struct r36sx_disk_menu *menu, int drive, int direction)
@@ -571,6 +579,21 @@ static void adjust_cpu_frequency(struct r36sx_disk_menu *menu, int delta)
     }
 }
 
+static void cycle_x87(struct r36sx_disk_menu *menu)
+{
+    if (!menu) {
+        return;
+    }
+    menu->x87_choice = menu->x87_choice == R36SX_DISK_X87_ON ?
+        R36SX_DISK_X87_OFF : R36SX_DISK_X87_ON;
+    menu->x87_changed = 1;
+}
+
+static const char *x87_label(uint8_t choice)
+{
+    return choice == R36SX_DISK_X87_ON ? "ON" : "OFF";
+}
+
 static void cycle_bios(struct r36sx_disk_menu *menu)
 {
     if (!menu) {
@@ -597,6 +620,7 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
     int failures = 0;
     int bios_changed = menu->bios_changed;
     int cpu_model_changed = menu->cpu_changed;
+    int x87_changed = menu->x87_changed;
 
     for (size_t i = 0; i < R36SX_DISK_MENU_ARRAY_COUNT(g_drives); i++) {
         const char *image = menu->images[menu->selected_image[i]];
@@ -619,6 +643,12 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
         snprintf(menu->message, sizeof(menu->message), "FREQ SAVE FAILED");
         return 0;
     }
+    if (x87_changed &&
+        !r36sx_pico286_set_x87_enabled(
+            menu->x87_choice == R36SX_DISK_X87_ON)) {
+        snprintf(menu->message, sizeof(menu->message), "X87 SAVE FAILED");
+        return 0;
+    }
     if (!r36sx_pico286_save_config()) {
         snprintf(menu->message, sizeof(menu->message), "SAVE FAILED");
         return 0;
@@ -638,13 +668,15 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
         snprintf(menu->message, sizeof(menu->message),
                  bios_changed ? "SAVED BIOS RESET" :
                  cpu_model_changed ? "SAVED CPU RESET" :
+                 x87_changed ? "SAVED X87 RESET" :
                  "SAVED AND APPLIED");
     }
     menu->boot_order_changed = 0;
     menu->bios_changed = 0;
     menu->cpu_changed = 0;
     menu->cpu_frequency_changed = 0;
-    return (bios_changed || cpu_model_changed) ?
+    menu->x87_changed = 0;
+    return (bios_changed || cpu_model_changed || x87_changed) ?
         R36SX_DISK_MENU_RESULT_RESET_PC : 0;
 }
 
@@ -725,6 +757,9 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_FREQUENCY &&
                (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         adjust_cpu_frequency(menu, -1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_X87 &&
+               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        cycle_x87(menu);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
                (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_bios(menu);
@@ -741,6 +776,9 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_FREQUENCY &&
                (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
         adjust_cpu_frequency(menu, 1);
+    } else if (menu->selected_row == R36SX_DISK_MENU_ROW_X87 &&
+               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        cycle_x87(menu);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
                (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_bios(menu);
@@ -754,6 +792,8 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
             cycle_cpu(menu, 1);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_FREQUENCY) {
             adjust_cpu_frequency(menu, 1);
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_X87) {
+            cycle_x87(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS) {
             cycle_bios(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
@@ -806,7 +846,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     int cancel_x = ok_x + ok_w + ok_gap;
     const int row_h = 24;
     const int gap = 4;
-    const int action_gap = 58;
+    const int action_gap = 30;
 
     if (!r36sx_disk_menu_is_visible(menu) || !frame) {
         return;
@@ -844,6 +884,10 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
              (unsigned int)menu->cpu_frequency_mhz);
     draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_FREQUENCY, x, y, full_w, row_h, line);
+    y += row_h + gap;
+    snprintf(line, sizeof(line), "X87  %s", x87_label(menu->x87_choice));
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_X87, x, y, full_w, row_h, line);
     y += row_h + gap;
     snprintf(line, sizeof(line), "BIOS  %s",
              bios_label(menu->bios_choice));

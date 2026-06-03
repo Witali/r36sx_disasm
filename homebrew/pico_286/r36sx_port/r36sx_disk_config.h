@@ -117,6 +117,12 @@ uint32_t r36sx_pico286_cpu_frequency_mhz(void);
 // Update the configured CPU frequency in whole MHz. Call save_config to persist.
 int r36sx_pico286_set_cpu_frequency_mhz(uint32_t mhz);
 
+// Return non-zero when the emulated x87 math coprocessor is present.
+int r36sx_pico286_x87_enabled(void);
+
+// Update the emulated x87 math coprocessor presence flag.
+int r36sx_pico286_set_x87_enabled(int enabled);
+
 // Return the configured initial CPU execution mode.
 r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void);
 

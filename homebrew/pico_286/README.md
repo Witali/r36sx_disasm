@@ -180,10 +180,12 @@ argument it maps `H:`.  A different letter can be selected with
 `MAPDRIVE G:` or `MAPDRIVE G`; `CONFIG.SYS` must contain `LASTDRIVE=` set to
 that letter or higher.
 The `BOOT ORDER` row switches between `A,C` and `C,A` so the next boot can try
-the floppy or hard disk first.  The `OK` button writes current bindings and
-boot order to `pico_286.conf` and applies them.  The `EXIT APP` row exits
-Pico-286 so hard-disk changes can be seen after restart.  `Cancel`, B, or X
-cancels the menu.
+the floppy or hard disk first.  The `CPU`, `FREQUENCY`, and `X87` rows edit the
+emulated processor model, speed knob, and math-coprocessor presence.  The `OK`
+button writes current bindings and boot order to `pico_286.conf` and applies
+them.  BIOS, CPU model, or X87 changes request a soft reset so the selected
+machine model starts cleanly.  The `EXIT APP` row exits Pico-286 so hard-disk
+changes can be seen after restart.  `Cancel`, B, or X cancels the menu.
 
 On-screen keyboard controls:
 
@@ -227,6 +229,7 @@ subdirectory with disk images, and drive bindings use short file names:
 cpu_model=80386
 cpu_mode=real
 cpu_mhz=10.0
+x87_enabled=1
 
 [timing]
 target_fps=60
@@ -454,6 +457,10 @@ hook.  Supported drive names are `fdd0`, `fdd1`, `hdd0`, and `hdd1`; use
 loads the external 64 KB BIOS ROM named by `test_bios_rom`, which defaults to
 `test386.bin` beside `pico_286.conf`.  The disk menu exposes this as
 `BIOS NORMAL/TEST386` and requests a soft reset after saving a BIOS change.
+
+`x87_enabled=1` exposes the emulated x87 math coprocessor.  Set it to `0`, or
+switch the disk-menu `X87` row to `OFF`, to make DOS probes behave as if no
+math coprocessor is installed.
 
 `image_dir` is resolved relative to `pico_286.conf` unless it is absolute.
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is
