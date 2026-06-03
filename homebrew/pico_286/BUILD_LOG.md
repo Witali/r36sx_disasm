@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-06-03 strict 8086 address space and AT-memory gating
+
+Audited the `cpu_model=8086` path against Intel 8086/8088 documentation and
+AMD second-source 8086/8088 material.  The documented 8086 opcode set remains
+enabled, while 80186/80286/80386 opcode gates continue to reject later
+instructions in 8086 mode.
+
+Fixed two capability leaks that were not plain opcodes:
+
+- Real-mode address translation now enforces the original 8086/8088 20-bit
+  physical address wrap.  `FFFF:0010` maps to physical `00000h`, and 16/32-bit
+  accesses crossing `0FFFFFh` are split byte-wise so they wrap correctly.
+- AT/286 memory services are hidden from `cpu_model=8086`: BIOS
+  `INT 15h AH=87h/88h` now reports unsupported, and XMS installation checks
+  through `INT 2Fh AX=4300h/4310h` no longer expose an XMS entry point.
+
+Reference documents used for the audit:
+
+- Intel, *The 8086 Family User's Manual*, October 1979.
+- AMD, *Am8086/Am8088 16-Bit HMOS Microprocessors* data-sheet/manual material.
+
+Rebuilt with:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+- size: `567528` bytes
+- SHA256:
+  `6158F7B471800C286BC5297C0D4FD509CB88D7F2038732760D8989B17A265DAE`
+
 ## 2026-06-03 strict documented 8086 opcode filtering
 
 Audited the `cpu_model=8086` decoder against Intel's documented 8086/8088

@@ -55,6 +55,7 @@ bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
 static uint8_t r36sx_cpu_interpreter_protected;
+static uint8_t r36sx_cpu_strict_8086_mode;
 
 static inline uint8_t r36sx_cpu_x87_present(void)
 {
@@ -4152,6 +4153,16 @@ static inline uint8_t r36sx_dpmi_real_entry_available(void)
            !r36sx_cpu_protected_enabled();
 }
 
+static inline uint8_t r36sx_cpu_at_class_memory_available(void)
+{
+    /*
+     * XMS, BIOS INT 15h extended-memory services, and HMA/A20-visible memory
+     * are AT/286-class facilities.  Hide them when the user selects the
+     * documented 8086 compatibility model.
+     */
+    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286);
+}
+
 static inline uint8_t r36sx_dpmi_processor_type(void)
 {
     if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
@@ -5667,14 +5678,26 @@ void intcall86(uint8_t intnum) {
         case 0x15: /* XMS */
             switch (CPU_AH) {
                 case 0x87: {
+                    if (!r36sx_cpu_at_class_memory_available()) {
+                        CPU_AH = 0x86; /* Function not supported. */
+                        cf = 1;
+                        return;
+                    }
                     //https://github.com/neozeed/himem.sys-2.06/blob/5761f4fc182543b3964fd0d3a236d04bac7bfb50/oemsrc/himem.asm#L690
                     //                    printf("mem move?! %x %x:%x\n", CPU_CX, CPU_ES, CPU_SI);
                     CPU_AX = 0;
+                    cf = 0;
                     return;
                 }
                     return;
                 case 0x88: {
+                    if (!r36sx_cpu_at_class_memory_available()) {
+                        CPU_AH = 0x86; /* Function not supported. */
+                        cf = 1;
+                        return;
+                    }
                     CPU_AX = (uint16_t)r36sx_pico286_extended_memory_kb();
+                    cf = 0;
                     return;
                 }
             }
@@ -5767,9 +5790,17 @@ void intcall86(uint8_t intnum) {
             switch (CPU_AX) {
                 /* XMS */
                 case 0x4300:
+                    if (!r36sx_cpu_at_class_memory_available()) {
+                        CPU_AL = 0x00; /* XMS driver not installed. */
+                        return;
+                    }
                     CPU_AL = 0x80;
                     return;
                 case 0x4310: {
+                    if (!r36sx_cpu_at_class_memory_available()) {
+                        CPU_AL = 0x00; /* Do not expose an XMS entry point. */
+                        return;
+                    }
                     r36sx_cpu_load_segment(reges, XMS_FN_CS); // to be handled by DOS memory manager using
                     CPU_BX = XMS_FN_IP; // CALL FAR ES:BX
                     return;
@@ -5821,6 +5852,12 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum)
 
 
 void reset86() {
+#if !PICO_ON_DEVICE
+    r36sx_cpu_strict_8086_mode =
+        r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086;
+#else
+    r36sx_cpu_strict_8086_mode = 0;
+#endif
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;

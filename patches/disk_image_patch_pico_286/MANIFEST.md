@@ -40,6 +40,24 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 strict 8086 address space and AT-memory gating
+
+The normal `pico_286` binary now keeps `cpu_model=8086` from exposing AT/286
+memory capabilities:
+
+- real-mode CPU memory accesses wrap to 20 physical address bits, including
+  16/32-bit accesses that cross `0FFFFFh`;
+- BIOS `INT 15h AH=87h/88h` is unsupported in 8086 mode;
+- XMS `INT 2Fh AX=4300h/4310h` does not advertise an installed XMS driver in
+  8086 mode.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `567528` bytes
+- SHA256:
+  `6158F7B471800C286BC5297C0D4FD509CB88D7F2038732760D8989B17A265DAE`
+
 ## 2026-06-03 strict documented 8086 opcode filtering
 
 The normal `pico_286` binary now rejects additional undocumented or invalid
