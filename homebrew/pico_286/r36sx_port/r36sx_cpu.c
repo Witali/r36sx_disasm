@@ -6083,16 +6083,20 @@ static uint8_t r36sx_dpmi_int2f_handler(void)
 
 static uint8_t r36sx_dpmi_int31_handler(void)
 {
+    if (!r36sx_dpmi_host_available()) {
+        /*
+         * With the DPMI host disabled we should behave like a machine without
+         * INT 31h installed, so raw protected-mode tests can exercise the CPU
+         * and BIOS/IVT path without receiving our DPMI scaffold responses.
+         */
+        return 0;
+    }
+
     /*
      * INT 31h is the DPMI service dispatcher.  DPMI 1.0 defines CF=1,
      * AX=8001h for unsupported functions; use that as the safe scaffold until
      * individual services are implemented.
      */
-    if (!r36sx_dpmi_host_available()) {
-        r36sx_dpmi_fail(R36SX_DPMI_UNSUPPORTED_FUNCTION);
-        return 1;
-    }
-
     switch (CPU_AX) {
         case R36SX_DPMI_FUNC_ALLOC_LDT_DESCRIPTORS:
             r36sx_dpmi_alloc_ldt_descriptors();
