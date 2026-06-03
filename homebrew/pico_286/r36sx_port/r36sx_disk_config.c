@@ -80,7 +80,6 @@ static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
 static double cpu_mhz_value = 32.768;
 static char x87_enabled_text[8] = "1";
-static char dpmi_host_enabled_text[8] = "0";
 static char bios_mode_text[16] = "normal";
 static char test_bios_value[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
 static char test_bios_path[R36SX_PICO286_MAX_DISK_PATH] = "test386.bin";
@@ -122,7 +121,6 @@ static uint32_t cpu_exec_loops = 0;
 static r36sx_pico286_cpu_model_t cpu_model = R36SX_PICO286_CPU_80386;
 static r36sx_pico286_cpu_mode_t cpu_mode = R36SX_PICO286_CPU_MODE_REAL;
 static int x87_enabled = 1;
-static int dpmi_host_enabled = 0;
 static r36sx_pico286_bios_mode_t bios_mode = R36SX_PICO286_BIOS_NORMAL;
 static int boot_bios_prompt = 0;
 static uint32_t disk_cache_buffer_bytes = 64u * 1024u;
@@ -727,30 +725,6 @@ static int set_x87_value(const char *key, const char *value, int line_no)
     snprintf(x87_enabled_text, sizeof(x87_enabled_text),
              "%d", enabled ? 1 : 0);
     r36sx_pico286_debug_log("diskcfg: x87_enabled=%d", x87_enabled);
-    return 1;
-}
-
-static int set_dpmi_host_value(const char *key, const char *value,
-                               int line_no)
-{
-    int enabled;
-
-    if (!parse_bool_value(value, &enabled)) {
-        r36sx_pico286_debug_log(
-            "diskcfg: ignoring invalid %s '%s' at line %d",
-            key, value, line_no);
-        return 1;
-    }
-
-    /*
-     * The built-in DPMI host is still an experimental scaffold.  Keep it behind
-     * an explicit switch so normal DOS extenders can choose their own path.
-     */
-    dpmi_host_enabled = enabled;
-    snprintf(dpmi_host_enabled_text, sizeof(dpmi_host_enabled_text),
-             "%d", enabled ? 1 : 0);
-    r36sx_pico286_debug_log("diskcfg: dpmi_host_enabled=%d",
-                            dpmi_host_enabled);
     return 1;
 }
 
@@ -1592,12 +1566,6 @@ static int set_config_value(const char *key, const char *value, int line_no)
         key_equals(key, "math_coprocessor_enabled")) {
         return set_x87_value(key, value, line_no);
     }
-    if (key_equals(key, "dpmi_host_enabled") ||
-        key_equals(key, "dpmi_enabled") ||
-        key_equals(key, "builtin_dpmi") ||
-        key_equals(key, "builtin_dpmi_host")) {
-        return set_dpmi_host_value(key, value, line_no);
-    }
     if (key_equals(key, "boot_mode")) {
         return set_boot_mode(value, line_no);
     }
@@ -1873,14 +1841,11 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# 80386=300k instructions/sec per MHz.\n");
     fprintf(fp, "# The disk menu edits cpu_mhz from 1 to 30 MHz in 1 MHz steps.\n");
     fprintf(fp, "# x87_enabled=0 hides the math coprocessor from DOS probes.\n");
-    fprintf(fp, "# dpmi_host_enabled=1 advertises the experimental built-in DPMI host.\n");
-    fprintf(fp, "# Keep it off for normal DOS extender testing until the host is complete.\n");
     fprintf(fp, "[cpu]\n");
     fprintf(fp, "cpu_model=%s\n", cpu_model_text);
     fprintf(fp, "cpu_mode=%s\n", cpu_mode_text);
     fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
-    fprintf(fp, "x87_enabled=%s\n", x87_enabled_text);
-    fprintf(fp, "dpmi_host_enabled=%s\n\n", dpmi_host_enabled_text);
+    fprintf(fp, "x87_enabled=%s\n\n", x87_enabled_text);
 
     fprintf(fp, "# Main loop timing. target_fps sets the frame budget used by\n");
     fprintf(fp, "# adaptive exec86 quantum control and display pacing.\n");
@@ -2143,13 +2108,6 @@ int r36sx_pico286_set_x87_enabled(int enabled)
     load_disk_config();
 
     return set_x87_value("x87_enabled", enabled ? "1" : "0", 0);
-}
-
-int r36sx_pico286_dpmi_host_enabled(void)
-{
-    load_disk_config();
-
-    return dpmi_host_enabled;
 }
 
 r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void)

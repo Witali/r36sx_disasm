@@ -173,10 +173,6 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
         CPU_CS, (unsigned long)CPU_IP);
 
     if (r36sx_cpu_protected_enabled()) {
-        if (r36sx_dpmi_dispatch_pm_exception(intnum, error_code,
-                                             has_error_code)) {
-            return;
-        }
         if (!r36sx_cpu_protected_interrupt(
                 intnum, error_code, has_error_code, 0)) {
             r36sx_pm_diag_log_first_fault("protected exception delivery",

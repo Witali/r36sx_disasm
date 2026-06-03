@@ -145,7 +145,6 @@ cpu_model=80386
 cpu_mode=real
 cpu_mhz=10.0
 x87_enabled=1
-dpmi_host_enabled=0
 
 [timing]
 target_fps=60
@@ -221,9 +220,9 @@ experimental: guest code can enter through `LMSW`/`MOV CR0`, load GDT/IDT with
 `LGDT`/`LIDT`, reload descriptors through far control transfers, use basic
 protected interrupt gates, and access linear physical memory above 1 MB
 through the XMS-backed extended RAM buffer.  Paging, privilege checks, task
-switching, call gates, and the built-in DPMI service are still incomplete.
-VCPI is intentionally not implemented in the emulator core; if a program needs
-VCPI, provide it as a guest DOS driver or TSR that hooks `INT 67h`.  Keep
+switching, call gates, and full VM86 monitor behavior are still incomplete.
+DPMI and VCPI are intentionally not implemented in the emulator core; provide
+them as guest DOS drivers or TSRs if a program needs those services.  Keep
 `cpu_mode=real` for normal DOS use.
 
 `cpu_mhz` is converted to an `exec86()` instruction budget with a

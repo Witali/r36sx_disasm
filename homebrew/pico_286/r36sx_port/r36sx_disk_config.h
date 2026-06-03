@@ -123,9 +123,6 @@ int r36sx_pico286_x87_enabled(void);
 // Update the emulated x87 math coprocessor presence flag.
 int r36sx_pico286_set_x87_enabled(int enabled);
 
-// Return non-zero when the experimental built-in DPMI host is advertised.
-int r36sx_pico286_dpmi_host_enabled(void);
-
 // Return the configured initial CPU execution mode.
 r36sx_pico286_cpu_mode_t r36sx_pico286_cpu_mode(void);
 

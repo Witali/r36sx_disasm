@@ -11,66 +11,24 @@ be checked against the relevant specification and committed separately.
   https://pdos.csail.mit.edu/6.828/2018/readings/i386.pdf
 - Intel 64 and IA-32 Architectures Software Developer's Manual:
   https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
-- DPMI Specification Version 1.0, DPMI Committee, March 12 1991:
-  https://docs.pcjs.org/specs/dpmi/1991_03_12-DPMI_Spec_v10.pdf
-
 ## Current Order
 
 0. 386 instruction-set audit.
    - Status: started.
    - Current audit file: `INTEL_386_INSTRUCTION_AUDIT.md`.
    - Next target: implement the missing 386-only opcodes listed there before
-     expanding the built-in DPMI surface.  VCPI belongs in a guest DOS driver
-     or TSR, not in the emulator core.
+     expanding protected-mode privilege, paging, and VM86 behavior.  DPMI and
+     VCPI belong in guest DOS drivers or TSRs, not in the emulator core.
 
-1. Minimal DPMI host groundwork.
-   - Status: partial.
-   - Specification checkpoints: DPMI client initialization, `INT 2Fh
-     AX=1686h/1687h`, protected-mode entry, and `INT 31h` dispatcher rules.
-   - Completed so far: `INT 2Fh AX=1686h/1687h` and `INT 31h` now route
-     through named DPMI helpers.  `AX=1687h` reports the host, returns a magic
-     far-call entry, and that entry switches a client to protected mode with
-     initial CS/SS/DS/ES descriptors and a converted PSP environment pointer.
-     Protected-mode `INT 31h` is intercepted before IDT delivery.  Protected
-     interrupt vectors installed through `INT 31h AX=0205h` are now dispatched
-     before the raw IDT fallback.  The real-mode translation bridge now
-     implements `INT 31h AX=0300h..0302h`, including host-supplied real-mode
-     stack fallback, DPMI register-block import/export, and default interrupt
-     reflection when no protected interrupt vector is installed.
-   - Next target: add real-mode callback services and raw mode-switch stubs
-     (`INT 31h AX=0303h..0306h`), or continue with DOS memory block services
-     if DOS4GW trips over `AX=0100h..0102h` first.
-   - Done when: the code has a clean DPMI probe/dispatch structure, debug logs
-     identify all required client-entry values, and later commits can add real
-     `INT 31h` services without touching the generic `intcall86()` flow.
+1. Guest-side extender boundary.
+   - Status: decided.
+   - DPMI and VCPI are outside the emulator core.  A DOS extender host should be
+     loaded as a guest program or driver and should own `INT 2Fh`, `INT 31h`,
+     or `INT 67h` itself.
+   - Done when: the emulator does not intercept those interfaces and the CPU
+     protected-mode implementation is accurate enough for a guest-side host.
 
-2. Minimal `INT 31h` services for DOS extenders.
-   - Status: started.
-   - Specification checkpoints: descriptor allocation/free, descriptor
-     base/limit/access rights, version query, real-mode interrupt/procedure
-     bridge, DOS memory allocate/free, exception/vector get/set, and terminate.
-   - Completed so far: the protected-mode `INT 31h` dispatcher implements
-     selector increment (`AX=0003h`), version query (`AX=0400h`), and the
-     capabilities/vendor string query (`AX=0401h`) with conservative feature
-     flags.  A small DPMI LDT-style descriptor pool handles descriptor
-     allocation/free (`AX=0000h/0001h`), base/limit/access updates
-     (`AX=0006h/0007h/0008h/0009h`), segment-to-descriptor mapping
-     (`AX=0002h`), alias descriptors (`AX=000Ah`), raw descriptor copy
-     (`AX=000Bh/000Ch`), allocate-specific selector (`AX=000Dh`), and
-     get/set-multiple descriptors (`AX=000Eh/000Fh`).  Vector services
-     (`AX=0200h..0205h`, `AX=0210h..0213h`), real-mode interrupt/procedure
-     simulation (`AX=0300h..0302h`), committed linear memory allocation/free/
-     resize (`AX=0500h..0503h`), and page-size query (`AX=0604h`) are
-     scaffolded.
-   - Missing: DOS memory block services (`AX=0100h..0102h`), real-mode
-     callbacks (`AX=0303h/0304h`), state-save/raw switch addresses
-     (`AX=0305h/0306h`), lock/unlock/page mapping APIs, and conformance testing
-     of the new default interrupt reflection path.
-   - Done when: common DOS extender probes can query DPMI version, allocate
-     descriptors, configure flat 32-bit code/data descriptors, and return clean
-     failure for unimplemented functions.
-
-3. Full VM86 monitor behavior.
+2. Full VM86 monitor behavior.
    - Status: partial.
    - Already present: VM86 task entry, VM86 interrupt frame/`IRETD`, TSS I/O
      bitmap checks, IOPL-sensitive traps for `LOCK`, `PUSHF`, `POPF`,
@@ -80,7 +38,7 @@ be checked against the relevant specification and committed separately.
    - Done when: a VM86 task can run DOS/BIOS calls under a protected monitor
      without leaving the emulator in a fault loop.
 
-4. Protected-mode paging conformance.
+3. Protected-mode paging conformance.
    - Status: partial.
    - Already present: basic 80386 two-level paging, `CR2`, `CR3`, `#PF`,
      present/user/write checks, and accessed/dirty updates.
@@ -90,7 +48,7 @@ be checked against the relevant specification and committed separately.
    - Done when: paging behavior matches the 80386 PRM for all supported CR0/CR3
      states used by DOS extenders.
 
-5. Full protected-mode privilege model.
+4. Full protected-mode privilege model.
    - Status: partial.
    - Already present: basic CPL/DPL/RPL checks for segment loads, far control
      transfers, call gates, interrupt/trap gates, and some stack transitions.
@@ -99,7 +57,7 @@ be checked against the relevant specification and committed separately.
    - Done when: descriptor, gate, stack, and exception behavior can be tested
      systematically against Intel 80386 rules.
 
-6. Hardware task-switching conformance.
+5. Hardware task-switching conformance.
    - Status: partial.
    - Already present: 16-bit/32-bit TSS task switches, task gates, busy-bit
      updates, backlink, `IRET` with `NT`, `CR3`, `LDTR`, segments, and `CR0.TS`.
@@ -108,7 +66,7 @@ be checked against the relevant specification and committed separately.
    - Done when: `test386.asm` protected TSS tests no longer expose task-switch
      failures.
 
-7. Regression and conformance tests.
+6. Regression and conformance tests.
    - Status: ongoing.
    - Keep using `test386.bin`, PCjs CPU tests, DOS benchmark pack, and the
      existing debug logs.  Add a short build-log entry for every completed

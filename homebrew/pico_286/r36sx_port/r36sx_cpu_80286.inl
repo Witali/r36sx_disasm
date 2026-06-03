@@ -298,7 +298,6 @@ static inline void r36sx_cpu_add_ip(int32_t delta)
 
 #if R36SX_DEBUG_PM_DIAG
 static uint8_t r36sx_pm_diag_first_fault_logged;
-static uint32_t r36sx_pm_diag_int31_logs;
 
 static void r36sx_pm_diag_log_state(const char *event)
 {
@@ -342,28 +341,7 @@ static void r36sx_pm_diag_log_first_fault(const char *reason,
 
 static void r36sx_pm_diag_log_interrupt(uint8_t intnum)
 {
-    if (intnum == 0x2Fu && (CPU_AX == 0x1686u || CPU_AX == 0x1687u)) {
-        r36sx_pico286_debug_log(
-            "[PM] DPMI probe INT 2Fh AX=%04X protected=%u "
-            "cs:eip=%04X:%08lX",
-            CPU_AX, r36sx_cpu_protected_enabled(),
-            CPU_CS, (unsigned long)CPU_IP);
-        return;
-    }
-
-    if (intnum == 0x31u) {
-        if (r36sx_pm_diag_int31_logs < 32u) {
-            r36sx_pico286_debug_log(
-                "[PM] DPMI service INT 31h AX=%04X BX=%04X CX=%04X "
-                "DX=%04X protected=%u cs:eip=%04X:%08lX",
-                CPU_AX, CPU_BX, CPU_CX, CPU_DX,
-                r36sx_cpu_protected_enabled(),
-                CPU_CS, (unsigned long)CPU_IP);
-            r36sx_pm_diag_int31_logs++;
-        }
-        return;
-    }
-
+    (void)intnum;
 }
 #else
 static inline void r36sx_pm_diag_log_first_fault(const char *reason,
@@ -429,10 +407,6 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
 static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
                                            r36sx_segment_cache_t *cache)
 {
-    if (r36sx_dpmi_lookup_descriptor(selector, cache)) {
-        return 1;
-    }
-
     if ((selector & 0xfffcu) == 0) {
         return r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 1);
@@ -459,10 +433,6 @@ static uint8_t r36sx_cpu_decode_descriptor(uint16_t selector,
 static uint8_t r36sx_cpu_decode_descriptor_any(uint16_t selector,
                                                r36sx_segment_cache_t *cache)
 {
-    if (r36sx_dpmi_lookup_descriptor(selector, cache)) {
-        return 1;
-    }
-
     if ((selector & 0xfffcu) == 0) {
         return r36sx_cpu_decode_descriptor_from_table(
             selector, r36sx_gdtr_base, r36sx_gdtr_limit, cache, "GDT", 0);

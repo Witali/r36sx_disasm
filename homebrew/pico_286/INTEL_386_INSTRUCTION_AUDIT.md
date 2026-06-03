@@ -63,10 +63,9 @@ Implemented or substantially implemented:
 - Hardware task switching has 16-bit and 32-bit TSS save/load paths, busy-bit
   updates, backlink handling, `IRET` with `NT`, `CR3`, `LDTR`, segments, and
   `CR0.TS`.
-- DPMI scaffolding exists, but it is intentionally conservative and still does
-  not expose a complete protected-mode host.  VCPI is intentionally not part of
-  the emulator core and should be provided by a guest DOS driver or TSR if
-  needed.
+- DPMI and VCPI host services are intentionally not part of the emulator core.
+  Programs that need them should load guest DOS drivers or TSRs that install the
+  appropriate interrupt interfaces.
 
 ## Missing 386 Instructions
 
@@ -99,10 +98,8 @@ mode is strict and many edge cases still need tests:
   program using hardware breakpoints.
 - Test registers are not implemented.  They matter mostly for strict 386 test
   suites, not normal DOS games.
-- DPMI still reports no real host through `INT 2Fh AX=1687h`, so many
-  DOS extenders will still reject protected mode before touching the CPU core.
-- VCPI is no longer implemented in the emulator core.  Programs that need VCPI
-  should load a guest DOS VCPI or EMS monitor that owns `INT 67h`.
+- DPMI and VCPI are no longer implemented in the emulator core.  DOS extenders
+  that require those APIs need external guest-side hosts.
 - `LOCK`, I/O privilege, VM86, interrupt reflection, and monitor behavior need
   conformance tests around every privileged path.
 - TSS and gate code is substantial, but still needs selector/error-code tests
@@ -118,9 +115,7 @@ mode is strict and many edge cases still need tests:
    correct fault ordering.
 3. Add 386 debug/test register moves, or document and test strict invalid
    behavior if we intentionally omit test registers.
-4. Continue DPMI: real `INT 2Fh AX=1687h` success path, protected-mode entry
-   state, DOS memory services, vector services, and real-mode callback bridge.
-5. Build a small 386 opcode conformance disk that explicitly exercises every
+4. Build a small 386 opcode conformance disk that explicitly exercises every
    386-only instruction above and records pass/fail output.
-6. Add protected-mode exception tests for paging, gates, TSS, privilege
+5. Add protected-mode exception tests for paging, gates, TSS, privilege
    transitions, VM86, and I/O bitmap paths.
