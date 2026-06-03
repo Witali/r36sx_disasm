@@ -27,8 +27,10 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 ## Lower-priority conformance checks
 
-- [ ] Recheck x87 `WAIT/FWAIT` and `ESC D8..DF` behavior against 80386+80387
-      after the integer core is closer to complete.
+- [x] Recheck x87 `WAIT/FWAIT` and `ESC D8..DF` behavior against 80386+80387:
+      `EM`, `MP`, and `TS` now route to `#NM` where required; absent x87 keeps
+      `WAIT/FWAIT` as no-op and decodes/skips `ESC` operands without touching
+      memory or FPU state.
 - [x] Emulate `DR0..DR3` execute-breakpoint `#DB` delivery and `DR6` `B0..B3`
       / `BS` status for instruction breakpoints and single-step traps.
 - [ ] Emulate `DR0..DR3` data read/write watchpoints; this needs hooks in the
