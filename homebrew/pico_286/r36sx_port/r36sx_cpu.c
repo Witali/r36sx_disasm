@@ -260,6 +260,11 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_CR0_PG 0x80000000u
 #define R36SX_CR0_386_RESERVED_READ_MASK 0x7ffffff0u
 #define R36SX_CR3_PAGE_DIRECTORY_MASK 0xfffff000u
+#define R36SX_DR6_RESET 0xffff0ff0u
+#define R36SX_DR7_RESET 0x00000400u
+#define R36SX_386_REGISTER_COUNT 8u
+#define R36SX_386_TEST_REGISTER_FIRST 6u
+#define R36SX_386_TEST_REGISTER_LAST 7u
 #define R36SX_PAGE_PRESENT 0x00000001u
 #define R36SX_PAGE_WRITABLE 0x00000002u
 #define R36SX_PAGE_USER 0x00000004u
@@ -510,6 +515,8 @@ static r36sx_segment_cache_t r36sx_seg_cache[6];
 static uint32_t r36sx_cr0 = R36SX_CR0_ET;
 static uint32_t r36sx_cr2;
 static uint32_t r36sx_cr3;
+static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
+static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_gdtr_base;
 static uint32_t r36sx_idtr_base;
 static uint16_t r36sx_gdtr_limit;
@@ -549,6 +556,8 @@ typedef struct {
     uint32_t cr0;
     uint32_t cr2;
     uint32_t cr3;
+    uint32_t debug_regs[R36SX_386_REGISTER_COUNT];
+    uint32_t test_regs[R36SX_386_REGISTER_COUNT];
     uint32_t gdtr_base;
     uint32_t idtr_base;
     uint16_t gdtr_limit;
@@ -678,7 +687,8 @@ static inline uint8_t r36sx_cpu_iopl(void)
 
 static uint8_t r36sx_cpu_require_cpl0(uint32_t fault_ip)
 {
-    if (r36sx_cpu_protected_enabled() && r36sx_cpu_cpl() != 0u) {
+    if (r36sx_cpu_v86_enabled() ||
+        (r36sx_cpu_protected_enabled() && r36sx_cpu_cpl() != 0u)) {
         r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
         return 0;
     }
@@ -4410,6 +4420,8 @@ static void r36sx_cpu_save_snapshot(r36sx_cpu_snapshot_t *snapshot)
     snapshot->cr0 = r36sx_cr0;
     snapshot->cr2 = r36sx_cr2;
     snapshot->cr3 = r36sx_cr3;
+    memcpy(snapshot->debug_regs, r36sx_dr, sizeof(snapshot->debug_regs));
+    memcpy(snapshot->test_regs, r36sx_tr, sizeof(snapshot->test_regs));
     snapshot->gdtr_base = r36sx_gdtr_base;
     snapshot->idtr_base = r36sx_idtr_base;
     snapshot->gdtr_limit = r36sx_gdtr_limit;
@@ -4463,6 +4475,8 @@ static void r36sx_cpu_restore_snapshot(const r36sx_cpu_snapshot_t *snapshot)
     r36sx_cr0 = snapshot->cr0;
     r36sx_cr2 = snapshot->cr2;
     r36sx_cr3 = snapshot->cr3;
+    memcpy(r36sx_dr, snapshot->debug_regs, sizeof(r36sx_dr));
+    memcpy(r36sx_tr, snapshot->test_regs, sizeof(r36sx_tr));
     r36sx_gdtr_base = snapshot->gdtr_base;
     r36sx_idtr_base = snapshot->idtr_base;
     r36sx_gdtr_limit = snapshot->gdtr_limit;
@@ -7323,6 +7337,10 @@ void reset86() {
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
     r36sx_cr3 = 0;
+    memset(r36sx_dr, 0, sizeof(r36sx_dr));
+    memset(r36sx_tr, 0, sizeof(r36sx_tr));
+    r36sx_dr[6] = R36SX_DR6_RESET;
+    r36sx_dr[7] = R36SX_DR7_RESET;
     r36sx_gdtr_base = 0;
     r36sx_gdtr_limit = 0;
     r36sx_idtr_base = 0;

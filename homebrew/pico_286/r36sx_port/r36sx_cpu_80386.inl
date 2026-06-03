@@ -950,6 +950,73 @@ static __not_in_flash() void r36sx_cpu_load_far_data_pointer(uint8_t segid,
     }
 }
 
+static inline uint8_t r36sx_cpu_debug_register_valid(uint8_t index)
+{
+    return index < R36SX_386_REGISTER_COUNT && index != 4u && index != 5u;
+}
+
+static inline uint8_t r36sx_cpu_test_register_valid(uint8_t index)
+{
+    return index >= R36SX_386_TEST_REGISTER_FIRST &&
+           index <= R36SX_386_TEST_REGISTER_LAST;
+}
+
+static inline uint32_t r36sx_cpu_read_debug_register(uint8_t index)
+{
+    /*
+     * Keep 386 reserved bits visible as ones where DOS extenders and
+     * diagnostic tools commonly probe them; breakpoint side effects are still
+     * tracked as a separate TODO.
+     */
+    if (index == 6u) {
+        return r36sx_dr[6] | R36SX_DR6_RESET;
+    }
+    if (index == 7u) {
+        return r36sx_dr[7] | R36SX_DR7_RESET;
+    }
+    return r36sx_dr[index];
+}
+
+static __not_in_flash() void r36sx_cpu_mov_debug_register(uint8_t to_debug,
+                                                          uint32_t fault_ip)
+{
+    modregrm();
+    if (mode != R36SX_MODRM_MOD_REGISTER ||
+        !r36sx_cpu_debug_register_valid(reg)) {
+        r36sx_cpu_invalid_opcode(fault_ip);
+        return;
+    }
+    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+        return;
+    }
+
+    if (to_debug) {
+        r36sx_dr[reg] = getreg32(rm);
+    } else {
+        putreg32(rm, r36sx_cpu_read_debug_register(reg));
+    }
+}
+
+static __not_in_flash() void r36sx_cpu_mov_test_register(uint8_t to_test,
+                                                         uint32_t fault_ip)
+{
+    modregrm();
+    if (mode != R36SX_MODRM_MOD_REGISTER ||
+        !r36sx_cpu_test_register_valid(reg)) {
+        r36sx_cpu_invalid_opcode(fault_ip);
+        return;
+    }
+    if (!r36sx_cpu_require_cpl0(fault_ip)) {
+        return;
+    }
+
+    if (to_test) {
+        r36sx_tr[reg] = getreg32(rm);
+    } else {
+        putreg32(rm, r36sx_tr[reg]);
+    }
+}
+
 static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 {
     uint8_t op2 = getmem8(CPU_CS, CPU_IP);
@@ -1167,8 +1234,11 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
 
         case 0x20: { /* MOV Rd,Cd */
             modregrm();
-            if (mode != 3) {
+            if (mode != R36SX_MODRM_MOD_REGISTER) {
                 r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            if (!r36sx_cpu_require_cpl0(fault_ip)) {
                 return;
             }
             switch (reg) {
@@ -1186,10 +1256,17 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             return;
         }
 
+        case 0x21: /* MOV Rd,Dd */
+            r36sx_cpu_mov_debug_register(0, fault_ip);
+            return;
+
         case 0x22: { /* MOV Cd,Rd */
             modregrm();
-            if (mode != 3) {
+            if (mode != R36SX_MODRM_MOD_REGISTER) {
                 r36sx_cpu_invalid_opcode(fault_ip);
+                return;
+            }
+            if (!r36sx_cpu_require_cpl0(fault_ip)) {
                 return;
             }
             switch (reg) {
@@ -1206,6 +1283,18 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             r36sx_cpu_invalid_opcode(fault_ip);
             return;
         }
+
+        case 0x23: /* MOV Dd,Rd */
+            r36sx_cpu_mov_debug_register(1, fault_ip);
+            return;
+
+        case 0x24: /* MOV Rd,Td */
+            r36sx_cpu_mov_test_register(0, fault_ip);
+            return;
+
+        case 0x26: /* MOV Td,Rd */
+            r36sx_cpu_mov_test_register(1, fault_ip);
+            return;
 
         case 0xA0:
             if (operandSizeOverride) {

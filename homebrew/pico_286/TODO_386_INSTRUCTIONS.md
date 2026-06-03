@@ -10,8 +10,8 @@ Intel 80386 Programmer's Reference Manual instruction set.
 - [x] `0F B2`: `LSS r16|32, m16:16|32`.
 - [x] `0F B4`: `LFS r16|32, m16:16|32`.
 - [x] `0F B5`: `LGS r16|32, m16:16|32`.
-- [ ] `0F 21` / `0F 23`: `MOV r32, DRx` and `MOV DRx, r32`.
-- [ ] `0F 24` / `0F 26`: `MOV r32, TR6|TR7` and `MOV TR6|TR7, r32`.
+- [x] `0F 21` / `0F 23`: `MOV r32, DRx` and `MOV DRx, r32`.
+- [x] `0F 24` / `0F 26`: `MOV r32, TR6|TR7` and `MOV TR6|TR7, r32`.
 
 ## Incomplete operand/address-size behavior
 
@@ -29,5 +29,8 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 - [ ] Recheck x87 `WAIT/FWAIT` and `ESC D8..DF` behavior against 80386+80387
       after the integer core is closer to complete.
+- [ ] Emulate debug-register breakpoint side effects (`DR0..DR3`, `DR6`,
+      `DR7`) and `#DB`; current `MOV DRx` support only stores and reports the
+      register state.
 - [ ] Add small instruction-level DOS tests for the fixed opcodes, especially
       flags and protected-mode exception paths.
