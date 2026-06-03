@@ -23,15 +23,16 @@ be checked against the relevant specification and committed separately.
      expanding the higher-level DPMI/VCPI surface.
 
 1. Minimal DPMI host groundwork.
-   - Status: started.
+   - Status: partial.
    - Specification checkpoints: DPMI client initialization, `INT 2Fh
      AX=1686h/1687h`, protected-mode entry, and `INT 31h` dispatcher rules.
    - Completed so far: `INT 2Fh AX=1686h/1687h` and `INT 31h` now route
-     through named DPMI helpers.  `AX=1687h` still reports no host until a real
-     protected-mode entry exists, and `INT 31h` returns the DPMI unsupported
-     function shape (`CF=1`, `AX=8001h`) as a safe scaffold.
-   - Next target: add the real `AX=1687h` installation-check success path only
-     after a protected-mode entry routine and client state block exist.
+     through named DPMI helpers.  `AX=1687h` reports the host, returns a magic
+     far-call entry, and that entry switches a client to protected mode with
+     initial CS/SS/DS/ES descriptors and a converted PSP environment pointer.
+     Protected-mode `INT 31h` is intercepted before IDT delivery.
+   - Next target: add the real-mode interrupt/procedure bridge and callback
+     services (`INT 31h AX=0300h..0306h`).
    - Done when: the code has a clean DPMI probe/dispatch structure, debug logs
      identify all required client-entry values, and later commits can add real
      `INT 31h` services without touching the generic `intcall86()` flow.
@@ -41,17 +42,23 @@ be checked against the relevant specification and committed separately.
    - Specification checkpoints: descriptor allocation/free, descriptor
      base/limit/access rights, version query, real-mode interrupt/procedure
      bridge, DOS memory allocate/free, exception/vector get/set, and terminate.
-   - Completed so far: the protected-mode `INT 31h` dispatcher now implements
+   - Completed so far: the protected-mode `INT 31h` dispatcher implements
      selector increment (`AX=0003h`), version query (`AX=0400h`), and the
      capabilities/vendor string query (`AX=0401h`) with conservative feature
-     flags.  A small DPMI LDT-style descriptor pool now handles descriptor
-     allocation/free (`AX=0000h/0001h`) plus base, limit, and access-rights
-     updates (`AX=0006h/0007h/0008h/0009h`), and the CPU descriptor decoder can
-     resolve those selectors.  Segment-to-descriptor mapping, alias
-     descriptors, and raw descriptor copy services (`AX=0002h/000Ah/000Bh/000Ch`)
-     are also scaffolded on the same pool.  The real-mode `AX=1687h`
-     installation check still reports no host until the mode-switch entry point
-     exists.
+     flags.  A small DPMI LDT-style descriptor pool handles descriptor
+     allocation/free (`AX=0000h/0001h`), base/limit/access updates
+     (`AX=0006h/0007h/0008h/0009h`), segment-to-descriptor mapping
+     (`AX=0002h`), alias descriptors (`AX=000Ah`), raw descriptor copy
+     (`AX=000Bh/000Ch`), allocate-specific selector (`AX=000Dh`), and
+     get/set-multiple descriptors (`AX=000Eh/000Fh`).  Vector services
+     (`AX=0200h..0205h`, `AX=0210h..0213h`), committed linear memory
+     allocation/free/resize (`AX=0500h..0503h`), and page-size query
+     (`AX=0604h`) are scaffolded.
+   - Missing: DOS memory block services (`AX=0100h..0102h`), real-mode
+     interrupt/procedure simulation (`AX=0300h..0302h`), callbacks
+     (`AX=0303h/0304h`), state-save/raw switch addresses (`AX=0305h/0306h`),
+     lock/unlock/page mapping APIs, and actual interrupt reflection through the
+     stored protected-mode vectors.
    - Done when: common DOS extender probes can query DPMI version, allocate
      descriptors, configure flat 32-bit code/data descriptors, and return clean
      failure for unimplemented functions.

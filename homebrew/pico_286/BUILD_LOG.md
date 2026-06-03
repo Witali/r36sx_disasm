@@ -1,5 +1,49 @@
 # pico-286 Build Log
 
+## 2026-06-03 DPMI entry, vectors, and memory services
+
+Extended the DPMI scaffold into a working real-to-protected entry path and added
+the next group of `INT 31h` services checked against DPMI 1.0.
+
+Implemented:
+
+- `INT 2Fh AX=1687h`: installation check now reports the host and returns a
+  magic far-call entry point.  The entry switches the client to protected mode,
+  creates initial CS/SS/DS/ES selectors, converts the PSP environment pointer,
+  and returns through the normal protected `RETF` path.
+- Protected-mode `INT 31h` dispatch is now intercepted before IDT delivery, so
+  DPMI calls work after the mode switch.
+- `AX=000Dh/000Eh/000Fh`: allocate specific selector and get/set multiple raw
+  descriptors.
+- `AX=0200h..0205h` plus `AX=0210h..0213h`: real-mode vector get/set, protected
+  interrupt vector get/set, and exception vector storage.
+- `AX=0500h..0503h`: committed linear memory info, allocate, free, and resize
+  blocks using a small first-fit allocator over the configured XMS-backed linear
+  memory area.
+- `AX=0604h`: page size query, currently `4096` bytes.
+
+Still not a full DPMI 1.0 host: real-mode interrupt/procedure simulation
+(`0300h..0302h`), real-mode callbacks (`0303h/0304h`), raw mode switch
+addresses/state save-restore (`0305h/0306h`), DOS memory block services
+(`0100h..0102h`), locking/page mapping APIs, and full protected interrupt
+reflection remain in the protected-mode TODO.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `555024` bytes
+- `pico_286` SHA256:
+  `03FA997F3A6A56A7B746161AA468D3FFCDEBFB62CD7E8D2FF388628E4946DF09`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-02 DPMI raw descriptor services
 
 Extended the DPMI descriptor scaffold with additional DPMI 1.0 selector
