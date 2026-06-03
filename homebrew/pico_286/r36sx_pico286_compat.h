@@ -58,9 +58,11 @@ static inline void r36sx_pico286_debug_log(const char *format, ...)
 static inline void r36sx_pico286_debug_reset(void)
 {
 #if DEBUG
-    unlink(R36SX_PICO286_LOG_PATH);
-    unlink(R36SX_PICO286_FALLBACK_LOG_PATH);
-    r36sx_pico286_debug_log("log reset");
+    /*
+     * Keep previous runs in the same file.  Each debug run appends this marker
+     * before the build/configuration lines so device logs preserve history.
+     */
+    r36sx_pico286_debug_log("log start");
 #endif
 }
 
