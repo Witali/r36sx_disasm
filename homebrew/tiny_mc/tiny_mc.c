@@ -2584,6 +2584,51 @@ static void split_dir_base(const char *path, char *dir, size_t dir_size, const c
     }
 }
 
+static void make_program_log_name(char *out, size_t out_size, const char *base, const char *suffix)
+{
+    size_t suffix_len = strlen(suffix);
+    size_t base_limit = 0;
+
+    if (out_size > suffix_len + 1) {
+        base_limit = out_size - suffix_len - 1;
+    }
+    if (!base || !base[0]) {
+        base = "program";
+    }
+
+    snprintf(out, out_size, "%.*s%s", (int)base_limit, base, suffix);
+}
+
+static void redirect_fd_to_file(int target_fd, const char *path)
+{
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+    if (fd < 0) {
+        log_msg("child output redirect failed: %s: %s", path, strerror(errno));
+        return;
+    }
+
+    if (dup2(fd, target_fd) < 0) {
+        log_msg("child output dup2 failed: %s: fd=%d: %s",
+                path, target_fd, strerror(errno));
+    }
+    if (fd != target_fd) {
+        close(fd);
+    }
+}
+
+static void redirect_child_output(const char *base)
+{
+    char stdout_log[MAX_NAME];
+    char stderr_log[MAX_NAME];
+
+    /* Keep each launched program's latest stdout/stderr next to the program. */
+    make_program_log_name(stdout_log, sizeof(stdout_log), base, ".stdout.log");
+    make_program_log_name(stderr_log, sizeof(stderr_log), base, ".stderr.log");
+    redirect_fd_to_file(STDOUT_FILENO, stdout_log);
+    redirect_fd_to_file(STDERR_FILENO, stderr_log);
+}
+
 static void finish_button_frame(uint32_t buttons)
 {
     ensure_selection_visible();
@@ -2650,6 +2695,7 @@ static int launch_selected(void)
 
     if (pid == 0) {
         chdir(dir);
+        redirect_child_output(base);
         setenv("LD_LIBRARY_PATH",
                "/mnt/sdcard/cubegm/lib:/mnt/sdcard/cubegm/usr/lib:/lib:/usr/lib",
                1);
