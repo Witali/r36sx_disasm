@@ -437,6 +437,48 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DPMI_INVALID_SELECTOR 0x8022u
 #define R36SX_DPMI_INVALID_HANDLE 0x8023u
 #define R36SX_DPMI_UNSUPPORTED_FUNCTION 0x8001u
+#define R36SX_VCPI_VERSION_MAJOR 1u
+#define R36SX_VCPI_VERSION_MINOR 0u
+#define R36SX_VCPI_FUNC_INSTALLATION_CHECK 0x00u
+#define R36SX_VCPI_FUNC_GET_PM_INTERFACE 0x01u
+#define R36SX_VCPI_FUNC_GET_MAX_PHYSICAL_PAGE 0x02u
+#define R36SX_VCPI_FUNC_GET_FREE_PAGES 0x03u
+#define R36SX_VCPI_FUNC_ALLOC_PAGE 0x04u
+#define R36SX_VCPI_FUNC_FREE_PAGE 0x05u
+#define R36SX_VCPI_FUNC_GET_FIRST_MB_PAGE 0x06u
+#define R36SX_VCPI_FUNC_READ_CR0 0x07u
+#define R36SX_VCPI_FUNC_READ_DEBUG_REGS 0x08u
+#define R36SX_VCPI_FUNC_SET_DEBUG_REGS 0x09u
+#define R36SX_VCPI_FUNC_GET_PIC_MAPPING 0x0au
+#define R36SX_VCPI_FUNC_SET_PIC_MAPPING 0x0bu
+#define R36SX_VCPI_FUNC_SWITCH_PM 0x0cu
+#define R36SX_VCPI_STATUS_NOT_PRESENT 0x84u
+#define R36SX_VCPI_STATUS_OUT_OF_MEMORY 0x88u
+#define R36SX_VCPI_STATUS_INVALID_PAGE 0x8au
+#define R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE 0x8bu
+#define R36SX_VCPI_STATUS_BAD_SUBFUNCTION 0x8fu
+#define R36SX_VCPI_PAGE_SIZE 4096u
+#define R36SX_VCPI_FIRST_MB_PAGES 256u
+#define R36SX_VCPI_MAX_PAGES 4096u
+#define R36SX_VCPI_EXTENDED_BASE 0x00100000u
+#define R36SX_VCPI_PM_ENTRY_IP 0x0404u
+#define R36SX_VCPI_SWITCH_CR3 0x00u
+#define R36SX_VCPI_SWITCH_GDTR_PTR 0x04u
+#define R36SX_VCPI_SWITCH_IDTR_PTR 0x08u
+#define R36SX_VCPI_SWITCH_LDTR 0x0cu
+#define R36SX_VCPI_SWITCH_TR 0x0eu
+#define R36SX_VCPI_SWITCH_EIP 0x10u
+#define R36SX_VCPI_SWITCH_CS 0x14u
+#define R36SX_VCPI_RETURN_FRAME_BYTES 8u
+#define R36SX_VCPI_V86_EIP 0x08u
+#define R36SX_VCPI_V86_CS 0x0cu
+#define R36SX_VCPI_V86_EFLAGS 0x10u
+#define R36SX_VCPI_V86_ESP 0x14u
+#define R36SX_VCPI_V86_SS 0x18u
+#define R36SX_VCPI_V86_ES 0x1cu
+#define R36SX_VCPI_V86_DS 0x20u
+#define R36SX_VCPI_V86_FS 0x24u
+#define R36SX_VCPI_V86_GS 0x28u
 #define R36SX_FLAGS_ALWAYS_ONE 0x0002u
 #define R36SX_FLAGS_STATUS_MASK 0x0fd5u
 #define R36SX_FLAGS_IF_MASK 0x0200u
@@ -568,9 +610,17 @@ static uint8_t r36sx_dpmi_rm_bridge_done;
 static r36sx_dpmi_rm_bridge_return_t r36sx_dpmi_rm_bridge_return;
 static uint16_t r36sx_dpmi_rm_bridge_return_ss;
 static uint32_t r36sx_dpmi_rm_bridge_return_sp;
+static uint8_t r36sx_vcpi_pages_allocated[R36SX_VCPI_MAX_PAGES];
+static uint32_t r36sx_vcpi_debug_regs[8];
+static uint32_t r36sx_vcpi_descriptor_linear;
+static uint16_t r36sx_vcpi_pm_entry_selector;
+static uint16_t r36sx_vcpi_pic_master_base = R36SX_DPMI_PIC_MASTER_BASE;
+static uint16_t r36sx_vcpi_pic_slave_base = R36SX_DPMI_PIC_SLAVE_BASE;
 static uint8_t r36sx_dpmi_lookup_descriptor(uint16_t selector,
                                             r36sx_segment_cache_t *cache);
 static uint32_t r36sx_dpmi_client_offset(void);
+static uint8_t r36sx_vcpi_handle_interrupt(void);
+static uint8_t r36sx_vcpi_protected_entry(void);
 
 static inline uint8_t r36sx_cpu_v86_enabled(void)
 {
@@ -4453,6 +4503,476 @@ static void r36sx_cpu_restore_snapshot(const r36sx_cpu_snapshot_t *snapshot)
     addressSizeOverride = snapshot->address_size_override;
 }
 
+static void r36sx_vcpi_reset_state(void)
+{
+    memset(r36sx_vcpi_pages_allocated, 0, sizeof(r36sx_vcpi_pages_allocated));
+    memset(r36sx_vcpi_debug_regs, 0, sizeof(r36sx_vcpi_debug_regs));
+    r36sx_vcpi_descriptor_linear = 0;
+    r36sx_vcpi_pm_entry_selector = 0;
+    r36sx_vcpi_pic_master_base = R36SX_DPMI_PIC_MASTER_BASE;
+    r36sx_vcpi_pic_slave_base = R36SX_DPMI_PIC_SLAVE_BASE;
+}
+
+static inline uint8_t r36sx_vcpi_available(void)
+{
+    /*
+     * VCPI is a 386+ EMS/V86-server API.  When the built-in DPMI host is
+     * advertised, most extenders should use DPMI instead; expose VCPI for the
+     * raw protected-mode test path where DPMI is deliberately hidden.
+     */
+    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+           !r36sx_pico286_dpmi_host_enabled();
+}
+
+static inline void r36sx_vcpi_succeed(void)
+{
+    CPU_AH = 0;
+}
+
+static inline void r36sx_vcpi_fail(uint8_t status)
+{
+    CPU_AH = status;
+}
+
+static uint32_t r36sx_vcpi_page_count(void)
+{
+    uint32_t bytes = r36sx_pico286_xms_memory_kb() * 1024u;
+    uint32_t pages = bytes / R36SX_VCPI_PAGE_SIZE;
+    return pages > R36SX_VCPI_MAX_PAGES ? R36SX_VCPI_MAX_PAGES : pages;
+}
+
+static uint32_t r36sx_vcpi_page_address(uint32_t page_index)
+{
+    return R36SX_VCPI_EXTENDED_BASE +
+           page_index * R36SX_VCPI_PAGE_SIZE;
+}
+
+static uint8_t r36sx_vcpi_page_index(uint32_t physical, uint32_t *page_index)
+{
+    physical &= R36SX_PAGE_FRAME_MASK;
+    if (physical < R36SX_VCPI_EXTENDED_BASE) {
+        return 0;
+    }
+    uint32_t index = (physical - R36SX_VCPI_EXTENDED_BASE) /
+                     R36SX_VCPI_PAGE_SIZE;
+    if (index >= r36sx_vcpi_page_count()) {
+        return 0;
+    }
+    *page_index = index;
+    return 1;
+}
+
+static uint32_t r36sx_vcpi_free_page_count(void)
+{
+    uint32_t pages = r36sx_vcpi_page_count();
+    uint32_t free_pages = 0;
+    for (uint32_t i = 0; i < pages; i++) {
+        free_pages += r36sx_vcpi_pages_allocated[i] ? 0u : 1u;
+    }
+    return free_pages;
+}
+
+static void r36sx_vcpi_write_descriptor(uint32_t linear,
+                                        uint32_t base,
+                                        uint32_t limit,
+                                        uint8_t access,
+                                        uint8_t flags)
+{
+    uint32_t lo = (limit & 0xffffu) | ((base & 0xffffu) << 16);
+    uint32_t hi = ((base >> 16) & 0x000000ffu) |
+                  ((uint32_t)access << 8) |
+                  ((limit & 0x000f0000u)) |
+                  ((uint32_t)(flags & 0x0fu) << 20) |
+                  (base & 0xff000000u);
+    writedw86(linear, lo);
+    writedw86(linear + 4u, hi);
+}
+
+static uint32_t r36sx_vcpi_segment_linear(uint16_t selector,
+                                          uint32_t offset,
+                                          uint32_t bytes,
+                                          uint8_t write_access,
+                                          uint8_t *ok)
+{
+    uint32_t linear = 0;
+    *ok = r36sx_cpu_segment_linear_checked(selector, offset, bytes,
+                                           write_access, 0, &linear);
+    return linear;
+}
+
+static void r36sx_vcpi_get_pm_interface(void)
+{
+    uint8_t ok;
+    uint32_t page_table_linear =
+        r36sx_vcpi_segment_linear(CPU_ES, CPU_DI, R36SX_VCPI_PAGE_SIZE,
+                                  1, &ok);
+    if (!ok) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+        return;
+    }
+    uint32_t descriptor_linear =
+        r36sx_vcpi_segment_linear(CPU_DS, CPU_SI, 24u, 1, &ok);
+    if (!ok) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+        return;
+    }
+
+    /*
+     * VCPI requires the client's first page table to identity-map at least the
+     * V86 first megabyte.  Filling the full 4 MiB table is legal and keeps the
+     * server hook reachable if a client maps more low linear memory.
+     */
+    for (uint32_t i = 0; i < 1024u; i++) {
+        uint32_t entry = (i * R36SX_VCPI_PAGE_SIZE) |
+                         R36SX_PAGE_PRESENT |
+                         R36SX_PAGE_WRITABLE |
+                         R36SX_PAGE_USER;
+        writedw86(page_table_linear + i * 4u, entry);
+    }
+
+    /*
+     * The three descriptors are owned by the VCPI server.  The first is a flat
+     * 32-bit code descriptor used only to reach the emulator-side magic hook;
+     * the other two are flat data descriptors for protected-mode VCPI calls.
+     */
+    r36sx_vcpi_write_descriptor(
+        descriptor_linear, 0, 0x000fffffu,
+        R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
+            R36SX_DESCRIPTOR_EXECUTABLE | R36SX_DESCRIPTOR_READABLE,
+        R36SX_DESCRIPTOR_FLAG_GRANULAR | R36SX_DESCRIPTOR_FLAG_DB);
+    r36sx_vcpi_write_descriptor(
+        descriptor_linear + 8u, 0, 0x000fffffu,
+        R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
+            R36SX_DESCRIPTOR_WRITABLE,
+        R36SX_DESCRIPTOR_FLAG_GRANULAR | R36SX_DESCRIPTOR_FLAG_DB);
+    r36sx_vcpi_write_descriptor(
+        descriptor_linear + 16u, 0, 0x000fffffu,
+        R36SX_DESCRIPTOR_PRESENT | R36SX_DESCRIPTOR_CODE_DATA |
+            R36SX_DESCRIPTOR_WRITABLE,
+        R36SX_DESCRIPTOR_FLAG_GRANULAR | R36SX_DESCRIPTOR_FLAG_DB);
+
+    r36sx_vcpi_descriptor_linear = descriptor_linear;
+    CPU_DI = (uint16_t)(CPU_DI + R36SX_VCPI_PAGE_SIZE);
+    CPU_EBX = R36SX_VCPI_PM_ENTRY_IP;
+    r36sx_vcpi_succeed();
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] VCPI DE01 page_table=%08lX descriptors=%08lX entry_off=%04X",
+        (unsigned long)page_table_linear,
+        (unsigned long)descriptor_linear,
+        R36SX_VCPI_PM_ENTRY_IP);
+}
+
+static void r36sx_vcpi_update_pm_entry_selector(void)
+{
+    r36sx_vcpi_pm_entry_selector = 0;
+    if (r36sx_vcpi_descriptor_linear < r36sx_gdtr_base) {
+        return;
+    }
+    uint32_t offset = r36sx_vcpi_descriptor_linear - r36sx_gdtr_base;
+    if (offset > 0xffffu || (offset & 7u) != 0 ||
+        offset + 7u > r36sx_gdtr_limit) {
+        return;
+    }
+    r36sx_vcpi_pm_entry_selector =
+        (uint16_t)(offset & R36SX_SELECTOR_INDEX_MASK);
+}
+
+static void r36sx_vcpi_alloc_page(void)
+{
+    uint32_t pages = r36sx_vcpi_page_count();
+    for (uint32_t i = pages; i > 0; i--) {
+        uint32_t page_index = i - 1u;
+        if (!r36sx_vcpi_pages_allocated[page_index]) {
+            r36sx_vcpi_pages_allocated[page_index] = 1;
+            CPU_EDX = r36sx_vcpi_page_address(page_index);
+            r36sx_vcpi_succeed();
+            return;
+        }
+    }
+    CPU_EDX = 0;
+    r36sx_vcpi_fail(R36SX_VCPI_STATUS_OUT_OF_MEMORY);
+}
+
+static void r36sx_vcpi_free_page(void)
+{
+    uint32_t page_index;
+    if (!r36sx_vcpi_page_index(CPU_EDX, &page_index) ||
+        !r36sx_vcpi_pages_allocated[page_index]) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_PAGE);
+        return;
+    }
+    r36sx_vcpi_pages_allocated[page_index] = 0;
+    r36sx_vcpi_succeed();
+}
+
+static void r36sx_vcpi_read_debug_regs(void)
+{
+    uint8_t ok;
+    uint32_t linear =
+        r36sx_vcpi_segment_linear(CPU_ES, CPU_DI, 8u * sizeof(uint32_t),
+                                  1, &ok);
+    if (!ok) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+        return;
+    }
+    for (uint8_t i = 0; i < 8u; i++) {
+        writedw86(linear + (uint32_t)i * 4u, r36sx_vcpi_debug_regs[i]);
+    }
+    r36sx_vcpi_succeed();
+}
+
+static void r36sx_vcpi_set_debug_regs(void)
+{
+    uint8_t ok;
+    uint32_t linear =
+        r36sx_vcpi_segment_linear(CPU_ES, CPU_DI, 8u * sizeof(uint32_t),
+                                  0, &ok);
+    if (!ok) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+        return;
+    }
+    for (uint8_t i = 0; i < 8u; i++) {
+        if (i == 4u || i == 5u) {
+            continue;
+        }
+        r36sx_vcpi_debug_regs[i] = readdw86(linear + (uint32_t)i * 4u);
+    }
+    r36sx_vcpi_succeed();
+}
+
+static uint8_t r36sx_vcpi_switch_to_protected(void)
+{
+    uint32_t switch_linear = CPU_ESI;
+    if (switch_linear >= R36SX_VCPI_EXTENDED_BASE) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+        return 0;
+    }
+
+    r36sx_cpu_snapshot_t snapshot;
+    r36sx_cpu_save_snapshot(&snapshot);
+
+    uint32_t new_cr3 = readdw86(switch_linear + R36SX_VCPI_SWITCH_CR3) &
+                       R36SX_CR3_PAGE_DIRECTORY_MASK;
+    uint32_t gdtr_ptr = readdw86(switch_linear + R36SX_VCPI_SWITCH_GDTR_PTR);
+    uint32_t idtr_ptr = readdw86(switch_linear + R36SX_VCPI_SWITCH_IDTR_PTR);
+    uint16_t new_ldtr = readw86(switch_linear + R36SX_VCPI_SWITCH_LDTR);
+    uint16_t new_tr = readw86(switch_linear + R36SX_VCPI_SWITCH_TR);
+    uint32_t target_eip = readdw86(switch_linear + R36SX_VCPI_SWITCH_EIP);
+    uint16_t target_cs = readw86(switch_linear + R36SX_VCPI_SWITCH_CS);
+    uint16_t new_gdtr_limit = readw86(gdtr_ptr);
+    uint32_t new_gdtr_base = readdw86(gdtr_ptr + 2u);
+    uint16_t new_idtr_limit = readw86(idtr_ptr);
+    uint32_t new_idtr_base = readdw86(idtr_ptr + 2u);
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] VCPI DE0C RM/V86->PM cr3=%08lX gdtr=%08lX:%04X "
+        "idtr=%08lX:%04X ldtr=%04X tr=%04X entry=%04X:%08lX",
+        (unsigned long)new_cr3,
+        (unsigned long)new_gdtr_base, new_gdtr_limit,
+        (unsigned long)new_idtr_base, new_idtr_limit,
+        new_ldtr, new_tr, target_cs, (unsigned long)target_eip);
+
+    r36sx_cr3 = new_cr3;
+    r36sx_gdtr_base = new_gdtr_base;
+    r36sx_gdtr_limit = new_gdtr_limit;
+    r36sx_idtr_base = new_idtr_base;
+    r36sx_idtr_limit = new_idtr_limit;
+    r36sx_vcpi_update_pm_entry_selector();
+
+    uint32_t new_cr0 = r36sx_cr0 | R36SX_CR0_PE;
+    if (new_cr3 != 0) {
+        new_cr0 |= R36SX_CR0_PG;
+    }
+    r36sx_cpu_set_cr0(new_cr0);
+
+    if (!r36sx_cpu_load_ldtr(new_ldtr, CPU_IP) ||
+        !r36sx_cpu_load_tr(new_tr, CPU_IP) ||
+        !r36sx_cpu_protected_far_jump(target_cs, target_eip)) {
+        R36SX_PM_DIAG_LOG("[PM] VCPI DE0C switch failed; restoring state");
+        r36sx_cpu_restore_snapshot(&snapshot);
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_PAGE);
+        return 0;
+    }
+
+    ifl = 0;
+    r36sx_vcpi_succeed();
+    return 1;
+}
+
+static uint32_t r36sx_vcpi_pre_step_ip(uint32_t target_ip)
+{
+    return target_ip - 1u;
+}
+
+static uint8_t r36sx_vcpi_switch_to_real_from_pm(void)
+{
+    uint8_t ok;
+    uint32_t frame_linear =
+        r36sx_vcpi_segment_linear(CPU_SS, CPU_ESP,
+                                  R36SX_VCPI_V86_GS + sizeof(uint32_t),
+                                  0, &ok);
+    if (!ok) {
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_PAGE);
+        return 0xcbu; /* RETF */
+    }
+
+    uint32_t target_ip = readdw86(frame_linear + R36SX_VCPI_V86_EIP);
+    uint16_t target_cs = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_CS);
+    uint32_t target_flags = readdw86(frame_linear + R36SX_VCPI_V86_EFLAGS);
+    uint32_t target_sp = readdw86(frame_linear + R36SX_VCPI_V86_ESP);
+    uint16_t target_ss = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_SS);
+    uint16_t target_es = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_ES);
+    uint16_t target_ds = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_DS);
+    uint16_t target_fs = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_FS);
+    uint16_t target_gs = (uint16_t)readdw86(frame_linear + R36SX_VCPI_V86_GS);
+
+    /*
+     * A real VCPI server returns to virtual-8086 mode.  Pico-286 does not run
+     * DOS under a V86 monitor yet, so use real mode as the DOS-compatible
+     * return environment while preserving the caller-provided register frame.
+     */
+    R36SX_PM_DIAG_LOG(
+        "[PM] VCPI PM-entry DE0C PM->RM frame=%08lX "
+        "cs:ip=%04X:%08lX ss:sp=%04X:%08lX",
+        (unsigned long)frame_linear, target_cs, (unsigned long)target_ip,
+        target_ss, (unsigned long)target_sp);
+
+    r36sx_cpu_set_cr0((r36sx_cr0 & ~(R36SX_CR0_PE | R36SX_CR0_PG)) |
+                      R36SX_CR0_ET);
+    r36sx_cpu_load_segment(regss, target_ss);
+    r36sx_cpu_load_segment(regds, target_ds);
+    r36sx_cpu_load_segment(reges, target_es);
+    r36sx_cpu_load_segment(regfs, target_fs);
+    r36sx_cpu_load_segment(reggs, target_gs);
+    r36sx_cpu_load_segment(regcs, target_cs);
+    CPU_ESP = target_sp;
+    CPU_SP = (uint16_t)target_sp;
+    decodeflagsword((uint16_t)target_flags);
+    ifl = 0;
+    r36sx_cpu_set_ip(r36sx_vcpi_pre_step_ip(target_ip));
+    return 0x90u; /* NOP: StepIP lands on the requested real-mode IP. */
+}
+
+static uint8_t r36sx_vcpi_service(uint8_t protected_entry)
+{
+    if ((CPU_AX & 0xff00u) != 0xde00u) {
+        return 0;
+    }
+
+    if (!r36sx_vcpi_available()) {
+        R36SX_PM_DIAG_LOG(
+            "[PM] VCPI DE%02X unavailable cpu=%s dpmi=%u",
+            CPU_AL, r36sx_pico286_cpu_model_name(),
+            r36sx_pico286_dpmi_host_enabled());
+        r36sx_vcpi_fail(R36SX_VCPI_STATUS_NOT_PRESENT);
+        CPU_BH = 0;
+        CPU_BL = 0;
+        return 1;
+    }
+
+    switch (CPU_AL) {
+        case R36SX_VCPI_FUNC_INSTALLATION_CHECK:
+            r36sx_vcpi_succeed();
+            CPU_BH = R36SX_VCPI_VERSION_MAJOR;
+            CPU_BL = R36SX_VCPI_VERSION_MINOR;
+            return 1;
+
+        case R36SX_VCPI_FUNC_GET_PM_INTERFACE:
+            if (protected_entry) {
+                r36sx_vcpi_fail(R36SX_VCPI_STATUS_BAD_SUBFUNCTION);
+                return 1;
+            }
+            r36sx_vcpi_get_pm_interface();
+            return 1;
+
+        case R36SX_VCPI_FUNC_GET_MAX_PHYSICAL_PAGE: {
+            uint32_t pages = r36sx_vcpi_page_count();
+            CPU_EDX = pages ? r36sx_vcpi_page_address(pages - 1u) : 0;
+            r36sx_vcpi_succeed();
+            return 1;
+        }
+
+        case R36SX_VCPI_FUNC_GET_FREE_PAGES:
+            CPU_EDX = r36sx_vcpi_free_page_count();
+            r36sx_vcpi_succeed();
+            return 1;
+
+        case R36SX_VCPI_FUNC_ALLOC_PAGE:
+            r36sx_vcpi_alloc_page();
+            return 1;
+
+        case R36SX_VCPI_FUNC_FREE_PAGE:
+            r36sx_vcpi_free_page();
+            return 1;
+
+        case R36SX_VCPI_FUNC_GET_FIRST_MB_PAGE:
+            if (CPU_CX >= R36SX_VCPI_FIRST_MB_PAGES) {
+                r36sx_vcpi_fail(R36SX_VCPI_STATUS_INVALID_FIRST_MB_PAGE);
+                return 1;
+            }
+            CPU_EDX = (uint32_t)CPU_CX * R36SX_VCPI_PAGE_SIZE;
+            r36sx_vcpi_succeed();
+            return 1;
+
+        case R36SX_VCPI_FUNC_READ_CR0:
+            CPU_EBX = r36sx_cpu_read_cr0();
+            r36sx_vcpi_succeed();
+            return 1;
+
+        case R36SX_VCPI_FUNC_READ_DEBUG_REGS:
+            r36sx_vcpi_read_debug_regs();
+            return 1;
+
+        case R36SX_VCPI_FUNC_SET_DEBUG_REGS:
+            r36sx_vcpi_set_debug_regs();
+            return 1;
+
+        case R36SX_VCPI_FUNC_GET_PIC_MAPPING:
+            CPU_BX = r36sx_vcpi_pic_master_base;
+            CPU_CX = r36sx_vcpi_pic_slave_base;
+            r36sx_vcpi_succeed();
+            return 1;
+
+        case R36SX_VCPI_FUNC_SET_PIC_MAPPING:
+            r36sx_vcpi_pic_master_base = CPU_BX;
+            r36sx_vcpi_pic_slave_base = CPU_CX;
+            r36sx_vcpi_succeed();
+            return 1;
+
+        case R36SX_VCPI_FUNC_SWITCH_PM:
+            if (protected_entry) {
+                return 1;
+            }
+            return r36sx_vcpi_switch_to_protected();
+
+        default:
+            R36SX_PM_DIAG_LOG(
+                "[PM] VCPI DE%02X unsupported subfunction", CPU_AL);
+            r36sx_vcpi_fail(R36SX_VCPI_STATUS_BAD_SUBFUNCTION);
+            return 1;
+    }
+}
+
+static uint8_t r36sx_vcpi_handle_interrupt(void)
+{
+    return r36sx_vcpi_service(0);
+}
+
+static uint8_t r36sx_vcpi_protected_entry(void)
+{
+    if ((CPU_AX & 0xff00u) != 0xde00u) {
+        return 0xcbu; /* RETF */
+    }
+
+    if (CPU_AL == R36SX_VCPI_FUNC_SWITCH_PM) {
+        return r36sx_vcpi_switch_to_real_from_pm();
+    }
+
+    (void)r36sx_vcpi_service(1);
+    return 0xcbu; /* RETF */
+}
+
 static uint8_t r36sx_dpmi_selector_slot(uint16_t selector, uint8_t *slot)
 {
     if ((selector & R36SX_SELECTOR_TABLE_INDICATOR) == 0) {
@@ -6813,6 +7333,7 @@ void reset86() {
     memset(r36sx_dpmi_memory_blocks, 0, sizeof(r36sx_dpmi_memory_blocks));
     r36sx_dpmi_client_active = 0;
     r36sx_dpmi_client_32bit = 0;
+    r36sx_vcpi_reset_state();
 #if R36SX_DEBUG_PM_DIAG
     r36sx_pm_diag_first_fault_logged = 0;
     r36sx_pm_diag_int31_logs = 0;
@@ -6916,6 +7437,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                                 r36sx_dpmi_client_active &&
                                 r36sx_cpu_protected_enabled())) {
                 opcode = r36sx_dpmi_raw_switch_to_real();
+            } else if (unlikely(r36sx_vcpi_pm_entry_selector != 0 &&
+                                (CPU_CS & 0xfffcu) ==
+                                    (r36sx_vcpi_pm_entry_selector & 0xfffcu) &&
+                                ip == R36SX_VCPI_PM_ENTRY_IP &&
+                                r36sx_cpu_protected_enabled())) {
+                opcode = r36sx_vcpi_protected_entry();
             } else {
                 opcode = getmem8(CPU_CS, CPU_IP);
             }
