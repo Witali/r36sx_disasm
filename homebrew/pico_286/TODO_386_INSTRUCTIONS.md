@@ -15,7 +15,7 @@ Intel 80386 Programmer's Reference Manual instruction set.
 
 ## Incomplete operand/address-size behavior
 
-- [ ] `BOUND`: add 32-bit bounds-table form for operand-size 32.
+- [x] `BOUND`: add 32-bit bounds-table form for operand-size 32.
 - [ ] `LDS` / `LES`: add `r32, m16:32` forms for operand-size 32.
 - [ ] `CMPSD`: implement `A7` as dword compare when operand-size is 32.
 - [ ] `INS` / `OUTS`: implement `INSD` and `OUTSD` when operand-size is 32.

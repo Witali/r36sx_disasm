@@ -8844,14 +8844,27 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
                 }
                 getea(rm);
-                if (!r36sx_cpu_check_segment_access(ea - useseg_base, 4u, 0)) {
-                    break;
-                }
-                if (signext32(getreg16(reg)) < signext32(readw86(ea))) {
-                    r36sx_cpu_set_ip(firstip);
-                    intcall86(R36SX_EXCEPTION_BOUND);
+                if (operandSizeOverride) {
+                    if (!r36sx_cpu_check_segment_access(
+                            ea - useseg_base, 8u, 0)) {
+                        break;
+                    }
+                    int32_t value = (int32_t)getreg32(reg);
+                    int32_t lower = (int32_t)readdw86(ea);
+                    int32_t upper = (int32_t)readdw86(ea + 4u);
+                    if (value < lower || value > upper) {
+                        r36sx_cpu_set_ip(firstip);
+                        intcall86(R36SX_EXCEPTION_BOUND);
+                    }
                 } else {
-                    if (signext32(getreg16(reg)) > signext32(readw86(ea + 2u))) {
+                    if (!r36sx_cpu_check_segment_access(
+                            ea - useseg_base, 4u, 0)) {
+                        break;
+                    }
+                    int32_t value = signext32(getreg16(reg));
+                    int32_t lower = signext32(readw86(ea));
+                    int32_t upper = signext32(readw86(ea + 2u));
+                    if (value < lower || value > upper) {
                         r36sx_cpu_set_ip(firstip);
                         intcall86(R36SX_EXCEPTION_BOUND);
                     }
