@@ -10,7 +10,12 @@
 static inline uint32_t r36sx_cpu_real_linear(uint16_t selector,
                                              uint32_t offset)
 {
-    uint32_t linear = ((uint32_t)selector << 4) + offset;
+    /*
+     * In plain real mode the cache base is selector << 4.  Immediately after
+     * a 386 program clears CR0.PE, however, hidden descriptor caches remain
+     * live until each segment register is reloaded.
+     */
+    uint32_t linear = r36sx_cpu_segbase(selector) + offset;
 
 #if !PICO_ON_DEVICE
     /*

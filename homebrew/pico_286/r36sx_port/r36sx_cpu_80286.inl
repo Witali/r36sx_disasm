@@ -244,10 +244,6 @@ static void r36sx_cpu_commit_segment_cache(uint8_t segid,
 
 uint32_t r36sx_cpu_segbase(uint16_t selector)
 {
-    if (!r36sx_cpu_protected_enabled()) {
-        return (uint32_t)selector << 4;
-    }
-
     for (uint8_t segid = reges; segid <= reggs; segid++) {
         if (r36sx_seg_cache[segid].valid &&
             r36sx_seg_cache[segid].selector == selector) {
@@ -267,7 +263,6 @@ static inline void r36sx_cpu_use_segment(uint8_t segid)
 static inline uint8_t r36sx_cpu_code_default32(void)
 {
     return r36sx_cpu_descriptor_uses_386_format() &&
-           r36sx_cpu_protected_enabled() &&
            r36sx_seg_cache[regcs].valid &&
            r36sx_descriptor_is_code(&r36sx_seg_cache[regcs]) &&
            (r36sx_seg_cache[regcs].flags & R36SX_DESCRIPTOR_FLAG_DB);
@@ -276,7 +271,6 @@ static inline uint8_t r36sx_cpu_code_default32(void)
 static inline uint8_t r36sx_cpu_stack_default32(void)
 {
     return r36sx_cpu_descriptor_uses_386_format() &&
-           r36sx_cpu_protected_enabled() &&
            r36sx_seg_cache[regss].valid &&
            (r36sx_seg_cache[regss].flags & R36SX_DESCRIPTOR_FLAG_DB);
 }
@@ -738,7 +732,11 @@ static void r36sx_cpu_set_cr0(uint32_t value)
             r36sx_cpu_current_cpl = 0;
         } else {
             r36sx_cpu_current_cpl = 0;
-            r36sx_cpu_real_cache_all_segments();
+            /*
+             * Clearing CR0.PE does not reload hidden segment caches.  386 DOS
+             * extenders often execute a short 32-bit trampoline before the
+             * mandatory far jump reloads CS as a real-mode segment.
+             */
         }
     }
 }
