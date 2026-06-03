@@ -1,14 +1,17 @@
 # pico-286 Build Log
 
-## 2026-06-03 screenshot shared object
+## 2026-06-03 screenshot shared object and static archive
 
 Moved screenshot file encoding out of the main Pico-286 executable into one
-common runtime shared object:
+common runtime shared object, then added the same encoder as a static archive
+for projects that want to link it directly:
 
 - `homebrew/common/r36sx_screenshot_module.h`
 - `homebrew/common/r36sx_screenshot_module.c`
 - `homebrew/common/build_screenshot_so_wsl.sh`
+- `homebrew/common/build_screenshot_a_wsl.sh`
 - `homebrew/common/screenshot.so`
+- `homebrew/common/screenshot.a`
 
 `r36sx_screenshot.c` keeps filename generation and directory fallback, then
 loads `screenshot.so` lazily with `dlopen()` and passes the requested format to
@@ -28,10 +31,13 @@ only on `screenshot.so`:
 
 - `pico_286`: no `NEEDED libz.so.1`.
 - `screenshot.so`: `NEEDED libz.so.1`, `NEEDED libc.so.6`.
+- `screenshot.a`: exports `r36sx_screenshot_write_rgb565`; static users must
+  link the target zlib when PNG output is enabled.
 
 Rebuild commands:
 
 ```powershell
+bash homebrew/common/build_screenshot_a_wsl.sh
 .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
 wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && ./homebrew/shell/build_shell_wsl.sh --strip --install"
 ```
@@ -54,6 +60,9 @@ Result:
 - `screenshot.so` size: `6232` bytes
 - `screenshot.so` SHA256:
   `FA4DC587DB3788B67AFAAFD53AE8B2C612D057BAEA0CC8C0F5DF097BC86D267E`
+- `screenshot.a` size: `4178` bytes
+- `screenshot.a` SHA256:
+  `7A1D0128C816ED5681CB80E61F01BE1B21B7E62999B546BD5171D9CC1549D6CC`
 - `shell` size: `58700` bytes
 - `shell` SHA256:
   `D9E619E2C406334E9BAF4082FDCC00412686416D0F3D6BFEF684797F9B88435A`

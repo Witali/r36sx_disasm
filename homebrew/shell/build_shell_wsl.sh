@@ -9,6 +9,7 @@ SYSROOT="$TOOLCHAIN_ROOT/sysroot/mipsel-r2-hard"
 FREETYPE_INCLUDE="$SDK_ROOT/mipsel-buildroot-linux-gnu/sysroot/usr/include/freetype2"
 PATCH_ROOT="$ROOT_DIR/patches/disk_image_patch_shell"
 SCREENSHOT_SO="$ROOT_DIR/homebrew/common/screenshot.so"
+SCREENSHOT_A="$ROOT_DIR/homebrew/common/screenshot.a"
 
 CC="${CC:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-gcc}"
 STRIP="${STRIP:-$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-strip}"
@@ -130,6 +131,8 @@ fi
 
 bash "$ROOT_DIR/homebrew/common/build_screenshot_so_wsl.sh" --strip \
     --out "$SCREENSHOT_SO"
+bash "$ROOT_DIR/homebrew/common/build_screenshot_a_wsl.sh" \
+    --out "$SCREENSHOT_A"
 
 if [[ "$DO_INSTALL" -eq 1 ]]; then
     install -d "$ROOT_DIR/disk_image/MIPS_NATIVE/shell"

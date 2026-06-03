@@ -36,6 +36,7 @@ OUT="$SCRIPT_DIR/pico_286.gcc"
 OBJ_DIR="$SCRIPT_DIR/obj-gcc"
 COMPAT_HEADER="$SCRIPT_DIR/r36sx_pico286_compat.h"
 SCREENSHOT_SO_OUT="$ROOT/homebrew/common/screenshot.so"
+SCREENSHOT_A_OUT="$ROOT/homebrew/common/screenshot.a"
 TARGET_ZLIB="$SYSROOT/usr/lib/libz.so.1.2.11"
 GCC_LIB="$TOOLCHAIN_ROOT/lib/gcc/mips-mti-linux-gnu/6.3.0/mipsel-r2-hard/lib"
 CXX_LIB="$TOOLCHAIN_ROOT/mips-mti-linux-gnu/lib/mipsel-r2-hard/lib"
@@ -358,4 +359,5 @@ if ((DO_STRIP)); then
 fi
 
 bash "$ROOT/homebrew/common/build_screenshot_so_wsl.sh" --strip --out "$SCREENSHOT_SO_OUT"
+bash "$ROOT/homebrew/common/build_screenshot_a_wsl.sh" --out "$SCREENSHOT_A_OUT"
 echo "Built $OUT"

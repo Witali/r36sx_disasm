@@ -44,7 +44,17 @@ Build the module with:
 bash homebrew/common/build_screenshot_so_wsl.sh --strip
 ```
 
-The Pico-286 WSL build script also rebuilds this module automatically.
+For static linking, build the same encoder as an archive:
+
+```sh
+bash homebrew/common/build_screenshot_a_wsl.sh
+```
+
+`screenshot.a` exports the same `r36sx_screenshot_write_rgb565()` function as
+`screenshot.so`.  It contains our encoder object only; applications that use
+PNG through the static archive must also link target zlib.  The Pico-286 and
+Shell WSL build scripts rebuild both `screenshot.so` and `screenshot.a`
+automatically.
 
 ## `r36sx_screen_keyboard`
 

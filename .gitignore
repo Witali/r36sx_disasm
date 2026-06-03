@@ -32,6 +32,8 @@ tools/*
 homebrew/*/obj/
 homebrew/*/obj-gcc/
 homebrew/common/.build-screenshot-so/
+homebrew/common/.build-screenshot-a/
+!homebrew/common/screenshot.a
 homebrew/pico_286/pico_286.gcc*
 homebrew/pico_286/pico_286.debug
 __pycache__/

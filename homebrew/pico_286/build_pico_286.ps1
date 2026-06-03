@@ -25,6 +25,7 @@ $CppTargetInclude = Join-Path $CppInclude "mips-mti-linux-gnu"
 $GccLib = Join-Path $ToolchainRoot "lib\gcc\mips-mti-linux-gnu\6.3.0\mipsel-r2-hard\lib"
 $TargetZlib = Join-Path $SysrootUsrLib "libz.so.1.2.11"
 $ScreenshotSoOut = Join-Path $Root "homebrew\common\screenshot.so"
+$ScreenshotAOut = Join-Path $Root "homebrew\common\screenshot.a"
 $Out = Join-Path $PSScriptRoot "pico_286"
 $ObjDir = Join-Path $PSScriptRoot "obj"
 $Crt1 = Join-Path $Sysroot "usr\lib\crt1.o"
@@ -292,5 +293,25 @@ Invoke-Checked { & $Zig cc `
     "-o" `
     $ScreenshotSoOut }
 
+$ScreenshotObj = Join-Path $ObjDir "r36sx_screenshot_module-static.o"
+Invoke-Checked { & $Zig cc `
+    "-target" `
+    "mipsel-linux-gnu" `
+    "-march=mips32r2" `
+    "--sysroot=$Sysroot" `
+    "-O2" `
+    "-fno-pic" `
+    "-I$(Join-Path $Root "homebrew\common")" `
+    "-isystem$SysrootInclude" `
+    "-c" `
+    (Join-Path $Root "homebrew\common\r36sx_screenshot_module.c") `
+    "-o" `
+    $ScreenshotObj }
+if (Test-Path -LiteralPath $ScreenshotAOut) {
+    Remove-Item -LiteralPath $ScreenshotAOut -Force
+}
+Invoke-Checked { & $Zig ar rcs $ScreenshotAOut $ScreenshotObj }
+
 Write-Host "Built $Out"
 Write-Host "Built $ScreenshotSoOut"
+Write-Host "Built $ScreenshotAOut"
