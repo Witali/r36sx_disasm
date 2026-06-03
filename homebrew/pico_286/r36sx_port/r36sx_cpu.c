@@ -4438,11 +4438,16 @@ static void r36sx_cpu_restore_snapshot(const r36sx_cpu_snapshot_t *snapshot)
 
 static uint8_t r36sx_dpmi_selector_slot(uint16_t selector, uint8_t *slot)
 {
-    if (!r36sx_cpu_protected_enabled() ||
-        (selector & R36SX_SELECTOR_TABLE_INDICATOR) == 0) {
+    if ((selector & R36SX_SELECTOR_TABLE_INDICATOR) == 0) {
         return 0;
     }
 
+    /*
+     * DPMI selectors are an emulator-owned LDT-style range.  Decoding that
+     * range must also work while the DPMI entry hook is still building the
+     * initial descriptors, before CR0.PE is set; INT 31h service access is
+     * guarded separately by r36sx_dpmi_host_available().
+     */
     uint16_t index = (selector & R36SX_SELECTOR_INDEX_MASK) >> 3;
     if (index < R36SX_DPMI_LDT_INDEX_BASE ||
         index >= R36SX_DPMI_LDT_INDEX_BASE + R36SX_DPMI_MAX_DESCRIPTORS) {
