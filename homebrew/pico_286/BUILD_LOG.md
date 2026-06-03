@@ -346,6 +346,13 @@ Result:
 Extended the DPMI scaffold into a working real-to-protected entry path and added
 the next group of `INT 31h` services checked against DPMI 1.0.
 
+Follow-up audit of the 386 real-to-protected path found that protected interrupt
+vectors installed through `INT 31h AX=0205h` were stored but ignored by normal
+protected-mode `INT xx` delivery.  Software interrupts now dispatch an installed
+DPMI protected interrupt handler before falling back to the raw protected IDT.
+This matches the DPMI interrupt chain rule and avoids bypassing DOS extender
+handlers after the client enters protected mode.
+
 Implemented:
 
 - `INT 2Fh AX=1687h`: installation check now reports the host and returns a

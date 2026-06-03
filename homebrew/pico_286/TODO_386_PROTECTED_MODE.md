@@ -30,7 +30,9 @@ be checked against the relevant specification and committed separately.
      through named DPMI helpers.  `AX=1687h` reports the host, returns a magic
      far-call entry, and that entry switches a client to protected mode with
      initial CS/SS/DS/ES descriptors and a converted PSP environment pointer.
-     Protected-mode `INT 31h` is intercepted before IDT delivery.
+     Protected-mode `INT 31h` is intercepted before IDT delivery.  Protected
+     interrupt vectors installed through `INT 31h AX=0205h` are now dispatched
+     before the raw IDT fallback.
    - Next target: add the real-mode interrupt/procedure bridge and callback
      services (`INT 31h AX=0300h..0306h`).
    - Done when: the code has a clean DPMI probe/dispatch structure, debug logs
@@ -57,8 +59,8 @@ be checked against the relevant specification and committed separately.
    - Missing: DOS memory block services (`AX=0100h..0102h`), real-mode
      interrupt/procedure simulation (`AX=0300h..0302h`), callbacks
      (`AX=0303h/0304h`), state-save/raw switch addresses (`AX=0305h/0306h`),
-     lock/unlock/page mapping APIs, and actual interrupt reflection through the
-     stored protected-mode vectors.
+     lock/unlock/page mapping APIs, and default interrupt reflection back to
+     real mode when no protected-mode vector is installed.
    - Done when: common DOS extender probes can query DPMI version, allocate
      descriptors, configure flat 32-bit code/data descriptors, and return clean
      failure for unimplemented functions.
