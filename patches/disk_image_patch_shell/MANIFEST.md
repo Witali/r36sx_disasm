@@ -40,9 +40,9 @@ Pico-286 shortcut. The frontend writes 24-bit BMP files through the shared
 Current WSL/GCC stripped binary:
 
 - `MIPS_NATIVE/shell/shell`
-- size: `58668` bytes
+- size: `58700` bytes
 - SHA256:
-  `EC78C89301F0070812D5BF2F70061A28DA55227D99A5EF82E178FA19193CFD59`
+  `CA3768CE02571F852CF995B86421E5045A940CED1B4FAF92FC3C0DE51163A943`
 
 Console output keeps 512 lines of scrollback. Use `FN+L` / `FN+R` for one-line
 history scrolling, `FN+D-pad Left` / `FN+D-pad Right` for page scrolling, and

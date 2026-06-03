@@ -35,6 +35,7 @@ STRIP="$TOOLCHAIN_ROOT/bin/mips-mti-linux-gnu-strip"
 OUT="$SCRIPT_DIR/pico_286.gcc"
 OBJ_DIR="$SCRIPT_DIR/obj-gcc"
 COMPAT_HEADER="$SCRIPT_DIR/r36sx_pico286_compat.h"
+PNG_SO_OUT="$ROOT/homebrew/common/r36sx_screenshot_png.so"
 TARGET_ZLIB="$SYSROOT/usr/lib/libz.so.1.2.11"
 GCC_LIB="$TOOLCHAIN_ROOT/lib/gcc/mips-mti-linux-gnu/6.3.0/mipsel-r2-hard/lib"
 CXX_LIB="$TOOLCHAIN_ROOT/mips-mti-linux-gnu/lib/mipsel-r2-hard/lib"
@@ -200,7 +201,6 @@ common_args=(
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
     "-DR36SX_VIDEO_DIRTY_TRACKING=1"
-    "-DR36SX_SCREENSHOT_ENABLE_PNG=1"
     "-DR36SX_MIPS_DSP=$MIPS_DSP_VALUE"
     "-DINI_HANDLER_LINENO=1"
     "-DINI_MAX_LINE=512"
@@ -347,7 +347,6 @@ compile_cpp "$PORT_ROOT/r36sx_linux-main.cpp"
     -lpthread \
     -ldl \
     -lm \
-    "$TARGET_ZLIB" \
     -lstdc++ \
     -lgcc_s \
     -lc \
@@ -358,4 +357,5 @@ if ((DO_STRIP)); then
     "$STRIP" --strip-all "$OUT"
 fi
 
+bash "$ROOT/homebrew/common/build_screenshot_png_wsl.sh" --strip --out "$PNG_SO_OUT"
 echo "Built $OUT"

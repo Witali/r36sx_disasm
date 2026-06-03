@@ -31,6 +31,7 @@ tools/*
 *.cache
 homebrew/*/obj/
 homebrew/*/obj-gcc/
+homebrew/common/.build-screenshot-png/
 homebrew/pico_286/pico_286.gcc*
 homebrew/pico_286/pico_286.debug
 __pycache__/

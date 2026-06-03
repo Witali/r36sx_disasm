@@ -24,6 +24,7 @@ $CppInclude = Join-Path $ToolchainRoot "mips-mti-linux-gnu\include\c++\6.3.0"
 $CppTargetInclude = Join-Path $CppInclude "mips-mti-linux-gnu"
 $GccLib = Join-Path $ToolchainRoot "lib\gcc\mips-mti-linux-gnu\6.3.0\mipsel-r2-hard\lib"
 $TargetZlib = Join-Path $SysrootUsrLib "libz.so.1.2.11"
+$PngSoOut = Join-Path $Root "homebrew\common\r36sx_screenshot_png.so"
 $Out = Join-Path $PSScriptRoot "pico_286"
 $ObjDir = Join-Path $PSScriptRoot "obj"
 $Crt1 = Join-Path $Sysroot "usr\lib\crt1.o"
@@ -141,7 +142,6 @@ $CommonArgs = @(
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",
     "-DR36SX_VIDEO_DIRTY_TRACKING=1",
-    "-DR36SX_SCREENSHOT_ENABLE_PNG=1",
     "-DINI_HANDLER_LINENO=1",
     "-DINI_MAX_LINE=512",
     "-DINI_ALLOW_MULTILINE=0",
@@ -255,7 +255,6 @@ Invoke-Checked { & $Zig ld.lld `
     "-lpthread" `
     "-ldl" `
     "-lm" `
-    $TargetZlib `
     "-lstdc++" `
     "-lgcc_s" `
     "-lc" `
@@ -276,4 +275,22 @@ if ($TryStrip) {
     }
 }
 
+Invoke-Checked { & $Zig cc `
+    "-target" `
+    "mipsel-linux-gnu" `
+    "-march=mips32r2" `
+    "--sysroot=$Sysroot" `
+    "-shared" `
+    "-fPIC" `
+    "-O2" `
+    "-I$(Join-Path $Root "homebrew\common")" `
+    "-isystem$SysrootInclude" `
+    "-Wl,--hash-style=sysv" `
+    "-Wl,-soname,r36sx_screenshot_png.so" `
+    (Join-Path $Root "homebrew\common\r36sx_screenshot_png.c") `
+    $TargetZlib `
+    "-o" `
+    $PngSoOut }
+
 Write-Host "Built $Out"
+Write-Host "Built $PngSoOut"

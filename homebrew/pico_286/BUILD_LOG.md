@@ -1,5 +1,60 @@
 # pico-286 Build Log
 
+## 2026-06-03 PNG screenshot shared object
+
+Moved PNG screenshot writing out of the main Pico-286 executable into a common
+runtime shared object:
+
+- `homebrew/common/r36sx_screenshot_png.h`
+- `homebrew/common/r36sx_screenshot_png.c`
+- `homebrew/common/build_screenshot_png_wsl.sh`
+- `homebrew/common/r36sx_screenshot_png.so`
+
+`r36sx_screenshot.c` keeps the built-in BMP writer and now loads PNG support
+lazily with `dlopen()`.  Runtime lookup order:
+
+1. `R36SX_SCREENSHOT_PNG_SO` environment variable.
+2. `/mnt/sdcard/MIPS_NATIVE/common/r36sx_screenshot_png.so`.
+3. `./r36sx_screenshot_png.so`.
+4. `r36sx_screenshot_png.so` through the dynamic loader path.
+
+This removes zlib from the main `pico_286` ELF.  `readelf -d` now shows zlib
+only on `r36sx_screenshot_png.so`:
+
+- `pico_286`: no `NEEDED libz.so.1`.
+- `r36sx_screenshot_png.so`: `NEEDED libz.so.1`, `NEEDED libc.so.6`.
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && ./homebrew/shell/build_shell_wsl.sh --strip --install"
+```
+
+Patch copy commands:
+
+```powershell
+New-Item -ItemType Directory -Force .\patches\disk_image_patch_pico_286\MIPS_NATIVE\common
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\common\r36sx_screenshot_png.so -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\common\r36sx_screenshot_png.so -Force
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\disk_image\MIPS_NATIVE\pico_286\pico_286 -Force
+Copy-Item -LiteralPath .\homebrew\common\r36sx_screenshot_png.so -Destination .\disk_image\MIPS_NATIVE\common\r36sx_screenshot_png.so -Force
+```
+
+Result:
+
+- `pico_286` size: `557816` bytes
+- `pico_286` SHA256:
+  `F4C2BAF6DBFDE894FBFCD130C9A3F83A5D794E0B8BDFD5858173DAB861AC5009`
+- `r36sx_screenshot_png.so` size: `5456` bytes
+- `r36sx_screenshot_png.so` SHA256:
+  `404C7430E081A6737C9F8D708D58E528402202EF07BBF663E605F1E4BFDBD0DD`
+- `shell` size: `58700` bytes
+- `shell` SHA256:
+  `CA3768CE02571F852CF995B86421E5045A940CED1B4FAF92FC3C0DE51163A943`
+- Pico and Shell WSL/GCC builds succeeded.  Pico still reports the existing
+  warning set in FPU, XMS, renderer, and audio/helper code.
+
 ## 2026-06-03 shared screenshot helper
 
 Moved RGB565 screenshot saving into the shared homebrew helper:

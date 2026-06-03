@@ -13,6 +13,7 @@ runtime `.conf` file loading instead of local hand-written line parsers.
 
 `r36sx_screenshot.h` / `r36sx_screenshot.c` save RGB565 framebuffers to disk
 with the shared filename and directory fallback logic used by native projects.
+`r36sx_screenshot_png.c` is an optional shared-object PNG backend.
 
 The caller supplies:
 
@@ -23,11 +24,25 @@ The caller supplies:
 - optional build SHA-256 string for the eight-character build hash suffix;
 - output format, currently BMP or PNG.
 
-BMP output is always available and writes uncompressed 24-bit BMP files.  PNG
-output is compiled only when `R36SX_SCREENSHOT_ENABLE_PNG=1` is defined and
-the target links zlib.  Pico-286 enables PNG because its configuration exposes
-`screenshot_format`; Shell keeps the helper in BMP-only mode and therefore
-does not need a zlib dependency.
+BMP output is always available and writes uncompressed 24-bit BMP files from
+inside the main application.  PNG output is loaded lazily from:
+
+```text
+/mnt/sdcard/MIPS_NATIVE/common/r36sx_screenshot_png.so
+```
+
+The `R36SX_SCREENSHOT_PNG_SO` environment variable can override that path, and
+the helper also tries `./r36sx_screenshot_png.so` for local tests.  Keeping PNG
+in a separate shared object removes zlib from the main Pico-286 executable; if
+the module is absent, PNG screenshot saves fail cleanly while BMP still works.
+
+Build the module with:
+
+```sh
+bash homebrew/common/build_screenshot_png_wsl.sh --strip
+```
+
+The Pico-286 WSL build script also rebuilds this module automatically.
 
 ## `r36sx_screen_keyboard`
 

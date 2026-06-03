@@ -271,8 +271,10 @@ Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
 compiled out with `build_pico_286.ps1 -DisableProfiling`.
 
-Set `screenshot_format=png` for compressed screenshots or
-`screenshot_format=bmp` for the old uncompressed 24-bit BMP output.
+Set `screenshot_format=png` for compressed screenshots through
+`MIPS_NATIVE/common/r36sx_screenshot_png.so`, or `screenshot_format=bmp` for
+the built-in uncompressed 24-bit BMP output.  If the PNG module is missing, PNG
+saves fail cleanly while BMP still works.
 Set `screenshot_build_hash=1` to add the first 8 hex digits of the embedded
 build commit-object SHA-256 to screenshot file names, or `0` to keep the older
 timestamp-only naming.
