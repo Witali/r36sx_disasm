@@ -116,8 +116,11 @@ LDFLAGS=(
     -o "$OBJ_DIR/shell.o"
 "$CC" "${CFLAGS[@]}" -c "$ROOT_DIR/homebrew/common/r36sx_screen_keyboard.c" \
     -o "$OBJ_DIR/r36sx_screen_keyboard.o"
+"$CC" "${CFLAGS[@]}" -c "$ROOT_DIR/homebrew/common/r36sx_screenshot.c" \
+    -o "$OBJ_DIR/r36sx_screenshot.o"
 "$CC" "${CFLAGS[@]}" "${LDFLAGS[@]}" \
     "$OBJ_DIR/shell.o" "$OBJ_DIR/r36sx_screen_keyboard.o" \
+    "$OBJ_DIR/r36sx_screenshot.o" \
     -o "$OUT" -ldl
 
 if [[ "$DO_STRIP" -eq 1 ]]; then

@@ -200,6 +200,7 @@ common_args=(
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
     "-DR36SX_VIDEO_DIRTY_TRACKING=1"
+    "-DR36SX_SCREENSHOT_ENABLE_PNG=1"
     "-DR36SX_MIPS_DSP=$MIPS_DSP_VALUE"
     "-DINI_HANDLER_LINENO=1"
     "-DINI_MAX_LINE=512"
@@ -306,6 +307,7 @@ for src in \
     "$SCRIPT_DIR/r36sx_mips_dsp_probe.S" \
     "$PICO_ROOT/src/printf/printf.c" \
     "$ROOT/homebrew/common/r36sx_screen_keyboard.c" \
+    "$ROOT/homebrew/common/r36sx_screenshot.c" \
     "$ROOT/homebrew/common/inih/ini.c" \
     "$SCRIPT_DIR/r36sx_disk_menu.c" \
     "$SCRIPT_DIR/r36sx_key_presets.c" \

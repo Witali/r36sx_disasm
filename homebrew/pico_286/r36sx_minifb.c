@@ -10,21 +10,19 @@
 #define _GNU_SOURCE
 #endif
 
-#include <ctype.h>
 #include <dlfcn.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <zlib.h>
 
 #include "MiniFB.h"
 #include "emulator/includes/font8x8.h"
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
+#include "../common/r36sx_screenshot.h"
 #include "r36sx_mips_dsp.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
@@ -763,290 +761,27 @@ static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
     }
 }
 
-static void r36sx_mfb_put_be32(uint8_t *dst, uint32_t value)
-{
-    dst[0] = (uint8_t)((value >> 24) & 0xffu);
-    dst[1] = (uint8_t)((value >> 16) & 0xffu);
-    dst[2] = (uint8_t)((value >> 8) & 0xffu);
-    dst[3] = (uint8_t)(value & 0xffu);
-}
-
-static void r36sx_mfb_put_le16(uint8_t *dst, uint16_t value)
-{
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)(value >> 8);
-}
-
-static void r36sx_mfb_put_le32(uint8_t *dst, uint32_t value)
-{
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)((value >> 8) & 0xffu);
-    dst[2] = (uint8_t)((value >> 16) & 0xffu);
-    dst[3] = (uint8_t)((value >> 24) & 0xffu);
-}
-
-static int r36sx_mfb_write_png_chunk(FILE *fp, const char type[4],
-                                     const uint8_t *data, uint32_t length)
-{
-    uint8_t header[8];
-    uint8_t crc_bytes[4];
-    uLong crc;
-
-    if (!fp || !type) {
-        return -1;
-    }
-
-    r36sx_mfb_put_be32(&header[0], length);
-    memcpy(&header[4], type, 4);
-    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
-        return -1;
-    }
-    if (length > 0 && (!data || fwrite(data, 1, length, fp) != length)) {
-        return -1;
-    }
-
-    crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, &header[4], 4);
-    if (length > 0) {
-        crc = crc32(crc, data, length);
-    }
-    r36sx_mfb_put_be32(crc_bytes, (uint32_t)crc);
-    return fwrite(crc_bytes, 1, sizeof(crc_bytes), fp) == sizeof(crc_bytes) ?
-        0 : -1;
-}
-
-static int r36sx_mfb_write_png24(const char *path, const uint16_t *pixels,
-                                 int width, int height)
-{
-    FILE *fp;
-    uint8_t ihdr[13];
-    uint8_t *raw;
-    uint8_t *compressed;
-    uint32_t row_bytes;
-    uint32_t raw_bytes;
-    uLongf compressed_bytes;
-    int rc = -1;
-    static const uint8_t png_signature[8] = {
-        0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'
-    };
-
-    if (!path || !pixels || width <= 0 || height <= 0) {
-        return -1;
-    }
-
-    row_bytes = (uint32_t)width * 3u;
-    raw_bytes = (row_bytes + 1u) * (uint32_t)height;
-    raw = (uint8_t *)malloc(raw_bytes);
-    if (!raw) {
-        return -1;
-    }
-
-    for (int y = 0; y < height; y++) {
-        uint8_t *row = raw + (size_t)y * (size_t)(row_bytes + 1u);
-        const uint16_t *src = pixels + (size_t)y * (size_t)width;
-
-        row[0] = 0; /* PNG filter type: none. */
-        r36sx_mips_dsp_rgb565_to_rgb24(&row[1], src, (size_t)width);
-    }
-
-    compressed_bytes = compressBound(raw_bytes);
-    compressed = (uint8_t *)malloc(compressed_bytes);
-    if (!compressed) {
-        free(raw);
-        return -1;
-    }
-    if (compress2(compressed, &compressed_bytes, raw, raw_bytes,
-                  Z_DEFAULT_COMPRESSION) != Z_OK) {
-        free(compressed);
-        free(raw);
-        return -1;
-    }
-
-    fp = fopen(path, "wb");
-    if (!fp) {
-        free(compressed);
-        free(raw);
-        return -1;
-    }
-
-    r36sx_mfb_put_be32(&ihdr[0], (uint32_t)width);
-    r36sx_mfb_put_be32(&ihdr[4], (uint32_t)height);
-    ihdr[8] = 8;  /* bit depth */
-    ihdr[9] = 2;  /* truecolor RGB */
-    ihdr[10] = 0; /* deflate compression */
-    ihdr[11] = 0; /* adaptive filtering */
-    ihdr[12] = 0; /* no interlace */
-
-    if (fwrite(png_signature, 1, sizeof(png_signature), fp) ==
-            sizeof(png_signature) &&
-        r36sx_mfb_write_png_chunk(fp, "IHDR", ihdr, sizeof(ihdr)) == 0 &&
-        r36sx_mfb_write_png_chunk(fp, "IDAT", compressed,
-                                  (uint32_t)compressed_bytes) == 0 &&
-        r36sx_mfb_write_png_chunk(fp, "IEND", NULL, 0) == 0) {
-        rc = 0;
-    }
-
-    if (fclose(fp) != 0) {
-        rc = -1;
-    }
-
-    free(compressed);
-    free(raw);
-    return rc;
-}
-
-static int r36sx_mfb_write_bmp24(const char *path, const uint16_t *pixels,
-                                 int width, int height)
-{
-    FILE *fp;
-    uint8_t header[54];
-    uint8_t *row;
-    uint32_t row_bytes;
-    uint32_t pixel_bytes;
-    uint32_t file_bytes;
-
-    if (!path || !pixels || width <= 0 || height <= 0) {
-        return -1;
-    }
-
-    row_bytes = (uint32_t)width * 3u;
-    pixel_bytes = row_bytes * (uint32_t)height;
-    file_bytes = 54u + pixel_bytes;
-    row = (uint8_t *)malloc(row_bytes);
-    if (!row) {
-        return -1;
-    }
-
-    memset(header, 0, sizeof(header));
-    header[0] = 'B';
-    header[1] = 'M';
-    r36sx_mfb_put_le32(&header[2], file_bytes);
-    r36sx_mfb_put_le32(&header[10], 54u);
-    r36sx_mfb_put_le32(&header[14], 40u);
-    r36sx_mfb_put_le32(&header[18], (uint32_t)width);
-    r36sx_mfb_put_le32(&header[22], (uint32_t)height);
-    r36sx_mfb_put_le16(&header[26], 1u);
-    r36sx_mfb_put_le16(&header[28], 24u);
-    r36sx_mfb_put_le32(&header[34], pixel_bytes);
-
-    fp = fopen(path, "wb");
-    if (!fp) {
-        free(row);
-        return -1;
-    }
-
-    if (fwrite(header, 1, sizeof(header), fp) != sizeof(header)) {
-        fclose(fp);
-        free(row);
-        return -1;
-    }
-
-    for (int y = height - 1; y >= 0; y--) {
-        const uint16_t *src = pixels + (size_t)y * (size_t)width;
-        r36sx_mips_dsp_rgb565_to_bgr24(row, src, (size_t)width);
-        if (fwrite(row, 1, row_bytes, fp) != row_bytes) {
-            fclose(fp);
-            free(row);
-            return -1;
-        }
-    }
-
-    if (fclose(fp) != 0) {
-        free(row);
-        return -1;
-    }
-
-    free(row);
-    return 0;
-}
-
-static int r36sx_mfb_build_hash8(char *dst, size_t dst_size)
-{
-    const char *hash = R36SX_BUILD_COMMIT_OBJECT_SHA256;
-
-    if (!dst || dst_size < 9 ||
-        !r36sx_pico286_screenshot_build_hash_enabled()) {
-        return 0;
-    }
-
-    if (!hash || !hash[0] || strcmp(hash, "unknown") == 0) {
-        return 0;
-    }
-
-    for (size_t i = 0; i < 8; i++) {
-        unsigned char ch = (unsigned char)hash[i];
-
-        if (!isxdigit(ch)) {
-            return 0;
-        }
-        dst[i] = (char)tolower(ch);
-    }
-    dst[8] = '\0';
-    return 1;
-}
-
-static int r36sx_mfb_save_screenshot_to_dir(const char *dir,
-                                            const uint16_t *pixels,
-                                            char *saved_path,
-                                            size_t saved_path_size)
-{
-    time_t now;
-    struct tm tm_now;
-    char stamp[32];
-    char build_hash[9];
-    char path[512];
-    uint32_t seq;
-    r36sx_pico286_screenshot_format_t format;
-    const char *ext;
-    int include_build_hash;
-
-    if (!dir || !pixels) {
-        return -1;
-    }
-
-    mkdir(dir, 0755);
-    now = (time_t)r36sx_pico286_rtc_current_time_unix();
-    if (localtime_r(&now, &tm_now) == NULL) {
-        memset(&tm_now, 0, sizeof(tm_now));
-    }
-    strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_now);
-    seq = g_mfb.screenshot_counter++;
-    format = r36sx_pico286_screenshot_format();
-    ext = format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP ? "bmp" : "png";
-    include_build_hash =
-        r36sx_mfb_build_hash8(build_hash, sizeof(build_hash));
-
-    if (include_build_hash) {
-        snprintf(path, sizeof(path), "%s/pico_286_%s_%s_%03u.%s",
-                 dir, stamp, build_hash, (unsigned)(seq % 1000u), ext);
-    } else {
-        snprintf(path, sizeof(path), "%s/pico_286_%s_%03u.%s",
-                 dir, stamp, (unsigned)(seq % 1000u), ext);
-    }
-    if (format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP) {
-        if (r36sx_mfb_write_bmp24(path, pixels, g_mfb.width,
-                                  g_mfb.height) != 0) {
-            return -1;
-        }
-    } else if (r36sx_mfb_write_png24(path, pixels, g_mfb.width,
-                                     g_mfb.height) != 0) {
-        return -1;
-    }
-
-    if (saved_path && saved_path_size > 0) {
-        snprintf(saved_path, saved_path_size, "%s", path);
-    }
-    return 0;
-}
-
 static int r36sx_mfb_save_screenshot(const uint16_t *pixels)
 {
+    r36sx_screenshot_options_t options;
     char path[512];
+    r36sx_pico286_screenshot_format_t format =
+        r36sx_pico286_screenshot_format();
 
-    if (r36sx_mfb_save_screenshot_to_dir(R36SX_PICO286_SCREENSHOT_DIR,
-                                         pixels, path, sizeof(path)) == 0 ||
-        r36sx_mfb_save_screenshot_to_dir(R36SX_PICO286_SCREENSHOT_LOCAL_DIR,
-                                         pixels, path, sizeof(path)) == 0) {
+    memset(&options, 0, sizeof(options));
+    options.primary_dir = R36SX_PICO286_SCREENSHOT_DIR;
+    options.fallback_dir = R36SX_PICO286_SCREENSHOT_LOCAL_DIR;
+    options.prefix = "pico_286";
+    options.unix_time = r36sx_pico286_rtc_current_time_unix();
+    options.sequence = g_mfb.screenshot_counter++;
+    options.format = format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP ?
+        R36SX_SCREENSHOT_FORMAT_BMP : R36SX_SCREENSHOT_FORMAT_PNG;
+    options.include_build_hash =
+        r36sx_pico286_screenshot_build_hash_enabled();
+    options.build_hash_sha256 = R36SX_BUILD_COMMIT_OBJECT_SHA256;
+
+    if (r36sx_screenshot_save_rgb565(&options, pixels, g_mfb.width,
+                                     g_mfb.height, path, sizeof(path)) == 0) {
         r36sx_pico286_debug_log("minifb: screenshot saved %s", path);
         return 1;
     } else {

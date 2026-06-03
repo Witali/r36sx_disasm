@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-06-03 shared screenshot helper
+
+Moved RGB565 screenshot saving into the shared homebrew helper:
+
+- `homebrew/common/r36sx_screenshot.h`
+- `homebrew/common/r36sx_screenshot.c`
+
+Pico-286 now uses that helper for screenshot directory fallback, timestamped
+filenames, optional build-hash filename suffixes, BMP output, and PNG output.
+The Pico-specific screenshot preview/toast UI remains in `r36sx_minifb.c`.
+Shell now uses the same helper for BMP screenshots.
+
+Rebuild commands:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+wsl bash -lc "cd /mnt/c/Work/r36sx_disasm && ./homebrew/shell/build_shell_wsl.sh --strip --install"
+```
+
+Result:
+
+- `pico_286` size: `558496` bytes
+- `pico_286` SHA256:
+  `D2325F9C5DDA123ABAE4050EB2F090EF530AE8AA1146A0E8883BA970E8E5A6CC`
+- `shell` size: `58668` bytes
+- `shell` SHA256:
+  `EC78C89301F0070812D5BF2F70061A28DA55227D99A5EF82E178FA19193CFD59`
+- Pico patch copy and Shell patch/install copies were updated with the same
+  binaries.
+- WSL/GCC builds succeeded.  Pico still reports the existing warning set in
+  FPU, XMS, renderer, and audio/helper code.
+
 ## 2026-06-03 BIOS RTC date/time services
 
 Fixed DOS-visible RTC time by replacing the old hardcoded BIOS `INT 1Ah`

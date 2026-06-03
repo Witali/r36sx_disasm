@@ -35,6 +35,7 @@
 
 #include "../common/hardware.h"
 #include "../common/r36sx_screen_keyboard.h"
+#include "../common/r36sx_screenshot.h"
 #include "../pico_286/pico-286/src/emulator/includes/font8x16.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -965,148 +966,23 @@ static void term_write_text(const char *text)
     }
 }
 
-static void shell_put_le16(uint8_t *dst, uint16_t value)
-{
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)((value >> 8) & 0xffu);
-}
-
-static void shell_put_le32(uint8_t *dst, uint32_t value)
-{
-    dst[0] = (uint8_t)(value & 0xffu);
-    dst[1] = (uint8_t)((value >> 8) & 0xffu);
-    dst[2] = (uint8_t)((value >> 16) & 0xffu);
-    dst[3] = (uint8_t)((value >> 24) & 0xffu);
-}
-
-static void shell_rgb565_to_bgr24(uint8_t *dst, const uint16_t *src,
-                                  int pixels)
-{
-    for (int i = 0; i < pixels; i++) {
-        uint16_t px = src[i];
-        unsigned r5 = (px >> 11) & 0x1fu;
-        unsigned g6 = (px >> 5) & 0x3fu;
-        unsigned b5 = px & 0x1fu;
-        dst[(size_t)i * 3u + 0u] = (uint8_t)((b5 * 255u) / 31u);
-        dst[(size_t)i * 3u + 1u] = (uint8_t)((g6 * 255u) / 63u);
-        dst[(size_t)i * 3u + 2u] = (uint8_t)((r5 * 255u) / 31u);
-    }
-}
-
-static int shell_write_bmp24(const char *path, const uint16_t *pixels,
-                             int width, int height)
-{
-    uint8_t header[54];
-    FILE *fp;
-    uint8_t *row;
-    size_t row_bytes;
-    size_t padded_row_bytes;
-    size_t pixel_bytes;
-    int ok;
-
-    if (!path || !pixels || width <= 0 || height <= 0) {
-        return -1;
-    }
-
-    row_bytes = (size_t)width * 3u;
-    padded_row_bytes = (row_bytes + 3u) & ~(size_t)3u;
-    pixel_bytes = padded_row_bytes * (size_t)height;
-    if (row_bytes / 3u != (size_t)width ||
-        padded_row_bytes < row_bytes ||
-        pixel_bytes / padded_row_bytes != (size_t)height ||
-        pixel_bytes + sizeof(header) > UINT32_MAX) {
-        return -1;
-    }
-
-    fp = fopen(path, "wb");
-    if (!fp) {
-        return -1;
-    }
-
-    memset(header, 0, sizeof(header));
-    header[0] = 'B';
-    header[1] = 'M';
-    shell_put_le32(&header[2], (uint32_t)(sizeof(header) + pixel_bytes));
-    shell_put_le32(&header[10], (uint32_t)sizeof(header));
-    shell_put_le32(&header[14], 40u);
-    shell_put_le32(&header[18], (uint32_t)width);
-    shell_put_le32(&header[22], (uint32_t)height);
-    shell_put_le16(&header[26], 1u);
-    shell_put_le16(&header[28], 24u);
-    shell_put_le32(&header[34], (uint32_t)pixel_bytes);
-
-    row = (uint8_t *)calloc(1u, padded_row_bytes);
-    if (!row) {
-        fclose(fp);
-        return -1;
-    }
-
-    ok = fwrite(header, 1u, sizeof(header), fp) == sizeof(header);
-    for (int y = height - 1; ok && y >= 0; y--) {
-        memset(row, 0, padded_row_bytes);
-        shell_rgb565_to_bgr24(row,
-                              pixels + (size_t)y * (size_t)width,
-                              width);
-        ok = fwrite(row, 1u, padded_row_bytes, fp) == padded_row_bytes;
-    }
-
-    free(row);
-    if (fclose(fp) != 0) {
-        ok = 0;
-    }
-    return ok ? 0 : -1;
-}
-
-static int shell_save_screenshot_to_dir(const char *dir,
-                                        const uint16_t *pixels,
-                                        char *saved_path,
-                                        size_t saved_path_size)
-{
-    time_t now;
-    struct tm tm_now;
-    char stamp[32];
-    char path[SHELL_SCREENSHOT_PATH_MAX];
-    uint32_t seq;
-    int written;
-
-    if (!dir || !pixels) {
-        return -1;
-    }
-
-    (void)mkdir(dir, 0755);
-    now = time(NULL);
-    if (now != (time_t)-1 && localtime_r(&now, &tm_now)) {
-        strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_now);
-    } else {
-        snprintf(stamp, sizeof(stamp), "unknown_time");
-    }
-
-    seq = g_screenshot_counter++;
-    written = snprintf(path, sizeof(path), "%s/shell_%s_%03u.bmp",
-                       dir, stamp, (unsigned)(seq % 1000u));
-    if (written < 0 || (size_t)written >= sizeof(path)) {
-        return -1;
-    }
-
-    if (shell_write_bmp24(path, pixels, FB_WIDTH, FB_HEIGHT) != 0) {
-        return -1;
-    }
-    if (saved_path && saved_path_size > 0) {
-        snprintf(saved_path, saved_path_size, "%s", path);
-    }
-    return 0;
-}
-
 static int shell_save_screenshot(const uint16_t *pixels, char *saved_path,
                                  size_t saved_path_size)
 {
-    if (shell_save_screenshot_to_dir(SHELL_SCREENSHOT_DIR, pixels,
-                                     saved_path, saved_path_size) == 0 ||
-        shell_save_screenshot_to_dir(SHELL_SCREENSHOT_LOCAL_DIR, pixels,
-                                     saved_path, saved_path_size) == 0) {
-        return 1;
-    }
-    return 0;
+    r36sx_screenshot_options_t options;
+    time_t now = time(NULL);
+
+    memset(&options, 0, sizeof(options));
+    options.primary_dir = SHELL_SCREENSHOT_DIR;
+    options.fallback_dir = SHELL_SCREENSHOT_LOCAL_DIR;
+    options.prefix = "shell";
+    options.unix_time = now == (time_t)-1 ? -1 : (int64_t)now;
+    options.sequence = g_screenshot_counter++;
+    options.format = R36SX_SCREENSHOT_FORMAT_BMP;
+
+    return r36sx_screenshot_save_rgb565(
+        &options, pixels, FB_WIDTH, FB_HEIGHT, saved_path,
+        saved_path_size) == 0;
 }
 
 static void shell_request_screenshot(void)

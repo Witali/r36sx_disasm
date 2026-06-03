@@ -37,6 +37,21 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 shared screenshot helper
+
+The normal `pico_286` binary now uses the shared homebrew screenshot helper
+from `homebrew/common/r36sx_screenshot.*`.  Runtime behavior is intended to
+stay the same: screenshots still use Pico-286's configured format, RTC-based
+timestamp, optional build-hash filename suffix, preview toast, and the same
+primary/fallback screenshot directories.
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `558496` bytes
+- SHA256:
+  `D2325F9C5DDA123ABAE4050EB2F090EF530AE8AA1146A0E8883BA970E8E5A6CC`
+
 ## 2026-06-03 BIOS RTC date/time services
 
 The normal `pico_286` binary now returns the emulated CMOS/RTC time through
