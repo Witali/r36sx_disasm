@@ -46,11 +46,15 @@ static r36sx_profile_bucket_t profile_buckets[R36SX_PROFILE_COUNT] = {
 
 static void r36sx_profile_log(const char *format, ...)
 {
+#if R36SX_PICO286_HAS_LOG_OPEN_HELPER
+    FILE *fp = r36sx_pico286_open_log_for_append();
+#else
     FILE *fp = fopen(R36SX_PICO286_LOG_PATH, "a");
 
     if (!fp) {
         fp = fopen(R36SX_PICO286_FALLBACK_LOG_PATH, "a");
     }
+#endif
     if (fp) {
         struct timeval tv;
         va_list args;

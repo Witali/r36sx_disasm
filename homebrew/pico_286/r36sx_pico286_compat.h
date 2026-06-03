@@ -31,14 +31,51 @@
 
 #define R36SX_PICO286_LOG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log"
 #define R36SX_PICO286_FALLBACK_LOG_PATH "/mnt/sdcard/pico_286.log"
+#define R36SX_PICO286_MAX_LOG_BYTES (2u * 1024u * 1024u)
+#define R36SX_PICO286_HAS_LOG_OPEN_HELPER 1
+
+/* Keep append-only logs bounded without unlinking the file from the filesystem. */
+static inline FILE *r36sx_pico286_open_log_for_append(void)
+{
+    const char *paths[] = {
+        R36SX_PICO286_LOG_PATH,
+        R36SX_PICO286_FALLBACK_LOG_PATH,
+    };
+
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
+        struct stat st;
+        const char *mode = "a";
+        long previous_size = 0;
+
+        if (stat(paths[i], &st) == 0 &&
+            st.st_size >= (off_t)R36SX_PICO286_MAX_LOG_BYTES) {
+            mode = "w";
+            previous_size = (long)st.st_size;
+        }
+
+        FILE *fp = fopen(paths[i], mode);
+        if (fp) {
+            if (mode[0] == 'w') {
+                struct timeval tv;
+
+                gettimeofday(&tv, NULL);
+                fprintf(fp,
+                        "[%ld.%03ld] log truncated: previous_size=%ld max=%u\n",
+                        (long)tv.tv_sec, (long)(tv.tv_usec / 1000),
+                        previous_size,
+                        (unsigned int)R36SX_PICO286_MAX_LOG_BYTES);
+            }
+            return fp;
+        }
+    }
+
+    return NULL;
+}
 
 static inline void r36sx_pico286_debug_log(const char *format, ...)
 {
 #if DEBUG
-    FILE *fp = fopen(R36SX_PICO286_LOG_PATH, "a");
-    if (!fp) {
-        fp = fopen(R36SX_PICO286_FALLBACK_LOG_PATH, "a");
-    }
+    FILE *fp = r36sx_pico286_open_log_for_append();
     if (fp) {
         struct timeval tv;
         va_list args;
