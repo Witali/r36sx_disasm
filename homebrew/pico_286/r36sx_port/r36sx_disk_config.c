@@ -13,7 +13,7 @@
 #define R36SX_PICO286_CONFIG_PATH "pico_286.conf"
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
-#define R36SX_PICO286_DEFAULT_RTC_START_TIME "2024-01-01 00:00:00"
+#define R36SX_PICO286_DEFAULT_RTC_START_TIME "2026-06-03 00:00:00"
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 250.000
 /* Round historical throughput estimates used to turn MHz into exec86 IPS. */

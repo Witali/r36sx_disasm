@@ -73,6 +73,173 @@ uint32_t ea;
 
 uint32_t dwordregs[8];
 
+#if !PICO_ON_DEVICE
+static uint8_t r36sx_bios_rtc_to_bcd(int value)
+{
+    return (uint8_t)(((value / 10) << 4) | (value % 10));
+}
+
+static int r36sx_bios_rtc_from_bcd(uint8_t value,
+                                   int min_value,
+                                   int max_value,
+                                   int *decoded)
+{
+    int high = (value >> 4) & 0x0f;
+    int low = value & 0x0f;
+    int result;
+
+    if (high > 9 || low > 9) {
+        return 0;
+    }
+
+    result = high * 10 + low;
+    if (result < min_value || result > max_value) {
+        return 0;
+    }
+
+    *decoded = result;
+    return 1;
+}
+
+static int r36sx_bios_rtc_get_time(struct tm *tm_value)
+{
+    time_t rtc_now;
+
+    if (!r36sx_pico286_rtc_enabled()) {
+        return 0;
+    }
+
+    rtc_now = (time_t)r36sx_pico286_rtc_current_time_unix();
+    return localtime_r(&rtc_now, tm_value) != NULL;
+}
+
+static int r36sx_bios_rtc_set_time(struct tm *tm_value)
+{
+    int year = tm_value->tm_year;
+    int month = tm_value->tm_mon;
+    int day = tm_value->tm_mday;
+    int hour = tm_value->tm_hour;
+    int minute = tm_value->tm_min;
+    int second = tm_value->tm_sec;
+    time_t parsed;
+
+    tm_value->tm_isdst = -1;
+    parsed = mktime(tm_value);
+    if (parsed == (time_t)-1 ||
+        tm_value->tm_year != year ||
+        tm_value->tm_mon != month ||
+        tm_value->tm_mday != day ||
+        tm_value->tm_hour != hour ||
+        tm_value->tm_min != minute ||
+        tm_value->tm_sec != second) {
+        return 0;
+    }
+
+    return r36sx_pico286_rtc_set_time_unix((int64_t)parsed);
+}
+
+static void r36sx_bios_rtc_success(void)
+{
+    CPU_AH = 0;
+    CPU_FL_CF = 0;
+}
+
+static void r36sx_bios_rtc_failure(void)
+{
+    CPU_AH = 0x80;
+    CPU_FL_CF = 1;
+}
+
+static int r36sx_bios_rtc_int1a(void)
+{
+    struct tm tm_value;
+    int hour;
+    int minute;
+    int second;
+    int century;
+    int year;
+    int month;
+    int day;
+    int full_year;
+
+    /*
+     * IBM-compatible BIOS INT 1Ah RTC services exchange packed BCD values:
+     * CH/CL/DH are hour/minute/second for time and century/year/month for date.
+     */
+    switch (CPU_AH) {
+        case 0x02: /* Read Real-Time Clock time */
+            if (!r36sx_bios_rtc_get_time(&tm_value)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            CPU_CH = r36sx_bios_rtc_to_bcd(tm_value.tm_hour);
+            CPU_CL = r36sx_bios_rtc_to_bcd(tm_value.tm_min);
+            CPU_DH = r36sx_bios_rtc_to_bcd(tm_value.tm_sec);
+            CPU_DL = 0;
+            r36sx_bios_rtc_success();
+            return 1;
+
+        case 0x03: /* Set Real-Time Clock time */
+            if (!r36sx_bios_rtc_get_time(&tm_value) ||
+                !r36sx_bios_rtc_from_bcd(CPU_CH, 0, 23, &hour) ||
+                !r36sx_bios_rtc_from_bcd(CPU_CL, 0, 59, &minute) ||
+                !r36sx_bios_rtc_from_bcd(CPU_DH, 0, 59, &second)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            tm_value.tm_hour = hour;
+            tm_value.tm_min = minute;
+            tm_value.tm_sec = second;
+            if (!r36sx_bios_rtc_set_time(&tm_value)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            r36sx_bios_rtc_success();
+            return 1;
+
+        case 0x04: /* Read Real-Time Clock date */
+            if (!r36sx_bios_rtc_get_time(&tm_value)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            full_year = tm_value.tm_year + 1900;
+            CPU_CH = r36sx_bios_rtc_to_bcd(full_year / 100);
+            CPU_CL = r36sx_bios_rtc_to_bcd(full_year % 100);
+            CPU_DH = r36sx_bios_rtc_to_bcd(tm_value.tm_mon + 1);
+            CPU_DL = r36sx_bios_rtc_to_bcd(tm_value.tm_mday);
+            r36sx_bios_rtc_success();
+            return 1;
+
+        case 0x05: /* Set Real-Time Clock date */
+            if (!r36sx_bios_rtc_get_time(&tm_value) ||
+                !r36sx_bios_rtc_from_bcd(CPU_CH, 19, 20, &century) ||
+                !r36sx_bios_rtc_from_bcd(CPU_CL, 0, 99, &year) ||
+                !r36sx_bios_rtc_from_bcd(CPU_DH, 1, 12, &month) ||
+                !r36sx_bios_rtc_from_bcd(CPU_DL, 1, 31, &day)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            full_year = century * 100 + year;
+            if (full_year < 1980 || full_year > 2037) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            tm_value.tm_year = full_year - 1900;
+            tm_value.tm_mon = month - 1;
+            tm_value.tm_mday = day;
+            if (!r36sx_bios_rtc_set_time(&tm_value)) {
+                r36sx_bios_rtc_failure();
+                return 1;
+            }
+            r36sx_bios_rtc_success();
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+#endif
+
 #define R36SX_CR0_PE 0x00000001u
 #define R36SX_CR0_MP 0x00000002u
 #define R36SX_CR0_EM 0x00000004u
@@ -5421,6 +5588,11 @@ void intcall86(uint8_t intnum) {
 #endif
             break;
         case 0x1A: /* Timer I/O RTC */
+#if !PICO_ON_DEVICE
+            if (r36sx_bios_rtc_int1a()) {
+                return;
+            }
+#else
             switch (CPU_AH) {
                 case 0x02: /* 02H: Read Time from Real-Time Clock */
                     CPU_CX = 0x2259;
@@ -5428,12 +5600,13 @@ void intcall86(uint8_t intnum) {
                     CPU_FL_CF = 0;
                     return;
                 case 0x04: /* 04H: Read Date from Real-Time Clock */
-                    CPU_CX = 0x2024;
-                    CPU_DX = 0x1024;
+                    CPU_CX = 0x2026;
+                    CPU_DX = 0x0603;
                     CPU_AH = 0;
                     CPU_FL_CF = 0;
                     return;
             }
+#endif
             break;
         case 0x31: /* DPMI services */
             if (r36sx_dpmi_int31_handler()) {

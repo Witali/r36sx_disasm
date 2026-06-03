@@ -87,6 +87,9 @@ int64_t r36sx_pico286_rtc_start_time_unix(void);
 // Return the current emulated RTC counter as Unix local-time seconds.
 int64_t r36sx_pico286_rtc_current_time_unix(void);
 
+// Set the emulated RTC counter from BIOS/CMOS writes.
+int r36sx_pico286_rtc_set_time_unix(int64_t unix_time);
+
 // Return non-zero when emulated RTC/CMOS clock support is globally enabled.
 int r36sx_pico286_rtc_enabled(void);
 

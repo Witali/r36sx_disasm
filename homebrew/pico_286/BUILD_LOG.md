@@ -1,5 +1,41 @@
 # pico-286 Build Log
 
+## 2026-06-03 BIOS RTC date/time services
+
+Fixed DOS-visible RTC time by replacing the old hardcoded BIOS `INT 1Ah`
+date/time stubs with values from the emulated CMOS/RTC counter.
+
+Implemented:
+
+- `INT 1Ah AH=02h`: read RTC time as packed BCD `HH:MM:SS`.
+- `INT 1Ah AH=03h`: set RTC time from packed BCD.
+- `INT 1Ah AH=04h`: read RTC date as packed BCD `CC:YY:MM:DD`.
+- `INT 1Ah AH=05h`: set RTC date from packed BCD.
+- Shared RTC setter used by both BIOS calls and CMOS writes, so DOS and CMOS
+  port access update the same emulated clock state.
+
+Config updates:
+
+- Source and patch `pico_286.conf` now use
+  `rtc_start_time=2026-06-03 09:07:02`.
+- Built-in fallback RTC start time is now `2026-06-03 00:00:00`.
+
+Rebuild command:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Out .\homebrew\pico_286\pico_286
+Copy-Item -LiteralPath .\homebrew\pico_286\pico_286 -Destination .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286 -Force
+```
+
+Result:
+
+- `pico_286` size: `557696` bytes
+- `pico_286` SHA256:
+  `4819842F9B274A1034EE3B82D15DC057EC62FA97752F89CB9001C49B7EF86F69`
+- Patch copy was updated with the same binary.
+- WSL/GCC build succeeded with the existing warning set in FPU, XMS, renderer,
+  and audio/helper code.
+
 ## 2026-06-03 DPMI entry, vectors, and memory services
 
 Extended the DPMI scaffold into a working real-to-protected entry path and added

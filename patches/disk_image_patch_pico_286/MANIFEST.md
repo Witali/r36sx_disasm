@@ -37,6 +37,25 @@ If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
 
+## 2026-06-03 BIOS RTC date/time services
+
+The normal `pico_286` binary now returns the emulated CMOS/RTC time through
+BIOS `INT 1Ah` instead of the old hardcoded 2024 date.  DOS date/time reads and
+file timestamps should now start from `rtc_start_time` in `pico_286.conf`.
+
+Updated files:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- `MIPS_NATIVE/pico_286/pico_286.conf`
+
+Rebuilt normal WSL/GCC `-O3` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `557696` bytes
+- SHA256:
+  `4819842F9B274A1034EE3B82D15DC057EC62FA97752F89CB9001C49B7EF86F69`
+- Patch config `[rtc] rtc_start_time=2026-06-03 09:07:02`.
+
 ## 2026-06-02 FWAIT and CPU-specific FLAGS masks
 
 `WAIT/FWAIT` is now wired into the CPU/FPU path instead of being a no-op.  It

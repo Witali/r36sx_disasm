@@ -416,6 +416,29 @@ int64_t r36sx_pico286_rtc_current_time_unix(void)
     return (int64_t)r36sx_rtc_current_time_raw();
 }
 
+int r36sx_pico286_rtc_set_time_unix(int64_t unix_time)
+{
+    time_t parsed = (time_t)unix_time;
+    time_t host_now;
+
+    r36sx_cmos_init_once();
+
+    if (parsed < 0 || (int64_t)parsed != unix_time) {
+        r36sx_pico286_debug_log("rtc: rejecting out-of-range unix=%lld",
+                                (long long)unix_time);
+        return 0;
+    }
+
+    if (time(&host_now) == (time_t)-1) {
+        host_now = rtc_host_start;
+    }
+    rtc_host_start = host_now;
+    rtc_start = parsed;
+    r36sx_cmos_latch_time_regs();
+    r36sx_pico286_debug_log("rtc: set unix=%ld", (long)rtc_start);
+    return 1;
+}
+
 static void r36sx_cmos_commit_time_regs(void)
 {
     uint8_t second;
@@ -428,7 +451,6 @@ static void r36sx_cmos_commit_time_regs(void)
     int full_year;
     struct tm tm_value;
     time_t parsed;
-    time_t host_now;
 
     if (!r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_SECONDS], &second) ||
         !r36sx_cmos_decode_value(cmos_ram[R36SX_CMOS_REG_MINUTES], &minute) ||
@@ -477,12 +499,7 @@ static void r36sx_cmos_commit_time_regs(void)
         return;
     }
 
-    if (time(&host_now) == (time_t)-1) {
-        host_now = rtc_host_start;
-    }
-    rtc_host_start = host_now;
-    rtc_start = parsed;
-    r36sx_pico286_debug_log("rtc: set unix=%ld", (long)rtc_start);
+    r36sx_pico286_rtc_set_time_unix((int64_t)parsed);
 }
 
 static uint8_t r36sx_cmos_read(uint8_t reg)
