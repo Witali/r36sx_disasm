@@ -540,6 +540,39 @@ static uint8_t r36sx_cpu_v86_iopl_sensitive_fault(uint32_t fault_ip)
     return 0;
 }
 
+static inline uint8_t r36sx_cpu_x87_wait_available(uint32_t fault_ip)
+{
+    /*
+     * WAIT/FWAIT synchronizes the CPU with the numeric processor extension.
+     * EM traps both WAIT and ESC for software emulation; MP makes WAIT honor
+     * TS for lazy x87 context switching.  A physically absent 80287 with EM
+     * clear behaves like inactive BUSY/ERROR pins, so it is handled by the
+     * caller as a no-op rather than as #NM.
+     */
+    if ((r36sx_cr0 & R36SX_CR0_EM) ||
+        ((r36sx_cr0 & R36SX_CR0_MP) && (r36sx_cr0 & R36SX_CR0_TS))) {
+        r36sx_cpu_raise_exception(
+            R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE, 0, 0, fault_ip);
+        return 0;
+    }
+    return 1;
+}
+
+static inline uint8_t r36sx_cpu_x87_escape_available(uint32_t fault_ip)
+{
+    /*
+     * ESC opcodes are x87 instructions.  EM requests an INT 7/#NM trap for an
+     * emulator, and TS traps any x87 instruction until CLTS or a task switch
+     * handler marks the coprocessor state usable again.
+     */
+    if (r36sx_cr0 & (R36SX_CR0_EM | R36SX_CR0_TS)) {
+        r36sx_cpu_raise_exception(
+            R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE, 0, 0, fault_ip);
+        return 0;
+    }
+    return 1;
+}
+
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear);
 static inline uint16_t r36sx_cpu_read_linear16(uint32_t linear);
 static inline uint32_t r36sx_cpu_read_linear32(uint32_t linear);
@@ -8202,13 +8235,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_9B: ;
 #endif
                 /* 9B WAIT */
-                if (!r36sx_cpu_x87_present()) {
+                if (!r36sx_cpu_x87_wait_available(firstip)) {
                     break;
                 }
-                if ((r36sx_cr0 & R36SX_CR0_MP) &&
-                    (r36sx_cr0 & R36SX_CR0_TS)) {
-                    r36sx_cpu_raise_exception(
-                        R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE, 0, 0, firstip);
+                if (!r36sx_cpu_x87_present()) {
                     break;
                 }
                 if (OpFwait()) {
@@ -9191,6 +9221,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_DF: ;
 #endif
                 /* escape to x87 FPU */
+                if (!r36sx_cpu_x87_escape_available(firstip)) {
+                    break;
+                }
                 if (!r36sx_cpu_x87_present()) {
                     r36sx_cpu_skip_x87_escape();
                     break;
