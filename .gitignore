@@ -21,8 +21,10 @@ tools/*
 !tools/build_debian12_mipsel_essential_image_wsl.sh
 !tools/repack_debian12_bootonly_image_wsl.sh
 !tools/repack_debian12_mtdfat_image_wsl.sh
+!tools/repack_debian12_stockfat_ext4root_image_wsl.sh
 !tools/verify_r36sx_sd_image_wsl.sh
 !tools/verify_r36sx_bootonly_image_wsl.sh
+!tools/verify_r36sx_stockfat_ext4root_image_wsl.sh
 
 # Build outputs and caches
 local_artifacts/
