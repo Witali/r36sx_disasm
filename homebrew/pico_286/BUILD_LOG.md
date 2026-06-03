@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-06-03 DPMI host config gate
+
+Analyzed `C:/Temp/pico_286.log` from the failing `mk.exe` run.  The important
+sequence was:
+
+- `INT 2Fh AX=1687h` DPMI installation probe at `1750:6D83`.
+- No protected `INT 31h` service calls before the crash.
+- `INT 6` at `0084:20F0`, where the 256-byte context dump starts with data-like
+  bytes `FF FF FF 00 00 FF FF FF`.
+
+That points to a bad path chosen after the DPMI probe rather than a missing
+ordinary 8086 opcode.  The built-in DPMI host is still experimental, so it is
+now hidden behind `dpmi_host_enabled`.  The default is `0`, making
+`INT 2Fh AX=1687h` report no resident DPMI host unless the setting is
+explicitly enabled for debugging.
+
+The startup log now includes `dpmi_host=on/off` next to the CPU and x87 status.
+
+Rebuilt with debug logging enabled:
+
+```powershell
+.\homebrew\pico_286\build_pico_286_wsl.ps1 -DebugLog -Strip -Out homebrew\pico_286\pico_286.debug
+```
+
+Scan commands:
+
+```powershell
+.\tools\scan-download.ps1 .\homebrew\pico_286\pico_286.debug
+.\tools\scan-download.ps1 .\disk_image\MIPS_NATIVE\pico_286\pico_286
+.\tools\scan-download.ps1 .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Result:
+
+- Output: `homebrew/pico_286/pico_286.debug`
+- Size: 469,420 bytes
+- SHA256: `DE0A90C8B8DBEFE55C116B94B6F733A92B170AB300F176F745FEABA1D9CE9587`
+- Defender scan: found no threats
+- Updated copies:
+  - `disk_image/MIPS_NATIVE/pico_286/pico_286`
+  - `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286`
+
 ## 2026-06-03 DPMI debug-log build
 
 Enabled extra protected-mode and DPMI diagnostics for tracking DOS/4GW and

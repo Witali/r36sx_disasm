@@ -230,6 +230,7 @@ cpu_model=80386
 cpu_mode=real
 cpu_mhz=10.0
 x87_enabled=1
+dpmi_host_enabled=0
 
 [timing]
 target_fps=60
@@ -461,6 +462,11 @@ loads the external 64 KB BIOS ROM named by `test_bios_rom`, which defaults to
 `x87_enabled=1` exposes the emulated x87 math coprocessor.  Set it to `0`, or
 switch the disk-menu `X87` row to `OFF`, to make DOS probes behave as if no
 math coprocessor is installed.
+
+`dpmi_host_enabled=0` keeps the experimental built-in DPMI host hidden from
+`INT 2Fh AX=1687h` probes.  Set it to `1` only when debugging the built-in DPMI
+scaffold itself; otherwise DOS extenders can choose their own protected-mode
+startup path.
 
 `image_dir` is resolved relative to `pico_286.conf` unless it is absolute.
 `fdd0` is BIOS drive `00h` / DOS `A:`, `fdd1` is `01h` / `B:`, `hdd0` is

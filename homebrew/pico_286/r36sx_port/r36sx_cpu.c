@@ -4279,7 +4279,8 @@ static inline uint8_t r36sx_dpmi_host_available(void)
 
 static inline uint8_t r36sx_dpmi_real_entry_available(void)
 {
-    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286) &&
+    return r36sx_pico286_dpmi_host_enabled() &&
+           r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286) &&
            !r36sx_cpu_protected_enabled();
 }
 

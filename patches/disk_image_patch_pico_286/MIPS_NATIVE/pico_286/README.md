@@ -145,6 +145,7 @@ cpu_model=80386
 cpu_mode=real
 cpu_mhz=10.0
 x87_enabled=1
+dpmi_host_enabled=0
 
 [timing]
 target_fps=60
