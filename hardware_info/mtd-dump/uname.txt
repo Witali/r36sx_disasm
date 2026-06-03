@@ -1,0 +1,1 @@
+Linux buildroot 4.4.186-release #21 PREEMPT Thu Dec 18 18:13:45 CST 2025 mips GNU/Linux

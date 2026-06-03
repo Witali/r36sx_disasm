@@ -1,0 +1,2 @@
+Filesystem                Size      Used Available Use% Mounted on
+/dev/mmcblk0p1           14.6G     14.3G    279.7M  98% /media/mmc

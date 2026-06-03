@@ -1,0 +1,5 @@
+mtd	device	size_hex	erase_hex	name	file	method	status
+mtd0	/dev/mtd0	00080000	00001000	"nor"	mtd0_nor.bin	dd	ok
+mtd1	/dev/mtd1	0006c000	00001000	"boot"	mtd1_boot.bin	dd	ok
+mtd2	/dev/mtd2	00004000	00001000	"eromfs"	mtd2_eromfs.bin	dd	ok
+mtd3	/dev/mtd3	00010000	00001000	"persistentmem"	mtd3_persistentmem.bin	dd	ok

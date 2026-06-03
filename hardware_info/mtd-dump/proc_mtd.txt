@@ -1,0 +1,5 @@
+dev:    size   erasesize  name
+mtd0: 00080000 00001000 "nor"
+mtd1: 0006c000 00001000 "boot"
+mtd2: 00004000 00001000 "eromfs"
+mtd3: 00010000 00001000 "persistentmem"

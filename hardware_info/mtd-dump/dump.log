@@ -1,0 +1,17 @@
+MTD dump output: /mnt/sdcard/mtd-dump/19700101_000938
+Started: Thu Jan  1 00:09:38 UTC 1970
+Dumping mtd0 ("nor") from /dev/mtd0 to mtd0_nor.bin
+8+0 records in
+8+0 records out
+Dumping mtd1 ("boot") from /dev/mtd1 to mtd1_boot.bin
+6+1 records in
+6+1 records out
+Dumping mtd2 ("eromfs") from /dev/mtd2 to mtd2_eromfs.bin
+0+1 records in
+0+1 records out
+Dumping mtd3 ("persistentmem") from /dev/mtd3 to mtd3_persistentmem.bin
+1+0 records in
+1+0 records out
+Finished: Thu Jan  1 00:09:39 UTC 1970
+Dumped: 4 partition(s), failed: 0
+Output directory: /mnt/sdcard/mtd-dump/19700101_000938
