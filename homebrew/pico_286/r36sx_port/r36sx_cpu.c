@@ -5447,6 +5447,44 @@ static uint8_t r36sx_dpmi_int31_handler(void)
     return 1;
 }
 
+static uint8_t r36sx_dpmi_dispatch_pm_interrupt(uint8_t intnum)
+{
+    if (!r36sx_dpmi_host_available()) {
+        return 0;
+    }
+
+    const r36sx_dpmi_vector_t *vector =
+        &r36sx_dpmi_pm_interrupt_vectors[intnum];
+    if (!vector->set) {
+        return 0;
+    }
+
+    /*
+     * DPMI INT 31h AX=0205h installs a protected-mode interrupt handler as a
+     * selector:offset pair, not as a raw IDT gate.  Dispatch it here before the
+     * fallback IDT path so DOS extenders can route DOS/BIOS-style interrupts
+     * through their own protected handlers.
+     */
+    r36sx_segment_cache_t target_cache;
+    uint8_t new_cpl;
+    if (!r36sx_cpu_load_code_for_transfer(vector->selector, vector->offset,
+                                          1, 0, &target_cache, &new_cpl)) {
+        return 1;
+    }
+
+    uint8_t wide = r36sx_cpu_code_default32();
+    r36sx_cpu_push_frame_value(wide ? makeflagsdword() : makeflagsword(),
+                               wide);
+    r36sx_cpu_push_frame_value(CPU_CS, wide);
+    r36sx_cpu_push_frame_value(CPU_IP, wide);
+    r36sx_cpu_commit_code_transfer(vector->selector, &target_cache, new_cpl,
+                                   vector->offset);
+    x86_flags.value &= ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
+    ifl = 0;
+    tf = 0;
+    return 1;
+}
+
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
@@ -5875,6 +5913,9 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum)
             return;
         }
         if (intnum == 0x2f && r36sx_dpmi_int2f_handler()) {
+            return;
+        }
+        if (r36sx_dpmi_dispatch_pm_interrupt(intnum)) {
             return;
         }
         (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1);
