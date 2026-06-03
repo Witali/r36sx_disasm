@@ -81,6 +81,7 @@ static inline void r36sx_cpu_real_write8(uint32_t linear, uint8_t value)
         linear &= 0x000fffffu;
     }
 #endif
+    r36sx_cpu_debug_note_data_write(linear, 1u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_write86_fast(linear, value);
 #else
@@ -98,6 +99,7 @@ static inline void r36sx_cpu_real_write16(uint32_t linear, uint16_t value)
         return;
     }
 #endif
+    r36sx_cpu_debug_note_data_write(linear, 2u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_writew86_fast(linear, value);
 #else
@@ -117,6 +119,7 @@ static inline void r36sx_cpu_real_write32(uint32_t linear, uint32_t value)
         return;
     }
 #endif
+    r36sx_cpu_debug_note_data_write(linear, 4u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_writedw86_fast(linear, value);
 #else

@@ -266,7 +266,10 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DR7_RESET 0x00000400u
 #define R36SX_DR7_ENABLE_MASK(slot) (0x03u << ((slot) * 2u))
 #define R36SX_DR7_RW_FIELD(slot) (((slot) * 4u) + 16u)
+#define R36SX_DR7_LEN_FIELD(slot) (((slot) * 4u) + 18u)
 #define R36SX_DR7_RW_EXECUTE 0x00u
+#define R36SX_DR7_RW_WRITE 0x01u
+#define R36SX_DR7_RW_READWRITE 0x03u
 #define R36SX_386_REGISTER_COUNT 8u
 #define R36SX_386_TEST_REGISTER_FIRST 6u
 #define R36SX_386_TEST_REGISTER_LAST 7u
@@ -525,7 +528,9 @@ static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint16_t r36sx_debug_resume_cs;
 static uint32_t r36sx_debug_resume_ip;
+static uint32_t r36sx_debug_pending_dr6_hits;
 static uint8_t r36sx_debug_resume_valid;
+static uint8_t r36sx_debug_suppress_watchpoints;
 static uint32_t r36sx_gdtr_base;
 static uint32_t r36sx_idtr_base;
 static uint16_t r36sx_gdtr_limit;
@@ -920,6 +925,44 @@ static uint8_t r36sx_cpu_segment_linear_checked(
     return 1;
 }
 
+static void r36sx_cpu_raise_debug_exception(uint32_t fault_ip,
+                                            uint32_t dr6_bits)
+{
+    r36sx_dr[6] |= R36SX_DR6_RESET | dr6_bits;
+    r36sx_debug_suppress_watchpoints++;
+    r36sx_cpu_raise_exception(R36SX_EXCEPTION_DEBUG, 0, 0, fault_ip);
+    r36sx_debug_suppress_watchpoints--;
+}
+
+static inline uint32_t r36sx_cpu_debug_watchpoint_length(uint8_t slot)
+{
+    uint32_t len = (r36sx_dr[7] >> R36SX_DR7_LEN_FIELD(slot)) & 0x03u;
+    switch (len) {
+        case 0x00u:
+            return 1u;
+        case 0x01u:
+            return 2u;
+        case 0x03u:
+            return 4u;
+        default:
+            return 1u;
+    }
+}
+
+static inline uint8_t r36sx_cpu_debug_ranges_overlap(uint32_t a_start,
+                                                     uint32_t a_len,
+                                                     uint32_t b_start,
+                                                     uint32_t b_len)
+{
+    uint32_t a_end = UINT32_MAX - a_start < a_len - 1u
+                         ? UINT32_MAX
+                         : a_start + a_len - 1u;
+    uint32_t b_end = UINT32_MAX - b_start < b_len - 1u
+                         ? UINT32_MAX
+                         : b_start + b_len - 1u;
+    return a_start <= b_end && b_start <= a_end;
+}
+
 static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
 {
     if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
@@ -965,15 +1008,40 @@ static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
 
     /*
      * 386 execution breakpoints are debug faults before the instruction
-     * executes.  Data read/write watchpoints need hooks in every memory access
-     * path, so they stay tracked separately in TODO_386_INSTRUCTIONS.md.
+     * executes.  Data read watchpoints need a fetch-aware read path, so they
+     * stay tracked separately in TODO_386_INSTRUCTIONS.md.
      */
-    r36sx_dr[6] |= R36SX_DR6_RESET | hits;
     r36sx_debug_resume_cs = CPU_CS;
     r36sx_debug_resume_ip = fault_ip;
     r36sx_debug_resume_valid = 1;
-    r36sx_cpu_raise_exception(R36SX_EXCEPTION_DEBUG, 0, 0, fault_ip);
+    r36sx_cpu_raise_debug_exception(fault_ip, hits);
     return 1;
+}
+
+static inline void r36sx_cpu_debug_note_data_write(uint32_t linear,
+                                                   uint32_t bytes)
+{
+    if (r36sx_debug_suppress_watchpoints ||
+        bytes == 0u ||
+        !r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        return;
+    }
+
+    uint32_t dr7 = r36sx_dr[7];
+    if ((dr7 & 0xffu) == 0) {
+        return;
+    }
+
+    for (uint8_t slot = 0; slot < 4u; slot++) {
+        uint32_t rw = (dr7 >> R36SX_DR7_RW_FIELD(slot)) & 0x03u;
+        if ((dr7 & R36SX_DR7_ENABLE_MASK(slot)) &&
+            (rw == R36SX_DR7_RW_WRITE || rw == R36SX_DR7_RW_READWRITE) &&
+            r36sx_cpu_debug_ranges_overlap(
+                linear, bytes, r36sx_dr[slot],
+                r36sx_cpu_debug_watchpoint_length(slot))) {
+            r36sx_debug_pending_dr6_hits |= R36SX_DR6_B0_MASK << slot;
+        }
+    }
 }
 
 static inline uint8_t r36sx_cpu_selector_is_current_cs(uint16_t selector)
@@ -2263,6 +2331,7 @@ static inline void r36sx_cpu_write_linear8(uint32_t linear, uint8_t value)
     if (!r36sx_cpu_translate_linear(linear, 1, &physical)) {
         return;
     }
+    r36sx_cpu_debug_note_data_write(linear, 1u);
     write86_ob(physical, value);
 }
 
@@ -2277,6 +2346,7 @@ static inline void r36sx_cpu_write_linear16(uint32_t linear, uint16_t value)
     if (!r36sx_cpu_translate_linear(linear, 1, &physical)) {
         return;
     }
+    r36sx_cpu_debug_note_data_write(linear, 2u);
     r36sx_cpu_phys_write16(physical, value);
 }
 
@@ -2293,6 +2363,7 @@ static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value)
     if (!r36sx_cpu_translate_linear(linear, 1, &physical)) {
         return;
     }
+    r36sx_cpu_debug_note_data_write(linear, 4u);
     r36sx_cpu_phys_write32(physical, value);
 }
 
@@ -7423,6 +7494,8 @@ void reset86() {
     r36sx_debug_resume_valid = 0;
     r36sx_debug_resume_cs = 0;
     r36sx_debug_resume_ip = 0;
+    r36sx_debug_pending_dr6_hits = 0;
+    r36sx_debug_suppress_watchpoints = 0;
     r36sx_gdtr_base = 0;
     r36sx_gdtr_limit = 0;
     r36sx_idtr_base = 0;
@@ -11315,12 +11388,15 @@ r36sx_opcode_done:
             r36sx_app_stats_record_x86(loopcount + 1u);
             return;
         }
-        if (was_TF) {
+        if (unlikely(r36sx_debug_pending_dr6_hits || was_TF)) {
+            uint32_t dr6_hits = r36sx_debug_pending_dr6_hits;
+            r36sx_debug_pending_dr6_hits = 0;
+            if (was_TF) {
+                dr6_hits |= R36SX_DR6_BS_MASK;
+            }
             was_TF = false;
-            r36sx_dr[6] |= R36SX_DR6_RESET | R36SX_DR6_BS_MASK;
-            r36sx_cpu_raise_exception(R36SX_EXCEPTION_DEBUG, 0, 0, CPU_IP);
-        }
-        if (tf) {
+            r36sx_cpu_raise_debug_exception(CPU_IP, dr6_hits);
+        } else if (tf) {
             was_TF = true;
         }
     }

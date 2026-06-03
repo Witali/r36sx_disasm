@@ -33,7 +33,9 @@ Intel 80386 Programmer's Reference Manual instruction set.
       memory or FPU state.
 - [x] Emulate `DR0..DR3` execute-breakpoint `#DB` delivery and `DR6` `B0..B3`
       / `BS` status for instruction breakpoints and single-step traps.
-- [ ] Emulate `DR0..DR3` data read/write watchpoints; this needs hooks in the
-      memory access paths, not only the instruction fetch path.
+- [x] Emulate `DR0..DR3` data write watchpoints with delayed `#DB` delivery
+      after the instruction completes.
+- [ ] Emulate `DR0..DR3` data read watchpoints; this needs data-read hooks that
+      do not misclassify opcode/immediate fetches as watched reads.
 - [ ] Add small instruction-level DOS tests for the fixed opcodes, especially
       flags and protected-mode exception paths.
