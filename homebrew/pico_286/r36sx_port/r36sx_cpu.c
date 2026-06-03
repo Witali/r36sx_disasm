@@ -341,6 +341,18 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_DPMI_INT2F_INSTALLATION_CHECK 0x1687u
 #define R36SX_DPMI_ENTRY_CS 0x0000u
 #define R36SX_DPMI_ENTRY_IP 0x03f8u
+#define R36SX_DPMI_RAW_RM_TO_PM_CS 0x0000u
+#define R36SX_DPMI_RAW_RM_TO_PM_IP 0x03fau
+#define R36SX_DPMI_STATE_RM_CS 0x0000u
+#define R36SX_DPMI_STATE_RM_IP 0x0400u
+/*
+ * INT 31h AX=0306h returns far-jump targets, so the protected-mode hook must
+ * pass normal CS limit checks before the magic fetch hook sees it.  Keep it in
+ * the same low-offset area as the DPMI entry hook instead of using a sentinel
+ * offset near 64K.
+ */
+#define R36SX_DPMI_RAW_PM_TO_RM_IP 0x03fcu
+#define R36SX_DPMI_STATE_PM_IP 0x0402u
 #define R36SX_DPMI_ENTRY_FLAG_32BIT 0x0001u
 #define R36SX_DPMI_FUNC_ALLOC_LDT_DESCRIPTORS 0x0000u
 #define R36SX_DPMI_FUNC_FREE_LDT_DESCRIPTOR 0x0001u
@@ -544,6 +556,8 @@ static r36sx_dpmi_memory_block_t
     r36sx_dpmi_memory_blocks[R36SX_DPMI_MAX_MEMORY_BLOCKS];
 static uint8_t r36sx_dpmi_client_active;
 static uint8_t r36sx_dpmi_client_32bit;
+static uint16_t r36sx_dpmi_state_pm_selector;
+static uint16_t r36sx_dpmi_raw_pm_to_rm_selector;
 #if R36SX_DEBUG_PM_DIAG
 static uint32_t r36sx_dpmi_entry_logs;
 static uint32_t r36sx_dpmi_fail_logs;
@@ -5055,6 +5069,8 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
     memset(r36sx_dpmi_memory_blocks, 0, sizeof(r36sx_dpmi_memory_blocks));
     r36sx_dpmi_client_active = 0;
     r36sx_dpmi_client_32bit = client32;
+    r36sx_dpmi_state_pm_selector = 0;
+    r36sx_dpmi_raw_pm_to_rm_selector = 0;
 
     uint16_t cs_selector;
     uint16_t ds_selector;
@@ -5087,18 +5103,19 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
         putmem16(psp_segment, 0x002cu, env_selector);
     }
 
-    /*
-     * Patch the real-mode FAR CALL return frame so the normal protected RETF
-     * path returns through the freshly-created CS selector.
-     */
-    putmem16(real_ss, (uint16_t)(real_sp + 2u), cs_selector);
-
     if (!r36sx_dpmi_lookup_descriptor(ss_selector, &ss_cache) ||
         !r36sx_dpmi_lookup_descriptor(ds_selector, &ds_cache) ||
         !r36sx_dpmi_lookup_descriptor(psp_selector, &psp_cache)) {
         r36sx_dpmi_entry_fail(R36SX_DPMI_DESCRIPTOR_UNAVAILABLE);
         return 0xcbu;
     }
+
+    /*
+     * Patch the real-mode FAR CALL return frame only after all failure-prone
+     * setup has completed.  A failed DPMI entry must return through the
+     * original real-mode frame; a successful one returns through this selector.
+     */
+    putmem16(real_ss, (uint16_t)(real_sp + 2u), cs_selector);
 
     /*
      * Use the normal CR0 path, not a raw bit set.  The entry returns through a
@@ -5134,6 +5151,139 @@ static uint8_t r36sx_dpmi_enter_protected_mode(void)
     }
 #endif
     return 0xcbu;
+}
+
+static uint32_t r36sx_dpmi_pre_step_ip(uint32_t target_ip)
+{
+    /*
+     * Magic hooks are detected before the core interpreter applies StepIP(1).
+     * Set the new IP one byte before the target and return a harmless NOP so
+     * the mandatory StepIP lands exactly on the DPMI raw-switch destination.
+     */
+    return target_ip - 1u;
+}
+
+static uint8_t r36sx_dpmi_raw_switch_to_protected(void)
+{
+    if (!r36sx_dpmi_client_active || r36sx_cpu_protected_enabled()) {
+        return 0x90u; /* NOP */
+    }
+
+    uint16_t target_ds = CPU_AX;
+    uint16_t target_es = CPU_CX;
+    uint16_t target_ss = CPU_DX;
+    uint32_t target_sp = r36sx_dpmi_client_32bit ? CPU_EBX : CPU_BX;
+    uint16_t target_cs = CPU_SI;
+    uint32_t target_ip = r36sx_dpmi_client_32bit ? CPU_EDI : CPU_DI;
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] DPMI raw switch RM->PM ds=%04X es=%04X ss:sp=%04X:%08lX "
+        "cs:eip=%04X:%08lX",
+        target_ds, target_es, target_ss, (unsigned long)target_sp,
+        target_cs, (unsigned long)target_ip);
+
+    r36sx_cpu_set_cr0(r36sx_cr0 | R36SX_CR0_PE);
+    if (!r36sx_cpu_load_segment(regss, target_ss) ||
+        !r36sx_cpu_load_segment(regds, target_ds) ||
+        !r36sx_cpu_load_segment(reges, target_es) ||
+        !r36sx_cpu_protected_far_jump(target_cs, target_ip)) {
+        return 0x90u; /* NOP */
+    }
+
+    CPU_ESP = target_sp;
+    if (!r36sx_dpmi_client_32bit) {
+        CPU_SP = (uint16_t)target_sp;
+    }
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        r36sx_cpu_clear_segment_cache(regfs, 0);
+        r36sx_cpu_clear_segment_cache(reggs, 0);
+    }
+    r36sx_cpu_set_ip(r36sx_dpmi_pre_step_ip(target_ip));
+    return 0x90u; /* NOP */
+}
+
+static uint8_t r36sx_dpmi_raw_switch_to_real(void)
+{
+    if (!r36sx_dpmi_client_active || !r36sx_cpu_protected_enabled()) {
+        return 0x90u; /* NOP */
+    }
+
+    uint16_t target_ds = CPU_AX;
+    uint16_t target_es = CPU_CX;
+    uint16_t target_ss = CPU_DX;
+    uint32_t target_sp = r36sx_dpmi_client_32bit ? CPU_EBX : CPU_BX;
+    uint16_t target_cs = CPU_SI;
+    uint32_t target_ip = r36sx_dpmi_client_32bit ? CPU_EDI : CPU_DI;
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] DPMI raw switch PM->RM ds=%04X es=%04X ss:sp=%04X:%08lX "
+        "cs:eip=%04X:%08lX",
+        target_ds, target_es, target_ss, (unsigned long)target_sp,
+        target_cs, (unsigned long)target_ip);
+
+    r36sx_cpu_set_cr0((r36sx_cr0 & ~(R36SX_CR0_PE | R36SX_CR0_PG)) |
+                      R36SX_CR0_ET);
+    r36sx_cpu_load_segment(regss, target_ss);
+    r36sx_cpu_load_segment(regds, target_ds);
+    r36sx_cpu_load_segment(reges, target_es);
+    r36sx_cpu_load_segment(regcs, target_cs);
+    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        r36sx_cpu_load_segment(regfs, 0);
+        r36sx_cpu_load_segment(reggs, 0);
+    }
+    CPU_ESP = target_sp;
+    CPU_SP = (uint16_t)target_sp;
+    r36sx_cpu_set_ip((uint16_t)r36sx_dpmi_pre_step_ip(target_ip));
+    return 0x90u; /* NOP */
+}
+
+static void r36sx_dpmi_get_raw_mode_switch(void)
+{
+    /*
+     * DPMI 0.9/1.0 function 0306h gives clients raw FAR JMP targets.  These
+     * are emulator-owned magic addresses intercepted before opcode fetch; the
+     * client still reaches them through normal far-control-transfer semantics.
+     */
+    r36sx_dpmi_succeed();
+    CPU_BX = R36SX_DPMI_RAW_RM_TO_PM_CS;
+    CPU_CX = R36SX_DPMI_RAW_RM_TO_PM_IP;
+    r36sx_dpmi_raw_pm_to_rm_selector = CPU_CS;
+    CPU_SI = r36sx_dpmi_raw_pm_to_rm_selector;
+    if (r36sx_dpmi_client_32bit) {
+        CPU_EDI = R36SX_DPMI_RAW_PM_TO_RM_IP;
+    } else {
+        CPU_DI = R36SX_DPMI_RAW_PM_TO_RM_IP;
+    }
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] DPMI raw switch addresses rm=%04X:%04X pm=%04X:%08lX",
+        CPU_BX, CPU_CX, CPU_SI,
+        (unsigned long)(r36sx_dpmi_client_32bit ? CPU_EDI : CPU_DI));
+}
+
+static void r36sx_dpmi_get_state_save_restore(void)
+{
+    /*
+     * DPMI explicitly allows hosts that do not need state buffers to return
+     * AX=0.  The returned FAR CALL entry points still have to be callable, so
+     * expose magic stubs that simply RETF without touching registers.
+     */
+    r36sx_dpmi_succeed();
+    CPU_AX = 0;
+    CPU_BX = R36SX_DPMI_STATE_RM_CS;
+    CPU_CX = R36SX_DPMI_STATE_RM_IP;
+    r36sx_dpmi_state_pm_selector = CPU_CS;
+    CPU_SI = r36sx_dpmi_state_pm_selector;
+    if (r36sx_dpmi_client_32bit) {
+        CPU_EDI = R36SX_DPMI_STATE_PM_IP;
+    } else {
+        CPU_DI = R36SX_DPMI_STATE_PM_IP;
+    }
+
+    R36SX_PM_DIAG_LOG(
+        "[PM] DPMI state stubs rm=%04X:%04X pm=%04X:%08lX size=0",
+        CPU_BX, CPU_CX, CPU_SI,
+        (unsigned long)(r36sx_dpmi_client_32bit ? CPU_EDI : CPU_DI));
 }
 
 static void r36sx_dpmi_reload_loaded_selector(uint16_t selector)
@@ -6034,15 +6184,15 @@ static uint8_t r36sx_dpmi_int31_handler(void)
 
         case R36SX_DPMI_FUNC_ALLOC_RM_CALLBACK:
         case R36SX_DPMI_FUNC_FREE_RM_CALLBACK:
-        case R36SX_DPMI_FUNC_GET_STATE_SAVE_RESTORE:
-        case R36SX_DPMI_FUNC_GET_RAW_MODE_SWITCH:
-            /*
-             * These services require host-owned callback stubs or raw mode
-             * switch entry points.  Keep them as explicit unsupported services
-             * until the callback/mode-switch stubs exist; callers using the
-             * higher-level 0300h..0302h bridge now have a functional path.
-             */
             r36sx_dpmi_fail(R36SX_DPMI_UNSUPPORTED_FUNCTION);
+            return 1;
+
+        case R36SX_DPMI_FUNC_GET_STATE_SAVE_RESTORE:
+            r36sx_dpmi_get_state_save_restore();
+            return 1;
+
+        case R36SX_DPMI_FUNC_GET_RAW_MODE_SWITCH:
+            r36sx_dpmi_get_raw_mode_switch();
             return 1;
 
         case R36SX_DPMI_FUNC_GET_EXT_EXCEPTION_RM_VECTOR:
@@ -6693,6 +6843,28 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             } else if (unlikely(CPU_CS == R36SX_DPMI_ENTRY_CS &&
                                 ip == R36SX_DPMI_ENTRY_IP)) {
                 opcode = r36sx_dpmi_enter_protected_mode();
+            } else if (unlikely(CPU_CS == R36SX_DPMI_STATE_RM_CS &&
+                                ip == R36SX_DPMI_STATE_RM_IP &&
+                                r36sx_dpmi_client_active &&
+                                !r36sx_cpu_protected_enabled())) {
+                opcode = 0xcbu; /* RETF for zero-length DPMI state stub. */
+            } else if (unlikely(CPU_CS == R36SX_DPMI_RAW_RM_TO_PM_CS &&
+                                ip == R36SX_DPMI_RAW_RM_TO_PM_IP &&
+                                r36sx_dpmi_client_active &&
+                                !r36sx_cpu_protected_enabled())) {
+                opcode = r36sx_dpmi_raw_switch_to_protected();
+            } else if (unlikely(r36sx_dpmi_state_pm_selector != 0 &&
+                                CPU_CS == r36sx_dpmi_state_pm_selector &&
+                                ip == R36SX_DPMI_STATE_PM_IP &&
+                                r36sx_dpmi_client_active &&
+                                r36sx_cpu_protected_enabled())) {
+                opcode = 0xcbu; /* RETF for zero-length DPMI state stub. */
+            } else if (unlikely(r36sx_dpmi_raw_pm_to_rm_selector != 0 &&
+                                CPU_CS == r36sx_dpmi_raw_pm_to_rm_selector &&
+                                ip == R36SX_DPMI_RAW_PM_TO_RM_IP &&
+                                r36sx_dpmi_client_active &&
+                                r36sx_cpu_protected_enabled())) {
+                opcode = r36sx_dpmi_raw_switch_to_real();
             } else {
                 opcode = getmem8(CPU_CS, CPU_IP);
             }
