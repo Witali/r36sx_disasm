@@ -567,8 +567,15 @@ static uint8_t r36sx_cpu_load_segment_at(uint8_t segid,
     memset(&cache, 0, sizeof(cache));
     uint8_t decoded = r36sx_cpu_decode_descriptor(selector, &cache);
     if (!decoded || !cache.valid) {
-        uint8_t exc = segid == regss ? R36SX_EXCEPTION_STACK :
-                      cache.access ? R36SX_EXCEPTION_NOT_PRESENT :
+        /*
+         * Intel MOV Sreg protected-mode faults distinguish a missing table
+         * entry from a present descriptor whose P bit is clear. SS gets #SS
+         * only for a not-present stack descriptor; a selector outside the
+         * descriptor-table limit is still #GP(selector).
+         */
+        uint8_t exc = cache.access ?
+                      (segid == regss ? R36SX_EXCEPTION_STACK :
+                                        R36SX_EXCEPTION_NOT_PRESENT) :
                       R36SX_EXCEPTION_GP;
 #if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
@@ -592,9 +599,13 @@ static uint8_t r36sx_cpu_load_segment_at(uint8_t segid,
             r36sx_selector_rpl(selector));
 #endif
         r36sx_pm_diag_log_first_fault("segment load failed", fault_ip);
-        r36sx_cpu_raise_exception(
-            segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            selector & 0xfffcu, 1, fault_ip);
+        /*
+         * For SS, bad type or privilege (DPL/RPL/CPL mismatch, non-writable
+         * data segment) raises #GP(selector). #SS is reserved for a valid
+         * stack descriptor that is marked not present.
+         */
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
+                                  1, fault_ip);
         return 0;
     }
 
