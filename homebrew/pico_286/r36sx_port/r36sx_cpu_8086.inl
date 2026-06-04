@@ -503,7 +503,7 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
 
 static inline void op_div8(uint16_t valdiv, uint8_t divisor, uint32_t fault_ip) {
     if (divisor == 0 || valdiv / divisor > 0xFF) {
-        printf("[op_div8] %d / %d\n", valdiv, divisor);
+        /* Intel DIV raises #DE for divide-by-zero or quotient overflow. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
@@ -514,7 +514,7 @@ static inline void op_div8(uint16_t valdiv, uint8_t divisor, uint32_t fault_ip) 
 
 static inline void op_idiv8(uint16_t valdiv, int8_t divisor, uint32_t fault_ip) {
     if (divisor == 0) {
-        printf("[op_idiv8] %d / 0\n", valdiv);
+        /* Intel IDIV reports divide-by-zero through #DE, not stdout. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
@@ -522,7 +522,7 @@ static inline void op_idiv8(uint16_t valdiv, int8_t divisor, uint32_t fault_ip) 
     int16_t quotient  = dividend / divisor;
     int16_t remainder = dividend % divisor;
     if (quotient < -128 || quotient > 127) {
-        printf("[op_idiv8] %d / %d overflow\n", dividend, divisor);
+        /* Quotient overflow is the same #DE fault as divide-by-zero. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
@@ -547,14 +547,14 @@ static inline void op_idiv16(uint32_t valdiv, uint16_t divisor, uint32_t fault_i
     int32_t dividend = (int32_t)valdiv;
     int16_t divisor_signed = (int16_t)divisor;
     if (divisor_signed == 0) {
-        printf("[op_idiv16] %d / 0\n", dividend);
+        /* Intel IDIV reports divide-by-zero through #DE, not stdout. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
     int32_t quotient  = dividend / divisor_signed;
     int32_t remainder = dividend % divisor_signed;
     if (quotient < -32768 || quotient > 32767) {
-        printf("[op_idiv16] %d / %d overflow\n", dividend, divisor_signed);
+        /* Quotient overflow is the same #DE fault as divide-by-zero. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
