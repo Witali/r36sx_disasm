@@ -112,6 +112,19 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         return 0;
     }
 
+    if (old_vm86 &&
+        (r36sx_descriptor_is_conforming_code(&target_cs) || new_cpl != 0u)) {
+        /*
+         * Intel 80386 leaves VM86 mode only through an interrupt/trap gate
+         * targeting a privilege-level-0 protected handler.  A conforming code
+         * segment or any non-zero target CPL is a #GP on the gate's CS
+         * selector, not a TSS stack fault.
+         */
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
+        return 0;
+    }
+
     uint16_t old_ss = CPU_SS;
     uint32_t old_sp = r36sx_cpu_stack_pointer_value();
     uint16_t old_es = CPU_ES;
