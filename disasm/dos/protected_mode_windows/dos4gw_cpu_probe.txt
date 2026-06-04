@@ -1,0 +1,101 @@
+  1000: 11bd:01e4:	e8 9a 1e	CALL 0x1000:3c51
+  1001: 11bd:01e7:	f6 06 47 00 01	TEST byte ptr [0x47],0x1
+  1002: 11bd:01ec:	74 28	JZ 0x1000:1de6
+  1003: 11bd:01ee:	c7 06 70 01 fa 04	MOV word ptr [0x170],0x4fa
+  1004: 11bd:01f4:	c7 06 b0 01 7c 0c	MOV word ptr [0x1b0],0xc7c
+  1005: 11bd:01fa:	c7 06 b2 01 18 00	MOV word ptr [0x1b2],0x18
+  1006: 11bd:0200:	8a 1e 51 00	MOV BL,byte ptr [0x51]
+  1007: 11bd:0204:	0a db	OR BL,BL
+  1008: 11bd:0206:	74 0e	JZ 0x1000:1de6
+  1009: 11bd:0208:	80 c3 05	ADD BL,0x5
+  1010: 11bd:020b:	32 ff	XOR BH,BH
+  1011: 11bd:020d:	c1 e3 03	SHL BX,0x3
+  1012: 11bd:0210:	c7 87 c0 00 56 05	MOV word ptr [BX + 0xc0],0x556
+  1013: 11bd:0216:	80 3e 3e 00 00	CMP byte ptr [0x3e],0x0
+  1014: 11bd:021b:	74 28	JZ 0x1000:1e15
+  1015: 11bd:021d:	db e3	FNINIT
+  1016: 11bd:021f:	8b 1e 82 0f	MOV BX,word ptr [0xf82]
+  1017: 11bd:0223:	0b db	OR BX,BX
+  1018: 11bd:0225:	74 02	JZ 0x1000:1df9
+  1019: 11bd:0227:	dd 37	FNSAVE [BX]
+  1020: 11bd:0229:	2e c6 06 2c 09 9b	MOV byte ptr CS:[0x92c],0x9b
+  1021: 11bd:022f:	2e c6 06 31 09 9b	MOV byte ptr CS:[0x931],0x9b
+  1022: 11bd:0235:	a0 2e 00	MOV AL,[0x2e]
+  1023: 11bd:0238:	0a c0	OR AL,AL
+  1024: 11bd:023a:	74 06	JZ 0x1000:1e12
+  1025: 11bd:023c:	3c 0b	CMP AL,0xb
+  1026: 11bd:023e:	74 02	JZ 0x1000:1e12
+  1027: 11bd:0240:	0f 06	CLTS
+  1028: 11bd:0242:	9b	WAIT
+  1029: 11bd:0243:	db e4	FSETPM
+  1030: 11bd:0245:	c3	RET
+  1031: 
+  1032: ### FUNCTION FUN_11bd_0246 @ 11bd:0246
+  1033: 11bd:0246:	e8 cc 0a	CALL 0x1000:28e5
+  1034: 11bd:0249:	ff 16 7a 09	CALL word ptr [0x97a]
+  1035: 11bd:024d:	e8 bc 0a	CALL 0x1000:28dc
+  1036: 11bd:0250:	c3	RET
+  1037: 
+  1038: ### FUNCTION FUN_11bd_0251 @ 11bd:0251
+  1039: 11bd:0251:	e8 f2 ff	CALL 0x1000:1e16
+  1040: 11bd:0254:	8b 26 96 09	MOV SP,word ptr [0x996]
+  1041: 11bd:0258:	8b ec	MOV BP,SP
+  1042: 11bd:025a:	8b 7e 0e	MOV DI,word ptr [BP + 0xe]
+  1043: 11bd:025d:	2e 89 3e 0c 00	MOV word ptr CS:[0xc],DI
+  1044: 11bd:0262:	8b 46 02	MOV AX,word ptr [BP + 0x2]
+  1045: 11bd:0265:	2e a3 0e 00	MOV CS:[0xe],AX
+  1046: 11bd:0269:	e8 24 00	CALL 0x1000:1e60
+  1047: 11bd:026c:	8d 76 1e	LEA SI,[BP + 0x1e]
+  1048: 11bd:026f:	fc	CLD
+  1049: 11bd:0270:	2e c4 3e 0c 00	LES DI,CS:[0xc]
+  1050: 11bd:0275:	66 a5	MOVSD ES:DI,SI
+  1051: 11bd:0277:	66 a5	MOVSD ES:DI,SI
+  1052: 11bd:0279:	66 a5	MOVSD ES:DI,SI
+  1053: 11bd:027b:	8f 06 96 09	POP word ptr [0x996]
+  1054: 11bd:027f:	44	INC SP
+  1055: 11bd:0280:	44	INC SP
+  1056: 11bd:0281:	1f	POP DS
+  1057: 11bd:0282:	07	POP ES
+  1058: 11bd:0283:	61	POPA
+  1059: 11bd:0284:	2e 8e 16 0e 00	MOV SS,word ptr CS:[0xe]
+  1060: 11bd:0289:	2e 8b 26 0c 00	MOV SP,word ptr CS:[0xc]
+  1061: 11bd:028e:	66 cf	IRETD
+  1062: 
+  1063: ### FUNCTION FUN_11bd_0290 @ 11bd:0290
+  1064: 11bd:0290:	ba 20 00	MOV DX,0x20
+  1065: 
+  1066: ### FUNCTION FUN_11bd_0293 @ 11bd:0293
+  1067: 11bd:0293:	60	PUSHA
+  1068: 11bd:0294:	ff 16 c0 09	CALL word ptr [0x9c0]
+  1069: 11bd:0298:	8e d2	MOV SS,DX
+  1070: 11bd:029a:	ba 20 00	MOV DX,0x20
+  1071: 11bd:029d:	8e da	MOV DS,DX
+  1072: 11bd:029f:	8e c2	MOV ES,DX
+  1073: 11bd:02a1:	b8 68 00	MOV AX,0x68
+  1074: 11bd:02a4:	0f 00 d0	LLDT AX
+  1075: 11bd:02a7:	0f 01 e0	SMSW AX
+  1076: 11bd:02aa:	0b 06 40 00	OR AX,word ptr [0x40]
+  1077: 11bd:02ae:	0f 01 f0	LMSW AX
+  1078: 11bd:02b1:	ff 26 c2 09	JMP word ptr [0x9c2]
+  1079: 
+  1080: ### FUNCTION FUN_11bd_0733 @ 11bd:0733
+  1081: 11bd:0733:	e6 22	OUT 0x22,AL
+  1082: 11bd:0735:	8a e0	MOV AH,AL
+  1083: 11bd:0737:	eb 00	JMP 0x1000:2309
+  1084: 11bd:0739:	e4 23	IN AL,0x23
+  1085: 11bd:073b:	c3	RET
+  1086: 
+  1087: ### FUNCTION FUN_11bd_0929 @ 11bd:0929
+  1088: 11bd:0929:	6a 20	PUSH 0x20
+  1089: 11bd:092b:	1f	POP DS
+  1090: 
+  1091: ### FUNCTION FUN_11bd_092c @ 11bd:092c
+  1092: 11bd:092c:	90	NOP
+  1093: 11bd:092d:	ff 26 bc 09	JMP word ptr [0x9bc]
+  1094: 
+  1095: ### FUNCTION FUN_11bd_0931 @ 11bd:0931
+  1096: 11bd:0931:	90	NOP
+  1097: 11bd:0932:	50	PUSH AX
+  1098: 11bd:0933:	53	PUSH BX
+  1099: 11bd:0934:	ff 26 be 09	JMP word ptr [0x9be]
+  1100: 

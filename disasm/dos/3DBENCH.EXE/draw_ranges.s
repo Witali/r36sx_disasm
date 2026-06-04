@@ -22,19 +22,19 @@
 1000:3e2b:	26 8b 0e 6c 04	MOV CX,word ptr ES:[0x46c]
 1000:3e30:	83 c1 5b	ADD CX,0x5b
 1000:3e33:	b4 01	MOV AH,0x1
-1000:3e35:	cd 16	INT 0x16
+1000:3e35:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=01h - check whether a keystroke is pending.
 1000:3e37:	75 09	JNZ 0x1000:3e42
 1000:3e39:	26 3b 0e 6c 04	CMP CX,word ptr ES:[0x46c]
 1000:3e3e:	74 06	JZ 0x1000:3e46
 1000:3e40:	eb f1	JMP 0x1000:3e33
 1000:3e42:	b4 00	MOV AH,0x0
-1000:3e44:	cd 16	INT 0x16
-1000:3e46:	b8 00 a0	MOV AX,0xa000
-1000:3e49:	8e c0	MOV ES,AX
+1000:3e44:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=00h - wait for and read keystroke.
+1000:3e46:	b8 00 a0	MOV AX,0xa000	; SYS: VIDEO memory segment A000h - VGA graphics framebuffer, used for direct drawing.
+1000:3e49:	8e c0	MOV ES,AX	; SYS: VIDEO draw target - ES now points at VGA mode 13h framebuffer A000:0000.
 1000:3e4b:	33 c0	XOR AX,AX
 1000:3e4d:	8b f8	MOV DI,AX
 1000:3e4f:	b9 ff ff	MOV CX,0xffff
-1000:3e52:	f3 ab	STOSW.REP ES:DI
+1000:3e52:	f3 ab	STOSW.REP ES:DI	; SYS: VIDEO draw - direct write/copy into VGA framebuffer at ES:DI (A000:offset).
 1000:3e54:	07	POP ES
 1000:3e55:	ba c8 b7	MOV DX,0xb7c8
 1000:3e58:	e8 6a 01	CALL 0x1000:3fc5
@@ -98,12 +98,12 @@
 1000:3f68:	b8 00 00	MOV AX,0x0
 1000:3f6b:	8e d8	MOV DS,AX
 1000:3f6d:	b8 03 00	MOV AX,0x3
-1000:3f70:	cd 10	INT 0x10
+1000:3f70:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=00h - set video mode AL=03h.
 1000:3f72:	ba a9 b6	MOV DX,0xb6a9
 1000:3f75:	b4 09	MOV AH,0x9
-1000:3f77:	cd 21	INT 0x21
+1000:3f77:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=09h - write "$"-terminated string at DS:DX to stdout.
 1000:3f79:	b8 00 4c	MOV AX,0x4c00
-1000:3f7c:	cd 21	INT 0x21
+1000:3f7c:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=4Ch - terminate process with return code AL=00h.
 1000:3f7e:	80 ff 02	CMP BH,0x2
 
 ### RANGE 1000:4240 +288
@@ -223,15 +223,15 @@
 1000:5e6f:	06	PUSH ES
 1000:5e70:	be 55 b9	MOV SI,0xb955
 1000:5e73:	bb 94 7b	MOV BX,0x7b94
-1000:5e76:	b8 00 a0	MOV AX,0xa000
-1000:5e79:	8e c0	MOV ES,AX
+1000:5e76:	b8 00 a0	MOV AX,0xa000	; SYS: VIDEO memory segment A000h - VGA graphics framebuffer, used for direct drawing.
+1000:5e79:	8e c0	MOV ES,AX	; SYS: VIDEO draw target - ES now points at VGA mode 13h framebuffer A000:0000.
 1000:5e7b:	ad	LODSW SI
 1000:5e7c:	8b c8	MOV CX,AX
 1000:5e7e:	ad	LODSW SI
 1000:5e7f:	83 c6 02	ADD SI,0x2
 1000:5e82:	51	PUSH CX
 1000:5e83:	8b 3f	MOV DI,word ptr [BX]
-1000:5e85:	f3 a4	MOVSB.REP ES:DI,SI
+1000:5e85:	f3 a4	MOVSB.REP ES:DI,SI	; SYS: VIDEO draw - direct write/copy into VGA framebuffer at ES:DI (A000:offset).
 1000:5e87:	83 eb 06	SUB BX,0x6
 1000:5e8a:	59	POP CX
 1000:5e8b:	48	DEC AX
@@ -264,14 +264,14 @@
 1000:5ec5:	00 1e 53 50	ADD byte ptr [0x5053],BL
 1000:5ec9:	b8 00 00	MOV AX,0x0
 1000:5ecc:	8e d8	MOV DS,AX
-1000:5ece:	e4 60	IN AL,0x60
+1000:5ece:	e4 60	IN AL,0x60	; SYS: IN keyboard controller port 60h - keyboard scan-code/data port.
 1000:5ed0:	8a d8	MOV BL,AL
-1000:5ed2:	e4 61	IN AL,0x61
+1000:5ed2:	e4 61	IN AL,0x61	; SYS: IN system control port 61h - keyboard acknowledge / PC speaker gate bits.
 1000:5ed4:	88 c4	MOV AH,AL
 1000:5ed6:	0c 80	OR AL,0x80
-1000:5ed8:	e6 61	OUT 0x61,AL
+1000:5ed8:	e6 61	OUT 0x61,AL	; SYS: OUT system control port 61h - keyboard acknowledge / PC speaker gate bits.
 1000:5eda:	88 e0	MOV AL,AH
-1000:5edc:	e6 61	OUT 0x61,AL
+1000:5edc:	e6 61	OUT 0x61,AL	; SYS: OUT system control port 61h - keyboard acknowledge / PC speaker gate bits.
 1000:5ede:	8a e3	MOV AH,BL
 1000:5ee0:	32 ff	XOR BH,BH
 1000:5ee2:	f6 c3 80	TEST BL,0x80
@@ -307,7 +307,7 @@
 1000:5f48:	a0 ac a5	MOV AL,[0xa5ac]
 1000:5f4b:	a2 3b 1e	MOV [0x1e3b],AL
 1000:5f4e:	b0 20	MOV AL,0x20
-1000:5f50:	e6 20	OUT 0x20,AL
+1000:5f50:	e6 20	OUT 0x20,AL	; SYS: OUT PIC port 20h - master interrupt controller command port, commonly EOI when AL=20h.
 1000:5f52:	58	POP AX
 1000:5f53:	5b	POP BX
 1000:5f54:	1f	POP DS
@@ -351,7 +351,7 @@
 1000:5fb6:	74 04	JZ 0x1000:5fbc
 1000:5fb8:	ff 0e 74 1d	DEC word ptr [0x1d74]
 1000:5fbc:	b0 20	MOV AL,0x20
-1000:5fbe:	e6 20	OUT 0x20,AL
+1000:5fbe:	e6 20	OUT 0x20,AL	; SYS: OUT PIC port 20h - master interrupt controller command port, commonly EOI when AL=20h.
 1000:5fc0:	58	POP AX
 1000:5fc1:	1f	POP DS
 1000:5fc2:	cf	IRET
@@ -399,9 +399,9 @@
 1000:6099:	5b	POP BX
 1000:609a:	ff 06 fd 6e	INC word ptr [0x6efd]
 1000:609e:	83 ea 02	SUB DX,0x2
-1000:60a1:	ee	OUT DX,AL
+1000:60a1:	ee	OUT DX,AL	; SYS: OUT hardware I/O port in DX - system/device register access; DX value not classified here.
 1000:60a2:	eb 06	JMP 0x1000:60aa
-1000:60a4:	ec	IN AL,DX
+1000:60a4:	ec	IN AL,DX	; SYS: IN hardware I/O port in DX - system/device register access; DX value not classified here.
 1000:60a5:	80 0e f9 6c 10	OR byte ptr [0x6cf9],0x10
 1000:60aa:	c3	RET
 1000:60ab:	1e	PUSH DS
@@ -428,10 +428,10 @@
 1000:60dc:	89 26 08 00	MOV word ptr [0x8],SP
 1000:60e0:	51	PUSH CX
 1000:60e1:	b4 0d	MOV AH,0xd
-1000:60e3:	cd 21	INT 0x21
+1000:60e3:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=0Dh - disk reset / flush DOS disk buffers.
 1000:60e5:	33 c9	XOR CX,CX
 1000:60e7:	b4 3c	MOV AH,0x3c
-1000:60e9:	cd 21	INT 0x21
+1000:60e9:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=3Ch - create/truncate file named at DS:DX, attributes in CX.
 1000:60eb:	8b d8	MOV BX,AX
 1000:60ed:	59	POP CX
 1000:60ee:	72 27	JC 0x1000:6117
@@ -440,7 +440,7 @@
 1000:60f2:	1f	POP DS
 1000:60f3:	8b d7	MOV DX,DI
 1000:60f5:	b4 40	MOV AH,0x40
-1000:60f7:	cd 21	INT 0x21
+1000:60f7:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=40h - write CX bytes from DS:DX to file/device handle BX.
 1000:60f9:	5b	POP BX
 1000:60fa:	72 13	JC 0x1000:610f
 1000:60fc:	39 c8	CMP AX,CX
@@ -448,21 +448,21 @@
 1000:60ff:	b8 01 00	MOV AX,0x1
 1000:6102:	75 0b	JNZ 0x1000:610f
 1000:6104:	b4 3e	MOV AH,0x3e
-1000:6106:	cd 21	INT 0x21
+1000:6106:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=3Eh - close file handle BX.
 1000:6108:	72 05	JC 0x1000:610f
 1000:610a:	33 c0	XOR AX,AX
 1000:610c:	e9 08 00	JMP 0x1000:6117
 1000:610f:	50	PUSH AX
 1000:6110:	9c	PUSHF
 1000:6111:	b4 3e	MOV AH,0x3e
-1000:6113:	cd 21	INT 0x21
+1000:6113:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=3Eh - close file handle BX.
 1000:6115:	9d	POPF
 1000:6116:	58	POP AX
 1000:6117:	50	PUSH AX
 1000:6118:	9c	PUSHF
 1000:6119:	b0 0c	MOV AL,0xc
 1000:611b:	ba f2 03	MOV DX,0x3f2
-1000:611e:	ee	OUT DX,AL
+1000:611e:	ee	OUT DX,AL	; SYS: OUT FDC port 03F2h - floppy digital output register (motor/DMA/reset control).
 1000:611f:	33 c0	XOR AX,AX
 1000:6121:	8e d8	MOV DS,AX
 1000:6123:	80 26 3f 04 f0	AND byte ptr [0x43f],0xf0
@@ -485,9 +485,9 @@
 1000:6143:	1f	POP DS
 1000:6144:	51	PUSH CX
 1000:6145:	b4 0d	MOV AH,0xd
-1000:6147:	cd 21	INT 0x21
+1000:6147:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=0Dh - disk reset / flush DOS disk buffers.
 1000:6149:	b8 00 3d	MOV AX,0x3d00
-1000:614c:	cd 21	INT 0x21
+1000:614c:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=3Dh - open file named at DS:DX, access mode AL=00h.
 1000:614e:	8b d8	MOV BX,AX
 1000:6150:	59	POP CX
 1000:6151:	72 27	JC 0x1000:617a
@@ -496,7 +496,7 @@
 1000:6155:	1f	POP DS
 1000:6156:	8b d7	MOV DX,DI
 1000:6158:	b4 3f	MOV AH,0x3f
-1000:615a:	cd 21	INT 0x21
+1000:615a:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=3Fh - read CX bytes from handle BX into DS:DX.
 1000:615c:	5b	POP BX
 1000:615d:	72 13	JC 0x1000:6172
 1000:615f:	39 c8	CMP AX,CX

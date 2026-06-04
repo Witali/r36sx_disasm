@@ -14,7 +14,7 @@
 1000:3da6:	70 1d	JO 0x1000:3dc5
 1000:3da8:	89 0e 72 1d	MOV word ptr [0x1d72],CX
 1000:3dac:	b8 13 00	MOV AX,0x13
-1000:3daf:	cd 10	INT 0x10
+1000:3daf:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=00h - set video mode AL=13h.
 1000:3db1:	ba bc b7	MOV DX,0xb7bc
 1000:3db4:	e8 0e 02	CALL 0x1000:3fc5
 1000:3db7:	5b	POP BX
@@ -70,12 +70,12 @@
 1000:3f68:	b8 00 00	MOV AX,0x0
 1000:3f6b:	8e d8	MOV DS,AX
 1000:3f6d:	b8 03 00	MOV AX,0x3
-1000:3f70:	cd 10	INT 0x10
+1000:3f70:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=00h - set video mode AL=03h.
 1000:3f72:	ba a9 b6	MOV DX,0xb6a9
 1000:3f75:	b4 09	MOV AH,0x9
-1000:3f77:	cd 21	INT 0x21
+1000:3f77:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=09h - write "$"-terminated string at DS:DX to stdout.
 1000:3f79:	b8 00 4c	MOV AX,0x4c00
-1000:3f7c:	cd 21	INT 0x21
+1000:3f7c:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=4Ch - terminate process with return code AL=00h.
 1000:3f7e:	80 ff 02	CMP BH,0x2
 1000:3f81:	75 32	JNZ 0x1000:3fb5
 1000:3f83:	1e	PUSH DS
@@ -127,7 +127,7 @@
 1000:3fe0:	33 db	XOR BX,BX
 1000:3fe2:	b9 00 01	MOV CX,0x100
 1000:3fe5:	b8 12 10	MOV AX,0x1012
-1000:3fe8:	cd 10	INT 0x10
+1000:3fe8:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AX=1012h - set block of VGA DAC palette registers (ES:DX, BX start, CX count).
 1000:3fea:	5a	POP DX
 1000:3feb:	b8 9a 45	MOV AX,0x459a
 1000:3fee:	8e c0	MOV ES,AX
@@ -140,12 +140,12 @@
 1000:4000:	b8 00 00	MOV AX,0x0
 1000:4003:	8e d8	MOV DS,AX
 1000:4005:	b8 03 00	MOV AX,0x3
-1000:4008:	cd 10	INT 0x10
+1000:4008:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=00h - set video mode AL=03h.
 1000:400a:	ba a9 b6	MOV DX,0xb6a9
 1000:400d:	b4 09	MOV AH,0x9
-1000:400f:	cd 21	INT 0x21
+1000:400f:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=09h - write "$"-terminated string at DS:DX to stdout.
 1000:4011:	b8 00 4c	MOV AX,0x4c00
-1000:4014:	cd 21	INT 0x21
+1000:4014:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=4Ch - terminate process with return code AL=00h.
 1000:4016:	be 0f 00	MOV SI,0xf
 1000:4019:	26 ad	LODSW ES:SI
 1000:401b:	3d 43 4d	CMP AX,0x4d43
@@ -169,7 +169,7 @@
 1000:40e4:	33 db	XOR BX,BX
 1000:40e6:	b9 00 01	MOV CX,0x100
 1000:40e9:	b8 12 10	MOV AX,0x1012
-1000:40ec:	cd 10	INT 0x10
+1000:40ec:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AX=1012h - set block of VGA DAC palette registers (ES:DX, BX start, CX count).
 1000:40ee:	58	POP AX
 1000:40ef:	5b	POP BX
 1000:40f0:	59	POP CX
@@ -195,19 +195,19 @@
 1000:44c0:	26 8e 1e ce 1b	MOV DS,word ptr ES:[0x1bce]
 1000:44c5:	26 8b 16 cc 1b	MOV DX,word ptr ES:[0x1bcc]
 1000:44ca:	b8 0b 25	MOV AX,0x250b
-1000:44cd:	cd 21	INT 0x21
+1000:44cd:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=25h - set interrupt vector AL=0bh to DS:DX.
 1000:44cf:	fa	CLI
 1000:44d0:	b0 34	MOV AL,0x34
-1000:44d2:	e6 43	OUT 0x43,AL
+1000:44d2:	e6 43	OUT 0x43,AL	; SYS: OUT PIT port 43h - programmable interval timer mode/control register.
 1000:44d4:	b0 ff	MOV AL,0xff
-1000:44d6:	e6 40	OUT 0x40,AL
+1000:44d6:	e6 40	OUT 0x40,AL	; SYS: OUT PIT port 40h - timer channel 0 counter data.
 1000:44d8:	b0 ff	MOV AL,0xff
-1000:44da:	e6 40	OUT 0x40,AL
+1000:44da:	e6 40	OUT 0x40,AL	; SYS: OUT PIT port 40h - timer channel 0 counter data.
 1000:44dc:	fb	STI
 1000:44dd:	b8 03 00	MOV AX,0x3
-1000:44e0:	cd 10	INT 0x10
+1000:44e0:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=00h - set video mode AL=03h.
 1000:44e2:	b8 00 4c	MOV AX,0x4c00
-1000:44e5:	cd 21	INT 0x21
+1000:44e5:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=4Ch - terminate process with return code AL=00h.
 1000:44e7:	56	PUSH SI
 1000:44e8:	57	PUSH DI
 1000:44e9:	06	PUSH ES
@@ -235,7 +235,7 @@
 1000:69f1:	33 db	XOR BX,BX
 1000:69f3:	b9 00 01	MOV CX,0x100
 1000:69f6:	b8 12 10	MOV AX,0x1012
-1000:69f9:	cd 10	INT 0x10
+1000:69f9:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AX=1012h - set block of VGA DAC palette registers (ES:DX, BX start, CX count).
 1000:69fb:	58	POP AX
 1000:69fc:	5b	POP BX
 1000:69fd:	59	POP CX

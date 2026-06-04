@@ -1,0 +1,231 @@
+  9080: 11bd:6b4e:	17	POP SS
+  9081: 11bd:6b4f:	8b e0	MOV SP,AX
+  9082: 11bd:6b51:	fb	STI
+  9083: 11bd:6b52:	8b ec	MOV BP,SP
+  9084: 11bd:6b54:	83 7e 18 0d	CMP word ptr [BP + 0x18],0xd
+  9085: 11bd:6b58:	74 73	JZ 0x1000:879d
+  9086: 11bd:6b5a:	2e ff 2e be 17	JMPF CS:[0x17be]
+  9087: 11bd:6b97:	8b 76 1e	MOV SI,word ptr [BP + 0x1e]
+  9088: 11bd:6b9a:	8e 5e 22	MOV DS,word ptr [BP + 0x22]
+  9089: 11bd:6b9d:	ad	LODSW SI
+  9090: 11bd:6b9e:	3d ff 5e	CMP AX,0x5eff
+  9091: 11bd:6ba1:	75 25	JNZ 0x1000:8798
+  9092: 11bd:6ba3:	ac	LODSB SI
+  9093: 11bd:6ba4:	98	CBW
+  9094: 11bd:6ba5:	03 46 0c	ADD AX,word ptr [BP + 0xc]
+  9095: 11bd:6ba8:	96	XCHG AX,SI
+  9096: 11bd:6ba9:	8e 5e 02	MOV DS,word ptr [BP + 0x2]
+  9097: 11bd:6bac:	8b 5c 02	MOV BX,word ptr [SI + 0x2]
+  9098: 11bd:6baf:	b8 06 00	MOV AX,0x6
+  9099: 11bd:6bb2:	cd 31	INT 0x31
+  9100: 11bd:6bb4:	72 12	JC 0x1000:8798
+  9101: 11bd:6bb6:	2e 8e 06 8e 20	MOV ES,word ptr CS:[0x208e]
+  9102: 11bd:6bbb:	26 8b 1e 9c 0a	MOV BX,word ptr ES:[0xa9c]
+  9103: 11bd:6bc0:	89 5c 02	MOV word ptr [SI + 0x2],BX
+  9104: 11bd:6bc3:	40	INC AX
+  9105: 11bd:6bc4:	cd 31	INT 0x31
+  9106: 11bd:6bc6:	73 7e	JNC 0x1000:8816
+  9107: 11bd:6bc8:	2e ff 2e be 17	JMPF CS:[0x17be]
+  9108: 11bd:6bcd:	0f 03 46 22	LSL AX,word ptr [BP + 0x22]
+  9109: 11bd:6bd1:	2b 46 1e	SUB AX,word ptr [BP + 0x1e]
+  9110: 11bd:6bd4:	76 f2	JBE 0x1000:8798
+  9111: 11bd:6bd6:	83 7e 1a 00	CMP word ptr [BP + 0x1a],0x0
+  9112: 11bd:6bda:	75 bb	JNZ 0x1000:8767
+  9113: 11bd:6bdc:	2d 04 00	SUB AX,0x4
+  9114: 11bd:6bdf:	76 e7	JBE 0x1000:8798
+  9115: 11bd:6be1:	8b 4e 04	MOV CX,word ptr [BP + 0x4]
+  9116: 11bd:6be4:	e3 e2	JCXZ 0x1000:8798
+  9117: 11bd:6be6:	0f 03 d9	LSL BX,CX
+  9118: 11bd:6be9:	8e c1	MOV ES,CX
+  9119: 11bd:6beb:	8b 76 1e	MOV SI,word ptr [BP + 0x1e]
+  9120: 11bd:6bee:	8e 5e 22	MOV DS,word ptr [BP + 0x22]
+  9121: 11bd:6bf1:	fc	CLD
+  9122: 11bd:6bf2:	ad	LODSW SI
+  9123: 11bd:6bf3:	b9 02 00	MOV CX,0x2
+  9124: 11bd:6bf6:	8b 7e 0a	MOV DI,word ptr [BP + 0xa]
+  9125: 11bd:6bf9:	3b df	CMP BX,DI
+  9126: 11bd:6bfb:	76 cb	JBE 0x1000:8798
+  9127: 11bd:6bfd:	26 8b 1d	MOV BX,word ptr ES:[DI]
+  9128: 11bd:6c00:	8b 56 16	MOV DX,word ptr [BP + 0x16]
+  9129: 11bd:6c03:	3d 89 04	CMP AX,0x489
+  9130: 11bd:6c06:	74 22	JZ 0x1000:87fa
+  9131: 11bd:6c08:	2b d3	SUB DX,BX
+  9132: 11bd:6c0a:	f7 da	NEG DX
+  9133: 11bd:6c0c:	3d 29 04	CMP AX,0x429
+  9134: 11bd:6c0f:	74 19	JZ 0x1000:87fa
+  9135: 11bd:6c11:	41	INC CX
+  9136: 11bd:6c12:	8b d3	MOV DX,BX
+  9137: 11bd:6c14:	8a 14	MOV DL,byte ptr [SI]
+  9138: 11bd:6c16:	3d c6 04	CMP AX,0x4c6
+  9139: 11bd:6c19:	74 0f	JZ 0x1000:87fa
+  9140: 11bd:6c1b:	0a d3	OR DL,BL
+  9141: 11bd:6c1d:	3d 80 0c	CMP AX,0xc80
+  9142: 11bd:6c20:	74 08	JZ 0x1000:87fa
+  9143: 11bd:6c22:	41	INC CX
+  9144: 11bd:6c23:	8b 14	MOV DX,word ptr [SI]
+  9145: 11bd:6c25:	3d c7 04	CMP AX,0x4c7
+  9146: 11bd:6c28:	75 9e	JNZ 0x1000:8798
+  9147: 11bd:6c2a:	01 4e 1e	ADD word ptr [BP + 0x1e],CX
+  9148: 11bd:6c2d:	8b 5e 04	MOV BX,word ptr [BP + 0x4]
+  9149: 11bd:6c30:	b8 0a 00	MOV AX,0xa
+  9150: 11bd:6c33:	cd 31	INT 0x31
+  9151: 11bd:6c35:	72 91	JC 0x1000:8798
+  9152: 11bd:6c37:	8e c0	MOV ES,AX
+  9153: 11bd:6c39:	8b d8	MOV BX,AX
+  9154: 11bd:6c3b:	8b 7e 0a	MOV DI,word ptr [BP + 0xa]
+  9155: 11bd:6c3e:	26 89 15	MOV word ptr ES:[DI],DX
+  9156: 11bd:6c41:	b8 01 00	MOV AX,0x1
+  9157: 11bd:6c44:	cd 31	INT 0x31
+  9158: 11bd:6c46:	8e 46 02	MOV ES,word ptr [BP + 0x2]
+  9159: 11bd:6c49:	8b 7e 0e	MOV DI,word ptr [BP + 0xe]
+  9160: 11bd:6c4c:	4f	DEC DI
+  9161: 11bd:6c4d:	4f	DEC DI
+  9162: 11bd:6c4e:	8d 76 26	LEA SI,[BP + 0x26]
+  9163: 11bd:6c51:	16	PUSH SS
+  9164: 11bd:6c52:	1f	POP DS
+  9165: 11bd:6c53:	fd	STD
+  9166: 11bd:6c54:	b9 15 00	MOV CX,0x15
+  9167: 11bd:6c57:	f3 a5	MOVSW.REP ES:DI,SI
+  9168: 11bd:6c59:	8c c0	MOV AX,ES
+  9169: 11bd:6c5b:	8e d0	MOV SS,AX
+  9170: 11bd:6c5d:	8b e7	MOV SP,DI
+  9171: 11bd:6c5f:	83 c4 06	ADD SP,0x6
+  9172: 11bd:6c62:	1f	POP DS
+  9173: 11bd:6c63:	07	POP ES
+  9174: 11bd:6c64:	61	POPA
+  9175: 11bd:6c65:	83 c4 06	ADD SP,0x6
+  9176: 11bd:6c68:	66 cf	IRETD
+  9177: 
+  9178: ### IN FUNCTION FUN_11bd_6c84
+  9179: 11bd:6c6a:	6a 26	PUSH 0x26
+  9180: 11bd:6c6c:	e8 3d a8	CALL 0x1000:307c
+  9181: 11bd:6c6f:	59	POP CX
+  9182: 11bd:6c70:	33 c0	XOR AX,AX
+  9183: 11bd:6c72:	eb 4b	JMP 0x1000:888f
+  9184: 
+  9185: ### FUNCTION FUN_11bd_6c74 @ 11bd:6c74
+  9186: 11bd:6c74:	b8 00 43	MOV AX,0x4300
+  9187: 11bd:6c77:	cd 2f	INT 0x2f
+  9188: 11bd:6c79:	3c 80	CMP AL,0x80
+  9189: 11bd:6c7b:	74 02	JZ 0x1000:884f
+  9190: 11bd:6c7d:	33 c0	XOR AX,AX
+  9191: 11bd:6c7f:	08 06 36 00	OR byte ptr [0x36],AL
+  9192: 11bd:6c83:	c3	RET
+  9193: 
+  9194: ### FUNCTION FUN_11bd_6c84 @ 11bd:6c84
+  9195: 11bd:6c84:	e8 ed ff	CALL 0x1000:8844
+  9196: 11bd:6c87:	0b c0	OR AX,AX
+  9197: 11bd:6c89:	75 01	JNZ 0x1000:885c
+  9198: 11bd:6c8b:	c3	RET
+  9199: 11bd:6c8c:	b8 10 43	MOV AX,0x4310
+  9200: 11bd:6c8f:	cd 2f	INT 0x2f
+  9201: 11bd:6c91:	89 1e ec 0a	MOV word ptr [0xaec],BX
+  9202: 11bd:6c95:	8c 06 ee 0a	MOV word ptr [0xaee],ES
+  9203: 11bd:6c99:	32 e4	XOR AH,AH
+  9204: 11bd:6c9b:	ff 1e ec 0a	CALLF [0xaec]
+  9205: 11bd:6c9f:	fe cc	DEC AH
+  9206: 11bd:6ca1:	7e c7	JLE 0x1000:883a
+  9207: 11bd:6ca3:	81 fb 04 02	CMP BX,0x204
+  9208: 11bd:6ca7:	73 07	JNC 0x1000:8880
+  9209: 11bd:6ca9:	2e c7 06 f5 1d 40 00	MOV word ptr CS:[0x1df5],0x40
+  9210: 11bd:6cb0:	b4 08	MOV AH,0x8
+  9211: 11bd:6cb2:	ff 1e ec 0a	CALLF [0xaec]
+  9212: 11bd:6cb6:	2e 2b 06 f5 1d	SUB AX,word ptr CS:[0x1df5]
+  9213: 11bd:6cbb:	73 02	JNC 0x1000:888f
+  9214: 11bd:6cbd:	33 c0	XOR AX,AX
+  9215: 11bd:6cbf:	0b c0	OR AX,AX
+  9216: 11bd:6cc1:	a3 ce 0e	MOV [0xece],AX
+  9217: 11bd:6cc4:	74 5d	JZ 0x1000:88f3
+  9218: 11bd:6cc6:	3b 06 cc 0e	CMP AX,word ptr [0xecc]
+  9219: 11bd:6cca:	72 03	JC 0x1000:889f
+  9220: 11bd:6ccc:	a1 cc 0e	MOV AX,[0xecc]
+  9221: 11bd:6ccf:	a3 cc 0e	MOV [0xecc],AX
+  9222: 11bd:6cd2:	92	XCHG AX,DX
+  9223: 11bd:6cd3:	b4 09	MOV AH,0x9
+  9224: 11bd:6cd5:	ff 1e ec 0a	CALLF [0xaec]
+  9225: 11bd:6cd9:	0b c0	OR AX,AX
+  9226: 11bd:6cdb:	74 46	JZ 0x1000:88f3
+  9227: 11bd:6cdd:	89 16 dc 0a	MOV word ptr [0xadc],DX
+  9228: 11bd:6ce1:	b4 0c	MOV AH,0xc
+  9229: 11bd:6ce3:	ff 1e ec 0a	CALLF [0xaec]
+  9230: 11bd:6ce7:	0b c0	OR AX,AX
+  9231: 11bd:6ce9:	75 05	JNZ 0x1000:88c0
+  9232: 11bd:6ceb:	e8 09 b1	CALL 0x1000:39c7
+  9233: 11bd:6cee:	eb 33	JMP 0x1000:88f3
+  9234: 11bd:6cf0:	83 c3 0f	ADD BX,0xf
+  9235: 11bd:6cf3:	83 d2 00	ADC DX,0x0
+  9236: 11bd:6cf6:	b9 04 00	MOV CX,0x4
+  9237: 11bd:6cf9:	d1 ea	SHR DX,0x1
+  9238: 11bd:6cfb:	d1 db	RCR BX,0x1
+  9239: 11bd:6cfd:	e2 fa	LOOP 0x1000:88c9
+  9240: 11bd:6cff:	89 1e 98 00	MOV word ptr [0x98],BX
+  9241: 11bd:6d03:	89 16 9a 00	MOV word ptr [0x9a],DX
+  9242: 11bd:6d07:	c7 06 a6 0a 5a 3e	MOV word ptr [0xaa6],0x3e5a
+  9243: 11bd:6d0d:	c7 06 a4 0a 25 3e	MOV word ptr [0xaa4],0x3e25
+  9244: 11bd:6d13:	b8 00 04	MOV AX,0x400
+  9245: 11bd:6d16:	f7 26 cc 0e	MUL word ptr [0xecc]
+  9246: 11bd:6d1a:	a3 a8 0a	MOV [0xaa8],AX
+  9247: 11bd:6d1d:	89 16 aa 0a	MOV word ptr [0xaaa],DX
+  9248: 11bd:6d21:	eb 06	JMP 0x1000:88f9
+  9249: 11bd:6d23:	c7 06 cc 0e 00 00	MOV word ptr [0xecc],0x0
+  9250: 11bd:6d29:	b0 01	MOV AL,0x1
+  9251: 11bd:6d2b:	c3	RET
+  9252: 
+  9253: ### FUNCTION FUN_11bd_6d30 @ 11bd:6d30
+  9254: 11bd:6d30:	59	POP CX
+  9255: 11bd:6d31:	5b	POP BX
+  9256: 11bd:6d32:	0f 02 c3	LAR AX,BX
+  9257: 11bd:6d35:	eb 00	JMP 0x1000:8907
+  9258: 11bd:6d37:	53	PUSH BX
+  9259: 11bd:6d38:	c1 e8 08	SHR AX,0x8
+  9260: 11bd:6d3b:	ff e1	JMP CX
+  9261: 
+  9262: ### FUNCTION FUN_11bd_6d9c @ 11bd:6d9c
+  9263: 11bd:6d9c:	56	PUSH SI
+  9264: 11bd:6d9d:	57	PUSH DI
+  9265: 11bd:6d9e:	b8 87 16	MOV AX,0x1687
+  9266: 11bd:6da1:	cd 2f	INT 0x2f
+  9267: 11bd:6da3:	0b c0	OR AX,AX
+  9268: 11bd:6da5:	b8 00 00	MOV AX,0x0
+  9269: 11bd:6da8:	75 15	JNZ 0x1000:898f
+  9270: 11bd:6daa:	2e 89 36 64 6d	MOV word ptr CS:[0x6d64],SI
+  9271: 11bd:6daf:	2e 89 3e 86 6e	MOV word ptr CS:[0x6e86],DI
+  9272: 11bd:6db4:	2e 8c 06 88 6e	MOV word ptr CS:[0x6e88],ES
+  9273: 11bd:6db9:	8a c1	MOV AL,CL
+  9274: 11bd:6dbb:	88 36 44 0c	MOV byte ptr [0xc44],DH
+  9275: 11bd:6dbf:	5f	POP DI
+  9276: 11bd:6dc0:	5e	POP SI
+  9277: 11bd:6dc1:	c3	RET
+  9278: 
+  9279: ### FUNCTION FUN_11bd_6dc2 @ 11bd:6dc2
+  9280: 11bd:6dc2:	55	PUSH BP
+  9281: 11bd:6dc3:	8b ec	MOV BP,SP
+  9282: 11bd:6dc5:	66 56	PUSH ESI
+  9283: 11bd:6dc7:	66 57	PUSH EDI
+  9284: 11bd:6dc9:	66 52	PUSH EDX
+  9285: 11bd:6dcb:	66 33 f6	XOR ESI,ESI
+  9286: 11bd:6dce:	66 33 ff	XOR EDI,EDI
+  9287: 11bd:6dd1:	66 33 d2	XOR EDX,EDX
+  9288: 11bd:6dd4:	8b 46 04	MOV AX,word ptr [BP + 0x4]
+  9289: 11bd:6dd7:	8b 6e 06	MOV BP,word ptr [BP + 0x6]
+  9290: 11bd:6dda:	8b 4e 04	MOV CX,word ptr [BP + 0x4]
+  9291: 11bd:6ddd:	8b 56 06	MOV DX,word ptr [BP + 0x6]
+  9292: 11bd:6de0:	8b 76 08	MOV SI,word ptr [BP + 0x8]
+  9293: 11bd:6de3:	8b 7e 0a	MOV DI,word ptr [BP + 0xa]
+  9294: 11bd:6de6:	8b 5e 02	MOV BX,word ptr [BP + 0x2]
+  9295: 11bd:6de9:	16	PUSH SS
+  9296: 11bd:6dea:	07	POP ES
+  9297: 11bd:6deb:	cd 31	INT 0x31
+  9298: 11bd:6ded:	89 46 00	MOV word ptr [BP + 0x0],AX
+  9299: 11bd:6df0:	89 5e 02	MOV word ptr [BP + 0x2],BX
+  9300: 11bd:6df3:	89 4e 04	MOV word ptr [BP + 0x4],CX
+  9301: 11bd:6df6:	89 56 06	MOV word ptr [BP + 0x6],DX
+  9302: 11bd:6df9:	89 76 08	MOV word ptr [BP + 0x8],SI
+  9303: 11bd:6dfc:	89 7e 0a	MOV word ptr [BP + 0xa],DI
+  9304: 11bd:6dff:	b8 00 00	MOV AX,0x0
+  9305: 11bd:6e02:	f5	CMC
+  9306: 11bd:6e03:	d1 d0	RCL AX,0x1
+  9307: 11bd:6e05:	66 5a	POP EDX
+  9308: 11bd:6e07:	66 5f	POP EDI
+  9309: 11bd:6e09:	66 5e	POP ESI
+  9310: 11bd:6e0b:	5d	POP BP

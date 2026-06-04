@@ -7,8 +7,8 @@
 1000:000d:	72 1b	JC 0x1000:002a
 1000:000f:	b4 09	MOV AH,0x9
 1000:0011:	ba 18 01	MOV DX,0x118
-1000:0014:	cd 21	INT 0x21
-1000:0016:	cd 20	INT 0x20
+1000:0014:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=09h - write "$"-terminated string at DS:DX to stdout.
+1000:0016:	cd 20	INT 0x20	; SYS: DOS INT 20h - terminate program (COM-style legacy exit).
 1000:0018:	4e	DEC SI
 1000:0019:	6f	OUTSW DX,SI
 1000:001a:	74 20	JZ 0x1000:003c

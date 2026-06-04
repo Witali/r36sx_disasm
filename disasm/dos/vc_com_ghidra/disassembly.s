@@ -4,7 +4,7 @@
 0000:9315:	33 c0	XOR AX,AX
 0000:9317:	8e d8	MOV DS,AX
 0000:9319:	fa	CLI
-0000:931a:	cd 1a	INT 0x1a
+0000:931a:	cd 1a	INT 0x1a	; SYS: BIOS time INT 1Ah/AH=00h - read system timer ticks since midnight.
 0000:931c:	a2 70 04	MOV [0x470],AL
 0000:931f:	fb	STI
 0000:9320:	1f	POP DS
@@ -23,7 +23,7 @@
 0000:9474:	8a d0	MOV DL,AL
 0000:9476:	33 db	XOR BX,BX
 0000:9478:	b8 0a 00	MOV AX,0xa
-0000:947b:	cd 33	INT 0x33
+0000:947b:	cd 33	INT 0x33	; SYS: Mouse driver INT 33h/AX=000Ah - set text-mode mouse cursor shape.
 0000:947d:	58	POP AX
 0000:947e:	5b	POP BX
 0000:947f:	59	POP CX
@@ -37,7 +37,7 @@
 0000:94ab:	3c 01	CMP AL,0x1
 0000:94ad:	b8 01 00	MOV AX,0x1
 0000:94b0:	14 00	ADC AL,0x0
-0000:94b2:	cd 33	INT 0x33
+0000:94b2:	cd 33	INT 0x33	; SYS: Mouse driver INT 33h - mouse service; AX not recovered at this site.
 0000:94b4:	58	POP AX
 0000:94b5:	c3	RET
 
@@ -49,7 +49,7 @@
 0000:94c0:	f9	STC
 0000:94c1:	74 2b	JZ 0x0000:94ee
 0000:94c3:	b8 03 00	MOV AX,0x3
-0000:94c6:	cd 33	INT 0x33
+0000:94c6:	cd 33	INT 0x33	; SYS: Mouse driver INT 33h/AX=0003h - get button state and cursor position.
 0000:94c8:	8b c1	MOV AX,CX
 0000:94ca:	b1 03	MOV CL,0x3
 0000:94cc:	d3 e8	SHR AX,CL
@@ -143,11 +143,11 @@
 0000:969e:	ba da 03	MOV DX,0x3da
 0000:96a1:	0a e4	OR AH,AH
 0000:96a3:	75 0b	JNZ 0x0000:96b0
-0000:96a5:	ec	IN AL,DX
+0000:96a5:	ec	IN AL,DX	; SYS: IN VGA port 03DAh - input status register #1; usually polling display-enable/vertical-retrace bits.
 0000:96a6:	a8 01	TEST AL,0x1
 0000:96a8:	75 fb	JNZ 0x0000:96a5
 0000:96aa:	fa	CLI
-0000:96ab:	ec	IN AL,DX
+0000:96ab:	ec	IN AL,DX	; SYS: IN VGA port 03DAh - input status register #1; usually polling display-enable/vertical-retrace bits.
 0000:96ac:	a8 01	TEST AL,0x1
 0000:96ae:	74 fb	JZ 0x0000:96ab
 0000:96b0:	a5	MOVSW ES:DI,SI
@@ -159,7 +159,7 @@
 0000:96b7:	26 80 3e 83 0a 00	CMP byte ptr ES:[0xa83],0x0
 0000:96bd:	74 04	JZ 0x0000:96c3
 0000:96bf:	b4 ff	MOV AH,0xff
-0000:96c1:	cd 10	INT 0x10
+0000:96c1:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=FFh - nonstandard/private video hook; not a normal IBM PC BIOS subfunction.
 0000:96c3:	b0 01	MOV AL,0x1
 0000:96c5:	e8 da fd	CALL 0x0000:94a2
 0000:96c8:	58	POP AX
@@ -185,13 +185,13 @@
 0000:970b:	75 16	JNZ 0x0000:9723
 0000:970d:	52	PUSH DX
 0000:970e:	ba da 03	MOV DX,0x3da
-0000:9711:	ec	IN AL,DX
+0000:9711:	ec	IN AL,DX	; SYS: IN VGA port 03DAh - input status register #1; usually polling display-enable/vertical-retrace bits.
 0000:9712:	a8 01	TEST AL,0x1
 0000:9714:	75 fb	JNZ 0x0000:9711
 0000:9716:	fb	STI
 0000:9717:	b9 0a 00	MOV CX,0xa
 0000:971a:	fa	CLI
-0000:971b:	ec	IN AL,DX
+0000:971b:	ec	IN AL,DX	; SYS: IN VGA port 03DAh - input status register #1; usually polling display-enable/vertical-retrace bits.
 0000:971c:	a8 01	TEST AL,0x1
 0000:971e:	74 f6	JZ 0x0000:9716
 0000:9720:	e2 f9	LOOP 0x0000:971b
@@ -244,7 +244,7 @@
 0000:a710:	50	PUSH AX
 0000:a711:	8a d8	MOV BL,AL
 0000:a713:	b4 02	MOV AH,0x2
-0000:a715:	cd 16	INT 0x16
+0000:a715:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=02h - read shift/control key status flags.
 0000:a717:	b4 03	MOV AH,0x3
 0000:a719:	a8 08	TEST AL,0x8
 0000:a71b:	75 0e	JNZ 0x0000:a72b
@@ -351,10 +351,10 @@
 0000:b13e:	1f	POP DS
 0000:b13f:	88 46 fe	MOV byte ptr [BP + -0x2],AL
 0000:b142:	b4 01	MOV AH,0x1
-0000:b144:	cd 16	INT 0x16
+0000:b144:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=01h - check whether a keystroke is pending.
 0000:b146:	74 07	JZ 0x0000:b14f
 0000:b148:	b4 00	MOV AH,0x0
-0000:b14a:	cd 16	INT 0x16
+0000:b14a:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=00h - wait for and read keystroke.
 0000:b14c:	e9 fd 01	JMP 0x0000:b34c
 0000:b14f:	33 c0	XOR AX,AX
 0000:b151:	e8 62 e3	CALL 0x0000:94b6
@@ -372,7 +372,7 @@
 0000:b16d:	f3 a5	MOVSW.REP ES:DI,SI
 0000:b16f:	07	POP ES
 0000:b170:	b4 02	MOV AH,0x2
-0000:b172:	cd 16	INT 0x16
+0000:b172:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=02h - read shift/control key status flags.
 0000:b174:	88 46 fa	MOV byte ptr [BP + -0x6],AL
 0000:b177:	c6 46 f8 00	MOV byte ptr [BP + -0x8],0x0
 0000:b17b:	c6 46 f6 00	MOV byte ptr [BP + -0xa],0x0
@@ -381,7 +381,7 @@
 0000:b186:	80 3e fb 00 00	CMP byte ptr [0xfb],0x0
 0000:b18b:	74 12	JZ 0x0000:b19f
 0000:b18d:	b4 2c	MOV AH,0x2c
-0000:b18f:	cd 21	INT 0x21
+0000:b18f:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=2Ch - get system time (CH hour, CL minute, DH second, DL hundredths).
 0000:b191:	02 0e fb 00	ADD CL,byte ptr [0xfb]
 0000:b195:	80 f9 3c	CMP CL,0x3c
 0000:b198:	72 05	JC 0x0000:b19f
@@ -395,7 +395,7 @@
 0000:b1ae:	80 3e fb 00 00	CMP byte ptr [0xfb],0x0
 0000:b1b3:	74 35	JZ 0x0000:b1ea
 0000:b1b5:	b4 2c	MOV AH,0x2c
-0000:b1b7:	cd 21	INT 0x21
+0000:b1b7:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=2Ch - get system time (CH hour, CL minute, DH second, DL hundredths).
 0000:b1b9:	80 fd 00	CMP CH,0x0
 0000:b1bc:	75 09	JNZ 0x0000:b1c7
 0000:b1be:	80 7e e9 18	CMP byte ptr [BP + -0x17],0x18
@@ -419,7 +419,7 @@
 0000:b1ef:	74 75	JZ 0x0000:b266
 0000:b1f1:	bf b0 24	MOV DI,0x24b0
 0000:b1f4:	b4 2c	MOV AH,0x2c
-0000:b1f6:	cd 21	INT 0x21
+0000:b1f6:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=2Ch - get system time (CH hour, CL minute, DH second, DL hundredths).
 0000:b1f8:	8a c5	MOV AL,CH
 0000:b1fa:	b4 00	MOV AH,0x0
 0000:b1fc:	80 3e c0 0b 00	CMP byte ptr [0xbc0],0x0
@@ -474,7 +474,7 @@
 0000:b26b:	74 19	JZ 0x0000:b286
 0000:b26d:	8b da	MOV BX,DX
 0000:b26f:	b4 2c	MOV AH,0x2c
-0000:b271:	cd 21	INT 0x21
+0000:b271:	cd 21	INT 0x21	; SYS: DOS INT 21h/AH=2Ch - get system time (CH hour, CL minute, DH second, DL hundredths).
 0000:b273:	87 da	XCHG DX,BX
 0000:b275:	b8 00 fe	MOV AX,0xfe00
 0000:b278:	3b 0e c3 0a	CMP CX,word ptr [0xac3]
@@ -484,17 +484,17 @@
 0000:b284:	73 0d	JNC 0x0000:b293
 0000:b286:	e8 41 03	CALL 0x0000:b5ca
 0000:b289:	b4 01	MOV AH,0x1
-0000:b28b:	cd 16	INT 0x16
+0000:b28b:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=01h - check whether a keystroke is pending.
 0000:b28d:	74 07	JZ 0x0000:b296
 0000:b28f:	b4 00	MOV AH,0x0
-0000:b291:	cd 16	INT 0x16
+0000:b291:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=00h - wait for and read keystroke.
 0000:b293:	e9 97 00	JMP 0x0000:b32d
 0000:b296:	33 c0	XOR AX,AX
 0000:b298:	e8 1b e2	CALL 0x0000:94b6
 0000:b29b:	b4 fc	MOV AH,0xfc
 0000:b29d:	75 f4	JNZ 0x0000:b293
 0000:b29f:	b4 02	MOV AH,0x2
-0000:b2a1:	cd 16	INT 0x16
+0000:b2a1:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=02h - read shift/control key status flags.
 0000:b2a3:	8a d8	MOV BL,AL
 0000:b2a5:	86 5e fa	XCHG byte ptr [BP + -0x6],BL
 0000:b2a8:	80 3e 84 0a 00	CMP byte ptr [0xa84],0x0
@@ -652,22 +652,22 @@
 0000:b409:	c3	RET
 
 ### FUNCTION FUN_0000_b40a @ 0000:b40a
-0000:b40a:	cd 28	INT 0x28
+0000:b40a:	cd 28	INT 0x28	; SYS: DOS INT 28h - DOS idle hook while waiting; gives TSRs/background handlers time.
 0000:b40c:	80 3e 85 0a 00	CMP byte ptr [0xa85],0x0
 0000:b411:	75 0e	JNZ 0x0000:b421
 0000:b413:	b8 80 16	MOV AX,0x1680
-0000:b416:	cd 2f	INT 0x2f
+0000:b416:	cd 2f	INT 0x2f	; SYS: Multiplex INT 2Fh/AX=1680h - DOS idle/release time slice under multitaskers.
 0000:b418:	3c 80	CMP AL,0x80
 0000:b41a:	75 05	JNZ 0x0000:b421
 0000:b41c:	c6 06 85 0a 01	MOV byte ptr [0xa85],0x1
 0000:b421:	80 3e 84 0a 00	CMP byte ptr [0xa84],0x0
 0000:b426:	74 0f	JZ 0x0000:b437
 0000:b428:	b8 1a 10	MOV AX,0x101a
-0000:b42b:	cd 15	INT 0x15
+0000:b42b:	cd 15	INT 0x15	; SYS: BIOS INT 15h/AX=101ah - miscellaneous BIOS/extension service probe/call.
 0000:b42d:	b8 00 10	MOV AX,0x1000
-0000:b430:	cd 15	INT 0x15
+0000:b430:	cd 15	INT 0x15	; SYS: BIOS INT 15h/AX=1000h - miscellaneous BIOS/extension service probe/call.
 0000:b432:	b8 25 10	MOV AX,0x1025
-0000:b435:	cd 15	INT 0x15
+0000:b435:	cd 15	INT 0x15	; SYS: BIOS INT 15h/AX=1025h - miscellaneous BIOS/extension service probe/call.
 0000:b437:	c3	RET
 
 ### FUNCTION FUN_0000_b438 @ 0000:b438
@@ -681,14 +681,14 @@
 0000:b43f:	b0 00	MOV AL,0x0
 0000:b441:	e8 5e e0	CALL 0x0000:94a2
 0000:b444:	b4 0f	MOV AH,0xf
-0000:b446:	cd 10	INT 0x10
+0000:b446:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=0Fh - get current video mode/page/columns.
 0000:b448:	b4 03	MOV AH,0x3
-0000:b44a:	cd 10	INT 0x10
+0000:b44a:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=03h - read cursor position and shape.
 0000:b44c:	51	PUSH CX
 0000:b44d:	52	PUSH DX
 0000:b44e:	b9 00 20	MOV CX,0x2000
 0000:b451:	b4 01	MOV AH,0x1
-0000:b453:	cd 10	INT 0x10
+0000:b453:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=01h - set cursor shape (CH/CL).
 0000:b455:	33 c9	XOR CX,CX
 0000:b457:	8a 36 81 0a	MOV DH,byte ptr [0xa81]
 0000:b45b:	fe ce	DEC DH
@@ -697,7 +697,7 @@
 0000:b461:	e8 2b ee	CALL 0x0000:a28f
 0000:b464:	8a fc	MOV BH,AH
 0000:b466:	b8 00 06	MOV AX,0x600
-0000:b469:	cd 10	INT 0x10
+0000:b469:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=06h - scroll/clear text window (BH attribute, CH/CL..DH/DL rectangle).
 0000:b46b:	bf 7b 0e	MOV DI,0xe7b
 0000:b46e:	b9 40 00	MOV CX,0x40
 0000:b471:	33 c0	XOR AX,AX
@@ -706,7 +706,7 @@
 0000:b477:	e8 3c e0	CALL 0x0000:94b6
 0000:b47a:	8b f1	MOV SI,CX
 0000:b47c:	b4 02	MOV AH,0x2
-0000:b47e:	cd 16	INT 0x16
+0000:b47e:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=02h - read shift/control key status flags.
 0000:b480:	8a c8	MOV CL,AL
 0000:b482:	33 ff	XOR DI,DI
 0000:b484:	56	PUSH SI
@@ -753,16 +753,16 @@
 0000:b4dc:	3e 89 5e fc	MOV word ptr DS:[BP + -0x4],BX
 0000:b4e0:	3e 89 56 fe	MOV word ptr DS:[BP + -0x2],DX
 0000:b4e4:	b4 0f	MOV AH,0xf
-0000:b4e6:	cd 10	INT 0x10
+0000:b4e6:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=0Fh - get current video mode/page/columns.
 0000:b4e8:	b4 02	MOV AH,0x2
-0000:b4ea:	cd 10	INT 0x10
+0000:b4ea:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=02h - set cursor position (BH page, DH row, DL column).
 0000:b4ec:	b4 24	MOV AH,0x24
 0000:b4ee:	e8 9e ed	CALL 0x0000:a28f
 0000:b4f1:	8a dc	MOV BL,AH
 0000:b4f3:	b9 01 00	MOV CX,0x1
 0000:b4f6:	26 a0 13 01	MOV AL,ES:[0x113]
 0000:b4fa:	b4 09	MOV AH,0x9
-0000:b4fc:	cd 10	INT 0x10
+0000:b4fc:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=09h - write character and attribute at cursor, repeated CX times.
 0000:b4fe:	be 7b 0e	MOV SI,0xe7b
 0000:b501:	b9 20 00	MOV CX,0x20
 0000:b504:	51	PUSH CX
@@ -797,25 +797,25 @@
 0000:b549:	b0 20	MOV AL,0x20
 0000:b54b:	50	PUSH AX
 0000:b54c:	b4 0f	MOV AH,0xf
-0000:b54e:	cd 10	INT 0x10
+0000:b54e:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=0Fh - get current video mode/page/columns.
 0000:b550:	b4 02	MOV AH,0x2
-0000:b552:	cd 10	INT 0x10
+0000:b552:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=02h - set cursor position (BH page, DH row, DL column).
 0000:b554:	58	POP AX
 0000:b555:	b4 25	MOV AH,0x25
 0000:b557:	e8 35 ed	CALL 0x0000:a28f
 0000:b55a:	8a dc	MOV BL,AH
 0000:b55c:	b9 01 00	MOV CX,0x1
 0000:b55f:	b4 09	MOV AH,0x9
-0000:b561:	cd 10	INT 0x10
+0000:b561:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=09h - write character and attribute at cursor, repeated CX times.
 0000:b563:	59	POP CX
 0000:b564:	e2 9e	LOOP 0x0000:b504
 0000:b566:	59	POP CX
 0000:b567:	5e	POP SI
 0000:b568:	b4 01	MOV AH,0x1
-0000:b56a:	cd 16	INT 0x16
+0000:b56a:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=01h - check whether a keystroke is pending.
 0000:b56c:	75 3d	JNZ 0x0000:b5ab
 0000:b56e:	b4 02	MOV AH,0x2
-0000:b570:	cd 16	INT 0x16
+0000:b570:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=02h - read shift/control key status flags.
 0000:b572:	86 c1	XCHG CL,AL
 0000:b574:	24 f0	AND AL,0xf0
 0000:b576:	32 c1	XOR AL,CL
@@ -843,15 +843,15 @@
 0000:b5a6:	e8 61 fe	CALL 0x0000:b40a
 0000:b5a9:	eb bd	JMP 0x0000:b568
 0000:b5ab:	b4 00	MOV AH,0x0
-0000:b5ad:	cd 16	INT 0x16
+0000:b5ad:	cd 16	INT 0x16	; SYS: BIOS keyboard INT 16h/AH=00h - wait for and read keystroke.
 0000:b5af:	b4 0f	MOV AH,0xf
-0000:b5b1:	cd 10	INT 0x10
+0000:b5b1:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=0Fh - get current video mode/page/columns.
 0000:b5b3:	5a	POP DX
 0000:b5b4:	b4 02	MOV AH,0x2
-0000:b5b6:	cd 10	INT 0x10
+0000:b5b6:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=02h - set cursor position (BH page, DH row, DL column).
 0000:b5b8:	59	POP CX
 0000:b5b9:	b4 01	MOV AH,0x1
-0000:b5bb:	cd 10	INT 0x10
+0000:b5bb:	cd 10	INT 0x10	; SYS: BIOS video INT 10h/AH=01h - set cursor shape (CH/CL).
 0000:b5bd:	b0 01	MOV AL,0x1
 0000:b5bf:	e8 e0 de	CALL 0x0000:94a2
 0000:b5c2:	58	POP AX

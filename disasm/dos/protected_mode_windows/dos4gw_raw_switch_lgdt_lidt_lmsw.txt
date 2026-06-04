@@ -1,0 +1,73 @@
+  8438: 11bd:6418:	89 16 ce 0e	MOV word ptr [0xece],DX
+  8439: 11bd:641c:	c3	RET
+  8440: 
+  8441: ### FUNCTION FUN_11bd_641d @ 11bd:641d
+  8442: 11bd:641d:	55	PUSH BP
+  8443: 11bd:641e:	fa	CLI
+  8444: 11bd:641f:	e8 c7 a7	CALL 0x1000:27b9
+  8445: 11bd:6422:	33 c0	XOR AX,AX
+  8446: 11bd:6424:	8e d8	MOV DS,AX
+  8447: 11bd:6426:	ff 36 00 00	PUSH word ptr [0x0]
+  8448: 11bd:642a:	ff 36 02 00	PUSH word ptr [0x2]
+  8449: 11bd:642e:	ff 36 04 00	PUSH word ptr [0x4]
+  8450: 11bd:6432:	36 89 26 7a 0f	MOV word ptr SS:[0xf7a],SP
+  8451: 11bd:6437:	b9 14 00	MOV CX,0x14
+  8452: 11bd:643a:	50	PUSH AX
+  8453: 11bd:643b:	e2 fd	LOOP 0x1000:800a
+  8454: 11bd:643d:	8c 16 69 04	MOV word ptr [0x469],SS
+  8455: 11bd:6441:	89 26 67 04	MOV word ptr [0x467],SP
+  8456: 11bd:6445:	b0 0f	MOV AL,0xf
+  8457: 11bd:6447:	e6 70	OUT 0x70,AL
+  8458: 11bd:6449:	c6 06 00 00 ea	MOV byte ptr [0x0],0xea
+  8459: 11bd:644e:	c7 06 01 00 85 64	MOV word ptr [0x1],0x6485
+  8460: 11bd:6454:	8c 0e 03 00	MOV word ptr [0x3],CS
+  8461: 11bd:6458:	b0 09	MOV AL,0x9
+  8462: 11bd:645a:	e6 71	OUT 0x71,AL
+  8463: 11bd:645c:	36 0f 01 16 c8 08	LGDT word ptr SS:[0x8c8]
+  8464: 11bd:6462:	36 0f 01 1e d0 08	LIDT word ptr SS:[0x8d0]
+  8465: 11bd:6468:	0f 01 e0	SMSW AX
+  8466: 11bd:646b:	0c 01	OR AL,0x1
+  8467: 11bd:646d:	0f 01 f0	LMSW AX
+  8468: 11bd:6470:	ea 75 64 18 00	JMPF 0x0000:65f5
+  8469: 
+  8470: ### FUNCTION FUN_11bd_64b7 @ 11bd:64b7
+  8471: 11bd:64b7:	55	PUSH BP
+  8472: 11bd:64b8:	fa	CLI
+  8473: 11bd:64b9:	e8 2d a7	CALL 0x1000:27b9
+  8474: 11bd:64bc:	e4 21	IN AL,0x21
+  8475: 11bd:64be:	8a e0	MOV AH,AL
+  8476: 11bd:64c0:	b0 ff	MOV AL,0xff
+  8477: 11bd:64c2:	e6 21	OUT 0x21,AL
+  8478: 11bd:64c4:	e4 a1	IN AL,0xa1
+  8479: 11bd:64c6:	50	PUSH AX
+  8480: 11bd:64c7:	f6 d0	NOT AL
+  8481: 11bd:64c9:	e6 a1	OUT 0xa1,AL
+  8482: 11bd:64cb:	33 c0	XOR AX,AX
+  8483: 11bd:64cd:	8e d8	MOV DS,AX
+  8484: 11bd:64cf:	b0 0f	MOV AL,0xf
+  8485: 11bd:64d1:	e6 70	OUT 0x70,AL
+  8486: 11bd:64d3:	8c 0e 69 04	MOV word ptr [0x469],CS
+  8487: 11bd:64d7:	c7 06 67 04 06 65	MOV word ptr [0x467],0x6506
+  8488: 11bd:64dd:	b0 0a	MOV AL,0xa
+  8489: 11bd:64df:	e6 71	OUT 0x71,AL
+  8490: 11bd:64e1:	36 89 26 7a 0f	MOV word ptr SS:[0xf7a],SP
+  8491: 11bd:64e6:	36 0f 01 16 c8 08	LGDT word ptr SS:[0x8c8]
+  8492: 11bd:64ec:	36 0f 01 1e d0 08	LIDT word ptr SS:[0x8d0]
+  8493: 11bd:64f2:	0f 01 e0	SMSW AX
+  8494: 11bd:64f5:	0c 01	OR AL,0x1
+  8495: 11bd:64f7:	0f 01 f0	LMSW AX
+  8496: 11bd:64fa:	ea ff 64 18 00	JMPF 0x0000:667f
+  8497: 
+  8498: ### FUNCTION FUN_11bd_6549 @ 11bd:6549
+  8499: 11bd:6549:	f6 06 47 00 01	TEST byte ptr [0x47],0x1
+  8500: 11bd:654e:	74 07	JZ 0x1000:8127
+  8501: 11bd:6550:	b4 0f	MOV AH,0xf
+  8502: 11bd:6552:	cd 10	INT 0x10
+  8503: 11bd:6554:	a2 17 0a	MOV [0xa17],AL
+  8504: 11bd:6557:	c3	RET
+  8505: 
+  8506: ### FUNCTION FUN_11bd_6558 @ 11bd:6558
+  8507: 11bd:6558:	b4 35	MOV AH,0x35
+  8508: 11bd:655a:	a0 34 00	MOV AL,[0x34]
+  8509: 11bd:655d:	cd 21	INT 0x21
+  8510: 11bd:655f:	2e 89 1e c4 12	MOV word ptr CS:[0x12c4],BX

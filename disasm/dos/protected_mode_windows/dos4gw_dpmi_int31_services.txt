@@ -1,0 +1,256 @@
+  9360: 11bd:6e85:	9a c2 6d bd 11	CALLF 0x1000:8992
+  9361: 11bd:6e8a:	72 81	JC 0x1000:89dd
+  9362: 11bd:6e8c:	fc	CLD
+  9363: 11bd:6e8d:	36 c7 06 c2 0a fc 71	MOV word ptr SS:[0xac2],0x71fc
+  9364: 11bd:6e94:	36 8c 1e 32 0c	MOV word ptr SS:[0xc32],DS
+  9365: 11bd:6e99:	8c 16 8e 20	MOV word ptr [0x208e],SS
+  9366: 11bd:6e9d:	36 8c 06 2a 0c	MOV word ptr SS:[0xc2a],ES
+  9367: 11bd:6ea2:	36 8c 06 b2 09	MOV word ptr SS:[0x9b2],ES
+  9368: 11bd:6ea7:	26 a1 2c 00	MOV AX,ES:[0x2c]
+  9369: 11bd:6eab:	36 a3 2c 0c	MOV SS:[0xc2c],AX
+  9370: 11bd:6eaf:	36 8c 1e 08 00	MOV word ptr SS:[0x8],DS
+  9371: 11bd:6eb4:	8c 0e c0 17	MOV word ptr [0x17c0],CS
+  9372: 11bd:6eb8:	8c 16 c4 17	MOV word ptr [0x17c4],SS
+  9373: 11bd:6ebc:	83 ec 08	SUB SP,0x8
+  9374: 11bd:6ebf:	8c d3	MOV BX,SS
+  9375: 11bd:6ec1:	8b fc	MOV DI,SP
+  9376: 11bd:6ec3:	8e c3	MOV ES,BX
+  9377: 11bd:6ec5:	b8 0b 00	MOV AX,0xb
+  9378: 11bd:6ec8:	cd 31	INT 0x31
+  9379: 11bd:6eca:	26 80 65 06 bf	AND byte ptr ES:[DI + 0x6],0xbf
+  9380: 11bd:6ecf:	b8 0c 00	MOV AX,0xc
+  9381: 11bd:6ed2:	cd 31	INT 0x31
+  9382: 11bd:6ed4:	8c db	MOV BX,DS
+  9383: 11bd:6ed6:	8b fc	MOV DI,SP
+  9384: 11bd:6ed8:	8e c3	MOV ES,BX
+  9385: 11bd:6eda:	b8 0b 00	MOV AX,0xb
+  9386: 11bd:6edd:	cd 31	INT 0x31
+  9387: 11bd:6edf:	26 80 65 06 bf	AND byte ptr ES:[DI + 0x6],0xbf
+  9388: 11bd:6ee4:	b8 0c 00	MOV AX,0xc
+  9389: 11bd:6ee7:	cd 31	INT 0x31
+  9390: 11bd:6ee9:	83 c4 08	ADD SP,0x8
+  9391: 11bd:6eec:	be 3d 6d	MOV SI,0x6d3d
+  9392: 11bd:6eef:	b8 00 0a	MOV AX,0xa00
+  9393: 11bd:6ef2:	cd 31	INT 0x31
+  9394: 11bd:6ef4:	b8 05 03	MOV AX,0x305
+  9395: 11bd:6ef7:	cd 31	INT 0x31
+  9396: 11bd:6ef9:	89 0e 4e 6d	MOV word ptr [0x6d4e],CX
+  9397: 11bd:6efd:	89 1e 50 6d	MOV word ptr [0x6d50],BX
+  9398: 11bd:6f01:	66 89 3e 54 6d	MOV dword ptr [0x6d54],EDI
+  9399: 11bd:6f06:	89 36 58 6d	MOV word ptr [0x6d58],SI
+  9400: 11bd:6f0a:	a3 52 6d	MOV [0x6d52],AX
+  9401: 11bd:6f0d:	b8 06 03	MOV AX,0x306
+  9402: 11bd:6f10:	cd 31	INT 0x31
+  9403: 11bd:6f12:	73 03	JNC 0x1000:8ae7
+  9404: 11bd:6f14:	e9 44 02	JMP 0x1000:8d2b
+  9405: 11bd:6f17:	89 0e 5a 6d	MOV word ptr [0x6d5a],CX
+  9406: 11bd:6f1b:	89 1e 5c 6d	MOV word ptr [0x6d5c],BX
+  9407: 11bd:6f1f:	66 89 3e 5e 6d	MOV dword ptr [0x6d5e],EDI
+  9408: 11bd:6f24:	89 36 62 6d	MOV word ptr [0x6d62],SI
+  9409: 11bd:6f28:	b3 21	MOV BL,0x21
+  9410: 11bd:6f2a:	b8 04 02	MOV AX,0x204
+  9411: 11bd:6f2d:	cd 31	INT 0x31
+  9412: 11bd:6f2f:	66 89 16 66 6d	MOV dword ptr [0x6d66],EDX
+  9413: 11bd:6f34:	89 0e 6a 6d	MOV word ptr [0x6d6a],CX
+  9414: 11bd:6f38:	36 89 0e 42 0c	MOV word ptr SS:[0xc42],CX
+  9415: 11bd:6f3d:	16	PUSH SS
+  9416: 11bd:6f3e:	1f	POP DS
+  9417: 11bd:6f3f:	1e	PUSH DS
+  9418: 11bd:6f40:	07	POP ES
+  9419: 11bd:6f41:	bf c0 00	MOV DI,0xc0
+  9420: 11bd:6f44:	0e	PUSH CS
+  9421: 11bd:6f45:	e8 be 06	CALL 0x1000:91d6
+  9422: 11bd:6f48:	8c 0e 26 0c	MOV word ptr [0xc26],CS
+  9423: 11bd:6f4c:	8c 0e f8 0a	MOV word ptr [0xaf8],CS
+  9424: 11bd:6f50:	8c 16 28 0c	MOV word ptr [0xc28],SS
+  9425: 11bd:6f54:	fb	STI
+  9426: 11bd:6f55:	8c 16 2c 00	MOV word ptr [0x2c],SS
+  9427: 11bd:6f59:	8c 0e 18 00	MOV word ptr [0x18],CS
+  9428: 11bd:6f5d:	8c 0e 1c 00	MOV word ptr [0x1c],CS
+  9429: 11bd:6f61:	c7 06 22 00 64 73	MOV word ptr [0x22],0x7364
+  9430: 11bd:6f67:	8c 0e 24 00	MOV word ptr [0x24],CS
+  9431: 11bd:6f6b:	8c 16 0c 00	MOV word ptr [0xc],SS
+  9432: 11bd:6f6f:	8c 16 3c 00	MOV word ptr [0x3c],SS
+  9433: 11bd:6f73:	8c 16 98 09	MOV word ptr [0x998],SS
+  9434: 11bd:6f77:	8c 16 44 00	MOV word ptr [0x44],SS
+  9435: 11bd:6f7b:	b8 03 02	MOV AX,0x203
+  9436: 11bd:6f7e:	b3 11	MOV BL,0x11
+  9437: 11bd:6f80:	8c c9	MOV CX,CS
+  9438: 11bd:6f82:	ba 6c 6d	MOV DX,0x6d6c
+  9439: 11bd:6f85:	cd 31	INT 0x31
+  9440: 11bd:6f87:	83 c2 04	ADD DX,0x4
+  9441: 11bd:6f8a:	fe cb	DEC BL
+  9442: 11bd:6f8c:	80 fb 06	CMP BL,0x6
+  9443: 11bd:6f8f:	73 f4	JNC 0x1000:8b55
+  9444: 11bd:6f91:	b3 0d	MOV BL,0xd
+  9445: 11bd:6f93:	ba bb 6a	MOV DX,0x6abb
+  9446: 11bd:6f96:	cd 31	INT 0x31
+  9447: 11bd:6f98:	ba f4 71	MOV DX,0x71f4
+  9448: 11bd:6f9b:	8c c9	MOV CX,CS
+  9449: 11bd:6f9d:	b3 03	MOV BL,0x3
+  9450: 11bd:6f9f:	b8 05 02	MOV AX,0x205
+  9451: 11bd:6fa2:	cd 31	INT 0x31
+  9452: 11bd:6fa4:	ba 2b 73	MOV DX,0x732b
+  9453: 11bd:6fa7:	b3 01	MOV BL,0x1
+  9454: 11bd:6fa9:	cd 31	INT 0x31
+  9455: 11bd:6fab:	ba f8 71	MOV DX,0x71f8
+  9456: 11bd:6fae:	b3 00	MOV BL,0x0
+  9457: 11bd:6fb0:	cd 31	INT 0x31
+  9458: 11bd:6fb2:	ba 84 75	MOV DX,0x7584
+  9459: 11bd:6fb5:	b3 23	MOV BL,0x23
+  9460: 11bd:6fb7:	cd 31	INT 0x31
+  9461: 11bd:6fb9:	2e 80 3e 4b 6d 00	CMP byte ptr CS:[0x6d4b],0x0
+  9462: 11bd:6fbf:	75 05	JNZ 0x1000:8b96
+  9463: 11bd:6fc1:	b8 82 16	MOV AX,0x1682
+  9464: 11bd:6fc4:	cd 2f	INT 0x2f
+  9465: 11bd:6fc6:	b8 03 00	MOV AX,0x3
+  9466: 11bd:6fc9:	cd 31	INT 0x31
+  9467: 11bd:6fcb:	a3 48 0c	MOV [0xc48],AX
+  9468: 11bd:6fce:	33 c9	XOR CX,CX
+  9469: 11bd:6fd0:	41	INC CX
+  9470: 11bd:6fd1:	d1 e8	SHR AX,0x1
+  9471: 11bd:6fd3:	73 fb	JNC 0x1000:8ba0
+  9472: 11bd:6fd5:	89 0e 46 0c	MOV word ptr [0xc46],CX
+  9473: 11bd:6fd9:	b9 06 00	MOV CX,0x6
+  9474: 11bd:6fdc:	33 c0	XOR AX,AX
+  9475: 11bd:6fde:	cd 31	INT 0x31
+  9476: 11bd:6fe0:	73 03	JNC 0x1000:8bb5
+  9477: 11bd:6fe2:	e9 76 01	JMP 0x1000:8d2b
+  9478: 11bd:6fe5:	a3 2e 0c	MOV [0xc2e],AX
+  9479: 11bd:6fe8:	93	XCHG AX,BX
+  9480: 11bd:6fe9:	b8 08 00	MOV AX,0x8
+  9481: 11bd:6fec:	b9 ff ff	MOV CX,0xffff
+  9482: 11bd:6fef:	8b d1	MOV DX,CX
+  9483: 11bd:6ff1:	cd 31	INT 0x31
+  9484: 11bd:6ff3:	72 ed	JC 0x1000:8bb2
+  9485: 11bd:6ff5:	03 1e 48 0c	ADD BX,word ptr [0xc48]
+  9486: 11bd:6ff9:	89 1e 38 0c	MOV word ptr [0xc38],BX
+  9487: 11bd:6ffd:	33 c9	XOR CX,CX
+  9488: 11bd:6fff:	cd 31	INT 0x31
+  9489: 11bd:7001:	72 df	JC 0x1000:8bb2
+  9490: 11bd:7003:	03 1e 48 0c	ADD BX,word ptr [0xc48]
+  9491: 11bd:7007:	89 1e 3e 0c	MOV word ptr [0xc3e],BX
+  9492: 11bd:700b:	cd 31	INT 0x31
+  9493: 11bd:700d:	72 d3	JC 0x1000:8bb2
+  9494: 11bd:700f:	83 ec 08	SUB SP,0x8
+  9495: 11bd:7012:	16	PUSH SS
+  9496: 11bd:7013:	07	POP ES
+  9497: 11bd:7014:	8b fc	MOV DI,SP
+  9498: 11bd:7016:	03 1e 48 0c	ADD BX,word ptr [0xc48]
+  9499: 11bd:701a:	89 1e 3c 0c	MOV word ptr [0xc3c],BX
+  9500: 11bd:701e:	89 1e f4 0a	MOV word ptr [0xaf4],BX
+  9501: 11bd:7022:	89 1e 00 0a	MOV word ptr [0xa00],BX
+  9502: 11bd:7026:	89 1e 08 0a	MOV word ptr [0xa08],BX
+  9503: 11bd:702a:	b8 0b 00	MOV AX,0xb
+  9504: 11bd:702d:	cd 31	INT 0x31
+  9505: 11bd:702f:	e8 f2 ae	CALL 0x1000:3af4
+  9506: 11bd:7032:	48	DEC AX
+  9507: 11bd:7033:	ab	STOSW ES:DI
+  9508: 11bd:7034:	a1 10 0a	MOV AX,[0xa10]
+  9509: 11bd:7037:	b9 10 00	MOV CX,0x10
+  9510: 11bd:703a:	f7 e1	MUL CX
+  9511: 11bd:703c:	ab	STOSW ES:DI
+  9512: 11bd:703d:	92	XCHG AX,DX
+  9513: 11bd:703e:	aa	STOSB ES:DI
+  9514: 11bd:703f:	8b fc	MOV DI,SP
+  9515: 11bd:7041:	b8 0c 00	MOV AX,0xc
+  9516: 11bd:7044:	cd 31	INT 0x31
+  9517: 11bd:7046:	8e db	MOV DS,BX
+  9518: 11bd:7048:	8c 16 80 56	MOV word ptr [0x5680],SS
+  9519: 11bd:704c:	8c c8	MOV AX,CS
+  9520: 11bd:704e:	a3 a8 3e	MOV [0x3ea8],AX
+  9521: 11bd:7051:	89 1e 03 04	MOV word ptr [0x403],BX
+  9522: 11bd:7055:	c7 06 01 04 92 56	MOV word ptr [0x401],0x5692
+  9523: 11bd:705b:	c6 06 00 04 ea	MOV byte ptr [0x400],0xea
+  9524: 11bd:7060:	be a0 07	MOV SI,0x7a0
+  9525: 11bd:7063:	89 5c 02	MOV word ptr [SI + 0x2],BX
+  9526: 11bd:7066:	89 5c 06	MOV word ptr [SI + 0x6],BX
+  9527: 11bd:7069:	83 c6 08	ADD SI,0x8
+  9528: 11bd:706c:	83 3c 00	CMP word ptr [SI],0x0
+  9529: 11bd:706f:	75 f2	JNZ 0x1000:8c33
+  9530: 11bd:7071:	0f 02 c8	LAR CX,AX
+  9531: 11bd:7074:	c1 e9 08	SHR CX,0x8
+  9532: 11bd:7077:	b8 09 00	MOV AX,0x9
+  9533: 11bd:707a:	53	PUSH BX
+  9534: 11bd:707b:	cd 31	INT 0x31
+  9535: 11bd:707d:	8c d9	MOV CX,DS
+  9536: 11bd:707f:	bb 10 00	MOV BX,0x10
+  9537: 11bd:7082:	b8 05 02	MOV AX,0x205
+  9538: 11bd:7085:	8b d3	MOV DX,BX
+  9539: 11bd:7087:	c1 e2 02	SHL DX,0x2
+  9540: 11bd:708a:	81 c2 00 00	ADD DX,0x0
+  9541: 11bd:708e:	cd 31	INT 0x31
+  9542: 11bd:7090:	73 03	JNC 0x1000:8c65
+  9543: 11bd:7092:	e9 c6 00	JMP 0x1000:8d2b
+  9544: 11bd:7095:	fe c3	INC BL
+  9545: 11bd:7097:	80 fb 1b	CMP BL,0x1b
+  9546: 11bd:709a:	74 f9	JZ 0x1000:8c65
+  9547: 11bd:709c:	80 fb 1c	CMP BL,0x1c
+  9548: 11bd:709f:	74 f4	JZ 0x1000:8c65
+  9549: 11bd:70a1:	80 fb 23	CMP BL,0x23
+  9550: 11bd:70a4:	74 ef	JZ 0x1000:8c65
+  9551: 11bd:70a6:	80 fb 24	CMP BL,0x24
+  9552: 11bd:70a9:	74 ea	JZ 0x1000:8c65
+  9553: 11bd:70ab:	80 fb 2f	CMP BL,0x2f
+  9554: 11bd:70ae:	74 e5	JZ 0x1000:8c65
+  9555: 11bd:70b0:	80 fb 16	CMP BL,0x16
+  9556: 11bd:70b3:	74 e0	JZ 0x1000:8c65
+  9557: 11bd:70b5:	80 fb 2e	CMP BL,0x2e
+  9558: 11bd:70b8:	76 cb	JBE 0x1000:8c55
+  9559: 11bd:70ba:	ba 9e 0c	MOV DX,0xc9e
+  9560: 11bd:70bd:	b3 21	MOV BL,0x21
+  9561: 11bd:70bf:	cd 31	INT 0x31
+  9562: 11bd:70c1:	72 cf	JC 0x1000:8c62
+  9563: 11bd:70c3:	ba 83 1a	MOV DX,0x1a83
+  9564: 11bd:70c6:	b3 10	MOV BL,0x10
+  9565: 11bd:70c8:	cd 31	INT 0x31
+  9566: 11bd:70ca:	ba 56 05	MOV DX,0x556
+  9567: 11bd:70cd:	b3 75	MOV BL,0x75
+  9568: 11bd:70cf:	cd 31	INT 0x31
+  9569: 11bd:70d1:	16	PUSH SS
+  9570: 11bd:70d2:	1f	POP DS
+  9571: 11bd:70d3:	b8 ff 1f	MOV AX,0x1fff
+  9572: 11bd:70d6:	ab	STOSW ES:DI
+  9573: 11bd:70d7:	a1 34 0c	MOV AX,[0xc34]
+  9574: 11bd:70da:	b9 10 00	MOV CX,0x10
+  9575: 11bd:70dd:	f7 e1	MUL CX
+  9576: 11bd:70df:	ab	STOSW ES:DI
+  9577: 11bd:70e0:	92	XCHG AX,DX
+  9578: 11bd:70e1:	aa	STOSB ES:DI
+  9579: 11bd:70e2:	5b	POP BX
+  9580: 11bd:70e3:	03 1e 48 0c	ADD BX,word ptr [0xc48]
+  9581: 11bd:70e7:	89 1e 34 0c	MOV word ptr [0xc34],BX
+  9582: 11bd:70eb:	89 1e a2 0a	MOV word ptr [0xaa2],BX
+  9583: 11bd:70ef:	8b fc	MOV DI,SP
+  9584: 11bd:70f1:	b8 0c 00	MOV AX,0xc
+  9585: 11bd:70f4:	cd 31	INT 0x31
+  9586: 11bd:70f6:	03 1e 48 0c	ADD BX,word ptr [0xc48]
+  9587: 11bd:70fa:	89 1e 9c 0a	MOV word ptr [0xa9c],BX
+  9588: 11bd:70fe:	b8 08 00	MOV AX,0x8
+  9589: 11bd:7101:	33 c9	XOR CX,CX
+  9590: 11bd:7103:	ba ff ff	MOV DX,0xffff
+  9591: 11bd:7106:	cd 31	INT 0x31
+  9592: 11bd:7108:	40	INC AX
+  9593: 11bd:7109:	8c c9	MOV CX,CS
+  9594: 11bd:710b:	0f 02 c9	LAR CX,CX
+  9595: 11bd:710e:	c1 e9 08	SHR CX,0x8
+  9596: 11bd:7111:	cd 31	INT 0x31
+  9597: 11bd:7113:	83 c4 08	ADD SP,0x8
+  9598: 11bd:7116:	e8 00 03	CALL 0x1000:8fe9
+  9599: 11bd:7119:	b2 00	MOV DL,0x0
+  9600: 11bd:711b:	86 16 80 09	XCHG byte ptr [0x980],DL
+  9601: 11bd:711f:	bb 40 00	MOV BX,0x40
+  9602: 11bd:7122:	b4 48	MOV AH,0x48
+  9603: 11bd:7124:	cd 21	INT 0x21
+  9604: 11bd:7126:	0f 83 03 00	JNC 0x1000:8cfd
+  9605: 11bd:712a:	eb 2f	JMP 0x1000:8d2b
+  9606: 11bd:712d:	a3 4c 0c	MOV [0xc4c],AX
+  9607: 11bd:7130:	88 16 80 09	MOV byte ptr [0x980],DL
+  9608: 11bd:7134:	8e c0	MOV ES,AX
+  9609: 11bd:7136:	33 ff	XOR DI,DI
+  9610: 11bd:7138:	0e	PUSH CS
+  9611: 11bd:7139:	e8 55 04	CALL 0x1000:9161
+  9612: 11bd:713c:	2e 66 8b 36 14 6e	MOV ESI,dword ptr CS:[0x6e14]
+  9613: 11bd:7142:	2e 66 8b 3e 18 6e	MOV EDI,dword ptr CS:[0x6e18]
+  9614: 11bd:7148:	2e 66 8b 16 1c 6e	MOV EDX,dword ptr CS:[0x6e1c]
+  9615: 11bd:714e:	c7 06 a4 0a 1d 57	MOV word ptr [0xaa4],0x571d
