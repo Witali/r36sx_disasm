@@ -68,6 +68,15 @@ static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
     r36sx_cpu_log_invalid_opcode_dump(fault_ip);
 #endif
     r36sx_cpu_set_ip(fault_ip);
+    if (r36sx_cpu_protected_enabled()) {
+        /*
+         * #UD is a processor exception in protected mode, so it is delivered
+         * through the protected IDT and pushes the faulting instruction IP.
+         */
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_INVALID_OPCODE, 0, 0,
+                                  fault_ip);
+        return;
+    }
     intcall86(6);
 }
 
