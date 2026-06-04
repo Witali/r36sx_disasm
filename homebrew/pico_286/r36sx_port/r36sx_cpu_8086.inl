@@ -291,14 +291,11 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
                 s = s | cf;
             }
 
-            if (cnt == 1) {
-                // of = cf ^ ( (s >> 7) & 1);
-                if ((s & 0x80) && cf)
-                    of = 1;
-                else
-                    of = 0;
-            } else
-                of = 0;
+            /*
+             * OF is architecturally defined only for count=1.  DOSBox and
+             * test386 both model the stable hardware result for larger counts.
+             */
+            of = cf ^ ((s & 0x80u) ? 1u : 0u);
             break;
 
         case 1: /* ROR r/m8 */
@@ -307,9 +304,7 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
                 s = (s >> 1) | (cf << 7);
             }
 
-            if (cnt == 1) {
-                of = (s >> 7) ^ ((s >> 6) & 1);
-            }
+            of = ((s >> 7) ^ (s >> 6)) & 1u;
             break;
 
         case 2: /* RCL r/m8 */
@@ -325,9 +320,7 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
                 s = s | oldcf;
             }
 
-            if (cnt == 1) {
-                of = cf ^ ((s >> 7) & 1);
-            }
+            of = cf ^ ((s & 0x80u) ? 1u : 0u);
             break;
 
         case 3: /* RCR r/m8 */
@@ -337,9 +330,7 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
                 s = (s >> 1) | (oldcf << 7);
             }
 
-            if (cnt == 1) {
-                of = (s >> 7) ^ ((s >> 6) & 1);
-            }
+            of = ((s >> 7) ^ (s >> 6)) & 1u;
             break;
 
         case 4:
@@ -418,9 +409,11 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
                 s = s | cf;
             }
 
-            if (cnt == 1) {
-                of = cf ^ ((s >> 15) & 1);
-            }
+            /*
+             * OF is architecturally defined only for count=1.  DOSBox and
+             * test386 both model the stable hardware result for larger counts.
+             */
+            of = cf ^ ((s & 0x8000u) ? 1u : 0u);
             break;
 
         case 1: /* ROR r/m16 */
@@ -429,9 +422,7 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
                 s = (s >> 1) | (cf << 15);
             }
 
-            if (cnt == 1) {
-                of = (s >> 15) ^ ((s >> 14) & 1);
-            }
+            of = ((s >> 15) ^ (s >> 14)) & 1u;
             break;
 
         case 2: /* RCL r/m16 */
@@ -447,9 +438,7 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
                 s = s | oldcf;
             }
 
-            if (cnt == 1) {
-                of = cf ^ ((s >> 15) & 1);
-            }
+            of = cf ^ ((s & 0x8000u) ? 1u : 0u);
             break;
 
         case 3: /* RCR r/m16 */
@@ -459,9 +448,7 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
                 s = (s >> 1) | (oldcf << 15);
             }
 
-            if (cnt == 1) {
-                of = (s >> 15) ^ ((s >> 14) & 1);
-            }
+            of = ((s >> 15) ^ (s >> 14)) & 1u;
             break;
 
         case 4:
