@@ -1,84 +1,86 @@
-# Итоги чата от 2026-06-02
+# Chat Summary for 2026-06-02
 
-Этот документ фиксирует, что было сделано в ходе текущего чата: разбор DTB/DTS,
-оценка загрузки Linux/Debian, проверка ABI/FPU и добавление native-программы
-`shell` для устройства.
+This document records what was done during the current chat: DTB/DTS analysis,
+Linux/Debian boot evaluation, ABI/FPU checks, and adding the native `shell`
+program for the device.
 
 ## DTB/DTS
 
-- Найден DTB устройства: `disk_image/cubegm/dtb.bin`.
-- DTB декомпилирован через Linux/WSL `dtc` в:
+- Found the device DTB: `disk_image/cubegm/dtb.bin`.
+- Decompiled the DTB through Linux/WSL `dtc` into:
   `disk_image/cubegm/dtb.dts`.
-- DTS был проверен обратной компиляцией в DTB. Остались только исходные
-  предупреждения по `reg` у `/hcrtos/sfspi/*`.
-- В `dtb.dts` добавлены комментарии по устройствам на основе локального анализа
-  и открытых источников: CPU, SoC, UART, AVP/hcRTOS, SPI NOR, USB, MMC, GPIO,
-  ADC, display/panel.
-- Эти DTS-комментарии уже закоммичены:
+- Checked the DTS by compiling it back into a DTB. Only the original `/hcrtos/sfspi/*`
+  `reg` warnings remained.
+- Added comments to `dtb.dts` for devices based on local analysis and open
+  sources: CPU, SoC, UART, AVP/hcRTOS, SPI NOR, USB, MMC, GPIO, ADC,
+  display/panel.
+- These DTS comments are already committed:
   `c46e0ba Add annotated HC16xx device tree source`.
 
-## Образ диска и загрузка Linux
+## Disk Image and Linux Boot
 
-- `disk_image` сейчас является распакованной структурой SD-карты/прошивки, а не
-  единым raw disk image.
-- Основные boot-артефакты в `disk_image/cubegm`:
+- `disk_image` is currently an unpacked SD-card/firmware structure, not a single
+  raw disk image.
+- Main boot artifacts in `disk_image/cubegm`:
   - `vmlinux.uImage` - U-Boot legacy Linux/MIPS kernel image.
-  - `advapi32.dll` - тоже U-Boot legacy Linux/MIPS kernel image с похожим
-    назначением, несмотря на расширение DLL.
-  - `avp.uImage` - firmware image для AVP/hcRTOS.
+  - `advapi32.dll` - also a U-Boot legacy Linux/MIPS kernel image with a similar
+    purpose despite the DLL extension.
+  - `avp.uImage` - firmware image for AVP/hcRTOS.
   - `dtb.bin` - device tree.
-  - `Bubbles.scr` - тоже DTB-подобный blob с отличающейся memory map.
-- В DTS `external_files` указывают на:
+  - `Bubbles.scr` - also a DTB-like blob with a different memory map.
+- In the DTS, `external_files` points to:
   - `cubegm/dtb.bin`
   - `cubegm/avp.uImage`
   - `cubegm/vmlinux.uImage`
   - `cubegm/xgame-logo.bmp`
-- Текущие `bootargs` используют ramfs:
+- Current `bootargs` use ramfs:
   `root=/dev/ram0 rootfstype=ramfs rw init=/linuxrc console=tty1 ...`
-- В ядре/модулях найдена поддержка FAT/VFAT/MSDOS, MMC/DW-MMC и ext2/ext3/ext4.
-  Поэтому SD-карта с небольшим FAT boot-разделом и ext4 root-разделом технически
-  выглядит реализуемой.
-- Для загрузки с ext4 root потребуется менять bootargs/DTS или initramfs-сценарий:
-  стоковая схема всё ещё ожидает `root=/dev/ram0`.
+- The kernel/modules contain support for FAT/VFAT/MSDOS, MMC/DW-MMC, and
+  ext2/ext3/ext4. Therefore an SD card with a small FAT boot partition and an
+  ext4 root partition looks technically feasible.
+- Booting from an ext4 root will require changing bootargs/DTS or the initramfs
+  script: the stock boot scheme still expects `root=/dev/ram0`.
 
-## Debian и ABI
+## Debian and ABI
 
-- Стоковые ELF-бинарники и собранные нами native-программы имеют ABI:
+- The stock ELF binaries and the native programs we built use this ABI:
   - ELF32 little-endian MIPS.
   - MIPS32r2.
   - O32.
   - hard-float.
   - dynamic linker `/lib/ld.so.1`.
-- В стоковой rootfs используется glibc, ранее наблюдался уровень около
+- The stock rootfs uses glibc; the previously observed level was around
   GLIBC 2.20.
-- Debian потенциально возможен как `mipsel` hard-float rootfs/chroot, особенно
-  на базе Debian Bookworm. Более новые Debian-релизы нужно проверять отдельно:
-  поддержка `mipsel` менялась/сокращалась.
-- Для полноценного Debian-boot нужны отдельные работы:
-  - rootfs под правильный MIPS ABI;
-  - bootargs под ext4 root;
-  - корректные `/dev`, `/proc`, `/sys`, init;
-  - сохранение доступа к vendor `driver.so`/AVP/hcRTOS-части, если нужен экран,
-    звук и кнопки.
+- Debian is potentially possible as a `mipsel` hard-float rootfs/chroot,
+  especially based on Debian Bookworm. Newer Debian releases must be checked
+  separately because `mipsel` support has changed or been reduced.
+- A full Debian boot needs separate work:
+  - a rootfs for the correct MIPS ABI;
+  - bootargs for an ext4 root;
+  - correct `/dev`, `/proc`, `/sys`, and init setup;
+  - preserving access to the vendor `driver.so`/AVP/hcRTOS side if screen,
+    sound, and buttons are needed.
 
-## Плавающая точка
+## Floating Point
 
-- Проверены локальные бинарники (`linuxrc`, `rkgame`, `cubevol`, `driver.so`):
-  они собраны как hard-float.
-- В kernel strings есть признаки работы с FPU, включая строки про FPU revision.
-- Вывод: прошивка рассчитана на hard-float ABI; аппаратная FPU весьма вероятна,
-  но окончательно подтвердить на железе нужно через:
+- Checked local binaries (`linuxrc`, `rkgame`, `cubevol`, `driver.so`): they are
+  built as hard-float.
+- Kernel strings contain signs of FPU handling, including strings mentioning FPU
+  revision.
+- Conclusion: the firmware targets a hard-float ABI; hardware FPU is very likely,
+  but final confirmation on hardware should be done with:
   - `cat /proc/cpuinfo`
   - `dmesg | grep -i fpu`
-- После проверки на железе в `dmesg` обнаружена строка про FPU. Поэтому
-  WSL/GCC-сборки `shell` и Pico-286 переключены с 74Kc на 74Kf:
+- After checking on the device, an FPU line was found in `dmesg`. Because of
+  that, the WSL/GCC builds of `shell` and Pico-286 were switched from 74Kc to
+  74Kf:
   `-march=74kf -mtune=74kf`.
 
 ## shell
 
-Добавлена новая native-программа `shell` без префикса `r36sx`.
+Added a new native program named `shell`, without the `r36sx` prefix.
 
-Исходники и сборка:
+Sources and build:
 
 ```text
 homebrew/shell/shell.c
@@ -86,7 +88,7 @@ homebrew/shell/build_shell_wsl.sh
 homebrew/shell/README.md
 ```
 
-Собранные/установленные копии:
+Built/installed copies:
 
 ```text
 homebrew/shell/shell
@@ -102,15 +104,15 @@ patches/disk_image_patch_shell/MIPS_NATIVE/shell/README.md
 patches/disk_image_patch_shell/MIPS_NATIVE/common/fonts/
 ```
 
-Что делает `shell`:
+What `shell` does:
 
-- Открывает `driver.so` и выводит RGB565 framebuffer через
+- Opens `driver.so` and displays an RGB565 framebuffer through
   `video_driver_disp_frame`.
-- Использует общую экранную клавиатуру из `homebrew/common`.
-- Рендерит терминал через FreeType и monospace-шрифты из
+- Uses the shared on-screen keyboard from `homebrew/common`.
+- Renders the terminal through FreeType and monospace fonts from
   `MIPS_NATIVE/common/fonts`.
-- Запускает настоящий `/bin/sh -i` через pseudo-terminal.
-- Позволяет выполнять обычные Linux-команды, pipes и редиректы, например:
+- Starts a real `/bin/sh -i` through a pseudo-terminal.
+- Allows normal Linux commands, pipes, and redirects, for example:
 
 ```sh
 ls / > /mnt/sdcard/root.txt
@@ -118,28 +120,28 @@ dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 cat /mnt/sdcard/root.txt
 ```
 
-- Поддерживает простую VT100/ANSI-отрисовку: цвета, cursor movement, clear
-  screen/line, printable UTF-8 через FreeType-глифы.
-- Если на прошивке не работает `/dev/ptmx`/`devpts`, `shell` теперь пытается
-  создать `/dev/ptmx`, смонтировать `devpts` на `/dev/pts`, повторить запуск
-  PTY, а затем переходит в pipe-backed fallback. В fallback-режиме команды и
-  редиректы работают, но полноценного TTY/job-control нет.
-- Управление через встроенные кнопки:
-  - `FN` - показать/скрыть экранную клавиатуру.
-  - `FN + D-pad Up` - сохранить скриншот framebuffer.
-  - `FN + X` - выйти.
-  - `SELECT` - показать клавиатуру или expand/collapse.
-  - При скрытой клавиатуре D-pad отправляет terminal arrow keys.
-- Скриншоты добавлены по той же комбинации, что в Pico 286:
-  `FN + D-pad Up`. В `shell` они сохраняются как 24-bit BMP:
+- Supports simple VT100/ANSI rendering: colors, cursor movement, clear
+  screen/line, and printable UTF-8 through FreeType glyphs.
+- If `/dev/ptmx`/`devpts` does not work on the firmware, `shell` now tries to
+  create `/dev/ptmx`, mount `devpts` on `/dev/pts`, retry PTY startup, and then
+  fall back to a pipe-backed shell. In fallback mode, commands and redirects
+  work, but full TTY/job-control is unavailable.
+- Built-in button controls:
+  - `FN` - show/hide the on-screen keyboard.
+  - `FN + D-pad Up` - save a framebuffer screenshot.
+  - `FN + X` - exit.
+  - `SELECT` - show the keyboard or expand/collapse it.
+  - With the keyboard hidden, D-pad sends terminal arrow keys.
+- Screenshots were added with the same key combination as Pico 286:
+  `FN + D-pad Up`. In `shell` they are saved as 24-bit BMP files:
   `/mnt/sdcard/MIPS_NATIVE/shell/screenshots/shell_YYYYMMDD_HHMMSS_NNN.bmp`.
-  Если SD-путь недоступен, используется локальный каталог `screenshots`.
+  If the SD path is unavailable, the local `screenshots` directory is used.
 
-## Физическая USB-клавиатура
+## Physical USB Keyboard
 
-- В DTS найдены два USB host-контроллера `hichip,hc16xx-musb` с
+- The DTS contains two USB host controllers, `hichip,hc16xx-musb`, with
   `dr_mode = "host"`.
-- В `modules.builtin` и kernel strings найдены:
+- `modules.builtin` and kernel strings contain:
   - `usbcore`
   - `musb`
   - `hid`
@@ -147,46 +149,46 @@ cat /mnt/sdcard/root.txt
   - `usbhid`
   - `input-core`
   - `evdev`
-- `mdev` включён через `/proc/sys/kernel/hotplug`, значит USB HID-клавиатура
-  должна появляться как `/dev/input/event*`, если физический USB host-порт и
-  питание работают.
-- В `shell` добавлен evdev-мост:
-  - периодически сканирует `/dev/input/event*`;
-  - фильтрует keyboard-like устройства по `EV_KEY`, `KEY_A`, `KEY_ENTER`;
-  - мапит клавиши физической USB-клавиатуры в PTY `/bin/sh`;
-  - поддерживает буквы, цифры, знаки, Enter, Backspace, Tab, Esc, стрелки,
-    Home/End/Page, Insert/Delete, F1-F12 и Ctrl-комбинации.
-- На железе стоит проверить:
+- `mdev` is enabled through `/proc/sys/kernel/hotplug`, so a USB HID keyboard
+  should appear as `/dev/input/event*` if the physical USB host port and power
+  path work.
+- An evdev bridge was added to `shell`:
+  - periodically scans `/dev/input/event*`;
+  - filters keyboard-like devices by `EV_KEY`, `KEY_A`, and `KEY_ENTER`;
+  - maps physical USB keyboard keys into the `/bin/sh` PTY;
+  - supports letters, digits, punctuation, Enter, Backspace, Tab, Esc, arrows,
+    Home/End/Page, Insert/Delete, F1-F12, and Ctrl combinations.
+- On hardware, check:
 
 ```sh
 dmesg
 ls /dev/input/event*
 ```
 
-При успешном подключении `shell` должен вывести строку вида:
+On successful connection, `shell` should print a line like:
 
 ```text
 [usb keyboard: /dev/input/eventX]
 ```
 
-Если клавиатура не определяется, вероятные причины:
+If the keyboard is not detected, likely causes are:
 
-- нужен OTG-переходник;
-- USB-порт не выдаёт 5V в нужном режиме;
-- нужен powered USB hub;
-- конкретный порт устройства физически разведён не как host.
+- an OTG adapter is needed;
+- the USB port does not provide 5V in the required mode;
+- a powered USB hub is needed;
+- the particular device port is not physically wired as host.
 
-## Изменения в общих компонентах
+## Shared Component Changes
 
-- В `homebrew/common/r36sx_screen_keyboard.c` добавлены пути к common
-  monospace-шрифтам:
+- `homebrew/common/r36sx_screen_keyboard.c` now includes paths to common
+  monospace fonts:
   `MIPS_NATIVE/common/fonts/*.ttf`.
-- Это позволяет экранной клавиатуре использовать те же шрифты, что `shell`,
-  `Tiny MC` и другие native-программы.
+- This lets the on-screen keyboard use the same fonts as `shell`, `Tiny MC`,
+  and other native programs.
 
-## Текущее состояние рабочей копии
+## Current Working Copy State
 
-На момент создания этого документа есть незакоммиченные изменения:
+At the time this document was created, the following changes were uncommitted:
 
 ```text
 homebrew/common/r36sx_screen_keyboard.c
@@ -194,74 +196,74 @@ homebrew/shell/
 patches/disk_image_patch_shell/
 ```
 
-Также в рабочей копии были несвязанные/старые untracked-артефакты, которые этот
-чат не менял намеренно:
+There were also unrelated/older untracked artifacts in the working copy that
+this chat did not intentionally modify:
 
 ```text
 disasm/
 homebrew/pico_286/pico_286.hardfloat.gcc
 ```
 
-Старые директории/пути `r36sx_shell` были переименованы в `shell`.
+Old directories/paths named `r36sx_shell` were renamed to `shell`.
 
-## Обновление shell: scrollback
+## shell Update: Scrollback
 
-- В `homebrew/shell/shell.c` добавлен кольцевой scrollback-буфер на 512 строк.
-- При терминальной прокрутке верхняя строка сохраняется в историю, а отрисовка
-  может показывать как live-экран, так и прошлый вывод.
-- Управление на устройстве:
-  - `FN + L` / `FN + R` - прокрутка истории на одну строку вверх/вниз.
-  - `FN + D-pad Left` / `FN + D-pad Right` - прокрутка истории на страницу.
-  - `FN + D-pad Down` - возврат к текущему live-выводу.
-- Через USB- или экранную клавиатуру:
-  - `Shift+Up` / `Shift+Down` - прокрутка на строку.
-  - `Shift+PageUp` / `Shift+PageDown` - прокрутка на страницу.
-  - `Ctrl+End` - возврат к текущему выводу.
-- Ввод в shell автоматически возвращает отображение к live-выводу.
-- `ESC[3J` очищает scrollback, а обычная очистка экрана оставляет историю.
+- Added a 512-line ring scrollback buffer to `homebrew/shell/shell.c`.
+- When the terminal scrolls, the top line is saved to history, and rendering can
+  show either the live screen or older output.
+- Device controls:
+  - `FN + L` / `FN + R` - scroll history one line up/down.
+  - `FN + D-pad Left` / `FN + D-pad Right` - scroll history by one page.
+  - `FN + D-pad Down` - return to the current live output.
+- Through the USB or on-screen keyboard:
+  - `Shift+Up` / `Shift+Down` - scroll by one line.
+  - `Shift+PageUp` / `Shift+PageDown` - scroll by one page.
+  - `Ctrl+End` - return to the current output.
+- Any shell input automatically returns the display to live output.
+- `ESC[3J` clears scrollback, while a normal screen clear leaves history intact.
 
-## Обновление shell: тихий fallback
+## shell Update: Quiet Fallback
 
-- Убраны видимые строки неудачных попыток PTY/devpts-подключения:
+- Visible PTY/devpts failure messages were removed:
   `posix_openpt failed`, `[trying /dev/pts setup]`, `mount devpts failed`,
   `[PTY unavailable...]`.
-- Pipe fallback остаётся включённым, чтобы команды и редиректы продолжали
-  работать на прошивке без usable `/dev/ptmx`.
-- Одноразовая строка BusyBox `sh: can't access tty; job control turned off`
-  фильтруется из вывода fallback-shell, но stderr обычных команд сохраняется.
+- The pipe fallback remains enabled so commands and redirects continue to work
+  on firmware without a usable `/dev/ptmx`.
+- The one-time BusyBox line `sh: can't access tty; job control turned off` is
+  filtered from fallback-shell output, while normal command stderr is preserved.
 
-## Переименование shell
+## shell Rename
 
-- Native-программа `shell` переименована в lowercase, как остальные
-  homebrew-программы.
-- Текущие пути:
+- The native program `shell` was renamed to lowercase, matching the other
+  homebrew programs.
+- Current paths:
   - `homebrew/shell/shell.c`
   - `homebrew/shell/build_shell_wsl.sh`
   - `disk_image/MIPS_NATIVE/shell/shell`
   - `patches/disk_image_patch_shell/MIPS_NATIVE/shell/shell`
-- Каталог скриншотов теперь:
+- The screenshot directory is now:
   `/mnt/sdcard/MIPS_NATIVE/shell/screenshots/`.
-- Имена BMP-скриншотов теперь начинаются с `shell_`.
+- BMP screenshot names now start with `shell_`.
 
-## Обновление shell: D-pad scrollback
+## shell Update: D-pad Scrollback
 
-- При скрытой экранной клавиатуре D-pad `Up` / `Down` теперь ведут себя как
-  `Shift+Up` / `Shift+Down`: прокручивают scrollback на одну строку.
-- D-pad `Left` / `Right` при скрытой клавиатуре всё ещё отправляют обычные
-  terminal arrow keys в shell.
+- With the on-screen keyboard hidden, D-pad `Up` / `Down` now behave like
+  `Shift+Up` / `Shift+Down`: they scroll back one line.
+- With the on-screen keyboard hidden, D-pad `Left` / `Right` still send normal
+  terminal arrow keys to the shell.
 
-## Скрипт сохранения MTD
+## MTD Dump Script
 
-- Добавлен `homebrew/shell/dump_mtd.sh`.
-- При установке `shell` скрипт копируется в:
+- Added `homebrew/shell/dump_mtd.sh`.
+- During `shell` installation, the script is copied to:
   - `disk_image/MIPS_NATIVE/shell/dump_mtd.sh`
   - `patches/disk_image_patch_shell/MIPS_NATIVE/shell/dump_mtd.sh`
-- На устройстве запуск:
+- Run it on the device with:
 
 ```sh
 /mnt/sdcard/MIPS_NATIVE/shell/dump_mtd.sh
 ```
 
-- По умолчанию сохраняет все разделы из `/proc/mtd` под
-  `/mnt/sdcard/mtd-dump/YYYYMMDD_HHMMSS/`, вместе с `proc_mtd.txt`,
-  `mtd_map.tsv`, `dump.log` и checksum-файлом.
+- By default, it saves all partitions from `/proc/mtd` under
+  `/mnt/sdcard/mtd-dump/YYYYMMDD_HHMMSS/`, together with `proc_mtd.txt`,
+  `mtd_map.tsv`, `dump.log`, and a checksum file.
