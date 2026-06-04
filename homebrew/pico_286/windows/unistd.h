@@ -5,10 +5,15 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <direct.h>
+#include <io.h>
 #include <stdlib.h>
 #include <windows.h>
 
 #define getcwd _getcwd
+#define access _access
+#ifndef R_OK
+#define R_OK 4
+#endif
 
 static int usleep(unsigned int usec)
 {

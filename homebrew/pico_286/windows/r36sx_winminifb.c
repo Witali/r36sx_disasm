@@ -11,20 +11,33 @@
 #include <windows.h>
 
 #include "MiniFB.h"
+#include "hardware.h"
+#include "r36sx_disk_menu.h"
+#include "r36sx_key_presets.h"
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern void HandleMouse(int x, int y, int buttons);
+extern void r36sx_pico286_request_soft_reset(void);
+
+#define R36SX_WIN_MENU_DISK 40001
+#define R36SX_WIN_MENU_PRESETS 40002
+#define R36SX_WIN_MENU_RESET 40003
+#define R36SX_WIN_MENU_EXIT 40004
 
 static HWND g_wnd;
 static HDC g_hdc;
 static BITMAPINFO g_bmi;
 static uint32_t *g_frame32;
+static uint16_t *g_overlay_frame;
 static int g_width;
 static int g_height;
 static int g_scale;
 static int g_close_requested;
 static char g_key_status[512];
 static volatile uint32_t g_frame_generation;
+static struct r36sx_disk_menu g_disk_menu;
+static struct r36sx_key_presets g_key_presets;
+static uint32_t g_menu_held_buttons;
 
 static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
 {
@@ -51,6 +64,129 @@ void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
 {
     (void)portnum;
     (void)value;
+}
+
+static int r36sx_win_menu_visible(void)
+{
+    return r36sx_disk_menu_is_visible(&g_disk_menu) ||
+           r36sx_key_presets_is_visible(&g_key_presets);
+}
+
+static void r36sx_win_open_disk_menu(void)
+{
+    r36sx_key_presets_set_visible(&g_key_presets, 0);
+    r36sx_disk_menu_set_visible(&g_disk_menu,
+                                !r36sx_disk_menu_is_visible(&g_disk_menu));
+    g_menu_held_buttons = 0;
+}
+
+static void r36sx_win_open_key_presets(void)
+{
+    r36sx_disk_menu_set_visible(&g_disk_menu, 0);
+    r36sx_key_presets_set_visible(
+        &g_key_presets,
+        !r36sx_key_presets_is_visible(&g_key_presets));
+    g_menu_held_buttons = 0;
+}
+
+static uint32_t r36sx_win_button_from_key(unsigned int key)
+{
+    switch (key) {
+        case VK_UP: return R36SX_RKGAME_KEY_UP;
+        case VK_DOWN: return R36SX_RKGAME_KEY_DOWN;
+        case VK_LEFT: return R36SX_RKGAME_KEY_LEFT;
+        case VK_RIGHT: return R36SX_RKGAME_KEY_RIGHT;
+        case VK_RETURN: return R36SX_RKGAME_KEY_A;
+        case VK_SPACE: return R36SX_RKGAME_KEY_A;
+        case VK_ESCAPE: return R36SX_RKGAME_KEY_B;
+        case VK_BACK: return R36SX_RKGAME_KEY_B;
+        case VK_TAB: return R36SX_RKGAME_KEY_SELECT;
+        case VK_PRIOR: return R36SX_RKGAME_KEY_L2;
+        case VK_NEXT: return R36SX_RKGAME_KEY_R2;
+        case 'A': return R36SX_RKGAME_KEY_A;
+        case 'B': return R36SX_RKGAME_KEY_B;
+        case 'X': return R36SX_RKGAME_KEY_X;
+        case 'Y': return R36SX_RKGAME_KEY_Y;
+        case 'L': return R36SX_RKGAME_KEY_L;
+        case 'R': return R36SX_RKGAME_KEY_R;
+        case 'S': return R36SX_RKGAME_KEY_START;
+        default: return 0;
+    }
+}
+
+static void r36sx_win_handle_disk_menu_buttons(uint32_t pressed)
+{
+    uint32_t result = r36sx_disk_menu_handle_buttons(&g_disk_menu, pressed);
+    if ((result & R36SX_DISK_MENU_RESULT_EXIT_APP) != 0) {
+        g_close_requested = 1;
+    }
+    if ((result & R36SX_DISK_MENU_RESULT_RESET_PC) != 0) {
+        r36sx_pico286_request_soft_reset();
+    }
+}
+
+static void r36sx_win_handle_key_preset_buttons(uint32_t pressed,
+                                                uint32_t held)
+{
+    uint32_t result =
+        r36sx_key_presets_handle_buttons(&g_key_presets, pressed, held);
+    if ((result & R36SX_KEY_PRESET_RESULT_CLOSED) != 0) {
+        r36sx_key_presets_set_visible(&g_key_presets, 0);
+    }
+}
+
+static int r36sx_win_handle_menu_key(unsigned int key, int is_down)
+{
+    uint32_t button = r36sx_win_button_from_key(key);
+    uint32_t pressed = 0;
+
+    if (!button || !r36sx_win_menu_visible()) {
+        return 0;
+    }
+
+    if (is_down) {
+        pressed = button & ~g_menu_held_buttons;
+        g_menu_held_buttons |= button;
+    } else {
+        g_menu_held_buttons &= ~button;
+    }
+
+    if (pressed) {
+        if (r36sx_disk_menu_is_visible(&g_disk_menu)) {
+            r36sx_win_handle_disk_menu_buttons(pressed);
+        } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
+            r36sx_win_handle_key_preset_buttons(pressed,
+                                                g_menu_held_buttons);
+        }
+    } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
+        /*
+         * The key-preset picker uses held state for virtual-keyboard modifier
+         * keys, so feed key releases even when there is no new press edge.
+         */
+        r36sx_win_handle_key_preset_buttons(0, g_menu_held_buttons);
+    }
+
+    return 1;
+}
+
+static void r36sx_win_handle_command(WORD command)
+{
+    switch (command) {
+        case R36SX_WIN_MENU_DISK:
+            r36sx_win_open_disk_menu();
+            break;
+        case R36SX_WIN_MENU_PRESETS:
+            r36sx_win_open_key_presets();
+            break;
+        case R36SX_WIN_MENU_RESET:
+            r36sx_pico286_request_soft_reset();
+            break;
+        case R36SX_WIN_MENU_EXIT:
+            g_close_requested = 1;
+            break;
+        default:
+            break;
+    }
 }
 
 static unsigned int r36sx_win_keycode(WPARAM w_param, LPARAM l_param)
@@ -80,6 +216,10 @@ static LRESULT CALLBACK r36sx_win_wndproc(HWND wnd, UINT msg,
         case WM_DESTROY:
             g_close_requested = 1;
             PostQuitMessage(0);
+            return 0;
+
+        case WM_COMMAND:
+            r36sx_win_handle_command(LOWORD(w_param));
             return 0;
 
         case WM_PAINT: {
@@ -122,6 +262,23 @@ static LRESULT CALLBACK r36sx_win_wndproc(HWND wnd, UINT msg,
         case WM_SYSKEYUP: {
             unsigned int key = r36sx_win_keycode(w_param, l_param);
             int is_down = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
+            int first_down = is_down && ((l_param & (1L << 30)) == 0);
+
+            if (first_down && key == VK_F9) {
+                r36sx_win_open_disk_menu();
+                return 0;
+            }
+            if (first_down && key == VK_F10) {
+                r36sx_win_open_key_presets();
+                return 0;
+            }
+            if (first_down && key == 'R' && (GetKeyState(VK_CONTROL) < 0)) {
+                r36sx_pico286_request_soft_reset();
+                return 0;
+            }
+            if (r36sx_win_handle_menu_key(key, is_down)) {
+                return 0;
+            }
             if (key < sizeof(g_key_status)) {
                 g_key_status[key] = (char)is_down;
             }
@@ -137,6 +294,8 @@ int mfb_open(const char *name, int width, int height, int scale)
 {
     WNDCLASS wc;
     RECT rect;
+    HMENU menu;
+    HMENU host_menu;
     const char *title = name ? name : "Pico-286";
 
     memset(&wc, 0, sizeof(wc));
@@ -152,6 +311,26 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_scale = scale > 0 ? scale : 1;
     g_close_requested = 0;
     g_frame_generation = 0;
+    g_menu_held_buttons = 0;
+    r36sx_disk_menu_init(&g_disk_menu);
+    r36sx_key_presets_load(&g_key_presets);
+
+    menu = CreateMenu();
+    host_menu = CreatePopupMenu();
+    if (menu && host_menu) {
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_DISK,
+                   "Disk menu\tF9");
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_PRESETS,
+                   "Key presets\tF10");
+        AppendMenu(host_menu, MF_SEPARATOR, 0, NULL);
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_RESET,
+                   "Soft reset\tCtrl+R");
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_EXIT, "Exit");
+        AppendMenu(menu, MF_POPUP, (UINT_PTR)host_menu, "Host");
+    } else if (host_menu) {
+        DestroyMenu(host_menu);
+        host_menu = NULL;
+    }
 
     rect.left = 0;
     rect.top = 0;
@@ -159,7 +338,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     rect.bottom = height * g_scale;
     AdjustWindowRect(&rect,
                      WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-                     FALSE);
+                     menu != NULL);
 
     g_wnd = CreateWindowEx(0, wc.lpszClassName, title,
                            WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX &
@@ -167,8 +346,11 @@ int mfb_open(const char *name, int width, int height, int scale)
                            CW_USEDEFAULT, CW_USEDEFAULT,
                            rect.right - rect.left,
                            rect.bottom - rect.top,
-                           NULL, NULL, wc.hInstance, NULL);
+                           NULL, menu, wc.hInstance, NULL);
     if (!g_wnd) {
+        if (menu) {
+            DestroyMenu(menu);
+        }
         return 0;
     }
 
@@ -182,7 +364,13 @@ int mfb_open(const char *name, int width, int height, int scale)
 
     g_frame32 = (uint32_t *)calloc((size_t)width * (size_t)height,
                                    sizeof(g_frame32[0]));
-    if (!g_frame32) {
+    g_overlay_frame = (uint16_t *)calloc((size_t)width * (size_t)height,
+                                         sizeof(g_overlay_frame[0]));
+    if (!g_frame32 || !g_overlay_frame) {
+        free(g_frame32);
+        free(g_overlay_frame);
+        g_frame32 = NULL;
+        g_overlay_frame = NULL;
         DestroyWindow(g_wnd);
         g_wnd = NULL;
         return 0;
@@ -198,16 +386,37 @@ int mfb_update(void *buffer, int fps_limit)
 {
     MSG msg;
     const uint16_t *src = (const uint16_t *)buffer;
+    const uint16_t *present_src;
     size_t pixels;
     (void)fps_limit;
 
-    if (!g_wnd || !g_frame32 || !src || g_close_requested) {
+    if (!g_wnd || !g_frame32 || !g_overlay_frame || !src ||
+        g_close_requested) {
         return -1;
     }
 
     pixels = (size_t)g_width * (size_t)g_height;
+    present_src = src;
+    if (r36sx_win_menu_visible()) {
+        /*
+         * The Windows host draws debug menus on a temporary RGB565 copy so the
+         * emulated PC framebuffer stays untouched.
+         */
+        if (r36sx_key_presets_is_visible(&g_key_presets)) {
+            r36sx_win_handle_key_preset_buttons(0, g_menu_held_buttons);
+        }
+        memcpy(g_overlay_frame, src, pixels * sizeof(g_overlay_frame[0]));
+        if (r36sx_disk_menu_is_visible(&g_disk_menu)) {
+            r36sx_disk_menu_draw(&g_disk_menu, g_overlay_frame, g_width,
+                                 g_height, g_width);
+        } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
+            r36sx_key_presets_draw(&g_key_presets, g_overlay_frame, g_width,
+                                   g_height, g_width);
+        }
+        present_src = g_overlay_frame;
+    }
     for (size_t i = 0; i < pixels; ++i) {
-        g_frame32[i] = r36sx_win_rgb565_to_rgb888(src[i]);
+        g_frame32[i] = r36sx_win_rgb565_to_rgb888(present_src[i]);
     }
 
     StretchDIBits(g_hdc, 0, 0, g_width * g_scale, g_height * g_scale,
@@ -247,6 +456,8 @@ void mfb_close(void)
     g_hdc = NULL;
     free(g_frame32);
     g_frame32 = NULL;
+    free(g_overlay_frame);
+    g_overlay_frame = NULL;
     if (g_wnd) {
         DestroyWindow(g_wnd);
     }
