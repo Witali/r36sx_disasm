@@ -20,6 +20,7 @@ tools/*
 !tools/build_debian12_mipsel_sd_image_wsl.sh
 !tools/build_debian12_mipsel_essential_image_wsl.sh
 !tools/build_stage3_pass_stock_sd_image_wsl.sh
+!tools/build_debian12_stage3_shell_image_wsl.sh
 !tools/repack_debian12_bootonly_image_wsl.sh
 !tools/repack_debian12_mtdfat_image_wsl.sh
 !tools/repack_debian12_stockfat_ext4root_image_wsl.sh
@@ -27,6 +28,7 @@ tools/*
 !tools/verify_r36sx_bootonly_image_wsl.sh
 !tools/verify_r36sx_stockfat_ext4root_image_wsl.sh
 !tools/verify_stage3_pass_stock_sd_image_wsl.sh
+!tools/verify_debian12_stage3_shell_image_wsl.sh
 
 # Build outputs and caches
 local_artifacts/
@@ -43,6 +45,7 @@ local_artifacts/
 *.cache
 homebrew/*/obj/
 homebrew/*/obj-gcc/
+homebrew/*/.build/
 homebrew/common/.build-screenshot-so/
 homebrew/common/.build-screenshot-a/
 !homebrew/common/screenshot.a
