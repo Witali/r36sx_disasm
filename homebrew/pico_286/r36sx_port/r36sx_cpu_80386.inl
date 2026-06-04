@@ -754,7 +754,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         case 0xCA: {
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_retf(bytes, 1, fault_ip);
                 return true;
             }
@@ -766,7 +766,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
 
         /* RETF */
         case 0xCB:
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_retf(0, 1, fault_ip);
                 return true;
             }
@@ -779,7 +779,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if (r36sx_cpu_v86_iopl_sensitive_fault(fault_ip)) {
                 return true;
             }
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_iret(1);
                 return true;
             }

@@ -8337,7 +8337,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* CA RETF Iw */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_retf(oper1, 0, firstip);
                     break;
                 }
@@ -8351,7 +8351,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_CB: ;
 #endif
                 /* CB RETF */
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_retf(0, 0, firstip);
                     break;
                 }
@@ -8398,15 +8398,13 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
                     break;
                 }
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_iret(0);
                     break;
                 }
                 r36sx_cpu_set_ip(pop());
                 r36sx_cpu_load_segment(regcs, pop());
                 decodeflagsword(pop());
-
-
                 /*
                  * if (net.enabled) net.canrecv = 1;
                  */
