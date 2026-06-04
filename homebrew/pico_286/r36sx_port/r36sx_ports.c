@@ -38,6 +38,9 @@ static int audio_covox_enabled = 1;
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
 #define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
+#define R36SX_KBD_CMD_READ_OUTPUT_PORT 0xD0u
+#define R36SX_KBD_CMD_WRITE_OUTPUT_PORT 0xD1u
+#define R36SX_FAST_A20_ENABLE_BIT 0x02u
 #define R36SX_PC_POST_PORT 0x80u
 #define R36SX_TEST386_POST_PORT 0x190u
 #define R36SX_TEST386_ASCII_PORT 0x191u
@@ -61,6 +64,9 @@ static uint8_t keyboard_queue_head;
 static uint8_t keyboard_queue_count;
 static uint8_t keyboard_output_full;
 static uint64_t keyboard_next_ready_us;
+static uint8_t keyboard_controller_response_ready;
+static uint8_t keyboard_controller_write_output_port;
+static uint8_t keyboard_controller_output_port;
 
 static void r36sx_test386_ascii_out(uint8_t value) {
     static char line[192];
@@ -112,7 +118,9 @@ static INLINE uint64_t r36sx_keyboard_now_us(void) {
 }
 
 static INLINE void r36sx_keyboard_refresh_status(void) {
-    if (keyboard_output_full && keyboard_queue_count > 0) {
+    if (keyboard_controller_response_ready) {
+        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
+    } else if (keyboard_output_full && keyboard_queue_count > 0) {
         port60 = keyboard_queue[keyboard_queue_head];
         port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
     } else {
@@ -175,12 +183,23 @@ void r36sx_keyboard_reset(void) {
     keyboard_queue_count = 0;
     keyboard_output_full = 0;
     keyboard_next_ready_us = 0;
+    keyboard_controller_response_ready = 0;
+    keyboard_controller_write_output_port = 0;
+    keyboard_controller_output_port =
+        a20_enabled ? R36SX_FAST_A20_ENABLE_BIT : 0x00u;
     port60 = 0;
     r36sx_keyboard_refresh_status();
 }
 
 static INLINE uint8_t r36sx_keyboard_read_data(void) {
     uint8_t data = port60;
+
+    if (keyboard_controller_response_ready) {
+        keyboard_controller_response_ready = 0;
+        r36sx_keyboard_refresh_status();
+        R36SX_KBD_LOG("kbd: read controller response=0x%02x", data);
+        return data;
+    }
 
     r36sx_keyboard_tick();
     if (keyboard_output_full && keyboard_queue_count > 0) {
@@ -197,6 +216,14 @@ static INLINE uint8_t r36sx_keyboard_read_data(void) {
     }
 
     return data;
+}
+
+static INLINE void r36sx_keyboard_output_port_write(uint8_t value) {
+    keyboard_controller_output_port = value;
+    a20_enabled = (value & R36SX_FAST_A20_ENABLE_BIT) != 0;
+    r36sx_pico286_debug_log(
+        "kbd: output port write value=%02x fast_a20=%d",
+        (unsigned)value, a20_enabled);
 }
 
 static uint16_t adlibregmem[5], adlib_register = 0;
@@ -694,6 +721,19 @@ void portout(uint16_t portnum, uint16_t value) {
         case 0x42:
         case 0x43: // i8253 PIT
             return out8253(portnum, value);
+        case 0x60: // Keyboard Controller data port
+            if (keyboard_controller_write_output_port) {
+                keyboard_controller_write_output_port = 0;
+                r36sx_keyboard_output_port_write((uint8_t)value);
+                r36sx_keyboard_refresh_status();
+                return;
+            }
+#if PICO_ON_DEVICE
+            keyboard_send(value);
+#endif
+            port60 = (uint8_t)value;
+            r36sx_keyboard_refresh_status();
+            return;
         case 0x61: // PC Speaker
             port61 = value;
             if ((value & 3) == 3) {
@@ -712,6 +752,22 @@ void portout(uint16_t portnum, uint16_t value) {
 
             break;
         case 0x64: // Keyboard Controller
+            if ((uint8_t)value == R36SX_KBD_CMD_READ_OUTPUT_PORT) {
+                port60 = (uint8_t)((keyboard_controller_output_port &
+                                    (uint8_t)~R36SX_FAST_A20_ENABLE_BIT) |
+                                   (a20_enabled ? R36SX_FAST_A20_ENABLE_BIT :
+                                                  0x00u));
+                keyboard_controller_response_ready = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command read output port");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_WRITE_OUTPUT_PORT) {
+                keyboard_controller_write_output_port = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command write output port");
+                return;
+            }
 #if PICO_ON_DEVICE
             keyboard_send(value);
 #endif
@@ -739,8 +795,18 @@ void portout(uint16_t portnum, uint16_t value) {
 
 // A20 Gate
         case 0x92:
-            a20_enabled = value & 1;
-            printf("A20 W: %d\n", a20_enabled);
+            /*
+             * PS/2 system control port A uses bit 1 for Fast A20 Gate.
+             * Bit 0 is CPU reset, so treating it as A20 makes DOS/16M and
+             * HIMEM-style probes believe extended memory is inaccessible.
+             */
+            a20_enabled = (value & R36SX_FAST_A20_ENABLE_BIT) != 0;
+            keyboard_controller_output_port =
+                (uint8_t)((keyboard_controller_output_port &
+                           (uint8_t)~R36SX_FAST_A20_ENABLE_BIT) |
+                          (a20_enabled ? R36SX_FAST_A20_ENABLE_BIT : 0x00u));
+            r36sx_pico286_debug_log("ports: fast A20 write value=%02x enabled=%d",
+                                    (unsigned)value, a20_enabled);
             return;
 // Tandy 3-Voice Sound
         case 0x1E0:
@@ -1051,8 +1117,9 @@ uint16_t portin(uint16_t portnum) {
             return i8237_readpage(portnum);
 // A20 Gate
         case 0x92:
-            printf("A20 R: %d\n", a20_enabled);
-            return a20_enabled;
+            r36sx_pico286_debug_log("ports: fast A20 read enabled=%d",
+                                    a20_enabled);
+            return a20_enabled ? R36SX_FAST_A20_ENABLE_BIT : 0x00u;
         case 0x201:
 // Joystick
             return joystick_in();
