@@ -158,6 +158,38 @@ problem is not necessarily a missing individual FAT file. Possible causes are:
 - the loader never reaches `external_files` loading and fails earlier during
   card/FAT initialization.
 
+## Confirmed Test
+
+After the analysis, a conservative image was built as
+`local_artifacts/r36sx_stage3_pass_stockfat.img` with
+`tools/build_stage3_pass_stock_sd_image_wsl.sh`.
+
+Parameters:
+
+```text
+2 GiB raw image
+MBR / msdos partition table
+partition 1: FAT32, start 4 MiB, flags boot,lba
+stock cubegm/dtb.bin with root=/dev/ram0 init=/linuxrc
+```
+
+The FAT partition contains stock-like `cubegm/`, `rootfs/`, `MIPS_NATIVE/`,
+`Chkdsk.*`, `Movie/`, `Ebook/`, and `Music/`. Verification confirmed the
+presence and matching SHA256 hashes for:
+
+```text
+cubegm/dtb.bin
+cubegm/avp.uImage
+cubegm/vmlinux.uImage
+cubegm/xgame-logo.bmp
+```
+
+The user wrote this image to an SD card. The device booted and reached TinyMC.
+This confirms that Stage 3 accepts this MBR/FAT32 baseline and that the original
+full SD-card size is not required to pass the external resource lookup.
+
+Detailed summary: `disasm/mtd/stage3_sd_boot_findings.md`.
+
 ## Still Worth Checking
 
 The low-level point where MMC/card-detect decides "no card" is deeper in the
@@ -182,6 +214,8 @@ The safest test sequence is:
 2. Single-FAT image with stock `cubegm`, `rootfs`, `/bin`, `/lib`, `/etc`, and
    `/usr`.
 3. The same single-FAT image with our `MIPS_NATIVE/shell`.
-4. Add a second partition only after the loader accepts the image.
-5. Reintroduce modified `dtb.bin` with `root=/dev/mmcblk0p2` only after the
+4. These single-FAT conditions are now confirmed through the working
+   `r36sx_stage3_pass_stockfat.img`, which booted to TinyMC.
+5. Next test: add a second partition without changing the stock `dtb.bin`.
+6. Reintroduce modified `dtb.bin` with `root=/dev/mmcblk0p2` only after the
    second partition itself is known not to trigger the popup.

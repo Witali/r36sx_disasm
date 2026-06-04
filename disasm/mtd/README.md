@@ -38,6 +38,7 @@ The same layout is described in `hardware_info/dtb/dtb.dts` under the RTOS
 | `mtd2_eromfs_extracted/` | Extracted ROMFS gzip bitmap resources and decompressed BMP files. |
 | `mtd3_persistentmem.strings.txt` | Raw string extraction from persistent memory. |
 | `mtd_magic_scan.txt` | Search for common uImage, FDT, gzip, ROMFS, and SquashFS signatures. |
+| `stage3_sd_boot_findings.md` / `stage3_sd_boot_findings_ru.md` | Confirmed Stage 3 SD resource requirements and the working single-FAT image result. |
 
 ## Partition notes
 
@@ -145,3 +146,17 @@ What is still not proven from the raw MTD code alone: the exact function and FAT
 path parser inside `mtd1_boot.bin`. The boot partition has no readable file-path
 strings, so the SD handoff is inferred from the DTS `external_files`, the actual
 SD files, the uImage headers, and the runtime mount/cmdline captures.
+
+## Confirmed SD image baseline
+
+The conservative image `local_artifacts/r36sx_stage3_pass_stockfat.img` was
+built with `tools/build_stage3_pass_stock_sd_image_wsl.sh` and verified with
+`tools/verify_stage3_pass_stock_sd_image_wsl.sh`. It is a 2 GiB MBR image with a
+single FAT32 partition starting at 4 MiB, stock `cubegm/dtb.bin`, and the
+required `cubegm/dtb.bin`, `cubegm/avp.uImage`, `cubegm/vmlinux.uImage`, and
+`cubegm/xgame-logo.bmp` resources.
+
+The user wrote this image to SD and the device booted into TinyMC. This confirms
+that Stage 3 accepts that single-FAT layout and that the original full SD-card
+size is not required for the external resource lookup. `local_artifacts/` stays
+ignored and is not committed to Git.

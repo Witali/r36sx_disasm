@@ -156,6 +156,39 @@ FUN_89eb2dcc
 - измененный `dtb.bin` доходит до loader, но затем ломает ранние условия;
 - loader не доходит даже до чтения `external_files`, а падает на card/FAT init.
 
+## Подтвержденный тест
+
+После анализа был собран консервативный образ
+`local_artifacts/r36sx_stage3_pass_stockfat.img` через
+`tools/build_stage3_pass_stock_sd_image_wsl.sh`.
+
+Параметры:
+
+```text
+2 GiB raw image
+MBR / msdos partition table
+partition 1: FAT32, start 4 MiB, flags boot,lba
+stock cubegm/dtb.bin with root=/dev/ram0 init=/linuxrc
+```
+
+На FAT-раздел скопированы stock-like `cubegm/`, `rootfs/`, `MIPS_NATIVE/`,
+`Chkdsk.*`, `Movie/`, `Ebook/` и `Music/`. Проверка подтвердила наличие и
+совпадение SHA256 для:
+
+```text
+cubegm/dtb.bin
+cubegm/avp.uImage
+cubegm/vmlinux.uImage
+cubegm/xgame-logo.bmp
+```
+
+Пользователь записал этот образ на SD-карту. Устройство загрузилось и дошло до
+TinyMC. Это подтверждает, что Stage 3 принимает такой MBR/FAT32 baseline и что
+оригинальный полный размер SD-карты не является обязательным условием для
+прохождения external resource lookup.
+
+Подробный итог: `disasm/mtd/stage3_sd_boot_findings_ru.md`.
+
 ## Что еще стоит проверить
 
 Точное низкоуровневое место, где MMC/card-detect решает "карты нет", находится
@@ -182,7 +215,8 @@ FUN_89ddc3c0
 2. Single-FAT образ с полностью штатными `cubegm`, `rootfs`, `/bin`, `/lib`,
    `/etc`, `/usr`.
 3. Тот же single-FAT, но с нашим `MIPS_NATIVE/shell`.
-4. Только после подтверждения, что loader принимает образ, добавлять второй
-   раздел.
-5. Только после подтверждения второго раздела возвращаться к измененному
+4. Эти single-FAT условия теперь подтверждены через рабочий
+   `r36sx_stage3_pass_stockfat.img`, который загрузился до TinyMC.
+5. Следующий тест: добавить второй раздел, не меняя stock `dtb.bin`.
+6. Только после подтверждения второго раздела возвращаться к измененному
    `dtb.bin` с `root=/dev/mmcblk0p2`.
