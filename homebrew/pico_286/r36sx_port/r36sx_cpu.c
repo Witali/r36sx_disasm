@@ -42,7 +42,7 @@ static inline void r36sx_app_stats_record_x86(uint32_t instructions)
 #endif
 
 int videomode = 3;
-uint8_t segoverride, reptype;
+uint8_t segoverride, reptype, lockPrefix;
 uint32_t segregs32[6];
 uint16_t segselector16[6];
 uint32_t segbase32[6];
@@ -5181,6 +5181,89 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
 /* 80386 operand-size, 32-bit, and extended-opcode helpers. */
 #include "r36sx_cpu_80386.inl"
 
+static inline uint8_t r36sx_cpu_lock_modrm_targets_memory(uint32_t modrm_ip)
+{
+    const uint8_t modrm = getmem8(CPU_CS, r36sx_cpu_mask_ip(modrm_ip));
+    return ((modrm >> 6u) & 0x03u) != R36SX_MODRM_MOD_REGISTER;
+}
+
+static inline uint8_t r36sx_cpu_lock_group_op_allowed(uint32_t modrm_ip,
+                                                       uint8_t allowed_mask)
+{
+    const uint8_t modrm = getmem8(CPU_CS, r36sx_cpu_mask_ip(modrm_ip));
+    const uint8_t group_op = (modrm >> 3u) & 0x07u;
+
+    return (((modrm >> 6u) & 0x03u) != R36SX_MODRM_MOD_REGISTER) &&
+           ((allowed_mask & (uint8_t)(1u << group_op)) != 0u);
+}
+
+static inline uint8_t r36sx_cpu_lock_prefix_allowed(uint8_t opcode)
+{
+    /*
+     * Intel defines LOCK as valid only for read-modify-write instructions
+     * with a memory destination. Anything else, including LOCK MOV, raises
+     * #UD and reports the prefix byte as the faulting instruction address.
+     */
+    switch (opcode) {
+        case 0x00: case 0x01: /* ADD r/m,reg */
+        case 0x08: case 0x09: /* OR r/m,reg */
+        case 0x10: case 0x11: /* ADC r/m,reg */
+        case 0x18: case 0x19: /* SBB r/m,reg */
+        case 0x20: case 0x21: /* AND r/m,reg */
+        case 0x28: case 0x29: /* SUB r/m,reg */
+        case 0x30: case 0x31: /* XOR r/m,reg */
+        case 0x80: case 0x81: /* Group 1 r/m,imm */
+        case 0x82: case 0x83: /* Group 1 r/m,imm */
+        case 0x86: case 0x87: /* XCHG r/m,reg */
+            return r36sx_cpu_lock_modrm_targets_memory(CPU_IP);
+
+        case 0xF6: case 0xF7:
+            /* Group 3: only NOT (/2) and NEG (/3) are read-modify-write. */
+            return r36sx_cpu_lock_group_op_allowed(CPU_IP,
+                                                   (1u << 2u) | (1u << 3u));
+
+        case 0xFE: case 0xFF:
+            /* INC (/0) and DEC (/1) are lockable when the operand is memory. */
+            return r36sx_cpu_lock_group_op_allowed(CPU_IP,
+                                                   (1u << 0u) | (1u << 1u));
+
+        case 0x0F: {
+            const uint8_t ext_opcode = getmem8(CPU_CS, CPU_IP);
+            switch (ext_opcode) {
+                case 0xAB: /* BTS r/m,reg */
+                case 0xB0: /* CMPXCHG r/m8,reg8 */
+                case 0xB1: /* CMPXCHG r/m,reg */
+                case 0xB3: /* BTR r/m,reg */
+                case 0xBB: /* BTC r/m,reg */
+                case 0xC0: /* XADD r/m8,reg8 */
+                case 0xC1: /* XADD r/m,reg */
+                    return r36sx_cpu_lock_modrm_targets_memory(CPU_IP + 1u);
+
+                case 0xBA:
+                    /*
+                     * Group 8: BTS (/5), BTR (/6), BTC (/7).
+                     * BT (/4) is read-only and therefore not lockable.
+                     */
+                    return r36sx_cpu_lock_group_op_allowed(CPU_IP + 1u,
+                                                           (1u << 5u) |
+                                                           (1u << 6u) |
+                                                           (1u << 7u));
+
+                case 0xC7:
+                    /* Group 9: CMPXCHG8B/CMPXCHG16B use /1 and memory. */
+                    return r36sx_cpu_lock_group_op_allowed(CPU_IP + 1u,
+                                                           (1u << 1u));
+
+                default:
+                    return 0;
+            }
+        }
+
+        default:
+            return 0;
+    }
+}
+
 
 
 
@@ -5277,6 +5360,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
         reptype = 0;
         segoverride = 0;
+        lockPrefix = 0;
         operandSizeOverride = r36sx_cpu_code_default32();
         addressSizeOverride = r36sx_cpu_code_default32();
         r36sx_cpu_use_segment(regds);
@@ -5391,6 +5475,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                         prefix_exception = 1;
                         docontinue = 1;
                     }
+                    lockPrefix = 1;
                     break;
 
                 case 0xF2: /* REPNE/REPNZ */
@@ -5408,6 +5493,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             }
         }
         if (prefix_exception) {
+            continue;
+        }
+        if (lockPrefix && !r36sx_cpu_lock_prefix_allowed(opcode)) {
+            r36sx_cpu_invalid_opcode(firstip);
             continue;
         }
 
