@@ -536,7 +536,12 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
                 return true;
             }
-            push(CPU_CS);
+            /*
+             * Intel far CALL with operand-size 32 stores both return fields in
+             * 32-bit stack slots: EIP and a zero-extended CS selector.  The
+             * selector itself is still 16 bits, but RETF32 consumes 8 bytes.
+             */
+            push32(CPU_CS);
             push32(CPU_IP);
             r36sx_cpu_load_segment(regcs, target_cs);
             r36sx_cpu_set_ip(target_ip);
@@ -753,7 +758,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 return true;
             }
             r36sx_cpu_set_ip(pop32());
-            r36sx_cpu_load_segment(regcs, pop());
+            r36sx_cpu_load_segment(regcs, (uint16_t)pop32());
             r36sx_cpu_adjust_stack(bytes);
             return true;
         }
@@ -765,7 +770,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 return true;
             }
             r36sx_cpu_set_ip(pop32());
-            r36sx_cpu_load_segment(regcs, pop());
+            r36sx_cpu_load_segment(regcs, (uint16_t)pop32());
             return true;
 
         /* IRETD */
@@ -871,7 +876,12 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                         r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
                         return true;
                     }
-                    push(CPU_CS);
+                    /*
+                     * CALL m16:32 follows the same return-stack layout as
+                     * direct ptr16:32: RETF32 later pops EIP and a 32-bit CS
+                     * slot with the selector in the low 16 bits.
+                     */
+                    push32(CPU_CS);
                     push32(CPU_IP);
                     r36sx_cpu_load_segment(regcs, target_cs);
                     r36sx_cpu_set_ip(target_ip);
