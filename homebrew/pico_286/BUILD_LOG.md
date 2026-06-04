@@ -1,5 +1,25 @@
 # pico-286 Build Log
 
+## 2026-06-03 DPMI disabled fallback invalid-opcode confirmation
+
+Reviewed the new `C:/Temp/pico_286.log` run and screenshots from MK/SEA and the
+DOS Benchmark Pack with `dpmi_host_enabled=0`.  The failure sequence is now
+clear:
+
+- the DOS program probes DPMI with `INT 2Fh AX=1687h`;
+- because the built-in host is hidden, it then probes VCPI with
+  `INT 67h AX=DE00h`, which is also not present;
+- it enters protected mode itself through `LGDT`, `LIDT`, and `LMSW`;
+- it still calls DPMI services (`INT 31h AX=0006h` and `AX=8002h`), which fail;
+- after leaving protected mode it executes bytes from an error text block
+  (`63 61 6C 20...`, ASCII `"cal Error..."`) and raises `INT 6`.
+
+So the visible "Invalid Opcode" is not a normal missing instruction in the
+benchmark code.  It is the no-DPMI fallback path falling through into data after
+DPMI/VCPI startup failed.  The default config now leaves
+`dpmi_host_enabled=1`; set it to `0` only when deliberately testing no-DPMI
+fallback behavior.
+
 ## 2026-06-03 DPMI host config gate
 
 Analyzed `C:/Temp/pico_286.log` from the failing `mk.exe` run.  The important
@@ -10,11 +30,10 @@ sequence was:
 - `INT 6` at `0084:20F0`, where the 256-byte context dump starts with data-like
   bytes `FF FF FF 00 00 FF FF FF`.
 
-That points to a bad path chosen after the DPMI probe rather than a missing
-ordinary 8086 opcode.  The built-in DPMI host is still experimental, so it is
-now hidden behind `dpmi_host_enabled`.  The default is `0`, making
-`INT 2Fh AX=1687h` report no resident DPMI host unless the setting is
-explicitly enabled for debugging.
+That pointed to a bad path chosen after the DPMI probe rather than a missing
+ordinary 8086 opcode.  At this checkpoint the built-in DPMI host was hidden
+behind `dpmi_host_enabled=0`; the newer entry above supersedes that default and
+ships `dpmi_host_enabled=1` for extender testing.
 
 The startup log now includes `dpmi_host=on/off` next to the CPU and x87 status.
 

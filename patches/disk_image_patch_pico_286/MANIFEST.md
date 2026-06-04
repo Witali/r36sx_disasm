@@ -31,14 +31,40 @@ testing is explicitly requested.  The captured target reports MIPS `dsp` and
 `dsp2` ASE support in the repository's `hardware_info/cpu.txt`, but the DSP
 binary is not kept in sync with normal rebuilds.
 
-The default binary is built with `DEBUG=0`.  Builds made with
-`build_pico_286.ps1 -DebugLog` write a startup/runtime log to:
+The current patch binary is a stripped `DEBUG=1` WSL/GCC build while DPMI and
+protected-mode diagnostics are being collected.  It writes a startup/runtime
+log to:
 
 - `MIPS_NATIVE/pico_286/pico_286.log`
 
 If that path cannot be opened on the device, it falls back to:
 
 - `pico_286.log` in the SD-card root
+
+## 2026-06-03 DPMI host enabled by default for extender tests
+
+The latest MK/SEA/DOS Benchmark Pack logs show that `dpmi_host_enabled=0`
+causes several DOS extender style programs to probe DPMI, probe VCPI, enter
+protected mode through their own fallback path, fail later `INT 31h` calls, and
+then fall through into text data that raises `INT 6`.
+
+The shipped configs now use:
+
+```ini
+[cpu]
+dpmi_host_enabled=1
+```
+
+Set it to `0` only when deliberately testing no-DPMI fallback paths.  The
+binary-side default in `r36sx_disk_config.c` was also changed to `1`, so newly
+generated configs keep the same behavior.
+
+Rebuilt stripped WSL/GCC `DEBUG=1` binary:
+
+- `MIPS_NATIVE/pico_286/pico_286`
+- size: `471852` bytes
+- SHA256:
+  `B039037DCAAA64BCF1D0F974308FD939102FAC53AF0FEEE1F7589591C3DC2D67`
 
 ## 2026-06-03 strict 8086 address space and AT-memory gating
 
