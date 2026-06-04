@@ -10,6 +10,11 @@
 ; Possible values: the 16-bit value of the diagnostic port of your system.
 POST_PORT equ 0x80
 
+; R36SX-only fine-grained breadcrumbs inside one POST stage.  The normal POST
+; stream stays on the standard 80h port, while these subcodes use the legacy
+; test386 debug port so the overlay can show which smaller block was reached.
+SUBPOST_PORT equ 0x190
+
 ; The parallel port to use to print ASCII computational results.
 ; Possible values: 0=disabled, 1=LPT1 (3BCh), 2=LPT2 (378h), 3=LPT3 (278h)
 LPT_PORT equ 0

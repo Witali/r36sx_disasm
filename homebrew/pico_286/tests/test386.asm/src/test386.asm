@@ -681,6 +681,11 @@ protTests:
 	mov    fs, ax
 	mov    gs, ax
 
+	; Sub-POST uses DX because the debug port is wider than OUT imm8 can encode.
+	mov    dx, SUBPOST_PORT
+	mov    al, 0x90
+	out    dx, al
+
 	;
 	; general purpose registers
 	;
@@ -724,6 +729,10 @@ protTests:
 	mov    ax,  D_SEG_PROT32
 	mov    ss,  ax
 
+	mov    dx, SUBPOST_PORT
+	mov    al, 0x95
+	out    dx, al
+
 	testPushPopR ax,32
 	testPushPopR bx,32
 	testPushPopR cx,32
@@ -747,6 +756,10 @@ protTests:
 	testPushImm 32
 
 	testPushPopF 32
+
+	mov    dx, SUBPOST_PORT
+	mov    al, 0x93
+	out    dx, al
 
 
 	; the stack works
