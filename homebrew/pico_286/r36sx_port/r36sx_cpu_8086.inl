@@ -271,6 +271,13 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
 #ifdef CPU_LIMIT_SHIFT_COUNT
     cnt &= 0x1F;
 #endif
+    /*
+     * Intel rotate/shift instructions with an effective count of zero are
+     * no-ops: the destination and all FLAGS bits must remain unchanged.
+     */
+    if (cnt == 0) {
+        return (uint8_t)s;
+    }
     switch (reg) {
         case 0: /* ROL r/m8 */
             for (int shift = 1; shift <= cnt; shift++) {
@@ -391,6 +398,13 @@ static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
 #ifdef CPU_LIMIT_SHIFT_COUNT
     cnt &= 0x1F;
 #endif
+    /*
+     * Intel rotate/shift instructions with an effective count of zero are
+     * no-ops: the destination and all FLAGS bits must remain unchanged.
+     */
+    if (cnt == 0) {
+        return (uint16_t)s;
+    }
     switch (reg) {
         case 0: /* ROL r/m16 */
             for (int shift = 1; shift <= cnt; shift++) {
