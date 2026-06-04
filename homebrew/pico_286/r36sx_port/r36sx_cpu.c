@@ -18,7 +18,6 @@
 #if PICO_ON_DEVICE
 
 #include "disks-rp2350.c.inl"
-#include "network-redirector-rp2350.c.inl"
 #include "graphics.h"
 #include "psram_spi.h"
 #include "swap.h"
@@ -31,8 +30,6 @@ static inline void r36sx_app_stats_record_x86(uint32_t instructions)
 #include "r36sx_disk_config.h"
 #include "r36sx_app_stats.h"
 #include "disks-win32.c.inl"
-#define R36SX_PICO286_HOST_DRIVE_CONFIG 1
-#include "network-redirector.c.inl"
 
 #endif
 
@@ -4671,31 +4668,6 @@ void intcall86(uint8_t intnum) {
                     return;
             }
 #endif
-            break;
-        case 0x2F: /* Multiplex Interrupt */
-            switch (CPU_AX) {
-                /* XMS */
-                case 0x4300:
-                    if (!r36sx_cpu_at_class_memory_available()) {
-                        CPU_AL = 0x00; /* XMS driver not installed. */
-                        return;
-                    }
-                    CPU_AL = 0x80;
-                    return;
-                case 0x4310: {
-                    if (!r36sx_cpu_at_class_memory_available()) {
-                        CPU_AL = 0x00; /* Do not expose an XMS entry point. */
-                        return;
-                    }
-                    r36sx_cpu_load_segment(reges, XMS_FN_CS); // to be handled by DOS memory manager using
-                    CPU_BX = XMS_FN_IP; // CALL FAR ES:BX
-                    return;
-                default:
-                    if (redirector_handler()) {
-                        return;
-                    }
-                }
-            }
             break;
     }
 

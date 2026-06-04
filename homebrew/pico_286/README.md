@@ -434,16 +434,11 @@ between one-second statistics samples; direct-present frames restore small
 overlay rectangles on the next `mfb_update()` when the DOS frame was not
 rerendered.  Set it to `0` to disable the shortcut and overlay.
 
-`host_drive_path` is the R36SX host directory exposed to DOS through Pico-286's
-`INT 2Fh/11h` network redirector.  Relative paths are resolved next to
-`pico_286.conf`, so the default `host` means `MIPS_NATIVE/pico_286/host` on the
-SD card.  DOS must run `MAPDRIVE.COM` after boot to register the drive; it
-defaults to `H:` and accepts another letter as `MAPDRIVE G:` or `MAPDRIVE G`.
-`CONFIG.SYS` must contain `LASTDRIVE=` set to the selected letter or higher so
-DOS allocates the needed CDS entry.  To map the drive automatically, add the
-chosen command, such as `MAPDRIVE` or `MAPDRIVE G:`, to the end of
-`AUTOEXEC.BAT`, `FDAUTO.BAT`, or the DOS startup `autorun.bat` used by your
-image.
+`INT 2Fh` is a DOS multiplex interrupt owned by DOS drivers and TSRs, not by
+the BIOS or CPU emulator.  Pico-286 no longer intercepts it internally.  Host
+drive mapping should therefore be provided by a guest-side DOS redirector or
+driver that installs its own `INT 2Fh` handler before tools such as
+`MAPDRIVE.COM` are used.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

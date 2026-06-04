@@ -4,6 +4,11 @@ Based on RBIL6 (Ralph Brown's Interrupt List) specifications and implementation 
 
 ## Overview
 
+This document describes the historical built-in Pico-286 network redirector.
+The R36SX build no longer wires this code into the CPU interrupt path:
+`INT 2Fh` is a DOS multiplex interrupt and should be owned by a guest-side DOS
+driver or TSR that installs the interrupt vector itself.
+
 The network redirector implements DOS INT 2Fh network file system calls, providing filesystem passthrough functionality for DOS applications. It enables DOS programs to access files on the host filesystem as if they were on a network drive.
 
 **Supported Platforms:**

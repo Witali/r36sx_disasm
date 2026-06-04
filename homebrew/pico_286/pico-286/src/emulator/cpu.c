@@ -10,14 +10,12 @@
 #if PICO_ON_DEVICE
 
 #include "disks-rp2350.c.inl"
-#include "network-redirector-rp2350.c.inl"
 #include "graphics.h"
 #include "psram_spi.h"
 #include "swap.h"
 #else
 
 #include "disks-win32.c.inl"
-#include "network-redirector.c.inl"
 
 #endif
 
@@ -695,23 +693,6 @@ void intcall86(uint8_t intnum) {
                     CPU_AH = 0;
                     CPU_FL_CF = 0;
                     return;
-            }
-            break;
-        case 0x2F: /* Multiplex Interrupt */
-            switch (CPU_AX) {
-                /* XMS */
-                case 0x4300:
-                    CPU_AL = 0x80;
-                    return;
-                case 0x4310: {
-                    CPU_ES = XMS_FN_CS; // to be handled by DOS memory manager using
-                    CPU_BX = XMS_FN_IP; // CALL FAR ES:BX
-                    return;
-                default:
-                    if (redirector_handler()) {
-                        return;
-                    }
-                }
             }
             break;
     }

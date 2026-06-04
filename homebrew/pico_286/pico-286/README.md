@@ -116,9 +116,9 @@ The emulator expects the following file paths and names for the disk images:
 
 ### Host Filesystem Access (Default Drive H:)
 
-For seamless file exchange, the emulator can map a directory from the host filesystem and present it as a DOS drive. The default drive is **H:**, but `MAPDRIVE.COM` can register another letter. This feature is implemented through the standard **DOS network redirector interface (INT 2Fh, Function 11h)**.
+Pico-286 no longer intercepts `INT 2Fh` inside the emulator. `INT 2Fh` is a DOS multiplex interrupt owned by DOS drivers and TSRs, not by BIOS. Host filesystem access therefore requires a guest-side DOS redirector or driver that installs its own `INT 2Fh` handler before a helper such as `MAPDRIVE.COM` is used.
 
-This is ideal for development, allowing you to edit files on your host machine and access them instantly within the emulator without modifying disk images.
+The notes below describe the historical built-in redirector design and are kept as implementation reference only.
 
 #### How It Works
 
