@@ -35,6 +35,14 @@ The full decompile was regenerated with:
 "key function" list is tuned for LibRetro entry points, not for `driver.so`.
 Use `decompiled_all.c`, `functions.tsv`, and `symbols.tsv` for this binary.
 
+Detailed framebuffer path notes with a Mermaid block diagram are stored next to
+the Ghidra export:
+
+```text
+disasm/disk_image/mips_elf/driver/framebuffer_path.md
+disasm/disk_image/mips_elf/driver/framebuffer_path_ru.md
+```
+
 ## What driver.so Is
 
 `driver.so` is the vendor hardware abstraction library used by `rkgame`. It
@@ -133,6 +141,24 @@ the framebuffer path. It has special handling for:
 After that it calls `fbdev_draw_frame(...)`, which queues/copies the frame into
 the framebuffer pipeline and signals the render thread. If the internal queue is
 full, it prints `drop frame`.
+
+The effective video pipeline is:
+
+```mermaid
+flowchart LR
+    app["native app"] --> disp["video_driver_disp_frame"]
+    disp --> draw["fbdev_draw_frame"]
+    draw --> paint["fb_paint_task"]
+    paint --> ge["/dev/ge\nhcge_blit / stretch_blit"]
+    ge --> fbmem["mmap /dev/fb0"]
+    fbmem --> render["fb_render_task"]
+    render --> flip["/dev/fb0 ioctl 0x4606"]
+    flip --> lcd["LCD"]
+```
+
+`/dev/dis` is used for display parameter queries, `/dev/ge` is the vendor
+graphics engine, and `/dev/fb0` is the final mapped framebuffer and page-flip
+endpoint.
 
 ## Audio Path
 
