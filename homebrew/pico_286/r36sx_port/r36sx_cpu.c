@@ -2249,6 +2249,29 @@ static INLINE uint32_t pop32(void) {
     return tempval;
 }
 
+static INLINE void r36sx_cpu_push_segment_selector(uint16_t selector)
+{
+    /*
+     * PUSH Sreg is controlled by the current operand size.  On 80386 a
+     * 32-bit operand-size segment push consumes a 32-bit stack slot even
+     * though the selector itself is only 16 bits.
+     */
+    if (operandSizeOverride) {
+        push32(selector);
+    } else {
+        push(selector);
+    }
+}
+
+static INLINE uint16_t r36sx_cpu_pop_segment_selector(void)
+{
+    /*
+     * POP Sreg with 32-bit operand size discards the high half of the stack
+     * value after advancing SP/ESP by four bytes.
+     */
+    return operandSizeOverride ? (uint16_t)pop32() : pop();
+}
+
 static INLINE void r36sx_cpu_adjust_stack(uint32_t bytes)
 {
     if (r36sx_cpu_stack_default32()) {
@@ -5316,7 +5339,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_06: ;
 #endif
                 /* 06 PUSH CPU_ES */
-                push(CPU_ES);
+                r36sx_cpu_push_segment_selector(CPU_ES);
                 break;
 
             case 0x7:
@@ -5324,7 +5347,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_07: ;
 #endif
                 /* 07 POP CPU_ES */
-                r36sx_cpu_load_segment(reges, pop());
+                r36sx_cpu_load_segment(reges, r36sx_cpu_pop_segment_selector());
                 break;
 
             case 0x8:
@@ -5415,7 +5438,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_0E: ;
 #endif
                 /* 0E PUSH CPU_CS */
-                push(CPU_CS);
+                r36sx_cpu_push_segment_selector(CPU_CS);
                 break;
 
             case 0xF:
@@ -5424,7 +5447,8 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
                     /* 8086/8088 only: 0F POP CS. */
-                    r36sx_cpu_load_segment(regcs, pop());
+                    r36sx_cpu_load_segment(regcs,
+                                           r36sx_cpu_pop_segment_selector());
                 } else {
                     r36sx_cpu_exec_0f(firstip);
                 }
@@ -5512,7 +5536,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_16: ;
 #endif
                 /* 16 PUSH CPU_SS */
-                push(CPU_SS);
+                r36sx_cpu_push_segment_selector(CPU_SS);
                 break;
 
             case 0x17:
@@ -5520,7 +5544,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_17: ;
 #endif
                 /* 17 POP CPU_SS */
-                r36sx_cpu_load_segment(regss, pop());
+                r36sx_cpu_load_segment(regss, r36sx_cpu_pop_segment_selector());
                 break;
 
             case 0x18:
@@ -5602,7 +5626,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_1E: ;
 #endif
                 /* 1E PUSH CPU_DS */
-                push(CPU_DS);
+                r36sx_cpu_push_segment_selector(CPU_DS);
                 break;
 
             case 0x1F:
@@ -5610,7 +5634,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_1F: ;
 #endif
                 /* 1F POP CPU_DS */
-                r36sx_cpu_load_segment(regds, pop());
+                r36sx_cpu_load_segment(regds, r36sx_cpu_pop_segment_selector());
                 break;
 
             case 0x20:

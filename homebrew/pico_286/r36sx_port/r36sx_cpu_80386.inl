@@ -1388,29 +1388,21 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             return;
 
         case 0xA0:
-            if (operandSizeOverride) {
-                push32(CPU_FS);
-            } else {
-                push(CPU_FS);
-            }
+            r36sx_cpu_push_segment_selector(CPU_FS);
             return;
 
         case 0xA1:
-            r36sx_cpu_load_segment(
-                regfs, operandSizeOverride ? (uint16_t)pop32() : pop());
+            r36sx_cpu_load_segment(regfs,
+                                   r36sx_cpu_pop_segment_selector());
             return;
 
         case 0xA8:
-            if (operandSizeOverride) {
-                push32(CPU_GS);
-            } else {
-                push(CPU_GS);
-            }
+            r36sx_cpu_push_segment_selector(CPU_GS);
             return;
 
         case 0xA9:
-            r36sx_cpu_load_segment(
-                reggs, operandSizeOverride ? (uint16_t)pop32() : pop());
+            r36sx_cpu_load_segment(reggs,
+                                   r36sx_cpu_pop_segment_selector());
             return;
 
         case 0xA3: /* BT Ev,Gv */
