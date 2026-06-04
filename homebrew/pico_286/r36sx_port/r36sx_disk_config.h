@@ -175,6 +175,9 @@ uint32_t r36sx_pico286_profiling_log_ms(void);
 // Return non-zero when the on-screen app statistics overlay can be toggled.
 int r36sx_pico286_app_stats_enabled(void);
 
+// Return non-zero when Pico-286 should provide built-in INT 2Fh services.
+int r36sx_pico286_int2f_enabled(void);
+
 // Return non-zero when AdLib/OPL2 audio is mixed into the output stream.
 int r36sx_pico286_audio_adlib_enabled(void);
 

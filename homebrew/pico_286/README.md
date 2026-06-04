@@ -323,6 +323,9 @@ screenshot_build_hash=1
 [stats]
 app_stats_enabled=1
 
+[compatibility]
+int2f_enabled=1
+
 [host_drive]
 host_drive_path=host
 
@@ -488,11 +491,11 @@ between one-second statistics samples; direct-present frames restore small
 overlay rectangles on the next `mfb_update()` when the DOS frame was not
 rerendered.  Set it to `0` to disable the shortcut and overlay.
 
-`INT 2Fh` is a DOS multiplex interrupt owned by DOS drivers and TSRs, not by
-the BIOS or CPU emulator.  Pico-286 no longer intercepts it internally.  Host
-drive mapping should therefore be provided by a guest-side DOS redirector or
-driver that installs its own `INT 2Fh` handler before tools such as
-`MAPDRIVE.COM` are used.
+`INT 2Fh` is a DOS multiplex interrupt normally owned by DOS drivers and TSRs.
+For compatibility, `int2f_enabled=1` lets Pico-286 provide a small built-in
+multiplex shim: XMS discovery through `AX=4300h/4310h` and the legacy host
+redirector used by `MAPDRIVE.COM`.  Set `int2f_enabled=0` when you want guest
+DOS drivers or TSRs to own `INT 2Fh` completely.
 
 `boot_mode=normal` attaches the configured disks during BIOS `INT 19h` and
 boots DOS.  `boot_mode=bios_prompt` leaves the disks detached at `INT 19h`,

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "emulator.h"
 #include "r36sx_debug_config.h"
+#include "r36sx_disk_config.h"
 
 #define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
 #define CPU_LIMIT_SHIFT_COUNT
@@ -18,6 +19,7 @@
 #if PICO_ON_DEVICE
 
 #include "disks-rp2350.c.inl"
+#include "network-redirector-rp2350.c.inl"
 #include "graphics.h"
 #include "psram_spi.h"
 #include "swap.h"
@@ -27,9 +29,10 @@ static inline void r36sx_app_stats_record_x86(uint32_t instructions)
 }
 #else
 
-#include "r36sx_disk_config.h"
 #include "r36sx_app_stats.h"
 #include "disks-win32.c.inl"
+#define R36SX_PICO286_HOST_DRIVE_CONFIG 1
+#include "network-redirector.c.inl"
 
 #endif
 
@@ -4818,6 +4821,35 @@ void intcall86(uint8_t intnum) {
                         return;
                     }
                     break;
+            }
+            break;
+        case 0x2F: /* DOS multiplex interrupt compatibility hook. */
+            if (r36sx_pico286_int2f_enabled()) {
+                switch (CPU_AX) {
+                    case 0x4300:
+                        /*
+                         * XMS installation check.  This mirrors a tiny HIMEM
+                         * manager shim so DOS programs can discover the
+                         * already-built-in XMS handler at XMS_FN_CS:XMS_FN_IP.
+                         */
+                        CPU_AL = r36sx_cpu_at_class_memory_available()
+                                     ? 0x80
+                                     : 0x00;
+                        return;
+                    case 0x4310:
+                        if (!r36sx_cpu_at_class_memory_available()) {
+                            CPU_AL = 0x00;
+                            return;
+                        }
+                        r36sx_cpu_load_segment(reges, XMS_FN_CS);
+                        CPU_BX = XMS_FN_IP;
+                        return;
+                    default:
+                        if (redirector_handler()) {
+                            return;
+                        }
+                        break;
+                }
             }
             break;
         /**/

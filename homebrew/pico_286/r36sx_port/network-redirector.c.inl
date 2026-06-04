@@ -34,7 +34,9 @@
 FILE *open_files[MAX_FILES] = {0};
 
 #ifdef WIN32
+#ifndef mkdir
 #define mkdir(path, mode) mkdir(path)
+#endif
 #endif
 
 // Current working directory for the remote drive (relative to HOST_BASE_DIR)

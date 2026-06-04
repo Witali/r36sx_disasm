@@ -94,6 +94,7 @@ static char disk_cache_flush_ms_text[16] = "2000";
 static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char app_stats_enabled_text[8] = "1";
+static char int2f_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
 static char rtc_enabled_text[8] = "1";
 static char rtc_at_enabled_text[8] = "1";
@@ -129,6 +130,7 @@ static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int app_stats_enabled = 1;
+static int int2f_enabled = 1;
 static uint32_t target_fps = 60u;
 static int rtc_enabled = 1;
 static int rtc_at_enabled = 1;
@@ -926,6 +928,33 @@ static int set_app_stats_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_compatibility_value(const char *key, const char *value,
+                                   int line_no)
+{
+    if (key_equals(key, "int2f_enabled") ||
+        key_equals(key, "int_2f_enabled") ||
+        key_equals(key, "bios_int2f_enabled") ||
+        key_equals(key, "multiplex_int_enabled")) {
+        int enabled;
+
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        int2f_enabled = enabled;
+        snprintf(int2f_enabled_text, sizeof(int2f_enabled_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: int2f_enabled=%d",
+                                int2f_enabled);
+        return 1;
+    }
+
+    return 0;
+}
+
 static int set_audio_bool_value(const char *key, const char *value,
                                 int line_no, const char *canonical_key,
                                 int *target, char *text, size_t text_size)
@@ -1615,6 +1644,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
+    if (set_compatibility_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_audio_value(key, value, line_no)) {
         return 1;
     }
@@ -1948,6 +1980,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[stats]\n");
     fprintf(fp, "app_stats_enabled=%s\n\n", app_stats_enabled_text);
 
+    fprintf(fp, "# Compatibility hooks for DOS multiplex services.\n");
+    fprintf(fp, "# int2f_enabled=1 exposes built-in XMS discovery and the legacy host redirector.\n");
+    fprintf(fp, "# Set to 0 to let guest DOS/TSR handlers own INT 2Fh completely.\n");
+    fprintf(fp, "[compatibility]\n");
+    fprintf(fp, "int2f_enabled=%s\n\n", int2f_enabled_text);
+
     fprintf(fp, "# Host filesystem directory exposed to DOS by MAPDRIVE.COM.\n");
     fprintf(fp, "# Relative paths are resolved next to pico_286.conf.\n");
     fprintf(fp, "# MAPDRIVE.COM defaults to H: or accepts a drive parameter, e.g. MAPDRIVE G:.\n");
@@ -2262,6 +2300,13 @@ int r36sx_pico286_app_stats_enabled(void)
     load_disk_config();
 
     return app_stats_enabled;
+}
+
+int r36sx_pico286_int2f_enabled(void)
+{
+    load_disk_config();
+
+    return int2f_enabled;
 }
 
 int r36sx_pico286_audio_adlib_enabled(void)
