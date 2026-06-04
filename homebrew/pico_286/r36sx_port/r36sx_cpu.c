@@ -4298,6 +4298,232 @@ static inline uint8_t r36sx_cpu_at_class_memory_available(void)
     return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286);
 }
 
+#define R36SX_BIOS_INT15_STATUS_OK 0x00u
+#define R36SX_BIOS_INT15_STATUS_INVALID_COMMAND 0x80u
+#define R36SX_BIOS_INT15_STATUS_UNSUPPORTED 0x86u
+#define R36SX_BIOS_E820_SIGNATURE 0x534D4150UL
+#define R36SX_BIOS_E820_ENTRY_SIZE 20u
+#define R36SX_BIOS_E820_TYPE_MEMORY 1UL
+#define R36SX_BIOS_E820_TYPE_RESERVED 2UL
+#define R36SX_BIOS_EXTENDED_BELOW_16M_KB 0x3C00u
+
+static inline uint32_t r36sx_bios_real_ptr(uint16_t segment, uint16_t offset)
+{
+    return ((uint32_t)segment << 4) + (uint32_t)offset;
+}
+
+static inline void r36sx_bios_int15_fail(uint8_t status)
+{
+    CPU_AH = status;
+    CPU_FL_CF = 1;
+}
+
+static inline void r36sx_bios_int15_success_status(void)
+{
+    CPU_AH = R36SX_BIOS_INT15_STATUS_OK;
+    CPU_FL_CF = 0;
+}
+
+static inline uint32_t r36sx_bios_descriptor_base(uint32_t descriptor)
+{
+    /* INT 15h AH=87h uses 286-style descriptors with a 24-bit base. */
+    return (uint32_t)read86_ob(descriptor + 2u) |
+           ((uint32_t)read86_ob(descriptor + 3u) << 8) |
+           ((uint32_t)read86_ob(descriptor + 4u) << 16);
+}
+
+static inline uint32_t r36sx_bios_descriptor_limit(uint32_t descriptor)
+{
+    uint32_t limit = (uint32_t)read86_ob(descriptor) |
+                     ((uint32_t)read86_ob(descriptor + 1u) << 8);
+    uint8_t flags = read86_ob(descriptor + 6u);
+
+    limit |= ((uint32_t)(flags & 0x0Fu) << 16);
+    if (flags & 0x80u) {
+        limit = (limit << 12) | 0xFFFu;
+    }
+    return limit;
+}
+
+static void r36sx_bios_int15_move_extended_block(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t bytes = (uint32_t)CPU_CX * 2u;
+    if (bytes == 0u) {
+        r36sx_bios_int15_success_status();
+        return;
+    }
+
+    uint32_t gdt = r36sx_bios_real_ptr(CPU_ES, CPU_SI);
+    uint32_t source_descriptor = gdt + 0x10u;
+    uint32_t destination_descriptor = gdt + 0x18u;
+    uint32_t source = r36sx_bios_descriptor_base(source_descriptor);
+    uint32_t destination = r36sx_bios_descriptor_base(destination_descriptor);
+    uint32_t source_limit = r36sx_bios_descriptor_limit(source_descriptor);
+    uint32_t destination_limit =
+        r36sx_bios_descriptor_limit(destination_descriptor);
+
+    if (source_limit < bytes - 1u || destination_limit < bytes - 1u) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_INVALID_COMMAND);
+        return;
+    }
+
+    /*
+     * Real BIOS implementations switch to protected mode for this copy.  Force
+     * A20 open while copying so physical addresses above 1 MB do not wrap.
+     */
+    int saved_a20 = a20_enabled;
+    a20_enabled = 1;
+    if (destination > source && destination < source + bytes) {
+        for (uint32_t i = bytes; i > 0u; i--) {
+            write86_ob(destination + i - 1u, read86_ob(source + i - 1u));
+        }
+    } else {
+        for (uint32_t i = 0; i < bytes; i++) {
+            write86_ob(destination + i, read86_ob(source + i));
+        }
+    }
+    a20_enabled = saved_a20;
+
+    r36sx_bios_int15_success_status();
+}
+
+static void r36sx_bios_int15_extended_memory_size(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t kb = r36sx_pico286_extended_memory_kb();
+    if (kb > 0xFFFFu) {
+        kb = 0xFFFFu;
+    }
+    CPU_AX = (uint16_t)kb;
+    CPU_FL_CF = 0;
+}
+
+static void r36sx_bios_int15_e801_memory_size(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t extended_kb = r36sx_pico286_extended_memory_kb();
+    uint32_t below_16m_kb = extended_kb;
+    uint32_t above_16m_blocks = 0;
+
+    if (below_16m_kb > R36SX_BIOS_EXTENDED_BELOW_16M_KB) {
+        below_16m_kb = R36SX_BIOS_EXTENDED_BELOW_16M_KB;
+        above_16m_blocks =
+            (extended_kb - R36SX_BIOS_EXTENDED_BELOW_16M_KB) / 64u;
+    }
+
+    CPU_AX = (uint16_t)below_16m_kb;
+    CPU_BX = (uint16_t)above_16m_blocks;
+    CPU_CX = (uint16_t)below_16m_kb;
+    CPU_DX = (uint16_t)above_16m_blocks;
+    CPU_FL_CF = 0;
+}
+
+static inline void r36sx_bios_write_e820_entry(uint32_t buffer,
+                                               uint32_t base,
+                                               uint32_t length,
+                                               uint32_t type)
+{
+    writedw86(buffer + 0u, base);
+    writedw86(buffer + 4u, 0u);
+    writedw86(buffer + 8u, length);
+    writedw86(buffer + 12u, 0u);
+    writedw86(buffer + 16u, type);
+}
+
+static void r36sx_bios_int15_e820_memory_map(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+    if (CPU_EDX != R36SX_BIOS_E820_SIGNATURE ||
+        CPU_ECX < R36SX_BIOS_E820_ENTRY_SIZE) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t conventional_kb = r36sx_pico286_conventional_memory_kb();
+    if (conventional_kb > 640u) {
+        conventional_kb = 640u;
+    }
+    uint32_t extended_kb = r36sx_pico286_extended_memory_kb();
+    uint32_t entry_count = extended_kb ? 3u : 2u;
+    uint32_t entry_index = CPU_EBX;
+
+    if (entry_index >= entry_count) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t buffer = r36sx_bios_real_ptr(CPU_ES, CPU_DI);
+    switch (entry_index) {
+        case 0:
+            r36sx_bios_write_e820_entry(
+                buffer, 0x00000000u, conventional_kb << 10,
+                R36SX_BIOS_E820_TYPE_MEMORY);
+            break;
+        case 1:
+            r36sx_bios_write_e820_entry(
+                buffer, 0x000A0000u, 0x00060000u,
+                R36SX_BIOS_E820_TYPE_RESERVED);
+            break;
+        default:
+            r36sx_bios_write_e820_entry(
+                buffer, 0x00100000u, extended_kb << 10,
+                R36SX_BIOS_E820_TYPE_MEMORY);
+            break;
+    }
+
+    CPU_EAX = R36SX_BIOS_E820_SIGNATURE;
+    CPU_EBX = (entry_index + 1u < entry_count) ? entry_index + 1u : 0u;
+    CPU_ECX = R36SX_BIOS_E820_ENTRY_SIZE;
+    CPU_FL_CF = 0;
+}
+
+static void r36sx_bios_int15_a20_service(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    switch (CPU_AX) {
+        case 0x2400:
+            a20_enabled = 0;
+            r36sx_bios_int15_success_status();
+            return;
+        case 0x2401:
+            a20_enabled = 1;
+            r36sx_bios_int15_success_status();
+            return;
+        case 0x2402:
+            CPU_AL = a20_enabled ? 1u : 0u;
+            CPU_AH = R36SX_BIOS_INT15_STATUS_OK;
+            CPU_FL_CF = 0;
+            return;
+        case 0x2403:
+            CPU_BX = 0x0003u; /* 8042 keyboard gate and fast port 92. */
+            r36sx_bios_int15_success_status();
+            return;
+        default:
+            r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+            return;
+    }
+}
+
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
@@ -4566,31 +4792,31 @@ void intcall86(uint8_t intnum) {
         }
         case 0x13:
             return diskhandler();
-        case 0x15: /* XMS */
+        case 0x15: /* System BIOS services. */
             switch (CPU_AH) {
-                case 0x87: {
-                    if (!r36sx_cpu_at_class_memory_available()) {
-                        CPU_AH = 0x86; /* Function not supported. */
-                        cf = 1;
+                case 0x24:
+                    /* AX=2400h..2403h: BIOS A20 gate disable/enable/query. */
+                    r36sx_bios_int15_a20_service();
+                    return;
+                case 0x87:
+                    /* AH=87h: copy words using source/destination GDT entries. */
+                    r36sx_bios_int15_move_extended_block();
+                    return;
+                case 0x88:
+                    /* AH=88h: legacy extended-memory size in KB above 1 MB. */
+                    r36sx_bios_int15_extended_memory_size();
+                    return;
+                case 0xE8:
+                    /* AX=E801h and E820h: later BIOS extended-memory reports. */
+                    if (CPU_AX == 0xE801u) {
+                        r36sx_bios_int15_e801_memory_size();
                         return;
                     }
-                    //https://github.com/neozeed/himem.sys-2.06/blob/5761f4fc182543b3964fd0d3a236d04bac7bfb50/oemsrc/himem.asm#L690
-                    //                    printf("mem move?! %x %x:%x\n", CPU_CX, CPU_ES, CPU_SI);
-                    CPU_AX = 0;
-                    cf = 0;
-                    return;
-                }
-                    return;
-                case 0x88: {
-                    if (!r36sx_cpu_at_class_memory_available()) {
-                        CPU_AH = 0x86; /* Function not supported. */
-                        cf = 1;
+                    if (CPU_EAX == 0x0000E820u) {
+                        r36sx_bios_int15_e820_memory_map();
                         return;
                     }
-                    CPU_AX = (uint16_t)r36sx_pico286_extended_memory_kb();
-                    cf = 0;
-                    return;
-                }
+                    break;
             }
             break;
         /**/
