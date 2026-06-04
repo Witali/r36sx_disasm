@@ -35,6 +35,15 @@ dmesg | tail -40 > /mnt/sdcard/dmesg_tail.txt
 cat /mnt/sdcard/root.txt
 ```
 
+Set `R36SX_SHELL_COMMAND` to run a specific command instead of the default
+interactive `/bin/sh`. The frontend still owns the framebuffer and keyboard, but
+the child command can enter another rootfs:
+
+```sh
+R36SX_SHELL_COMMAND='sh /mnt/sdcard/MIPS_NATIVE/debian/enter_debian_shell.sh' \
+  /mnt/sdcard/MIPS_NATIVE/shell/shell
+```
+
 To save all MTD partitions to the SD card:
 
 ```sh

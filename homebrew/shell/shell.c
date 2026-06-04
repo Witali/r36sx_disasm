@@ -1207,6 +1207,27 @@ static void pty_write_raw_fd(int fd, const char *bytes, size_t len)
     }
 }
 
+static const char *shell_launch_command(void)
+{
+    const char *cmd = getenv("R36SX_SHELL_COMMAND");
+    if (cmd && cmd[0]) {
+        return cmd;
+    }
+    return NULL;
+}
+
+static void shell_exec_child(void)
+{
+    const char *cmd = shell_launch_command();
+    shell_child_set_env();
+    if (cmd) {
+        execl("/bin/sh", "sh", "-lc", cmd, (char *)NULL);
+    } else {
+        execl("/bin/sh", "sh", "-i", (char *)NULL);
+    }
+    _exit(127);
+}
+
 static int pipe_spawn_shell(void)
 {
     int in_pipe[2] = { -1, -1 };
@@ -1242,9 +1263,7 @@ static int pipe_spawn_shell(void)
         if (out_pipe[1] > STDERR_FILENO) {
             close(out_pipe[1]);
         }
-        shell_child_set_env();
-        execl("/bin/sh", "sh", "-i", (char *)NULL);
-        _exit(127);
+        shell_exec_child();
     }
 
     close(in_pipe[0]);
@@ -1298,9 +1317,7 @@ static int pty_spawn_shell(void)
             close(slave);
         }
         close(master);
-        shell_child_set_env();
-        execl("/bin/sh", "sh", "-i", (char *)NULL);
-        _exit(127);
+        shell_exec_child();
     }
 
     g_pty.master_fd = master;
@@ -1614,14 +1631,47 @@ static char evdev_shifted_digit(int code)
     return 0;
 }
 
+static char evdev_letter_for_key(int code)
+{
+    switch (code) {
+    case KEY_A: return 'a';
+    case KEY_B: return 'b';
+    case KEY_C: return 'c';
+    case KEY_D: return 'd';
+    case KEY_E: return 'e';
+    case KEY_F: return 'f';
+    case KEY_G: return 'g';
+    case KEY_H: return 'h';
+    case KEY_I: return 'i';
+    case KEY_J: return 'j';
+    case KEY_K: return 'k';
+    case KEY_L: return 'l';
+    case KEY_M: return 'm';
+    case KEY_N: return 'n';
+    case KEY_O: return 'o';
+    case KEY_P: return 'p';
+    case KEY_Q: return 'q';
+    case KEY_R: return 'r';
+    case KEY_S: return 's';
+    case KEY_T: return 't';
+    case KEY_U: return 'u';
+    case KEY_V: return 'v';
+    case KEY_W: return 'w';
+    case KEY_X: return 'x';
+    case KEY_Y: return 'y';
+    case KEY_Z: return 'z';
+    default: return 0;
+    }
+}
+
 static char evdev_key_to_char(int code)
 {
     char digit = evdev_shifted_digit(code);
     if (digit) {
         return digit;
     }
-    if (code >= KEY_A && code <= KEY_Z) {
-        char base = (char)('a' + code - KEY_A);
+    char base = evdev_letter_for_key(code);
+    if (base) {
         if (g_evdev.ctrl) {
             return (char)(base - 'a' + 1);
         }
@@ -2143,8 +2193,14 @@ int main(void)
     term_write_text("Scrollback: FN+L/R line, FN+Left/Right page, FN+Down live.\r\n");
     term_write_text("USB keyboards are accepted from /dev/input/event*.\r\n");
     term_write_text("Redirection works normally, e.g. ls / > /mnt/sdcard/root.txt\r\n\r\n");
+    const char *cmd = shell_launch_command();
+    if (cmd) {
+        term_write_text("Starting command: ");
+        term_write_text(cmd);
+        term_write_text("\r\n\r\n");
+    }
     if (pty_spawn_shell() != 0) {
-        term_write_text("Could not start /bin/sh.\r\n");
+        term_write_text("Could not start shell command.\r\n");
     }
 
     while (g_running) {
