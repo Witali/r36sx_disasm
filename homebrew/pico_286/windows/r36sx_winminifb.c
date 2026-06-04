@@ -40,6 +40,7 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_STATS_ROWS 5
 #define R36SX_WIN_POST_PAD 5
 #define R36SX_WIN_POST_MARGIN 8
+#define R36SX_WIN_POST_SUBCODE_PORT 0x190u
 
 static HWND g_wnd;
 static HDC g_hdc;
@@ -61,6 +62,10 @@ static uint8_t g_post_codes_visible;
 static volatile LONG g_post_code_generation;
 static volatile LONG g_post_code_port;
 static volatile LONG g_post_code_value;
+static volatile LONG g_post_code_valid;
+static volatile LONG g_post_subcode_port;
+static volatile LONG g_post_subcode_value;
+static volatile LONG g_post_subcode_valid;
 
 static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
 {
@@ -218,13 +223,19 @@ static void r36sx_win_draw_stats_text(uint16_t *target, int x, int y,
 
 static void r36sx_win_draw_post_codes_overlay(uint16_t *target)
 {
-    char line[24];
+    char line0[24];
+    char line1[24];
     LONG generation = g_post_code_generation;
     LONG port = g_post_code_port;
     LONG value = g_post_code_value;
+    LONG code_valid = g_post_code_valid;
+    LONG sub_port = g_post_subcode_port;
+    LONG sub_value = g_post_subcode_value;
+    LONG sub_valid = g_post_subcode_valid;
     int text_w;
     int box_w;
     int box_h;
+    int line_h = R36SX_WIN_STATS_FONT_H * R36SX_WIN_STATS_FONT_SCALE + 2;
     int x = R36SX_WIN_POST_MARGIN;
     int y;
 
@@ -232,17 +243,25 @@ static void r36sx_win_draw_post_codes_overlay(uint16_t *target)
         return;
     }
 
-    if (generation == 0) {
-        snprintf(line, sizeof(line), "POST --");
+    if (generation == 0 || !code_valid) {
+        snprintf(line0, sizeof(line0), "POST --");
     } else {
-        snprintf(line, sizeof(line), "POST %03lX:%02lX",
+        snprintf(line0, sizeof(line0), "POST %03lX:%02lX",
                  (unsigned long)(port & 0xffff),
                  (unsigned long)(value & 0xff));
     }
+    if (sub_valid) {
+        snprintf(line1, sizeof(line1), "%03lX:%02lX",
+                 (unsigned long)(sub_port & 0xffff),
+                 (unsigned long)(sub_value & 0xff));
+    } else {
+        snprintf(line1, sizeof(line1), "%03X:--",
+                 (unsigned int)R36SX_WIN_POST_SUBCODE_PORT);
+    }
 
-    text_w = r36sx_win_stats_text_width(line);
+    text_w = r36sx_win_stats_text_width(line0);
     box_w = text_w + R36SX_WIN_POST_PAD * 2;
-    box_h = R36SX_WIN_STATS_FONT_H * R36SX_WIN_STATS_FONT_SCALE +
+    box_h = line_h * 2 - 2 +
             R36SX_WIN_POST_PAD * 2;
     y = g_height - box_h - R36SX_WIN_POST_MARGIN;
     if (y < 0) {
@@ -254,7 +273,10 @@ static void r36sx_win_draw_post_codes_overlay(uint16_t *target)
     r36sx_win_stroke_rect(target, x, y, box_w, box_h,
                           r36sx_win_rgb565(70, 96, 112));
     r36sx_win_draw_stats_text(target, x + R36SX_WIN_POST_PAD,
-                              y + R36SX_WIN_POST_PAD, line,
+                              y + R36SX_WIN_POST_PAD, line0,
+                              r36sx_win_rgb565(236, 242, 220));
+    r36sx_win_draw_stats_text(target, x + R36SX_WIN_POST_PAD,
+                              y + R36SX_WIN_POST_PAD + line_h, line1,
                               r36sx_win_rgb565(236, 242, 220));
 }
 
@@ -337,8 +359,19 @@ void r36sx_pico286_disk_activity(void)
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
 {
-    g_post_code_port = (LONG)portnum;
-    g_post_code_value = (LONG)value;
+    /*
+     * Keep the standard POST stage and R36SX test386 sub-step separately, so
+     * a 190h breadcrumb does not hide the major 80h stage on the overlay.
+     */
+    if (portnum == R36SX_WIN_POST_SUBCODE_PORT) {
+        g_post_subcode_port = (LONG)portnum;
+        g_post_subcode_value = (LONG)value;
+        g_post_subcode_valid = 1;
+    } else {
+        g_post_code_port = (LONG)portnum;
+        g_post_code_value = (LONG)value;
+        g_post_code_valid = 1;
+    }
     InterlockedIncrement(&g_post_code_generation);
     r36sx_pico286_debug_log("post: port=0x%03x code=0x%02x",
                             portnum, value);
@@ -693,6 +726,10 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_post_code_generation = 0;
     g_post_code_port = 0;
     g_post_code_value = 0;
+    g_post_code_valid = 0;
+    g_post_subcode_port = 0;
+    g_post_subcode_value = 0;
+    g_post_subcode_valid = 0;
     r36sx_app_stats_init();
     r36sx_disk_menu_init(&g_disk_menu);
     r36sx_key_presets_load(&g_key_presets);

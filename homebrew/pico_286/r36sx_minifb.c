@@ -59,6 +59,9 @@
 #define R36SX_PICO286_POST_FONT_SCALE 2
 #define R36SX_PICO286_POST_PAD 6
 #define R36SX_PICO286_POST_MARGIN 8
+#define R36SX_PICO286_POST_MAX_CHARS 11
+#define R36SX_PICO286_POST_LINES 2
+#define R36SX_PICO286_POST_SUBCODE_PORT 0x190u
 
 typedef int (*video_driver_setting_fn)(int *);
 typedef int (*video_drivers_init_fn)(void);
@@ -148,6 +151,10 @@ static volatile uint32_t g_disk_activity_until_ms;
 static volatile uint32_t g_post_code_generation;
 static volatile uint16_t g_post_code_port;
 static volatile uint8_t g_post_code_value;
+static volatile uint8_t g_post_code_valid;
+static volatile uint16_t g_post_subcode_port;
+static volatile uint8_t g_post_subcode_value;
+static volatile uint8_t g_post_subcode_valid;
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
@@ -184,8 +191,20 @@ void r36sx_pico286_disk_activity(void)
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
 {
-    g_post_code_port = portnum;
-    g_post_code_value = value;
+    /*
+     * Port 80h is the standard BIOS POST byte.  The R36SX test386 ROM writes
+     * finer breadcrumbs to 190h so the overlay can keep showing both the
+     * current major POST stage and the last sub-step inside it.
+     */
+    if (portnum == R36SX_PICO286_POST_SUBCODE_PORT) {
+        g_post_subcode_port = portnum;
+        g_post_subcode_value = value;
+        g_post_subcode_valid = 1;
+    } else {
+        g_post_code_port = portnum;
+        g_post_code_value = value;
+        g_post_code_valid = 1;
+    }
     g_post_code_generation++;
     g_mfb.force_present = 1;
     r36sx_pico286_debug_log("post: port=0x%03x code=0x%02x",
@@ -664,10 +683,15 @@ static void r36sx_mfb_draw_stats_overlay(uint16_t *target, uint32_t now_ms)
 
 static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
 {
-    char line[32];
+    char line0[24];
+    char line1[24];
     uint32_t generation = g_post_code_generation;
     uint16_t port = g_post_code_port;
     uint8_t value = g_post_code_value;
+    uint8_t code_valid = g_post_code_valid;
+    uint16_t sub_port = g_post_subcode_port;
+    uint8_t sub_value = g_post_subcode_value;
+    uint8_t sub_valid = g_post_subcode_valid;
     int text_w;
     int box_w;
     int box_h;
@@ -681,16 +705,23 @@ static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
         return;
     }
 
-    if (generation == 0) {
-        snprintf(line, sizeof(line), "POST --");
+    if (generation == 0 || !code_valid) {
+        snprintf(line0, sizeof(line0), "POST --");
     } else {
-        snprintf(line, sizeof(line), "POST %03X:%02X",
+        snprintf(line0, sizeof(line0), "POST %03X:%02X",
                  (unsigned int)port, (unsigned int)value);
     }
+    if (sub_valid) {
+        snprintf(line1, sizeof(line1), "%03X:%02X",
+                 (unsigned int)sub_port, (unsigned int)sub_value);
+    } else {
+        snprintf(line1, sizeof(line1), "%03X:--",
+                 (unsigned int)R36SX_PICO286_POST_SUBCODE_PORT);
+    }
 
-    text_w = (int)strlen(line) * 8 * R36SX_PICO286_POST_FONT_SCALE;
+    text_w = (int)strlen(line0) * 8 * R36SX_PICO286_POST_FONT_SCALE;
     box_w = text_w + R36SX_PICO286_POST_PAD * 2;
-    box_h = 8 * R36SX_PICO286_POST_FONT_SCALE +
+    box_h = R36SX_PICO286_POST_LINES * 8 * R36SX_PICO286_POST_FONT_SCALE +
             R36SX_PICO286_POST_PAD * 2;
     y = g_mfb.height - box_h - R36SX_PICO286_POST_MARGIN;
     if (x + box_w > g_mfb.width) {
@@ -708,7 +739,14 @@ static void r36sx_mfb_draw_post_codes_overlay(uint16_t *target)
     r36sx_mfb_draw_text8_scaled(target,
                                 x + R36SX_PICO286_POST_PAD,
                                 y + R36SX_PICO286_POST_PAD,
-                                line,
+                                line0,
+                                text,
+                                R36SX_PICO286_POST_FONT_SCALE);
+    r36sx_mfb_draw_text8_scaled(target,
+                                x + R36SX_PICO286_POST_PAD,
+                                y + R36SX_PICO286_POST_PAD +
+                                    8 * R36SX_PICO286_POST_FONT_SCALE,
+                                line1,
                                 text,
                                 R36SX_PICO286_POST_FONT_SCALE);
 }
@@ -1441,9 +1479,11 @@ static int r36sx_mfb_draw_stats_saved(uint16_t *target, uint32_t now_ms,
 static int r36sx_mfb_draw_post_codes_saved(
     uint16_t *target, struct r36sx_mfb_saved_rect *saved)
 {
-    int box_w = 11 * 8 * R36SX_PICO286_POST_FONT_SCALE +
+    int box_w = R36SX_PICO286_POST_MAX_CHARS *
+                    8 * R36SX_PICO286_POST_FONT_SCALE +
                 R36SX_PICO286_POST_PAD * 2;
-    int box_h = 8 * R36SX_PICO286_POST_FONT_SCALE +
+    int box_h = R36SX_PICO286_POST_LINES *
+                    8 * R36SX_PICO286_POST_FONT_SCALE +
                 R36SX_PICO286_POST_PAD * 2;
     int x = R36SX_PICO286_POST_MARGIN;
     int y = g_mfb.height - box_h - R36SX_PICO286_POST_MARGIN;
