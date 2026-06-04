@@ -174,6 +174,86 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     return 1;
 }
 
+#if R36SX_DEBUG_PM_DIAG
+static uint8_t r36sx_pm_diag_raw_code_byte(uint32_t offset)
+{
+    /*
+     * Diagnostic only: read instruction bytes through the current CS hidden
+     * base without using getmem(), so a fault report cannot recursively raise
+     * another segment exception while we are already reporting one.
+     */
+    uint32_t base = r36sx_seg_cache[regcs].valid ?
+                    r36sx_seg_cache[regcs].base :
+                    ((uint32_t)CPU_CS << 4);
+    return read86_ob(base + offset);
+}
+
+static void r36sx_pm_diag_log_segment_cache(const char *name,
+                                            const r36sx_segment_cache_t *cache)
+{
+    r36sx_pico286_debug_log(
+        "[PM] seg %s sel=%04X base=%08lX limit=%08lX access=%02X flags=%02X valid=%u",
+        name, cache->selector, (unsigned long)cache->base,
+        (unsigned long)cache->limit, cache->access, cache->flags,
+        cache->valid);
+}
+
+static void r36sx_pm_diag_log_exception_context(uint8_t intnum,
+                                                uint32_t error_code,
+                                                uint8_t has_error_code,
+                                                uint32_t fault_ip)
+{
+    if (intnum != R36SX_EXCEPTION_GP &&
+        intnum != R36SX_EXCEPTION_STACK &&
+        intnum != R36SX_EXCEPTION_NOT_PRESENT &&
+        intnum != R36SX_EXCEPTION_INVALID_TSS) {
+        return;
+    }
+
+    uint8_t b0 = r36sx_pm_diag_raw_code_byte(fault_ip + 0u);
+    uint8_t b1 = r36sx_pm_diag_raw_code_byte(fault_ip + 1u);
+    uint8_t b2 = r36sx_pm_diag_raw_code_byte(fault_ip + 2u);
+    uint8_t b3 = r36sx_pm_diag_raw_code_byte(fault_ip + 3u);
+    uint8_t b4 = r36sx_pm_diag_raw_code_byte(fault_ip + 4u);
+    uint8_t b5 = r36sx_pm_diag_raw_code_byte(fault_ip + 5u);
+    uint8_t b6 = r36sx_pm_diag_raw_code_byte(fault_ip + 6u);
+    uint8_t b7 = r36sx_pm_diag_raw_code_byte(fault_ip + 7u);
+
+    r36sx_pico286_debug_log(
+        "[PM] exception ctx int=%02X err=%08lX cs:eip=%04X:%08lX bytes=%02X %02X %02X %02X %02X %02X %02X %02X",
+        intnum, (unsigned long)error_code, CPU_CS, (unsigned long)fault_ip,
+        b0, b1, b2, b3, b4, b5, b6, b7);
+    r36sx_pico286_debug_log(
+        "[PM] regs ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X flags=%04X cpl=%u",
+        CPU_AX, CPU_BX, CPU_CX, CPU_DX, CPU_SI, CPU_DI, CPU_BP, CPU_SP,
+        makeflagsword(), r36sx_cpu_cpl());
+    r36sx_pm_diag_log_segment_cache("cs", &r36sx_seg_cache[regcs]);
+    r36sx_pm_diag_log_segment_cache("ss", &r36sx_seg_cache[regss]);
+    r36sx_pm_diag_log_segment_cache("ds", &r36sx_seg_cache[regds]);
+    r36sx_pm_diag_log_segment_cache("es", &r36sx_seg_cache[reges]);
+
+    if (has_error_code && (error_code & 0xfffcu) != 0u &&
+        (error_code & 0x02u) == 0u) {
+        uint16_t selector = (uint16_t)(error_code & 0xfffcu);
+        r36sx_segment_cache_t descriptor;
+        memset(&descriptor, 0, sizeof(descriptor));
+        if (r36sx_cpu_decode_descriptor_any(selector, &descriptor)) {
+            r36sx_pico286_debug_log(
+                "[PM] err selector desc sel=%04X base=%08lX limit=%08lX access=%02X flags=%02X valid=%u",
+                selector, (unsigned long)descriptor.base,
+                (unsigned long)descriptor.limit, descriptor.access,
+                descriptor.flags, descriptor.valid);
+        } else {
+            r36sx_pico286_debug_log(
+                "[PM] err selector desc sel=%04X unavailable gdtr=%08lX:%04X ldtr=%04X base=%08lX limit=%08lX valid=%u",
+                selector, (unsigned long)r36sx_gdtr_base, r36sx_gdtr_limit,
+                r36sx_ldtr_selector, (unsigned long)r36sx_ldtr_cache.base,
+                (unsigned long)r36sx_ldtr_cache.limit, r36sx_ldtr_cache.valid);
+        }
+    }
+}
+#endif
+
 static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint32_t error_code,
                                       uint8_t has_error_code,
@@ -220,6 +300,10 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
             "[PM] exception int=%02X err=%08lX has_err=%u cs:eip=%04X:%08lX",
             intnum, (unsigned long)error_code, has_error_code,
             CPU_CS, (unsigned long)CPU_IP);
+        if (repeat_count == 1u) {
+            r36sx_pm_diag_log_exception_context(
+                intnum, error_code, has_error_code, fault_ip);
+        }
     }
 #endif
 

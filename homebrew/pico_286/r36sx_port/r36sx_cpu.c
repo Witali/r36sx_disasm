@@ -4337,15 +4337,13 @@ static inline uint32_t r36sx_bios_descriptor_base(uint32_t descriptor)
 
 static inline uint32_t r36sx_bios_descriptor_limit(uint32_t descriptor)
 {
-    uint32_t limit = (uint32_t)read86_ob(descriptor) |
-                     ((uint32_t)read86_ob(descriptor + 1u) << 8);
-    uint8_t flags = read86_ob(descriptor + 6u);
-
-    limit |= ((uint32_t)(flags & 0x0Fu) << 16);
-    if (flags & 0x80u) {
-        limit = (limit << 12) | 0xFFFu;
-    }
-    return limit;
+    /*
+     * INT 15h AH=87h is an AT/286 BIOS service.  Its caller supplies 286-style
+     * descriptors, where the limit is exactly the low 16-bit limit field; the
+     * 386 limit-high/granularity byte is not part of the contract here.
+     */
+    return (uint32_t)read86_ob(descriptor) |
+           ((uint32_t)read86_ob(descriptor + 1u) << 8);
 }
 
 static void r36sx_bios_int15_move_extended_block(void)
