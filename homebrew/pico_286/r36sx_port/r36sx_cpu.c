@@ -1345,10 +1345,10 @@ static inline int r36sx_rep_try_stos_ram(uint32_t count,
 
 static inline void r36sx_rep_movsb(uint32_t count)
 {
-    uint16_t si = CPU_SI;
-    uint16_t di = CPU_DI;
+    uint32_t si = r36sx_src_index();
+    uint32_t di = r36sx_dst_index();
 
-    if (r36sx_rep_try_movs_ram(count, 1u, CPU_SI, CPU_DI, 0)) {
+    if (r36sx_rep_try_movs_ram(count, 1u, si, di, addressSizeOverride)) {
         return;
     }
 
@@ -1366,16 +1366,16 @@ static inline void r36sx_rep_movsb(uint32_t count)
         }
     }
 
-    CPU_SI = si;
-    CPU_DI = di;
+    r36sx_set_src_index(si);
+    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_movsw(uint32_t count)
 {
-    uint16_t si = CPU_SI;
-    uint16_t di = CPU_DI;
+    uint32_t si = r36sx_src_index();
+    uint32_t di = r36sx_dst_index();
 
-    if (r36sx_rep_try_movs_ram(count, 2u, CPU_SI, CPU_DI, 0)) {
+    if (r36sx_rep_try_movs_ram(count, 2u, si, di, addressSizeOverride)) {
         return;
     }
 
@@ -1393,8 +1393,8 @@ static inline void r36sx_rep_movsw(uint32_t count)
         }
     }
 
-    CPU_SI = si;
-    CPU_DI = di;
+    r36sx_set_src_index(si);
+    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_movsd(uint32_t count)
@@ -1426,10 +1426,10 @@ static inline void r36sx_rep_movsd(uint32_t count)
 
 static inline void r36sx_rep_stosb(uint32_t count)
 {
-    uint16_t di = CPU_DI;
+    uint32_t di = r36sx_dst_index();
     uint8_t value = CPU_AL;
 
-    if (r36sx_rep_try_stos_ram(count, 1u, CPU_DI, 0)) {
+    if (r36sx_rep_try_stos_ram(count, 1u, di, addressSizeOverride)) {
         return;
     }
 
@@ -1445,7 +1445,7 @@ static inline void r36sx_rep_stosb(uint32_t count)
         }
     }
 
-    CPU_DI = di;
+    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_stosd(uint32_t count)
@@ -1474,10 +1474,10 @@ static inline void r36sx_rep_stosd(uint32_t count)
 
 static inline void r36sx_rep_stosw(uint32_t count)
 {
-    uint16_t di = CPU_DI;
+    uint32_t di = r36sx_dst_index();
     uint16_t value = CPU_AX;
 
-    if (r36sx_rep_try_stos_ram(count, 2u, CPU_DI, 0)) {
+    if (r36sx_rep_try_stos_ram(count, 2u, di, addressSizeOverride)) {
         return;
     }
 
@@ -1493,7 +1493,7 @@ static inline void r36sx_rep_stosw(uint32_t count)
         }
     }
 
-    CPU_DI = di;
+    r36sx_set_dst_index(di);
 }
 
 static const bool __not_in_flash("cpu.pf") parity[0x100] = {
@@ -7641,9 +7641,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A4: ;
 #endif
                 /* A4 MOVSB */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -7651,12 +7649,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     uint32_t batch =
                         (tf || was_TF)
                             ? 1u
-                            : r36sx_rep_batch_count(CPU_CX, loopcount,
-                                                    execloops);
+                            : r36sx_rep_batch_count(r36sx_rep_get_count(),
+                                                    loopcount, execloops);
                     r36sx_rep_movsb(batch);
-                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                     loopcount += batch;
-                    if (CPU_CX != 0) {
+                    if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
                     break;
@@ -7671,9 +7669,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A5: ;
 #endif
                 /* A5 MOVSW */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -7681,12 +7677,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     uint32_t batch =
                         (tf || was_TF)
                             ? 1u
-                            : r36sx_rep_batch_count(CPU_CX, loopcount,
-                                                    execloops);
+                            : r36sx_rep_batch_count(r36sx_rep_get_count(),
+                                                    loopcount, execloops);
                     r36sx_rep_movsw(batch);
-                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                     loopcount += batch;
-                    if (CPU_CX != 0) {
+                    if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
                     break;
@@ -7701,26 +7697,23 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A6: ;
 #endif
                 /* A6 CMPSB */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
-                oper1b = getmem8(useseg, CPU_SI);
-                oper2b = getmem8(CPU_ES, CPU_DI);
-                if (df) {
-                    CPU_SI = CPU_SI - 1;
-                    CPU_DI = CPU_DI - 1;
-                } else {
-                    CPU_SI = CPU_SI + 1;
-                    CPU_DI = CPU_DI + 1;
+                {
+                    uint32_t si = r36sx_src_index();
+                    uint32_t di = r36sx_dst_index();
+                    oper1b = getmem8(useseg, si);
+                    oper2b = getmem8(CPU_ES, di);
+                    r36sx_set_src_index(df ? si - 1u : si + 1u);
+                    r36sx_set_dst_index(df ? di - 1u : di + 1u);
                 }
 
                 flag_sub8(oper1b, oper2b
                 );
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 if ((reptype == 1) && !zf) {
@@ -7742,26 +7735,23 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_A7: ;
 #endif
                 /* A7 CMPSW */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
-                oper1 = getmem16(useseg, CPU_SI);
-                oper2 = getmem16(CPU_ES, CPU_DI);
-                if (df) {
-                    CPU_SI = CPU_SI - 2;
-                    CPU_DI = CPU_DI - 2;
-                } else {
-                    CPU_SI = CPU_SI + 2;
-                    CPU_DI = CPU_DI + 2;
+                {
+                    uint32_t si = r36sx_src_index();
+                    uint32_t di = r36sx_dst_index();
+                    oper1 = getmem16(useseg, si);
+                    oper2 = getmem16(CPU_ES, di);
+                    r36sx_set_src_index(df ? si - 2u : si + 2u);
+                    r36sx_set_dst_index(df ? di - 2u : di + 2u);
                 }
 
                 flag_sub16(oper1, oper2
                 );
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 if ((reptype == 1) && !zf) {
@@ -7809,9 +7799,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AA: ;
 #endif
                 /* AA STOSB */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -7819,12 +7807,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     uint32_t batch =
                         (tf || was_TF)
                             ? 1u
-                            : r36sx_rep_batch_count(CPU_CX, loopcount,
-                                                    execloops);
+                            : r36sx_rep_batch_count(r36sx_rep_get_count(),
+                                                    loopcount, execloops);
                     r36sx_rep_stosb(batch);
-                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                     loopcount += batch;
-                    if (CPU_CX != 0) {
+                    if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
                     break;
@@ -7839,9 +7827,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AB: ;
 #endif
                 /* AB STOSW */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -7849,12 +7835,12 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     uint32_t batch =
                         (tf || was_TF)
                             ? 1u
-                            : r36sx_rep_batch_count(CPU_CX, loopcount,
-                                                    execloops);
+                            : r36sx_rep_batch_count(r36sx_rep_get_count(),
+                                                    loopcount, execloops);
                     r36sx_rep_stosw(batch);
-                    CPU_CX = (uint16_t)(CPU_CX - batch);
+                    r36sx_rep_set_count(r36sx_rep_get_count() - batch);
                     loopcount += batch;
-                    if (CPU_CX != 0) {
+                    if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
                     break;
@@ -7869,21 +7855,18 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AC: ;
 #endif
                 /* AC LODSB */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
-                CPU_AL = getmem8(useseg, CPU_SI);
-                if (df) {
-                    CPU_SI = CPU_SI - 1;
-                } else {
-                    CPU_SI = CPU_SI + 1;
+                {
+                    uint32_t si = r36sx_src_index();
+                    CPU_AL = getmem8(useseg, si);
+                    r36sx_set_src_index(df ? si - 1u : si + 1u);
                 }
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 loopcount++;
@@ -7899,22 +7882,19 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AD: ;
 #endif
                 /* AD LODSW */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
-                oper1 = getmem16(useseg, CPU_SI);
-                CPU_AX = oper1;
-                if (df) {
-                    CPU_SI = CPU_SI - 2;
-                } else {
-                    CPU_SI = CPU_SI + 2;
+                {
+                    uint32_t si = r36sx_src_index();
+                    oper1 = getmem16(useseg, si);
+                    CPU_AX = oper1;
+                    r36sx_set_src_index(df ? si - 2u : si + 2u);
                 }
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 loopcount++;
@@ -7930,24 +7910,21 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AE: ;
 #endif
                 /* AE SCASB */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
                 oper1b = CPU_AL;
-                oper2b = getmem8(CPU_ES, CPU_DI);
+                {
+                    uint32_t di = r36sx_dst_index();
+                    oper2b = getmem8(CPU_ES, di);
+                    r36sx_set_dst_index(df ? di - 1u : di + 1u);
+                }
                 flag_sub8(oper1b, oper2b
                 );
-                if (df) {
-                    CPU_DI = CPU_DI - 1;
-                } else {
-                    CPU_DI = CPU_DI + 1;
-                }
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 if ((reptype == 1) && !zf) {
@@ -7969,24 +7946,21 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_AF: ;
 #endif
                 /* AF SCASW */
-                if (
-                    reptype && (CPU_CX
-                                == 0)) {
+                if (reptype && r36sx_rep_get_count() == 0) {
                     break;
                 }
 
                 oper1 = CPU_AX;
-                oper2 = getmem16(CPU_ES, CPU_DI);
+                {
+                    uint32_t di = r36sx_dst_index();
+                    oper2 = getmem16(CPU_ES, di);
+                    r36sx_set_dst_index(df ? di - 2u : di + 2u);
+                }
                 flag_sub16(oper1, oper2
                 );
-                if (df) {
-                    CPU_DI = CPU_DI - 2;
-                } else {
-                    CPU_DI = CPU_DI + 2;
-                }
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
                 if ((reptype == 1) && !zf) {
