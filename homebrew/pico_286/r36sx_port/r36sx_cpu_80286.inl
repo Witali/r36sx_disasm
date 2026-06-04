@@ -701,10 +701,17 @@ static void r36sx_cpu_set_cr0(uint32_t value)
     }
 #if R36SX_ENABLE_PROTECTED_MODE
     uint32_t old_cr0 = r36sx_cr0;
-    r36sx_cr0 = value | R36SX_CR0_ET;
+    /*
+     * MOV reg,CR0 may report legacy reserved/read-as-one bits to CPU probes,
+     * but a CR0 write must not persist those bits in the live machine state.
+     * Keep only implemented 386 control bits and force ET, which is fixed on
+     * 80386-class systems with a 387-compatible coprocessor interface.
+     */
+    r36sx_cr0 = (value & R36SX_CR0_386_WRITE_MASK) | R36SX_CR0_ET;
 #else
     uint32_t old_cr0 = r36sx_cr0;
-    r36sx_cr0 = (value & ~R36SX_CR0_PE) | R36SX_CR0_ET;
+    r36sx_cr0 = (value & R36SX_CR0_386_WRITE_MASK & ~R36SX_CR0_PE) |
+                R36SX_CR0_ET;
 #endif
     uint8_t new_pe = r36sx_cpu_protected_enabled();
     r36sx_cpu_interpreter_protected = new_pe;
