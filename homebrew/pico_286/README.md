@@ -105,6 +105,7 @@ that would normally be opened through handheld Fn combinations:
 - `Host -> Key presets` opens the key preset editor.
 - `Host -> Screenshot` or `F12` saves a screenshot.
 - `Host -> Show statistics` toggles the statistics overlay.
+- `Host -> Show POST codes` toggles the lower-left POST-code overlay.
 - `Host -> Soft reset` or `Ctrl+R` requests a PC soft reset.
 - While either menu is open, use arrow keys to move, `Enter`/`Space`/`A`/`Y`
   to accept, and `Esc`/`Backspace`/`B`/`X` to cancel or close.  `L`, `R`,

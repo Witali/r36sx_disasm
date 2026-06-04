@@ -6,6 +6,7 @@
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
@@ -26,8 +27,9 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_MENU_PRESETS 40002
 #define R36SX_WIN_MENU_SCREENSHOT 40003
 #define R36SX_WIN_MENU_STATS 40004
-#define R36SX_WIN_MENU_RESET 40005
-#define R36SX_WIN_MENU_EXIT 40006
+#define R36SX_WIN_MENU_POST_CODES 40005
+#define R36SX_WIN_MENU_RESET 40006
+#define R36SX_WIN_MENU_EXIT 40007
 
 #define R36SX_WIN_SCREENSHOT_DIR "screenshots"
 #define R36SX_WIN_STATS_FONT_W 3
@@ -36,6 +38,8 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_STATS_CHAR_ADVANCE \
     ((R36SX_WIN_STATS_FONT_W + 1) * R36SX_WIN_STATS_FONT_SCALE)
 #define R36SX_WIN_STATS_ROWS 5
+#define R36SX_WIN_POST_PAD 5
+#define R36SX_WIN_POST_MARGIN 8
 
 static HWND g_wnd;
 static HDC g_hdc;
@@ -53,6 +57,10 @@ static uint32_t g_screenshot_counter;
 static struct r36sx_disk_menu g_disk_menu;
 static struct r36sx_key_presets g_key_presets;
 static uint32_t g_menu_held_buttons;
+static uint8_t g_post_codes_visible;
+static volatile LONG g_post_code_generation;
+static volatile LONG g_post_code_port;
+static volatile LONG g_post_code_value;
 
 static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
 {
@@ -131,6 +139,7 @@ static const uint8_t *r36sx_win_stats_glyph(char ch)
     static const uint8_t glyph_f[5] = { 7, 4, 6, 4, 4 };
     static const uint8_t glyph_i[5] = { 7, 2, 2, 2, 7 };
     static const uint8_t glyph_k[5] = { 5, 5, 6, 5, 5 };
+    static const uint8_t glyph_o[5] = { 7, 5, 5, 5, 7 };
     static const uint8_t glyph_p[5] = { 6, 5, 6, 4, 4 };
     static const uint8_t glyph_q[5] = { 7, 5, 5, 7, 1 };
     static const uint8_t glyph_r[5] = { 6, 5, 6, 5, 5 };
@@ -138,6 +147,8 @@ static const uint8_t *r36sx_win_stats_glyph(char ch)
     static const uint8_t glyph_t[5] = { 7, 2, 2, 2, 2 };
     static const uint8_t glyph_w[5] = { 5, 5, 5, 7, 5 };
     static const uint8_t glyph_x[5] = { 5, 5, 2, 5, 5 };
+    static const uint8_t colon[5] = { 0, 2, 0, 2, 0 };
+    static const uint8_t minus[5] = { 0, 0, 7, 0, 0 };
 
     if (ch >= '0' && ch <= '9') {
         return digits[ch - '0'];
@@ -148,12 +159,15 @@ static const uint8_t *r36sx_win_stats_glyph(char ch)
 
     switch (ch) {
         case '/': return slash;
+        case ':': return colon;
+        case '-': return minus;
         case 'A': return glyph_a;
         case 'D': return glyph_d;
         case 'E': return glyph_e;
         case 'F': return glyph_f;
         case 'I': return glyph_i;
         case 'K': return glyph_k;
+        case 'O': return glyph_o;
         case 'P': return glyph_p;
         case 'Q': return glyph_q;
         case 'R': return glyph_r;
@@ -200,6 +214,48 @@ static void r36sx_win_draw_stats_text(uint16_t *target, int x, int y,
             }
         }
     }
+}
+
+static void r36sx_win_draw_post_codes_overlay(uint16_t *target)
+{
+    char line[24];
+    LONG generation = g_post_code_generation;
+    LONG port = g_post_code_port;
+    LONG value = g_post_code_value;
+    int text_w;
+    int box_w;
+    int box_h;
+    int x = R36SX_WIN_POST_MARGIN;
+    int y;
+
+    if (!target || !g_post_codes_visible) {
+        return;
+    }
+
+    if (generation == 0) {
+        snprintf(line, sizeof(line), "POST --");
+    } else {
+        snprintf(line, sizeof(line), "POST %03lX:%02lX",
+                 (unsigned long)(port & 0xffff),
+                 (unsigned long)(value & 0xff));
+    }
+
+    text_w = r36sx_win_stats_text_width(line);
+    box_w = text_w + R36SX_WIN_POST_PAD * 2;
+    box_h = R36SX_WIN_STATS_FONT_H * R36SX_WIN_STATS_FONT_SCALE +
+            R36SX_WIN_POST_PAD * 2;
+    y = g_height - box_h - R36SX_WIN_POST_MARGIN;
+    if (y < 0) {
+        y = 0;
+    }
+
+    r36sx_win_fill_rect(target, x, y, box_w, box_h,
+                        r36sx_win_rgb565(5, 8, 12));
+    r36sx_win_stroke_rect(target, x, y, box_w, box_h,
+                          r36sx_win_rgb565(70, 96, 112));
+    r36sx_win_draw_stats_text(target, x + R36SX_WIN_POST_PAD,
+                              y + R36SX_WIN_POST_PAD, line,
+                              r36sx_win_rgb565(236, 242, 220));
 }
 
 static void r36sx_win_draw_stats_overlay(uint16_t *target)
@@ -281,8 +337,11 @@ void r36sx_pico286_disk_activity(void)
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
 {
-    (void)portnum;
-    (void)value;
+    g_post_code_port = (LONG)portnum;
+    g_post_code_value = (LONG)value;
+    InterlockedIncrement(&g_post_code_generation);
+    r36sx_pico286_debug_log("post: port=0x%03x code=0x%02x",
+                            portnum, value);
 }
 
 static int r36sx_win_menu_visible(void)
@@ -302,6 +361,18 @@ static void r36sx_win_update_stats_menu_check(void)
                   MF_BYCOMMAND |
                   (r36sx_app_stats_is_visible() ? MF_CHECKED :
                                                   MF_UNCHECKED));
+}
+
+static void r36sx_win_update_post_menu_check(void)
+{
+    HMENU menu = g_wnd ? GetMenu(g_wnd) : NULL;
+
+    if (!menu) {
+        return;
+    }
+    CheckMenuItem(menu, R36SX_WIN_MENU_POST_CODES,
+                  MF_BYCOMMAND |
+                  (g_post_codes_visible ? MF_CHECKED : MF_UNCHECKED));
 }
 
 static void r36sx_win_open_disk_menu(void)
@@ -325,6 +396,14 @@ static void r36sx_win_request_screenshot(void)
 {
     g_screenshot_requested = 1;
     r36sx_pico286_debug_log("winminifb: F12 screenshot requested");
+}
+
+static void r36sx_win_toggle_post_codes(void)
+{
+    g_post_codes_visible = !g_post_codes_visible;
+    r36sx_win_update_post_menu_check();
+    r36sx_pico286_debug_log("winminifb: POST codes %s",
+                            g_post_codes_visible ? "on" : "off");
 }
 
 static void r36sx_win_save_screenshot(const uint16_t *pixels)
@@ -471,6 +550,9 @@ static void r36sx_win_handle_command(WORD command)
             r36sx_app_stats_toggle_visible();
             r36sx_win_update_stats_menu_check();
             break;
+        case R36SX_WIN_MENU_POST_CODES:
+            r36sx_win_toggle_post_codes();
+            break;
         case R36SX_WIN_MENU_RESET:
             r36sx_pico286_request_soft_reset();
             break;
@@ -607,6 +689,10 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_frame_generation = 0;
     g_screenshot_counter = 0;
     g_menu_held_buttons = 0;
+    g_post_codes_visible = 0;
+    g_post_code_generation = 0;
+    g_post_code_port = 0;
+    g_post_code_value = 0;
     r36sx_app_stats_init();
     r36sx_disk_menu_init(&g_disk_menu);
     r36sx_key_presets_load(&g_key_presets);
@@ -622,6 +708,8 @@ int mfb_open(const char *name, int width, int height, int scale)
                    "Screenshot\tF12");
         AppendMenu(host_menu, MF_STRING | MF_UNCHECKED,
                    R36SX_WIN_MENU_STATS, "Show statistics");
+        AppendMenu(host_menu, MF_STRING | MF_UNCHECKED,
+                   R36SX_WIN_MENU_POST_CODES, "Show POST codes");
         AppendMenu(host_menu, MF_SEPARATOR, 0, NULL);
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_RESET,
                    "Soft reset\tCtrl+R");
@@ -697,7 +785,8 @@ int mfb_update(void *buffer, int fps_limit)
 
     pixels = (size_t)g_width * (size_t)g_height;
     present_src = src;
-    if (r36sx_win_menu_visible() || r36sx_app_stats_is_visible()) {
+    if (r36sx_win_menu_visible() || r36sx_app_stats_is_visible() ||
+        g_post_codes_visible) {
         /*
          * The Windows host draws debug overlays on a temporary RGB565 copy so
          * the emulated PC framebuffer stays untouched.
@@ -714,6 +803,7 @@ int mfb_update(void *buffer, int fps_limit)
                                    g_height, g_width);
         } else {
             r36sx_win_draw_stats_overlay(g_overlay_frame);
+            r36sx_win_draw_post_codes_overlay(g_overlay_frame);
         }
         present_src = g_overlay_frame;
     }
