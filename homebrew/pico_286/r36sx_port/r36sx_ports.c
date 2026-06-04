@@ -44,6 +44,12 @@ static int audio_covox_enabled = 1;
 #define R36SX_PC_POST_PORT 0x80u
 #define R36SX_TEST386_SUBPOST_PORT 0x190u
 #define R36SX_TEST386_ASCII_PORT 0x191u
+/*
+ * test386's printChar uses OUT imm8,AL for OUT_PORT.  Per Intel 80386, the
+ * immediate port id is only 8 bits and is zero-extended to 16 bits, so a source
+ * EQU of 0x191 is observed by hardware as port 0x91.
+ */
+#define R36SX_TEST386_ASCII_IMM8_PORT 0x91u
 
 extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
 extern void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value);
@@ -68,6 +74,39 @@ static uint64_t keyboard_next_ready_us;
 static uint8_t keyboard_controller_response_ready;
 static uint8_t keyboard_controller_write_output_port;
 static uint8_t keyboard_controller_output_port;
+static uint8_t r36sx_test386_current_post;
+
+#if R36SX_DEBUG_TEST_BIOS_TRACE
+static FILE *r36sx_test386_ee_output_fp;
+static uint8_t r36sx_test386_ee_output_open_attempted;
+
+static void r36sx_test386_ee_output_line(const char *line)
+{
+    if (!r36sx_test386_ee_output_fp &&
+        !r36sx_test386_ee_output_open_attempted) {
+        /*
+         * Keep the huge POST EE arithmetic/logic reference stream out of the
+         * capped main debug log.  The file is intentionally overwritten for
+         * each emulator run so it can be diffed directly against upstream.
+         */
+        r36sx_test386_ee_output_open_attempted = 1;
+        r36sx_test386_ee_output_fp = fopen("test386-ee-output.txt", "w");
+        if (r36sx_test386_ee_output_fp) {
+            r36sx_pico286_debug_log(
+                "test386: writing POST EE output to test386-ee-output.txt");
+        } else {
+            r36sx_pico286_debug_log(
+                "test386: failed to open test386-ee-output.txt");
+        }
+    }
+
+    if (r36sx_test386_ee_output_fp) {
+        fputs(line, r36sx_test386_ee_output_fp);
+        fputc('\n', r36sx_test386_ee_output_fp);
+        fflush(r36sx_test386_ee_output_fp);
+    }
+}
+#endif
 
 static void r36sx_test386_ascii_out(uint8_t value) {
     static char line[192];
@@ -79,7 +118,13 @@ static void r36sx_test386_ascii_out(uint8_t value) {
     if (value == '\n') {
         if (line_pos > 0) {
             line[line_pos] = 0;
-            R36SX_TEST_BIOS_LOG("test386: %s", line);
+            if (r36sx_test386_current_post == 0xEEu) {
+#if R36SX_DEBUG_TEST_BIOS_TRACE
+                r36sx_test386_ee_output_line(line);
+#endif
+            } else {
+                R36SX_TEST_BIOS_LOG("test386: %s", line);
+            }
             line_pos = 0;
         }
         return;
@@ -689,6 +734,7 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 void portout(uint16_t portnum, uint16_t value) {
     switch (portnum) {
         case R36SX_PC_POST_PORT:
+            r36sx_test386_current_post = (uint8_t)value;
             r36sx_pico286_post_code_out(portnum, (uint8_t)value);
             /*
              * Main POSTs are frequent during early ROM self-tests.  Keep the
@@ -702,6 +748,7 @@ void portout(uint16_t portnum, uint16_t value) {
         case R36SX_TEST386_SUBPOST_PORT:
             r36sx_test386_subpost_out((uint8_t)value);
             return;
+        case R36SX_TEST386_ASCII_IMM8_PORT:
         case R36SX_TEST386_ASCII_PORT:
             r36sx_test386_ascii_out((uint8_t)value);
             return;
