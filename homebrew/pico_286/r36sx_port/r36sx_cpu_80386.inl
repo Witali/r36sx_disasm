@@ -740,7 +740,21 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 r36sx_cpu_invalid_opcode(fault_ip);
                 return true;
             }
-            writerm32(rm, getmem32(CPU_CS, CPU_IP));
+            {
+                uint32_t imm32 = getmem32(CPU_CS, CPU_IP);
+                if (r36sx_cpu_exception_is_pending()) {
+                    return true;
+                }
+                writerm32(rm, imm32);
+                if (r36sx_cpu_exception_is_pending()) {
+                    /*
+                     * Intel fault semantics require #PF/#GP/#SS to restart at
+                     * the instruction that faulted. The exception handler has
+                     * already loaded CS:EIP, so do not consume the immediate.
+                     */
+                    return true;
+                }
+            }
             StepIP(4);
             return true;
 

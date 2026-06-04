@@ -388,6 +388,13 @@ static uint32_t r36sx_cr3;
  * so memory helpers use this per-instruction context instead of CPU_IP.
  */
 static uint32_t r36sx_cpu_fault_ip_context;
+/*
+ * Fault-class exceptions redirect execution before the faulting instruction
+ * completes. Opcode handlers that perform memory accesses must not continue
+ * with immediate StepIP() or register writes after raise_exception() enters
+ * the handler.
+ */
+static uint8_t r36sx_cpu_exception_pending;
 static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint16_t r36sx_debug_resume_cs;
@@ -492,6 +499,11 @@ static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
 void intcall86(uint8_t intnum);
 static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip);
 static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops);
+
+static inline uint8_t r36sx_cpu_exception_is_pending(void)
+{
+    return r36sx_cpu_exception_pending;
+}
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
 #include "r36sx_cpu_80286.inl"
@@ -5272,6 +5284,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
         uint8_t prefix_exception = 0;
         firstip = CPU_IP;
         r36sx_cpu_fault_ip_context = firstip;
+        r36sx_cpu_exception_pending = 0u;
         register uint8_t opcode;
 
         if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {

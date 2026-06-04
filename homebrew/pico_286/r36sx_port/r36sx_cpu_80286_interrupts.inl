@@ -300,6 +300,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint8_t has_error_code,
                                       uint32_t fault_ip)
 {
+    r36sx_cpu_exception_pending = 1u;
     r36sx_cpu_set_ip(fault_ip);
 #if R36SX_DEBUG_PM_DIAG
     static uint8_t last_intnum;
