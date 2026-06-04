@@ -46,6 +46,7 @@ local_artifacts/
 homebrew/*/obj/
 homebrew/*/obj-gcc/
 homebrew/*/.build/
+homebrew/pico_286/build/
 homebrew/common/.build-screenshot-so/
 homebrew/common/.build-screenshot-a/
 !homebrew/common/screenshot.a

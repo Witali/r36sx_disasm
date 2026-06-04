@@ -53,10 +53,45 @@ integration pieces:
   not used by the Linux/host configuration.
 - `build_pico_286.ps1` cross-compiles the upstream C/C++ emulator sources into
   a native MIPS executable named `pico_286`.
+- `build_pico_286_windows.ps1` builds a native Windows debug executable named
+  `pico_286_win.exe` with the same R36SX CPU/VGA/disk/config sources.  It uses
+  the local Zig toolchain and writes build products under
+  `homebrew/pico_286/build/`.
 - The upstream `.psram` memory arrays are kept as `.psram` only for
   `PICO_ON_DEVICE` builds.  In the Linux/MIPS host build they use normal
   zero-initialized storage so the executable does not contain 7 MB of empty
   RAM/EMS/XMS data.
+
+## Windows debug build
+
+The Windows build is meant for fast PC-side debugging without copying each test
+binary to the handheld.  It compiles the current R36SX emulator core and opens a
+Win32 framebuffer window.  The host layer is intentionally small: video,
+physical keyboard input, disk images, config loading, RTC, profiling, and debug
+logs are active; the R36SX `driver.so` video/audio paths, joypad Fn overlays,
+and device-only audio output are not used in this build.
+
+Build it from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+The script writes:
+
+- `homebrew\pico_286\build\pico_286_win.exe`
+- `patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286_win.exe`
+
+The patch folder already contains `images`, `host`, `pico_286.conf`, and
+`keypresets.conf`, so run the Windows debug executable from that directory:
+
+```powershell
+cd patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286
+.\pico_286_win.exe
+```
+
+Debug logs are appended to `pico_286.log` beside the Windows executable and stop
+growing after 2 MB, matching the bounded device-log behavior.
 
 The build script leaves upstream source files untouched.  R36SX changes live as
 separate source files under `homebrew/pico_286/r36sx_port/`; the `obj/`

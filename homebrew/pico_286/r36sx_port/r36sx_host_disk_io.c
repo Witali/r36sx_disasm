@@ -10,7 +10,13 @@
 
 #include "r36sx_disk_config.h"
 #include "r36sx_app_stats.h"
+#ifndef _WIN32
+/*
+ * The Windows debug host force-includes its own compatibility layer, while the
+ * MIPS/Linux device build still needs the original R36SX helper definitions.
+ */
 #include "r36sx_pico286_compat.h"
+#endif
 
 static uint32_t r36sx_host_disk_now_ms(void)
 {
