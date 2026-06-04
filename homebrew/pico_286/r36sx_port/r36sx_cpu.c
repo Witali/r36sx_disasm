@@ -8517,8 +8517,16 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                r36sx_cpu_set_stack_pointer(CPU_BP);
-                CPU_BP = pop();
+                /*
+                 * LEAVE uses the stack-address size for SP/ESP restoration
+                 * and the operand size for the BP/EBP pop width.
+                 */
+                r36sx_cpu_set_stack_pointer(CPU_EBP);
+                if (operandSizeOverride) {
+                    CPU_EBP = pop32();
+                } else {
+                    CPU_BP = pop();
+                }
                 break;
 
             case 0xCA:
