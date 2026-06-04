@@ -34,7 +34,7 @@
 #define R36SX_PICO286_MAX_LOG_BYTES (2u * 1024u * 1024u)
 #define R36SX_PICO286_HAS_LOG_OPEN_HELPER 1
 
-/* Keep append-only logs bounded without unlinking the file from the filesystem. */
+/* Keep append-only logs bounded: once the file reaches the cap, stop writing. */
 static inline FILE *r36sx_pico286_open_log_for_append(void)
 {
     const char *paths[] = {
@@ -44,27 +44,14 @@ static inline FILE *r36sx_pico286_open_log_for_append(void)
 
     for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
         struct stat st;
-        const char *mode = "a";
-        long previous_size = 0;
 
         if (stat(paths[i], &st) == 0 &&
             st.st_size >= (off_t)R36SX_PICO286_MAX_LOG_BYTES) {
-            mode = "w";
-            previous_size = (long)st.st_size;
+            return NULL;
         }
 
-        FILE *fp = fopen(paths[i], mode);
+        FILE *fp = fopen(paths[i], "a");
         if (fp) {
-            if (mode[0] == 'w') {
-                struct timeval tv;
-
-                gettimeofday(&tv, NULL);
-                fprintf(fp,
-                        "[%ld.%03ld] log truncated: previous_size=%ld max=%u\n",
-                        (long)tv.tv_sec, (long)(tv.tv_usec / 1000),
-                        previous_size,
-                        (unsigned int)R36SX_PICO286_MAX_LOG_BYTES);
-            }
             return fp;
         }
     }
