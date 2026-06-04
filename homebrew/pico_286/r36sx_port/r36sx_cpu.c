@@ -2375,6 +2375,25 @@ static uint32_t r36sx_test386_trace_remaining;
 void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value)
 {
     /*
+     * POST EE intentionally prints a large manual arithmetic/logic reference
+     * stream, and POST FF is the final halt.  Do not let an earlier trace window
+     * spill into those blocks or the useful log reaches its size cap before the
+     * completion POST is visible.
+     */
+    if (value == 0xEEu || value == 0xFFu) {
+        if (r36sx_test386_trace_remaining != 0u) {
+            r36sx_pico286_debug_log(
+                "[T386] trace stopped by post=%03x:%02x previous_left=%lu",
+                (unsigned int)portnum, (unsigned int)value,
+                (unsigned long)r36sx_test386_trace_remaining);
+        }
+        r36sx_test386_trace_port = portnum;
+        r36sx_test386_trace_code = value;
+        r36sx_test386_trace_remaining = 0;
+        return;
+    }
+
+    /*
      * Re-arm on every R36SX sub-POST.  test386 POST 09 contains several large
      * instruction groups; tracing a bounded window after each breadcrumb lets
      * us localize the failing group from the Windows host without growing the
