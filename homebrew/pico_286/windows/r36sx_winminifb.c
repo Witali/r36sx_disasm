@@ -12,8 +12,11 @@
 
 #include "MiniFB.h"
 #include "hardware.h"
+#include "r36sx_app_stats.h"
+#include "r36sx_disk_config.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
+#include "r36sx_screenshot.h"
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern void HandleMouse(int x, int y, int buttons);
@@ -21,8 +24,18 @@ extern void r36sx_pico286_request_soft_reset(void);
 
 #define R36SX_WIN_MENU_DISK 40001
 #define R36SX_WIN_MENU_PRESETS 40002
-#define R36SX_WIN_MENU_RESET 40003
-#define R36SX_WIN_MENU_EXIT 40004
+#define R36SX_WIN_MENU_SCREENSHOT 40003
+#define R36SX_WIN_MENU_STATS 40004
+#define R36SX_WIN_MENU_RESET 40005
+#define R36SX_WIN_MENU_EXIT 40006
+
+#define R36SX_WIN_SCREENSHOT_DIR "screenshots"
+#define R36SX_WIN_STATS_FONT_W 3
+#define R36SX_WIN_STATS_FONT_H 5
+#define R36SX_WIN_STATS_FONT_SCALE 2
+#define R36SX_WIN_STATS_CHAR_ADVANCE \
+    ((R36SX_WIN_STATS_FONT_W + 1) * R36SX_WIN_STATS_FONT_SCALE)
+#define R36SX_WIN_STATS_ROWS 5
 
 static HWND g_wnd;
 static HDC g_hdc;
@@ -33,8 +46,10 @@ static int g_width;
 static int g_height;
 static int g_scale;
 static int g_close_requested;
+static uint8_t g_screenshot_requested;
 static char g_key_status[512];
 static volatile uint32_t g_frame_generation;
+static uint32_t g_screenshot_counter;
 static struct r36sx_disk_menu g_disk_menu;
 static struct r36sx_key_presets g_key_presets;
 static uint32_t g_menu_held_buttons;
@@ -48,6 +63,210 @@ static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
     g = (g << 2) | (g >> 4);
     b = (b << 3) | (b >> 2);
     return (r << 16) | (g << 8) | b;
+}
+
+static uint16_t r36sx_win_rgb565(uint8_t r, uint8_t g, uint8_t b)
+{
+    return (uint16_t)(((uint16_t)(r >> 3) << 11) |
+                      ((uint16_t)(g >> 2) << 5) |
+                      (uint16_t)(b >> 3));
+}
+
+static void r36sx_win_fill_rect(uint16_t *target, int x, int y,
+                                int w, int h, uint16_t color)
+{
+    if (!target || w <= 0 || h <= 0) {
+        return;
+    }
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x + w > g_width) {
+        w = g_width - x;
+    }
+    if (y + h > g_height) {
+        h = g_height - y;
+    }
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    for (int row = 0; row < h; row++) {
+        uint16_t *dst = target + (size_t)(y + row) * (size_t)g_width +
+                        (size_t)x;
+        for (int col = 0; col < w; col++) {
+            dst[col] = color;
+        }
+    }
+}
+
+static void r36sx_win_stroke_rect(uint16_t *target, int x, int y,
+                                  int w, int h, uint16_t color)
+{
+    r36sx_win_fill_rect(target, x, y, w, 1, color);
+    r36sx_win_fill_rect(target, x, y + h - 1, w, 1, color);
+    r36sx_win_fill_rect(target, x, y, 1, h, color);
+    r36sx_win_fill_rect(target, x + w - 1, y, 1, h, color);
+}
+
+static const uint8_t *r36sx_win_stats_glyph(char ch)
+{
+    static const uint8_t blank[5] = { 0, 0, 0, 0, 0 };
+    static const uint8_t digits[10][5] = {
+        { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 },
+        { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 },
+        { 5, 5, 7, 1, 1 }, { 7, 4, 7, 1, 7 },
+        { 7, 4, 7, 5, 7 }, { 7, 1, 2, 2, 2 },
+        { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 }
+    };
+    static const uint8_t slash[5] = { 1, 1, 2, 4, 4 };
+    static const uint8_t glyph_a[5] = { 7, 5, 7, 5, 5 };
+    static const uint8_t glyph_d[5] = { 6, 5, 5, 5, 6 };
+    static const uint8_t glyph_e[5] = { 7, 4, 6, 4, 7 };
+    static const uint8_t glyph_f[5] = { 7, 4, 6, 4, 4 };
+    static const uint8_t glyph_i[5] = { 7, 2, 2, 2, 7 };
+    static const uint8_t glyph_k[5] = { 5, 5, 6, 5, 5 };
+    static const uint8_t glyph_p[5] = { 6, 5, 6, 4, 4 };
+    static const uint8_t glyph_q[5] = { 7, 5, 5, 7, 1 };
+    static const uint8_t glyph_r[5] = { 6, 5, 6, 5, 5 };
+    static const uint8_t glyph_s[5] = { 7, 4, 7, 1, 7 };
+    static const uint8_t glyph_t[5] = { 7, 2, 2, 2, 2 };
+    static const uint8_t glyph_w[5] = { 5, 5, 5, 7, 5 };
+    static const uint8_t glyph_x[5] = { 5, 5, 2, 5, 5 };
+
+    if (ch >= '0' && ch <= '9') {
+        return digits[ch - '0'];
+    }
+    if (ch >= 'a' && ch <= 'z') {
+        ch = (char)(ch - 'a' + 'A');
+    }
+
+    switch (ch) {
+        case '/': return slash;
+        case 'A': return glyph_a;
+        case 'D': return glyph_d;
+        case 'E': return glyph_e;
+        case 'F': return glyph_f;
+        case 'I': return glyph_i;
+        case 'K': return glyph_k;
+        case 'P': return glyph_p;
+        case 'Q': return glyph_q;
+        case 'R': return glyph_r;
+        case 'S': return glyph_s;
+        case 'T': return glyph_t;
+        case 'W': return glyph_w;
+        case 'X': return glyph_x;
+        default: return blank;
+    }
+}
+
+static int r36sx_win_stats_text_width(const char *text)
+{
+    int len = text ? (int)strlen(text) : 0;
+
+    if (len <= 0) {
+        return 0;
+    }
+    return len * R36SX_WIN_STATS_CHAR_ADVANCE -
+           R36SX_WIN_STATS_FONT_SCALE;
+}
+
+static void r36sx_win_draw_stats_text(uint16_t *target, int x, int y,
+                                      const char *text, uint16_t color)
+{
+    for (int i = 0; text && text[i] != '\0'; i++) {
+        const uint8_t *glyph = r36sx_win_stats_glyph(text[i]);
+        int char_x = x + i * R36SX_WIN_STATS_CHAR_ADVANCE;
+
+        for (int row = 0; row < R36SX_WIN_STATS_FONT_H; row++) {
+            uint8_t bits = glyph[row];
+            for (int col = 0; col < R36SX_WIN_STATS_FONT_W; col++) {
+                if ((bits & (uint8_t)(1u << (R36SX_WIN_STATS_FONT_W -
+                                             1 - col))) == 0) {
+                    continue;
+                }
+                r36sx_win_fill_rect(
+                    target,
+                    char_x + col * R36SX_WIN_STATS_FONT_SCALE,
+                    y + row * R36SX_WIN_STATS_FONT_SCALE,
+                    R36SX_WIN_STATS_FONT_SCALE,
+                    R36SX_WIN_STATS_FONT_SCALE,
+                    color);
+            }
+        }
+    }
+}
+
+static void r36sx_win_draw_stats_overlay(uint16_t *target)
+{
+    r36sx_app_stats_snapshot_t stats;
+    static const char *labels[R36SX_WIN_STATS_ROWS] = {
+        "X86", "QPS", "READ", "WRITE", "FPS"
+    };
+    char values[R36SX_WIN_STATS_ROWS][16];
+    int label_w = r36sx_win_stats_text_width("WRITE");
+    int value_w = 0;
+    const int pad = 4;
+    const int gap = 7;
+    const int row_h = 12;
+    int box_w;
+    int box_h;
+    int x;
+    int y;
+
+    if (!target || !r36sx_app_stats_is_visible()) {
+        return;
+    }
+
+    r36sx_app_stats_snapshot(&stats);
+    snprintf(values[0], sizeof(values[0]), "%luK/S",
+             (unsigned long)(stats.x86_per_sec / 1000u));
+    snprintf(values[1], sizeof(values[1]), "%lu",
+             (unsigned long)stats.quanta_per_sec);
+    snprintf(values[2], sizeof(values[2]), "%luK/S",
+             (unsigned long)stats.disk_read_kb_per_sec);
+    snprintf(values[3], sizeof(values[3]), "%luK/S",
+             (unsigned long)stats.disk_write_kb_per_sec);
+    snprintf(values[4], sizeof(values[4]), "%lu",
+             (unsigned long)stats.fps);
+
+    for (int i = 0; i < R36SX_WIN_STATS_ROWS; i++) {
+        int width = r36sx_win_stats_text_width(values[i]);
+        if (width > value_w) {
+            value_w = width;
+        }
+    }
+
+    box_w = pad * 2 + label_w + gap + value_w;
+    box_h = pad * 2 + R36SX_WIN_STATS_ROWS * row_h -
+            (row_h - R36SX_WIN_STATS_FONT_H *
+                     R36SX_WIN_STATS_FONT_SCALE);
+    x = g_width - box_w - 8;
+    y = g_height - box_h - 8;
+    if (x < 0) {
+        x = 0;
+    }
+    if (y < 0) {
+        y = 0;
+    }
+
+    r36sx_win_fill_rect(target, x, y, box_w, box_h,
+                        r36sx_win_rgb565(5, 8, 12));
+    r36sx_win_stroke_rect(target, x, y, box_w, box_h,
+                          r36sx_win_rgb565(70, 96, 112));
+    for (int i = 0; i < R36SX_WIN_STATS_ROWS; i++) {
+        int row_y = y + pad + i * row_h;
+        r36sx_win_draw_stats_text(target, x + pad, row_y, labels[i],
+                                  r36sx_win_rgb565(176, 202, 214));
+        r36sx_win_draw_stats_text(target, x + pad + label_w + gap,
+                                  row_y, values[i],
+                                  r36sx_win_rgb565(236, 242, 220));
+    }
 }
 
 void r36sx_mfb_mark_frame_ready(void)
@@ -72,6 +291,19 @@ static int r36sx_win_menu_visible(void)
            r36sx_key_presets_is_visible(&g_key_presets);
 }
 
+static void r36sx_win_update_stats_menu_check(void)
+{
+    HMENU menu = g_wnd ? GetMenu(g_wnd) : NULL;
+
+    if (!menu) {
+        return;
+    }
+    CheckMenuItem(menu, R36SX_WIN_MENU_STATS,
+                  MF_BYCOMMAND |
+                  (r36sx_app_stats_is_visible() ? MF_CHECKED :
+                                                  MF_UNCHECKED));
+}
+
 static void r36sx_win_open_disk_menu(void)
 {
     r36sx_key_presets_set_visible(&g_key_presets, 0);
@@ -87,6 +319,60 @@ static void r36sx_win_open_key_presets(void)
         &g_key_presets,
         !r36sx_key_presets_is_visible(&g_key_presets));
     g_menu_held_buttons = 0;
+}
+
+static void r36sx_win_request_screenshot(void)
+{
+    g_screenshot_requested = 1;
+    r36sx_pico286_debug_log("winminifb: F12 screenshot requested");
+}
+
+static void r36sx_win_save_screenshot(const uint16_t *pixels)
+{
+    r36sx_screenshot_options_t options;
+    char path[512];
+    r36sx_pico286_screenshot_format_t format;
+
+    if (!pixels) {
+        g_screenshot_requested = 0;
+        return;
+    }
+
+    format = r36sx_pico286_screenshot_format();
+    memset(&options, 0, sizeof(options));
+    options.primary_dir = R36SX_WIN_SCREENSHOT_DIR;
+    options.prefix = "pico_286_win";
+    options.unix_time = r36sx_pico286_rtc_current_time_unix();
+    options.sequence = g_screenshot_counter++;
+    options.format = format == R36SX_PICO286_SCREENSHOT_FORMAT_BMP ?
+        R36SX_SCREENSHOT_FORMAT_BMP : R36SX_SCREENSHOT_FORMAT_PNG;
+    options.include_build_hash =
+        r36sx_pico286_screenshot_build_hash_enabled();
+    options.build_hash_sha256 = R36SX_BUILD_COMMIT_OBJECT_SHA256;
+
+    if (r36sx_screenshot_save_rgb565(&options, pixels, g_width, g_height,
+                                     path, sizeof(path)) == 0) {
+        r36sx_pico286_debug_log("winminifb: screenshot saved %s", path);
+        g_screenshot_requested = 0;
+        return;
+    }
+
+    /*
+     * Windows debug builds may not have a loadable screenshot.so for PNG.
+     * Keep F12 useful by falling back to the built-in BMP writer.
+     */
+    if (options.format == R36SX_SCREENSHOT_FORMAT_PNG) {
+        options.format = R36SX_SCREENSHOT_FORMAT_BMP;
+        if (r36sx_screenshot_save_rgb565(&options, pixels, g_width,
+                                         g_height, path, sizeof(path)) == 0) {
+            r36sx_pico286_debug_log("winminifb: screenshot saved %s", path);
+            g_screenshot_requested = 0;
+            return;
+        }
+    }
+
+    r36sx_pico286_debug_log("winminifb: screenshot save failed");
+    g_screenshot_requested = 0;
 }
 
 static uint32_t r36sx_win_button_from_key(unsigned int key)
@@ -178,6 +464,13 @@ static void r36sx_win_handle_command(WORD command)
         case R36SX_WIN_MENU_PRESETS:
             r36sx_win_open_key_presets();
             break;
+        case R36SX_WIN_MENU_SCREENSHOT:
+            r36sx_win_request_screenshot();
+            break;
+        case R36SX_WIN_MENU_STATS:
+            r36sx_app_stats_toggle_visible();
+            r36sx_win_update_stats_menu_check();
+            break;
         case R36SX_WIN_MENU_RESET:
             r36sx_pico286_request_soft_reset();
             break;
@@ -264,12 +557,12 @@ static LRESULT CALLBACK r36sx_win_wndproc(HWND wnd, UINT msg,
             int is_down = (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN);
             int first_down = is_down && ((l_param & (1L << 30)) == 0);
 
-            if (first_down && key == VK_F9) {
+            if (first_down && key == VK_F11) {
                 r36sx_win_open_disk_menu();
                 return 0;
             }
-            if (first_down && key == VK_F10) {
-                r36sx_win_open_key_presets();
+            if (first_down && key == VK_F12) {
+                r36sx_win_request_screenshot();
                 return 0;
             }
             if (first_down && key == 'R' && (GetKeyState(VK_CONTROL) < 0)) {
@@ -310,8 +603,11 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_height = height;
     g_scale = scale > 0 ? scale : 1;
     g_close_requested = 0;
+    g_screenshot_requested = 0;
     g_frame_generation = 0;
+    g_screenshot_counter = 0;
     g_menu_held_buttons = 0;
+    r36sx_app_stats_init();
     r36sx_disk_menu_init(&g_disk_menu);
     r36sx_key_presets_load(&g_key_presets);
 
@@ -319,9 +615,13 @@ int mfb_open(const char *name, int width, int height, int scale)
     host_menu = CreatePopupMenu();
     if (menu && host_menu) {
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_DISK,
-                   "Disk menu\tF9");
+                   "Disk menu\tF11");
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_PRESETS,
-                   "Key presets\tF10");
+                   "Key presets");
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_SCREENSHOT,
+                   "Screenshot\tF12");
+        AppendMenu(host_menu, MF_STRING | MF_UNCHECKED,
+                   R36SX_WIN_MENU_STATS, "Show statistics");
         AppendMenu(host_menu, MF_SEPARATOR, 0, NULL);
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_RESET,
                    "Soft reset\tCtrl+R");
@@ -397,10 +697,10 @@ int mfb_update(void *buffer, int fps_limit)
 
     pixels = (size_t)g_width * (size_t)g_height;
     present_src = src;
-    if (r36sx_win_menu_visible()) {
+    if (r36sx_win_menu_visible() || r36sx_app_stats_is_visible()) {
         /*
-         * The Windows host draws debug menus on a temporary RGB565 copy so the
-         * emulated PC framebuffer stays untouched.
+         * The Windows host draws debug overlays on a temporary RGB565 copy so
+         * the emulated PC framebuffer stays untouched.
          */
         if (r36sx_key_presets_is_visible(&g_key_presets)) {
             r36sx_win_handle_key_preset_buttons(0, g_menu_held_buttons);
@@ -412,8 +712,13 @@ int mfb_update(void *buffer, int fps_limit)
         } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
             r36sx_key_presets_draw(&g_key_presets, g_overlay_frame, g_width,
                                    g_height, g_width);
+        } else {
+            r36sx_win_draw_stats_overlay(g_overlay_frame);
         }
         present_src = g_overlay_frame;
+    }
+    if (g_screenshot_requested) {
+        r36sx_win_save_screenshot(present_src);
     }
     for (size_t i = 0; i < pixels; ++i) {
         g_frame32[i] = r36sx_win_rgb565_to_rgb888(present_src[i]);
@@ -422,6 +727,7 @@ int mfb_update(void *buffer, int fps_limit)
     StretchDIBits(g_hdc, 0, 0, g_width * g_scale, g_height * g_scale,
                   0, 0, g_width, g_height,
                   g_frame32, &g_bmi, DIB_RGB_COLORS, SRCCOPY);
+    r36sx_app_stats_record_frame();
 
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {

@@ -98,11 +98,13 @@ cd patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286
 Debug logs are appended to `pico_286.log` beside the Windows executable and stop
 growing after 2 MB, matching the bounded device-log behavior.
 
-The Windows host has its own menu entry and shortcuts for debug-only menus that
-would normally be opened through handheld Fn combinations:
+The Windows host has its own menu entry and shortcuts for debug-only actions
+that would normally be opened through handheld Fn combinations:
 
-- `Host -> Disk menu` or `F9` opens the disk/CPU/device-settings menu.
-- `Host -> Key presets` or `F10` opens the key preset editor.
+- `Host -> Disk menu` or `F11` opens the disk/CPU/device-settings menu.
+- `Host -> Key presets` opens the key preset editor.
+- `Host -> Screenshot` or `F12` saves a screenshot.
+- `Host -> Show statistics` toggles the statistics overlay.
 - `Host -> Soft reset` or `Ctrl+R` requests a PC soft reset.
 - While either menu is open, use arrow keys to move, `Enter`/`Space`/`A`/`Y`
   to accept, and `Esc`/`Backspace`/`B`/`X` to cancel or close.  `L`, `R`,
