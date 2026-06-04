@@ -118,6 +118,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint16_t old_ds = CPU_DS;
     uint16_t old_fs = CPU_FS;
     uint16_t old_gs = CPU_GS;
+    uint32_t old_flags_dword = makeflagsdword();
+    uint16_t old_flags_word = makeflagsword();
 
     if (old_vm86 || new_cpl < old_cpl) {
         uint32_t new_sp;
@@ -140,6 +142,16 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         r36sx_cpu_current_cpl = new_cpl & 3u;
     }
 
+    if (old_vm86) {
+        /*
+         * VM86 exception delivery switches to a protected-mode handler stack.
+         * Keep the VM bit only in the saved EFLAGS image; stack frame writes
+         * themselves must use the target protected SS descriptor, not VM86's
+         * real-mode segment translation.
+         */
+        x86_flags.value &= ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
+    }
+
     if (gate32) {
         /*
          * A 386 interrupt from VM86 first saves the VM86 data segments, then
@@ -156,7 +168,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
             push32(old_ss);
             push32(old_sp);
         }
-        push32(makeflagsdword());
+        push32(old_flags_dword);
         push32(CPU_CS);
         push32(CPU_IP);
         if (has_error_code) {
@@ -167,7 +179,7 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
             push(old_ss);
             push((uint16_t)old_sp);
         }
-        push(makeflagsword());
+        push(old_flags_word);
         push(CPU_CS);
         push(CPU_IP);
         if (has_error_code) {
