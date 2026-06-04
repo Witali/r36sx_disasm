@@ -646,38 +646,38 @@ static uint8_t r36sx_cpu_check_segment_cache_access(
     }
 
     if (!cache || !cache->valid) {
+        /*
+         * Intel reports memory-reference segment faults as #GP(0) or #SS(0).
+         * Selector error codes are for selector-load/gate/task faults, not for
+         * a data/code access through an already loaded segment register.
+         */
         r36sx_cpu_raise_exception(
             segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            segid == regss ? 0u : (cache ? cache->selector & 0xfffcu : 0u),
-            1, CPU_IP);
+            0, 1, r36sx_cpu_fault_ip_context);
         return 0;
     }
 
     if (execute_access) {
         if (!r36sx_descriptor_is_code(cache)) {
-            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
-                                      cache->selector & 0xfffcu,
-                                      1, CPU_IP);
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1,
+                                      r36sx_cpu_fault_ip_context);
             return 0;
         }
     } else if (write_access) {
         if (!r36sx_descriptor_is_writable_data(cache)) {
-            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
-                                      cache->selector & 0xfffcu,
-                                      1, CPU_IP);
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1,
+                                      r36sx_cpu_fault_ip_context);
             return 0;
         }
     } else if (r36sx_descriptor_is_code(cache)) {
         if (!r36sx_descriptor_is_readable_code(cache)) {
-            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
-                                      cache->selector & 0xfffcu,
-                                      1, CPU_IP);
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1,
+                                      r36sx_cpu_fault_ip_context);
             return 0;
         }
     } else if (!r36sx_descriptor_is_data(cache)) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP,
-                                  cache->selector & 0xfffcu,
-                                  1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1,
+                                  r36sx_cpu_fault_ip_context);
         return 0;
     }
 
@@ -696,7 +696,7 @@ static uint8_t r36sx_cpu_check_segment_cache_access(
     if (limit_fault) {
         r36sx_cpu_raise_exception(
             segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            segid == regss ? 0u : (cache->selector & 0xfffcu), 1, CPU_IP);
+            0, 1, r36sx_cpu_fault_ip_context);
         return 0;
     }
 
@@ -719,8 +719,8 @@ static uint8_t r36sx_cpu_segment_linear_checked(
     uint8_t segid = 0xffu;
     const r36sx_segment_cache_t *cache = NULL;
     if (!r36sx_cpu_find_segment_cache(selector, &segid, &cache)) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, selector & 0xfffcu,
-                                  1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1,
+                                  r36sx_cpu_fault_ip_context);
         return 0;
     }
 
@@ -732,7 +732,7 @@ static uint8_t r36sx_cpu_segment_linear_checked(
     if (offset > UINT32_MAX - cache->base) {
         r36sx_cpu_raise_exception(
             segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            segid == regss ? 0u : (cache->selector & 0xfffcu), 1, CPU_IP);
+            0, 1, r36sx_cpu_fault_ip_context);
         return 0;
     }
 
