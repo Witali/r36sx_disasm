@@ -7,7 +7,8 @@
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
-                                             uint8_t software_int)
+                                             uint8_t software_int,
+                                             uint32_t fault_ip)
 {
     uint32_t gate_offset = (uint32_t)intnum * 8u;
     if (gate_offset + 7u > r36sx_idtr_limit) {
@@ -44,8 +45,14 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
             return 0;
         }
         if (software_int && r36sx_cpu_cpl() > gate_dpl) {
+            /*
+             * A denied software INT is a #GP fault.  Intel fault semantics
+             * return to the INT opcode itself, while a successful INT pushes
+             * the next EIP.  CPU_IP is already past the opcode here, so use
+             * the decoder-supplied fault_ip for the exception path.
+             */
             r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, gate_error, 1,
-                                      CPU_IP);
+                                      fault_ip);
             return 0;
         }
         uint8_t switched = r36sx_cpu_task_switch(
@@ -79,7 +86,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     }
 
     if (software_int && r36sx_cpu_cpl() > gate_dpl) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, gate_error, 1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, gate_error, 1,
+                                  fault_ip);
         return 0;
     }
 
@@ -92,7 +100,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint8_t old_vm86 = r36sx_cpu_v86_enabled();
     uint8_t new_cpl;
     if (!r36sx_cpu_load_code_for_transfer(selector, offset, 1, 0,
-                                          &target_cs, &new_cpl)) {
+                                          &target_cs, &new_cpl,
+                                          fault_ip)) {
 #if R36SX_DEBUG_PM_VERBOSE
         r36sx_pico286_debug_log(
             "[CPU] protected interrupt invalid target CS int=%02x selector=%04x access=%02x",
@@ -122,6 +131,13 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         }
         r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
         r36sx_cpu_set_stack_pointer(new_sp);
+        /*
+         * Intel privilege transitions load the inner stack before building the
+         * interrupt frame.  The frame writes are performed with the target CPL:
+         * otherwise a ring-3 -> ring-0 interrupt into a supervisor page would
+         * incorrectly look like a user-mode write and raise #PF(P/W/U).
+         */
+        r36sx_cpu_current_cpl = new_cpl & 3u;
     }
 
     if (gate32) {
@@ -309,7 +325,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
 
     if (r36sx_cpu_protected_enabled()) {
         if (!r36sx_cpu_protected_interrupt(
-                intnum, error_code, has_error_code, 0)) {
+                intnum, error_code, has_error_code, 0, fault_ip)) {
             r36sx_pm_diag_log_first_fault("protected exception delivery",
                                           fault_ip);
         }

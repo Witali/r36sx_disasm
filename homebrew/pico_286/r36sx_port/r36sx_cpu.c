@@ -54,6 +54,7 @@ x86_flags_t x86_flags;
 bool operandSizeOverride = false;
 bool addressSizeOverride = false;
 static volatile uint8_t hltstate;
+static uint8_t r36sx_cpu_maskable_interrupt_shadow;
 static uint8_t r36sx_cpu_interpreter_protected;
 static uint8_t r36sx_cpu_current_cpl;
 static uint8_t r36sx_cpu_strict_8086_mode;
@@ -474,14 +475,15 @@ static inline uint8_t r36sx_cpu_native_protected_enabled(void)
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
-                                             uint8_t software_int);
+                                             uint8_t software_int,
+                                             uint32_t fault_ip);
 static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint32_t error_code,
                                       uint8_t has_error_code,
                                       uint32_t fault_ip);
 static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
 void intcall86(uint8_t intnum);
-static void r36sx_cpu_software_interrupt(uint8_t intnum);
+static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip);
 static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops);
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
@@ -2207,6 +2209,22 @@ static uint8_t r36sx_cpu_check_segment_access(uint32_t offset,
                                             write_access, 0, &linear);
 }
 
+static inline void r36sx_cpu_delay_maskable_interrupts_one_instruction(void)
+{
+    /*
+     * Intel documents a one-instruction interrupt shadow after STI, and after
+     * loading SS with MOV/POP.  Without this, a pending PIT IRQ can fire before
+     * the instruction immediately following STI; test386's "STI; PUSHF" then
+     * vectors into the protected-mode default handler instead of testing IF.
+     */
+    /*
+     * Use a two-phase counter because the common opcode epilogue runs after
+     * the instruction that created the shadow.  2 -> 1 after STI/MOV SS/POP SS,
+     * then 1 -> 0 after the following instruction has executed.
+     */
+    r36sx_cpu_maskable_interrupt_shadow = 2u;
+}
+
 static INLINE void push(uint16_t pushval) {
     if (r36sx_cpu_stack_default32()) {
         CPU_ESP -= 2u;
@@ -2281,6 +2299,22 @@ static INLINE void r36sx_cpu_adjust_stack(uint32_t bytes)
     }
 }
 
+static INLINE uint32_t r36sx_cpu_adjust_stack_value_for_cache(
+    uint32_t sp,
+    uint32_t bytes,
+    const r36sx_segment_cache_t *stack_cache)
+{
+    /*
+     * Used before committing an outer-privilege SS.  The stack width belongs
+     * to the stack segment we are about to restore, not to the current SS.
+     */
+    if (r36sx_cpu_descriptor_uses_386_format() && stack_cache->valid &&
+        (stack_cache->flags & R36SX_DESCRIPTOR_FLAG_DB)) {
+        return sp + bytes;
+    }
+    return (uint16_t)(sp + bytes);
+}
+
 static INLINE void r36sx_cpu_set_stack_pointer(uint32_t value)
 {
     if (r36sx_cpu_stack_default32()) {
@@ -2289,6 +2323,91 @@ static INLINE void r36sx_cpu_set_stack_pointer(uint32_t value)
         CPU_SP = (uint16_t)value;
     }
 }
+
+#if R36SX_DEBUG_TEST386_CPU_TRACE
+static uint16_t r36sx_test386_trace_port;
+static uint8_t r36sx_test386_trace_code;
+static uint32_t r36sx_test386_trace_remaining;
+
+void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value)
+{
+    /*
+     * Re-arm on every R36SX sub-POST.  test386 POST 09 contains several large
+     * instruction groups; tracing a bounded window after each breadcrumb lets
+     * us localize the failing group from the Windows host without growing the
+     * ROM with many more OUT instructions.
+     */
+    if (r36sx_test386_trace_remaining != 0u) {
+        r36sx_pico286_debug_log(
+            "[T386] trace rearmed by post=%03x:%02x previous_left=%lu",
+            (unsigned int)portnum, (unsigned int)value,
+            (unsigned long)r36sx_test386_trace_remaining);
+    }
+    r36sx_test386_trace_port = portnum;
+    r36sx_test386_trace_code = value;
+    r36sx_test386_trace_remaining = R36SX_DEBUG_TEST386_CPU_TRACE_LIMIT;
+    r36sx_pico286_debug_log(
+        "[T386] trace armed post=%03x:%02x limit=%lu",
+        (unsigned int)portnum, (unsigned int)value,
+        (unsigned long)r36sx_test386_trace_remaining);
+}
+
+static void r36sx_cpu_debug_trace_test386_instruction(uint32_t firstip,
+                                                      uint8_t opcode)
+{
+    if (r36sx_test386_trace_remaining == 0u) {
+        return;
+    }
+
+    uint8_t bytes[8];
+    for (uint8_t i = 0; i < sizeof(bytes); ++i) {
+        bytes[i] = getmem8(CPU_CS, r36sx_cpu_mask_ip(firstip + i));
+    }
+
+    uint32_t index = R36SX_DEBUG_TEST386_CPU_TRACE_LIMIT -
+                     r36sx_test386_trace_remaining;
+    r36sx_pico286_debug_log(
+        "[T386] #%03lu post=%03x:%02x cs:eip=%04X:%08lX op=%02X "
+        "bytes=%02X %02X %02X %02X %02X %02X %02X %02X os=%u as=%u "
+        "ss:sp=%04X:%04X esp=%08lX ds=%04X es=%04X fs=%04X gs=%04X "
+        "eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX "
+        "ebp=%08lX flags=%08lX cr0=%08lX",
+        (unsigned long)index,
+        (unsigned int)r36sx_test386_trace_port,
+        (unsigned int)r36sx_test386_trace_code,
+        CPU_CS, (unsigned long)firstip, opcode,
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5], bytes[6], bytes[7],
+        operandSizeOverride ? 32u : 16u,
+        addressSizeOverride ? 32u : 16u,
+        CPU_SS, CPU_SP, (unsigned long)CPU_ESP,
+        CPU_DS, CPU_ES, CPU_FS, CPU_GS,
+        (unsigned long)CPU_EAX, (unsigned long)CPU_EBX,
+        (unsigned long)CPU_ECX, (unsigned long)CPU_EDX,
+        (unsigned long)CPU_ESI, (unsigned long)CPU_EDI,
+        (unsigned long)CPU_EBP,
+        (unsigned long)x86_flags.value,
+        (unsigned long)r36sx_cr0);
+
+    r36sx_test386_trace_remaining--;
+    if (r36sx_test386_trace_remaining == 0u) {
+        r36sx_pico286_debug_log("[T386] trace exhausted");
+    }
+}
+#else
+void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value)
+{
+    (void)portnum;
+    (void)value;
+}
+
+static inline void r36sx_cpu_debug_trace_test386_instruction(uint32_t firstip,
+                                                             uint8_t opcode)
+{
+    (void)firstip;
+    (void)opcode;
+}
+#endif
 
 typedef struct {
     uint16_t selector;
@@ -2308,7 +2427,8 @@ static INLINE void decodeflagsdword(uint32_t x);
 static uint8_t r36sx_cpu_validate_return_code(uint16_t selector,
                                               uint32_t offset,
                                               uint8_t new_cpl,
-                                              r36sx_segment_cache_t *cache);
+                                              r36sx_segment_cache_t *cache,
+                                              uint32_t fault_ip);
 
 static inline uint32_t r36sx_cpu_stack_pointer_value(void)
 {
@@ -2345,6 +2465,13 @@ static inline void r36sx_cpu_raise_selector_fault(uint8_t exception,
                                                   uint16_t selector)
 {
     r36sx_cpu_raise_exception(exception, selector & 0xfffcu, 1, CPU_IP);
+}
+
+static inline void r36sx_cpu_raise_selector_fault_at(uint8_t exception,
+                                                     uint16_t selector,
+                                                     uint32_t fault_ip)
+{
+    r36sx_cpu_raise_exception(exception, selector & 0xfffcu, 1, fault_ip);
 }
 
 static uint8_t r36sx_cpu_descriptor_linear_address(uint16_t selector,
@@ -2494,10 +2621,12 @@ static uint8_t r36sx_cpu_decode_call_gate(uint16_t selector,
 static uint8_t r36sx_cpu_code_offset_valid(
     uint16_t selector,
     const r36sx_segment_cache_t *cache,
-    uint32_t offset)
+    uint32_t offset,
+    uint32_t fault_ip)
 {
     if (offset > cache->limit) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
     return 1;
@@ -2509,27 +2638,32 @@ static uint8_t r36sx_cpu_load_code_for_transfer(
     uint8_t gate_transfer,
     uint8_t jump_transfer,
     r36sx_segment_cache_t *target_cache,
-    uint8_t *new_cpl)
+    uint8_t *new_cpl,
+    uint32_t fault_ip)
 {
     if ((selector & 0xfffcu) == 0) {
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
         return 0;
     }
 
     memset(target_cache, 0, sizeof(*target_cache));
     if (!r36sx_cpu_decode_descriptor(selector, target_cache)) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
     if (!target_cache->valid) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_NOT_PRESENT, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_NOT_PRESENT,
+                                          selector, fault_ip);
         return 0;
     }
     if (!r36sx_descriptor_is_code(target_cache)) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
-    if (!r36sx_cpu_code_offset_valid(selector, target_cache, offset)) {
+    if (!r36sx_cpu_code_offset_valid(selector, target_cache, offset,
+                                     fault_ip)) {
         return 0;
     }
 
@@ -2539,7 +2673,8 @@ static uint8_t r36sx_cpu_load_code_for_transfer(
 
     if (r36sx_descriptor_is_conforming_code(target_cache)) {
         if (dpl > cpl) {
-            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                              fault_ip);
             return 0;
         }
         *new_cpl = cpl;
@@ -2548,7 +2683,8 @@ static uint8_t r36sx_cpu_load_code_for_transfer(
 
     if (!gate_transfer) {
         if (dpl != cpl || rpl > cpl) {
-            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                              fault_ip);
             return 0;
         }
         *new_cpl = cpl;
@@ -2557,7 +2693,8 @@ static uint8_t r36sx_cpu_load_code_for_transfer(
 
     if (jump_transfer) {
         if (dpl != cpl) {
-            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                              fault_ip);
             return 0;
         }
         *new_cpl = cpl;
@@ -2565,7 +2702,8 @@ static uint8_t r36sx_cpu_load_code_for_transfer(
     }
 
     if (dpl > cpl) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
     *new_cpl = dpl;
@@ -2967,7 +3105,7 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
     r36sx_segment_cache_t cs_cache;
     r36sx_segment_cache_t ss_cache;
     if (!r36sx_cpu_validate_return_code(new_cs, new_ip, new_cpl,
-                                        &cs_cache) ||
+                                        &cs_cache, CPU_IP) ||
         !r36sx_cpu_decode_stack_segment_for_level(
             new_ss, new_cpl, &ss_cache, R36SX_EXCEPTION_INVALID_TSS)) {
         return 0;
@@ -3117,21 +3255,28 @@ static void r36sx_cpu_invalidate_data_segments_for_cpl(uint8_t cpl)
         }
         if (r36sx_descriptor_is_code(&r36sx_seg_cache[segid]) &&
             !r36sx_descriptor_is_readable_code(&r36sx_seg_cache[segid])) {
-            r36sx_cpu_clear_segment_cache(segid, segselector16[segid]);
+            /*
+             * Intel specifies that an interlevel RET/IRET checks DS/ES/FS/GS
+             * against the return CPL.  Selectors that are no longer usable are
+             * replaced with the null selector, not merely left with an invalid
+             * hidden descriptor cache.
+             */
+            r36sx_cpu_clear_segment_cache(segid, 0);
             continue;
         }
         if (r36sx_descriptor_is_conforming_code(&r36sx_seg_cache[segid])) {
             continue;
         }
         if (r36sx_descriptor_dpl(&r36sx_seg_cache[segid]) < cpl) {
-            r36sx_cpu_clear_segment_cache(segid, segselector16[segid]);
+            r36sx_cpu_clear_segment_cache(segid, 0);
         }
     }
 }
 
 static uint8_t r36sx_cpu_protected_far_call(uint16_t selector,
                                             uint32_t offset,
-                                            uint8_t wide)
+                                            uint8_t wide,
+                                            uint32_t fault_ip)
 {
     uint32_t raw_lo;
     uint32_t raw_hi;
@@ -3147,7 +3292,8 @@ static uint8_t r36sx_cpu_protected_far_call(uint16_t selector,
         r36sx_segment_cache_t target_cache;
         uint8_t new_cpl;
         if (!r36sx_cpu_load_code_for_transfer(selector, offset, 0, 0,
-                                              &target_cache, &new_cpl)) {
+                                              &target_cache, &new_cpl,
+                                              fault_ip)) {
             return 0;
         }
         r36sx_cpu_push_frame_value(CPU_CS, wide);
@@ -3205,11 +3351,17 @@ static uint8_t r36sx_cpu_protected_far_call(uint16_t selector,
     }
 
     if (!r36sx_cpu_load_code_for_transfer(gate.selector, gate.offset, 1, 0,
-                                          &target_cache, &new_cpl)) {
+                                          &target_cache, &new_cpl,
+                                          fault_ip)) {
         return 0;
     }
 
-    uint8_t frame_wide = gate.is_32 || wide;
+    /*
+     * Intel protected-mode call gates define their own operand size.  A 16-bit
+     * gate pushes 16-bit return/old-stack fields and copies word parameters
+     * even when the caller executes the far CALL from a 32-bit code segment.
+     */
+    uint8_t frame_wide = gate.is_32;
     uint16_t old_cs = CPU_CS;
     uint32_t old_ip = CPU_IP;
     uint16_t old_ss = CPU_SS;
@@ -3261,7 +3413,8 @@ static uint8_t r36sx_cpu_protected_far_call(uint16_t selector,
 }
 
 static uint8_t r36sx_cpu_protected_far_jump(uint16_t selector,
-                                            uint32_t offset)
+                                            uint32_t offset,
+                                            uint32_t fault_ip)
 {
     uint32_t raw_lo;
     uint32_t raw_hi;
@@ -3277,7 +3430,8 @@ static uint8_t r36sx_cpu_protected_far_jump(uint16_t selector,
     uint8_t new_cpl;
     if (r36sx_descriptor_is_code(&descriptor_cache)) {
         if (!r36sx_cpu_load_code_for_transfer(selector, offset, 0, 1,
-                                              &target_cache, &new_cpl)) {
+                                              &target_cache, &new_cpl,
+                                              fault_ip)) {
             return 0;
         }
         r36sx_cpu_commit_code_transfer(selector, &target_cache, new_cpl,
@@ -3328,7 +3482,8 @@ static uint8_t r36sx_cpu_protected_far_jump(uint16_t selector,
         return 0;
     }
     if (!r36sx_cpu_load_code_for_transfer(gate.selector, gate.offset, 1, 1,
-                                          &target_cache, &new_cpl)) {
+                                          &target_cache, &new_cpl,
+                                          fault_ip)) {
         return 0;
     }
     r36sx_cpu_commit_code_transfer(gate.selector, &target_cache, new_cpl,
@@ -3339,38 +3494,45 @@ static uint8_t r36sx_cpu_protected_far_jump(uint16_t selector,
 static uint8_t r36sx_cpu_validate_return_code(uint16_t selector,
                                               uint32_t offset,
                                               uint8_t new_cpl,
-                                              r36sx_segment_cache_t *cache)
+                                              r36sx_segment_cache_t *cache,
+                                              uint32_t fault_ip)
 {
     memset(cache, 0, sizeof(*cache));
     if ((selector & 0xfffcu) == 0 ||
         !r36sx_cpu_decode_descriptor(selector, cache)) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
     if (!cache->valid) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_NOT_PRESENT, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_NOT_PRESENT,
+                                          selector, fault_ip);
         return 0;
     }
     if (!r36sx_descriptor_is_code(cache) ||
-        !r36sx_cpu_code_offset_valid(selector, cache, offset)) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        !r36sx_cpu_code_offset_valid(selector, cache, offset, fault_ip)) {
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
 
     uint8_t dpl = r36sx_descriptor_dpl(cache);
     if (r36sx_descriptor_is_conforming_code(cache)) {
         if (dpl > new_cpl) {
-            r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+            r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                              fault_ip);
             return 0;
         }
     } else if (dpl != new_cpl) {
-        r36sx_cpu_raise_selector_fault(R36SX_EXCEPTION_GP, selector);
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, selector,
+                                          fault_ip);
         return 0;
     }
     return 1;
 }
 
-static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide)
+static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide,
+                                        uint32_t fault_ip)
 {
     uint8_t old_cpl = r36sx_cpu_cpl();
     uint32_t target_ip = r36sx_cpu_pop_frame_value(wide);
@@ -3378,9 +3540,19 @@ static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide)
     uint8_t new_cpl = r36sx_selector_rpl(target_cs);
     r36sx_segment_cache_t target_cache;
 
-    if (new_cpl < old_cpl ||
-        !r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
-                                        &target_cache)) {
+    /*
+     * A far return can only keep the same CPL or return to a less privileged
+     * outer level.  Returning from user mode directly to a kernel selector is
+     * a fault on the RETF itself, not a silent no-op that continues after it.
+     */
+    if (new_cpl < old_cpl) {
+        r36sx_cpu_raise_selector_fault_at(R36SX_EXCEPTION_GP, target_cs,
+                                          fault_ip);
+        return 0;
+    }
+
+    if (!r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
+                                        &target_cache, fault_ip)) {
         return 0;
     }
 
@@ -3400,6 +3572,14 @@ static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide)
         return 0;
     }
 
+    /*
+     * For an inter-privilege RETF imm16, Intel specifies that the immediate
+     * count releases parameters from both the inner stack and the restored
+     * outer stack.  The earlier adjust skipped copied parameters before
+     * popping old SP/SS; this one skips the caller's original parameters.
+     */
+    new_sp = r36sx_cpu_adjust_stack_value_for_cache(new_sp, adjust,
+                                                   &new_ss_cache);
     r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
                                    target_ip);
     r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
@@ -3466,7 +3646,7 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
 
     if (new_cpl < old_cpl ||
         !r36sx_cpu_validate_return_code(target_cs, target_ip, new_cpl,
-                                        &target_cache)) {
+                                        &target_cache, CPU_IP)) {
         return 0;
     }
 
@@ -4555,7 +4735,7 @@ void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
     if (r36sx_cpu_protected_enabled() &&
-        r36sx_cpu_protected_interrupt(intnum, 0, 0, 0)) {
+        r36sx_cpu_protected_interrupt(intnum, 0, 0, 0, CPU_IP)) {
         return;
     }
 
@@ -4962,11 +5142,11 @@ void intcall86(uint8_t intnum) {
     tf = 0;
 }
 
-static void r36sx_cpu_software_interrupt(uint8_t intnum)
+static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
 {
     if (r36sx_cpu_protected_enabled()) {
         r36sx_pm_diag_log_interrupt(intnum);
-        (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1);
+        (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip);
         return;
     }
 
@@ -4996,6 +5176,7 @@ void reset86() {
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
+    r36sx_cpu_maskable_interrupt_shadow = 0;
     r36sx_cpu_current_cpl = 0;
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
@@ -5052,15 +5233,18 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
     //counterticks = (uint64_t) ( (double) timerfreq / (double) 65536.0);
     //tickssource();
     for (loopcount = 0; loopcount < execloops; loopcount++) {
+        uint8_t maskable_irq_shadowed = r36sx_cpu_maskable_interrupt_shadow;
         if (unlikely(hltstate)) {
-            if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
+            if (unlikely(ifl && !maskable_irq_shadowed &&
+                         r36sx_cpu_pending_maskable_irq())) {
                 hltstate = 0;
                 intcall86(nextintr());
             } else {
                 r36sx_app_stats_record_x86(loopcount);
                 return;
             }
-        } else if (unlikely(ifl && r36sx_cpu_pending_maskable_irq())) {
+        } else if (unlikely(ifl && !maskable_irq_shadowed &&
+                            r36sx_cpu_pending_maskable_irq())) {
             intcall86(nextintr()); // get next interrupt from the i8259, if any d
         }
 #if PICO_ON_DEVICE
@@ -5202,6 +5386,8 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
         if (prefix_exception) {
             continue;
         }
+
+        r36sx_cpu_debug_trace_test386_instruction(firstip, opcode);
 
         register uint32_t res32;
         register uint8_t res8;
@@ -5544,7 +5730,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_17: ;
 #endif
                 /* 17 POP CPU_SS */
-                r36sx_cpu_load_segment(regss, r36sx_cpu_pop_segment_selector());
+                if (r36sx_cpu_load_segment(regss,
+                                           r36sx_cpu_pop_segment_selector())) {
+                    r36sx_cpu_delay_maskable_interrupts_one_instruction();
+                }
                 break;
 
             case 0x18:
@@ -7204,8 +7393,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
                 }
 
-                r36sx_cpu_load_segment(reg, readrm16(rm)
-                );
+                if (r36sx_cpu_load_segment(reg, readrm16(rm)) &&
+                    reg == regss) {
+                    r36sx_cpu_delay_maskable_interrupts_one_instruction();
+                }
                 break;
 
             case 0x8F:
@@ -7335,7 +7526,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 if (r36sx_cpu_protected_enabled()) {
-                    r36sx_cpu_protected_far_call(oper2, oper1, 0);
+                    r36sx_cpu_protected_far_call(oper2, oper1, 0, firstip);
                     break;
                 }
                 push(CPU_CS);
@@ -8147,7 +8338,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 if (r36sx_cpu_protected_enabled()) {
-                    r36sx_cpu_protected_retf(oper1, 0);
+                    r36sx_cpu_protected_retf(oper1, 0, firstip);
                     break;
                 }
                 r36sx_cpu_set_ip(pop());
@@ -8161,7 +8352,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* CB RETF */
                 if (r36sx_cpu_protected_enabled()) {
-                    r36sx_cpu_protected_retf(0, 0);
+                    r36sx_cpu_protected_retf(0, 0, firstip);
                     break;
                 }
                 r36sx_cpu_set_ip(pop());
@@ -8173,7 +8364,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_CC: ;
 #endif
                 /* CC INT 3 */
-                r36sx_cpu_software_interrupt(3);
+                r36sx_cpu_software_interrupt(3, firstip);
                 break;
 
             case 0xCD:
@@ -8186,7 +8377,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 if (r36sx_cpu_v86_iopl_sensitive_fault(firstip)) {
                     break;
                 }
-                r36sx_cpu_software_interrupt(oper1b);
+                r36sx_cpu_software_interrupt(oper1b, firstip);
                 break;
 
             case 0xCE:
@@ -8195,7 +8386,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* CE INTO */
                 if (of) {
-                    r36sx_cpu_software_interrupt(4);
+                    r36sx_cpu_software_interrupt(4, firstip);
                 }
                 break;
 
@@ -8514,7 +8705,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
                 if (r36sx_cpu_protected_enabled()) {
-                    r36sx_cpu_protected_far_jump(oper2, oper1);
+                    r36sx_cpu_protected_far_jump(oper2, oper1, firstip);
                     break;
                 }
                 r36sx_cpu_load_segment(regcs, oper2);
@@ -8751,6 +8942,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
                 }
                 ifl = 1;
+                r36sx_cpu_delay_maskable_interrupts_one_instruction();
                 break;
 
             case 0xFC:
@@ -8814,7 +9006,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 }
 
                 oper1 = readrm16(rm);
-                op_grp5();
+                op_grp5(firstip);
                 break;
 
             default:
@@ -8831,6 +9023,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 break;
         }
 r36sx_opcode_done:
+        if (unlikely(r36sx_cpu_maskable_interrupt_shadow != 0u)) {
+            r36sx_cpu_maskable_interrupt_shadow--;
+        }
         if (unlikely(r36sx_debug_pending_dr6_hits || was_TF)) {
             uint32_t dr6_hits = r36sx_debug_pending_dr6_hits;
             r36sx_debug_pending_dr6_hits = 0;

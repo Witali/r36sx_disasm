@@ -207,7 +207,22 @@ extern struct i8259_s {
     uint8_t controller_enabled;
 } i8259_controller;
 
-#define doirq(irqnum) (i8259_controller.interrupt_request_register |= (1 << (irqnum)) & (~i8259_controller.interrupt_mask_register))
+static inline void doirq(uint8_t irqnum) {
+    uint8_t bit = (uint8_t)(1u << (irqnum & 7u));
+
+    /*
+     * Hardware IRQ lines should only become pending after the 8259A has been
+     * put into service by its ICW sequence.  This also keeps diagnostic BIOS
+     * ROMs from receiving host timer IRQs before they have configured a PIC.
+     */
+    if (!i8259_controller.controller_enabled) {
+        return;
+    }
+    if ((i8259_controller.interrupt_mask_register & bit) != 0u) {
+        return;
+    }
+    i8259_controller.interrupt_request_register |= bit;
+}
 
 static inline uint8_t nextintr() {
     uint8_t tmpirr = i8259_controller.interrupt_request_register & (~i8259_controller.interrupt_mask_register); //XOR request register with inverted mask register
@@ -215,7 +230,7 @@ static inline uint8_t nextintr() {
         if ((tmpirr >> i) & 1) {
             i8259_controller.interrupt_request_register &= ~(1 << i);
             i8259_controller.in_service_register |= (1 << i);
-            return (i8259_controller.initialization_command_words[2] + i);
+            return (uint8_t)(i8259_controller.interrupt_vector_offset + i);
         }
     return 0;
 }

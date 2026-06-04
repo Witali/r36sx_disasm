@@ -624,7 +624,7 @@ static __not_in_flash() void op_grp3_16(uint32_t fault_ip) {
     }
 }
 
-static __not_in_flash() void op_grp5() {
+static __not_in_flash() void op_grp5(uint32_t fault_ip) {
     switch (reg) {
         case 0: /* INC Ev */
             oper2 = 1;
@@ -655,7 +655,7 @@ static __not_in_flash() void op_grp5() {
             oper1 = readw86(ea);
             oper2 = readw86(ea + 2u);
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_far_call(oper2, oper1, 0);
+                r36sx_cpu_protected_far_call(oper2, oper1, 0, fault_ip);
                 break;
             }
             push(CPU_CS);
@@ -676,7 +676,7 @@ static __not_in_flash() void op_grp5() {
             oper1 = readw86(ea);
             oper2 = readw86(ea + 2u);
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_far_jump(oper2, oper1);
+                r36sx_cpu_protected_far_jump(oper2, oper1, fault_ip);
                 break;
             }
             r36sx_cpu_load_segment(regcs, oper2);

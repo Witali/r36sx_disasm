@@ -101,6 +101,32 @@ static int r36sx_pico286_video_take_dirty(void)
 
 static void r36sx_pico286_soft_reset(void);
 
+static void r36sx_pico286_reset_pic(void)
+{
+    memset(&i8259_controller, 0, sizeof(i8259_controller));
+    i8259_controller.interrupt_vector_offset = 8;
+    i8259_controller.initialization_command_words[2] = 8;
+
+    /*
+     * The normal R36SX boot path uses BIOS services implemented in the emulator
+     * instead of a full PC BIOS ROM, so keep the historical "ready PIC" state
+     * for DOS compatibility.  A diagnostic BIOS ROM such as test386 must not
+     * receive synthetic timer IRQs before it has explicitly initialized the PIC.
+     */
+    if (r36sx_pico286_bios_mode() == R36SX_PICO286_BIOS_TEST386) {
+        i8259_controller.interrupt_mask_register = 0xFF;
+        i8259_controller.controller_enabled = 0;
+    } else {
+        i8259_controller.interrupt_mask_register = 0x00;
+        i8259_controller.controller_enabled = 1;
+    }
+    r36sx_pico286_debug_log("pic: reset bios=%s enabled=%u mask=%02x vector=%02x",
+                            r36sx_pico286_bios_mode_name(),
+                            (unsigned int)i8259_controller.controller_enabled,
+                            (unsigned int)i8259_controller.interrupt_mask_register,
+                            (unsigned int)i8259_controller.interrupt_vector_offset);
+}
+
 static uint64_t r36sx_pico286_now_us(void)
 {
     struct timespec ts;
@@ -1230,8 +1256,7 @@ static void r36sx_pico286_soft_reset(void) {
     port60 = 0;
     port61 = 0;
     port64 = 0;
-    memset(&i8259_controller, 0, sizeof(i8259_controller));
-    i8259_controller.interrupt_vector_offset = 8;
+    r36sx_pico286_reset_pic();
     memset(&i8253_controller, 0, sizeof(i8253_controller));
     timer_period = 54925;
     speakerenabled = 0;
@@ -1563,6 +1588,7 @@ int main() {
     r36sx_pico286_debug_log("main: blaster_reset done");
     sn76489_reset();
     r36sx_pico286_debug_log("main: sn76489_reset done");
+    r36sx_pico286_reset_pic();
     reset86();
     r36sx_pico286_debug_log("main: reset86 done");
 

@@ -36,6 +36,7 @@ void out8259(uint16_t port_number, uint8_t register_value) {
                 i8259_controller.initialization_command_words[1] = register_value;
                 i8259_controller.initialization_command_word_step = 2;
                 i8259_controller.register_read_mode = 0;
+                i8259_controller.controller_enabled = 0;
             } else if ((register_value & 0x08) == 0) { //OCW2
 #ifdef DEBUG_PIC
                 debug_log(DEBUG_DETAIL, "[I8259] OCW2 = %02X\r\n", register_value);
@@ -88,11 +89,13 @@ void out8259(uint16_t port_number, uint8_t register_value) {
                         i8259_controller.initialization_command_word_step = 4;
                     } else {
                         i8259_controller.initialization_command_word_step = 5; //done with ICWs
+                        i8259_controller.controller_enabled = 1;
                     }
                     break;
                 case 4: //ICW4
                     i8259_controller.initialization_command_words[4] = register_value;
                     i8259_controller.initialization_command_word_step = 5; //done with ICWs
+                    i8259_controller.controller_enabled = 1;
                     break;
                 case 5: //just set IMR value now
                     i8259_controller.interrupt_mask_register = register_value;

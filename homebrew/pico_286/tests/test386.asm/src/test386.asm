@@ -693,6 +693,11 @@ protTests:
 	testPushPopR bx,16
 	testPushPopR cx,16
 	testPushPopR dx,16
+
+	mov    dx, SUBPOST_PORT
+	mov    al, 0x91
+	out    dx, al
+
 	testPushPopR sp,16
 	testPushPopR bp,16
 	testPushPopR si,16
@@ -700,6 +705,10 @@ protTests:
 
 	testPushPopAll16 16
 	testPushPopAll32 16
+
+	mov    dx, SUBPOST_PORT
+	mov    al, 0x95
+	out    dx, al
 
 	;
 	; segment registers
@@ -729,10 +738,6 @@ protTests:
 	mov    ax,  D_SEG_PROT32
 	mov    ss,  ax
 
-	mov    dx, SUBPOST_PORT
-	mov    al, 0x95
-	out    dx, al
-
 	testPushPopR ax,32
 	testPushPopR bx,32
 	testPushPopR cx,32
@@ -756,11 +761,6 @@ protTests:
 	testPushImm 32
 
 	testPushPopF 32
-
-	mov    dx, SUBPOST_PORT
-	mov    al, 0x93
-	out    dx, al
-
 
 	; the stack works
 	; initialize it for the next tests

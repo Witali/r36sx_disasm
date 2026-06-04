@@ -42,10 +42,11 @@ static int audio_covox_enabled = 1;
 #define R36SX_KBD_CMD_WRITE_OUTPUT_PORT 0xD1u
 #define R36SX_FAST_A20_ENABLE_BIT 0x02u
 #define R36SX_PC_POST_PORT 0x80u
-#define R36SX_TEST386_POST_PORT 0x190u
+#define R36SX_TEST386_SUBPOST_PORT 0x190u
 #define R36SX_TEST386_ASCII_PORT 0x191u
 
 extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
+extern void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value);
 
 #if R36SX_DEBUG_TEST_BIOS_TRACE
 #define R36SX_TEST_BIOS_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
@@ -88,9 +89,10 @@ static void r36sx_test386_ascii_out(uint8_t value) {
     }
 }
 
-static void r36sx_test386_post_out(uint8_t value) {
-    r36sx_pico286_post_code_out(R36SX_TEST386_POST_PORT, value);
-    R36SX_TEST_BIOS_LOG("test386: POST=0x%02x", value);
+static void r36sx_test386_subpost_out(uint8_t value) {
+    r36sx_pico286_post_code_out(R36SX_TEST386_SUBPOST_PORT, value);
+    R36SX_TEST_BIOS_LOG("test386: SUBPOST=0x%02x", value);
+    r36sx_cpu_debug_test386_subpost(R36SX_TEST386_SUBPOST_PORT, value);
 }
 
 static void r36sx_audio_ensure_flags(void)
@@ -688,9 +690,17 @@ void portout(uint16_t portnum, uint16_t value) {
     switch (portnum) {
         case R36SX_PC_POST_PORT:
             r36sx_pico286_post_code_out(portnum, (uint8_t)value);
+            /*
+             * Main POSTs are frequent during early ROM self-tests.  Keep the
+             * compact POST log for all values, but only arm the expensive
+             * instruction trace for the protected-mode blocks we are debugging.
+             */
+            if ((uint8_t)value >= 0x20u) {
+                r36sx_cpu_debug_test386_subpost(portnum, (uint8_t)value);
+            }
             return;
-        case R36SX_TEST386_POST_PORT:
-            r36sx_test386_post_out((uint8_t)value);
+        case R36SX_TEST386_SUBPOST_PORT:
+            r36sx_test386_subpost_out((uint8_t)value);
             return;
         case R36SX_TEST386_ASCII_PORT:
             r36sx_test386_ascii_out((uint8_t)value);

@@ -533,7 +533,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
+                r36sx_cpu_protected_far_call(target_cs, target_ip, 1,
+                                             fault_ip);
                 return true;
             }
             /*
@@ -754,7 +755,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint16_t bytes = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_retf(bytes, 1);
+                r36sx_cpu_protected_retf(bytes, 1, fault_ip);
                 return true;
             }
             r36sx_cpu_set_ip(pop32());
@@ -766,7 +767,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* RETF */
         case 0xCB:
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_retf(0, 1);
+                r36sx_cpu_protected_retf(0, 1, fault_ip);
                 return true;
             }
             r36sx_cpu_set_ip(pop32());
@@ -823,7 +824,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             uint16_t target_cs = getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (r36sx_cpu_protected_enabled()) {
-                r36sx_cpu_protected_far_jump(target_cs, target_ip);
+                r36sx_cpu_protected_far_jump(target_cs, target_ip, fault_ip);
                 return true;
             }
             r36sx_cpu_load_segment(regcs, target_cs);
@@ -873,7 +874,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     uint32_t target_ip = readdw86(ea);
                     uint16_t target_cs = readw86(ea + 4);
                     if (r36sx_cpu_protected_enabled()) {
-                        r36sx_cpu_protected_far_call(target_cs, target_ip, 1);
+                        r36sx_cpu_protected_far_call(target_cs, target_ip, 1,
+                                                     fault_ip);
                         return true;
                     }
                     /*
@@ -898,7 +900,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     uint32_t target_ip = readdw86(ea);
                     uint16_t target_cs = readw86(ea + 4);
                     if (r36sx_cpu_protected_enabled()) {
-                        r36sx_cpu_protected_far_jump(target_cs, target_ip);
+                        r36sx_cpu_protected_far_jump(target_cs, target_ip,
+                                                     fault_ip);
                         return true;
                     }
                     r36sx_cpu_load_segment(regcs, target_cs);
