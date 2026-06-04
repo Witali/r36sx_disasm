@@ -5533,7 +5533,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_07: ;
 #endif
                 /* 07 POP CPU_ES */
-                r36sx_cpu_load_segment(reges, r36sx_cpu_pop_segment_selector());
+                r36sx_cpu_load_segment_at(reges,
+                                          r36sx_cpu_pop_segment_selector(),
+                                          firstip);
                 break;
 
             case 0x8:
@@ -5730,8 +5732,8 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_17: ;
 #endif
                 /* 17 POP CPU_SS */
-                if (r36sx_cpu_load_segment(regss,
-                                           r36sx_cpu_pop_segment_selector())) {
+                if (r36sx_cpu_load_segment_at(
+                        regss, r36sx_cpu_pop_segment_selector(), firstip)) {
                     r36sx_cpu_delay_maskable_interrupts_one_instruction();
                 }
                 break;
@@ -5823,7 +5825,9 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_1F: ;
 #endif
                 /* 1F POP CPU_DS */
-                r36sx_cpu_load_segment(regds, r36sx_cpu_pop_segment_selector());
+                r36sx_cpu_load_segment_at(regds,
+                                          r36sx_cpu_pop_segment_selector(),
+                                          firstip);
                 break;
 
             case 0x20:
@@ -7393,7 +7397,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
                 }
 
-                if (r36sx_cpu_load_segment(reg, readrm16(rm)) &&
+                if (r36sx_cpu_load_segment_at(reg, readrm16(rm), firstip) &&
                     reg == regss) {
                     r36sx_cpu_delay_maskable_interrupts_one_instruction();
                 }

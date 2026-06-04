@@ -1033,7 +1033,7 @@ static __not_in_flash() void r36sx_cpu_load_far_data_pointer(uint8_t segid,
 
     uint32_t offset = operandSizeOverride ? readdw86(ea) : readw86(ea);
     uint16_t selector = readw86(ea + (operandSizeOverride ? 4u : 2u));
-    if (!r36sx_cpu_load_segment(segid, selector)) {
+    if (!r36sx_cpu_load_segment_at(segid, selector, fault_ip)) {
         return;
     }
 
@@ -1395,8 +1395,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             return;
 
         case 0xA1:
-            r36sx_cpu_load_segment(regfs,
-                                   r36sx_cpu_pop_segment_selector());
+            r36sx_cpu_load_segment_at(regfs,
+                                      r36sx_cpu_pop_segment_selector(),
+                                      fault_ip);
             return;
 
         case 0xA8:
@@ -1404,8 +1405,9 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
             return;
 
         case 0xA9:
-            r36sx_cpu_load_segment(reggs,
-                                   r36sx_cpu_pop_segment_selector());
+            r36sx_cpu_load_segment_at(reggs,
+                                      r36sx_cpu_pop_segment_selector(),
+                                      fault_ip);
             return;
 
         case 0xA3: /* BT Ev,Gv */

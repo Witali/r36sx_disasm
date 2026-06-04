@@ -528,7 +528,9 @@ static uint8_t r36sx_cpu_segment_valid_for_load(
     return r36sx_descriptor_is_usable_data_segment(cache);
 }
 
-static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
+static uint8_t r36sx_cpu_load_segment_at(uint8_t segid,
+                                         uint16_t selector,
+                                         uint32_t fault_ip)
 {
     if (!r36sx_cpu_protected_enabled()) {
         putsegreg(segid, selector);
@@ -549,7 +551,7 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
                 "[CPU] protected mode null selector rejected seg=%u selector=%04x",
                 segid, selector);
 #endif
-            r36sx_pm_diag_log_first_fault("null CS/SS selector load", CPU_IP);
+            r36sx_pm_diag_log_first_fault("null CS/SS selector load", fault_ip);
             return 0;
         }
         r36sx_cpu_clear_segment_cache(segid, selector);
@@ -569,9 +571,9 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
             segid, selector, cache.access, cache.flags, exc);
 #endif
         r36sx_pm_diag_log_first_fault("segment not present/table fault",
-                                      CPU_IP);
+                                      fault_ip);
         r36sx_cpu_raise_exception(exc, selector & 0xfffcu,
-                                  1, CPU_IP);
+                                  1, fault_ip);
         return 0;
     }
 
@@ -584,10 +586,10 @@ static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
             r36sx_cpu_cpl(), r36sx_descriptor_dpl(&cache),
             r36sx_selector_rpl(selector));
 #endif
-        r36sx_pm_diag_log_first_fault("segment load failed", CPU_IP);
+        r36sx_pm_diag_log_first_fault("segment load failed", fault_ip);
         r36sx_cpu_raise_exception(
             segid == regss ? R36SX_EXCEPTION_STACK : R36SX_EXCEPTION_GP,
-            selector & 0xfffcu, 1, CPU_IP);
+            selector & 0xfffcu, 1, fault_ip);
         return 0;
     }
 
@@ -638,6 +640,11 @@ static uint8_t r36sx_cpu_load_ldtr(uint16_t selector, uint32_t fault_ip)
     r36sx_ldtr_selector = selector;
     r36sx_ldtr_cache = cache;
     return 1;
+}
+
+static uint8_t r36sx_cpu_load_segment(uint8_t segid, uint16_t selector)
+{
+    return r36sx_cpu_load_segment_at(segid, selector, CPU_IP);
 }
 
 static uint8_t r36sx_cpu_load_tr(uint16_t selector, uint32_t fault_ip)
