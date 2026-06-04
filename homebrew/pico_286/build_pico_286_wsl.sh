@@ -15,6 +15,7 @@ Options:
   --disable-protected-mode Compile out CR0.PE protected-mode switching.
   --opt-level LEVEL        GCC optimization level. Default: O2.
   --enable-mips-dsp        Experimental buffer helpers with MIPS DSP Rev2.
+  --rebuild-screenshot     Rebuild common screenshot.so and screenshot.a.
   --strip                  Run mips-mti-linux-gnu-strip on the output.
   --out PATH               Output path. Default: homebrew/pico_286/pico_286.gcc
   --help                   Show this help.
@@ -53,6 +54,7 @@ PROTECTED_MODE_VALUE=1
 DO_STRIP=0
 OPT_LEVEL=O2
 MIPS_DSP_VALUE=0
+REBUILD_SCREENSHOT=0
 
 while (($#)); do
     case "$1" in
@@ -94,6 +96,10 @@ while (($#)); do
             ;;
         --enable-mips-dsp)
             MIPS_DSP_VALUE=1
+            shift
+            ;;
+        --rebuild-screenshot)
+            REBUILD_SCREENSHOT=1
             shift
             ;;
         --strip)
@@ -358,6 +364,19 @@ if ((DO_STRIP)); then
     "$STRIP" --strip-all "$OUT"
 fi
 
-bash "$ROOT/homebrew/common/build_screenshot_so_wsl.sh" --strip --out "$SCREENSHOT_SO_OUT"
-bash "$ROOT/homebrew/common/build_screenshot_a_wsl.sh" --out "$SCREENSHOT_A_OUT"
+# Pico links the lightweight screenshot helper directly and loads screenshot.so
+# at runtime for PNG encoding.  Keep common screenshot artifacts stable during
+# ordinary Pico-only rebuilds; rebuild them only on first use or by request.
+if ((REBUILD_SCREENSHOT)) || [[ ! -e "$SCREENSHOT_SO_OUT" ]]; then
+    bash "$ROOT/homebrew/common/build_screenshot_so_wsl.sh" \
+        --strip --out "$SCREENSHOT_SO_OUT"
+else
+    echo "Keeping existing screenshot module: $SCREENSHOT_SO_OUT"
+fi
+if ((REBUILD_SCREENSHOT)) || [[ ! -e "$SCREENSHOT_A_OUT" ]]; then
+    bash "$ROOT/homebrew/common/build_screenshot_a_wsl.sh" \
+        --out "$SCREENSHOT_A_OUT"
+else
+    echo "Keeping existing screenshot static archive: $SCREENSHOT_A_OUT"
+fi
 echo "Built $OUT"

@@ -7,6 +7,7 @@ param(
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og", "Ofast")]
     [string]$OptLevel = "O2",
     [switch]$EnableMipsDsp,
+    [switch]$RebuildScreenshot,
     [switch]$Strip,
     [string]$Out
 )
@@ -39,6 +40,7 @@ if ($EffectiveOptLevel) {
     $ArgsList += $EffectiveOptLevel
 }
 if ($EnableMipsDsp) { $ArgsList += "--enable-mips-dsp" }
+if ($RebuildScreenshot) { $ArgsList += "--rebuild-screenshot" }
 if ($Strip) { $ArgsList += "--strip" }
 if ($Out) {
     $ArgsList += "--out"

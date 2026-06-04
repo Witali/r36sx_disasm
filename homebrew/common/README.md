@@ -52,9 +52,10 @@ bash homebrew/common/build_screenshot_a_wsl.sh
 
 `screenshot.a` exports the same `r36sx_screenshot_write_rgb565()` function as
 `screenshot.so`.  It contains our encoder object only; applications that use
-PNG through the static archive must also link target zlib.  The Pico-286 and
-Shell WSL build scripts rebuild both `screenshot.so` and `screenshot.a`
-automatically.
+PNG through the static archive must also link target zlib.  Pico-286 WSL builds
+reuse existing screenshot artifacts by default and rebuild them only if missing;
+pass `--rebuild-screenshot` or PowerShell `-RebuildScreenshot` when this common
+module changed.  Shell builds still refresh the module while packaging Shell.
 
 ## `r36sx_screen_keyboard`
 
