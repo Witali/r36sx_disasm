@@ -48,8 +48,21 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                       CPU_IP);
             return 0;
         }
-        return r36sx_cpu_task_switch((uint16_t)(lo >> 16),
-                                     R36SX_TASK_SWITCH_INTERRUPT);
+        uint8_t switched = r36sx_cpu_task_switch(
+            (uint16_t)(lo >> 16), R36SX_TASK_SWITCH_INTERRUPT);
+        if (switched && has_error_code) {
+            /*
+             * Intel pushes an exception error code on the new task stack after
+             * a task-gate switch.  DOS extenders such as DOS/16M may install
+             * task-gate exception handlers and expect this word/dword there.
+             */
+            if (r36sx_cpu_stack_default32()) {
+                push32(error_code);
+            } else {
+                push((uint16_t)error_code);
+            }
+        }
+        return switched;
     }
 
     if ((access & R36SX_DESCRIPTOR_PRESENT) == 0 ||
@@ -167,10 +180,48 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint32_t fault_ip)
 {
     r36sx_cpu_set_ip(fault_ip);
-    R36SX_PM_DIAG_LOG(
-        "[PM] exception int=%02X err=%08lX has_err=%u cs:eip=%04X:%08lX",
-        intnum, (unsigned long)error_code, has_error_code,
-        CPU_CS, (unsigned long)CPU_IP);
+#if R36SX_DEBUG_PM_DIAG
+    static uint8_t last_intnum;
+    static uint32_t last_error_code;
+    static uint8_t last_has_error_code;
+    static uint16_t last_cs;
+    static uint32_t last_ip;
+    static uint32_t repeat_count;
+    uint8_t repeated = repeat_count &&
+                       last_intnum == intnum &&
+                       last_error_code == error_code &&
+                       last_has_error_code == has_error_code &&
+                       last_cs == CPU_CS &&
+                       last_ip == CPU_IP;
+
+    if (repeated) {
+        repeat_count++;
+    } else {
+        if (repeat_count > 8u) {
+            r36sx_pico286_debug_log(
+                "[PM] exception repeat suppressed count=%lu",
+                (unsigned long)(repeat_count - 8u));
+        }
+        last_intnum = intnum;
+        last_error_code = error_code;
+        last_has_error_code = has_error_code;
+        last_cs = CPU_CS;
+        last_ip = CPU_IP;
+        repeat_count = 1u;
+    }
+
+    /*
+     * Keep only the first few identical exception records.  A broken protected
+     * exception path can otherwise fill the 2 MB log before the useful first
+     * fault and descriptor diagnostics survive.
+     */
+    if (repeat_count <= 8u) {
+        r36sx_pico286_debug_log(
+            "[PM] exception int=%02X err=%08lX has_err=%u cs:eip=%04X:%08lX",
+            intnum, (unsigned long)error_code, has_error_code,
+            CPU_CS, (unsigned long)CPU_IP);
+    }
+#endif
 
     if (r36sx_cpu_protected_enabled()) {
         if (!r36sx_cpu_protected_interrupt(
