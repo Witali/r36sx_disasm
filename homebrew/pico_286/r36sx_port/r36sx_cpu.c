@@ -6143,23 +6143,25 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 27 DAA */
             {
-                uint8_t old_al;
-                old_al = CPU_AL;
-                if (((CPU_AL & 0x0F) > 9) || af) {
-                    oper1 = (uint16_t) CPU_AL + 0x06;
-                    CPU_AL = oper1 & 0xFF;
-                    if (oper1 & 0xFF00)
-                        cf = 1;
-                    if ((oper1 & 0x000F) < (old_al & 0x0F))
-                        af = 1;
+                const uint8_t old_al = CPU_AL;
+                const uint8_t old_cf = cf;
+
+                /*
+                 * Intel DAA decides the high-digit correction from the input
+                 * AL/CF state.  The low correction sets AF but must not clear a
+                 * carry that was already pending before the instruction.
+                 */
+                if (((old_al & 0x0F) > 9) || af) {
+                    CPU_AL = (uint8_t)(CPU_AL + 0x06);
+                    af = 1;
+                } else {
+                    af = 0;
                 }
-                if (((CPU_AL & 0xF0) > 0x90) || cf) {
-                    oper1 = (uint16_t) CPU_AL + 0x60;
-                    CPU_AL = oper1 & 0xFF;
-                    if (oper1 & 0xFF00)
-                        cf = 1;
-                    else
-                        cf = 0;
+                if ((old_al > 0x99) || old_cf) {
+                    CPU_AL = (uint8_t)(CPU_AL + 0x60);
+                    cf = 1;
+                } else {
+                    cf = 0;
                 }
                 flag_szp8(CPU_AL);
                 break;
@@ -6254,23 +6256,25 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 2F DAS */
             {
-                uint8_t old_al;
-                old_al = CPU_AL;
-                if (((CPU_AL & 0x0F) > 9) || af) {
-                    oper1 = (uint16_t) CPU_AL - 0x06;
-                    CPU_AL = oper1 & 0xFF;
-                    if (oper1 & 0xFF00)
-                        cf = 1;
-                    if ((oper1 & 0x000F) >= (old_al & 0x0F))
-                        af = 1;
+                const uint8_t old_al = CPU_AL;
+                const uint8_t old_cf = cf;
+                const uint8_t low_adjust = ((old_al & 0x0F) > 9) || af;
+
+                /*
+                 * DAS mirrors DAA: high correction is based on input AL/CF.
+                 * If only the low correction borrows from AL, CF remains set.
+                 */
+                if (low_adjust) {
+                    CPU_AL = (uint8_t)(CPU_AL - 0x06);
+                    af = 1;
+                } else {
+                    af = 0;
                 }
-                if (((CPU_AL & 0xF0) > 0x90) || cf) {
-                    oper1 = (uint16_t) CPU_AL - 0x60;
-                    CPU_AL = oper1 & 0xFF;
-                    if (oper1 & 0xFF00)
-                        cf = 1;
-                    else
-                        cf = 0;
+                if ((old_al > 0x99) || old_cf) {
+                    CPU_AL = (uint8_t)(CPU_AL - 0x60);
+                    cf = 1;
+                } else {
+                    cf = low_adjust && (old_al < 0x06);
                 }
                 flag_szp8(CPU_AL);
                 break;
