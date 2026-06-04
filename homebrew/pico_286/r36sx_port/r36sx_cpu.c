@@ -2185,6 +2185,27 @@ static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value)
     r36sx_cpu_phys_write32(physical, value);
 }
 
+static inline uint8_t r36sx_cpu_probe_stack_write(uint32_t offset,
+                                                  uint32_t bytes)
+{
+    uint32_t linear;
+    uint32_t physical;
+
+    /*
+     * ENTER performs stack-access checks for the final stack pointer after the
+     * frame allocation.  No byte is stored there, but Intel still treats it as
+     * a would-write stack access for segment-limit and paging faults.
+     */
+    if (bytes == 0u) {
+        return 1;
+    }
+    if (!r36sx_cpu_segment_linear_checked(CPU_SS, offset, bytes, 1, 0,
+                                          &linear)) {
+        return 0;
+    }
+    return r36sx_cpu_translate_linear(linear, 1, &physical);
+}
+
 #undef read86
 #undef readw86
 #undef readdw86
@@ -2464,6 +2485,9 @@ static INLINE void r36sx_cpu_enter16(uint16_t frame_size,
 
     nesting_level &= 0x1Fu;
     push(CPU_BP);
+    if (r36sx_cpu_exception_is_pending()) {
+        return;
+    }
     frame_ptr = CPU_SP;
 
     /* ENTER copies saved frame-pointer values from the caller's frame chain.
@@ -2475,12 +2499,84 @@ static INLINE void r36sx_cpu_enter16(uint16_t frame_size,
         for (uint8_t level = 1; level < nesting_level; level++) {
             source_bp = (uint16_t)(source_bp - 2u);
             push(getmem16(CPU_SS, source_bp));
+            if (r36sx_cpu_exception_is_pending()) {
+                return;
+            }
         }
         push(frame_ptr);
+        if (r36sx_cpu_exception_is_pending()) {
+            return;
+        }
+    }
+
+    uint32_t final_sp = r36sx_cpu_stack_default32() ?
+                        CPU_ESP - frame_size :
+                        (uint16_t)(CPU_SP - frame_size);
+    if (!r36sx_cpu_probe_stack_write(final_sp, frame_size ? 1u : 0u)) {
+        return;
     }
 
     CPU_BP = frame_ptr;
-    CPU_SP = (uint16_t)(CPU_SP - frame_size);
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP -= frame_size;
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP - frame_size);
+    }
+}
+
+static INLINE void r36sx_cpu_enter32(uint16_t frame_size,
+                                     uint8_t nesting_level)
+{
+    uint32_t frame_ptr;
+
+    nesting_level &= 0x1Fu;
+    push32(CPU_EBP);
+    if (r36sx_cpu_exception_is_pending()) {
+        return;
+    }
+    frame_ptr = CPU_ESP;
+
+    /*
+     * Operand size selects the frame-pointer width, while the stack segment
+     * B-bit selects whether nested display loads address the chain with BP or
+     * EBP.  This mirrors the Intel ENTER pseudo-code and test386's model.
+     */
+    if (nesting_level != 0) {
+        uint32_t source_ebp = CPU_EBP;
+
+        for (uint8_t level = 1; level < nesting_level; level++) {
+            if (r36sx_cpu_stack_default32()) {
+                source_ebp -= 4u;
+                push32(getmem32(CPU_SS, source_ebp));
+            } else {
+                source_ebp =
+                    (source_ebp & 0xffff0000u) |
+                    ((source_ebp - 4u) & 0x0000ffffu);
+                push32(getmem32(CPU_SS, (uint16_t)source_ebp));
+            }
+            if (r36sx_cpu_exception_is_pending()) {
+                return;
+            }
+        }
+        push32(frame_ptr);
+        if (r36sx_cpu_exception_is_pending()) {
+            return;
+        }
+    }
+
+    uint32_t final_sp = r36sx_cpu_stack_default32() ?
+                        CPU_ESP - frame_size :
+                        (uint16_t)(CPU_SP - frame_size);
+    if (!r36sx_cpu_probe_stack_write(final_sp, frame_size ? 1u : 0u)) {
+        return;
+    }
+
+    CPU_EBP = frame_ptr;
+    if (r36sx_cpu_stack_default32()) {
+        CPU_ESP -= frame_size;
+    } else {
+        CPU_SP = (uint16_t)(CPU_SP - frame_size);
+    }
 }
 
 static inline void r36sx_cpu_raise_selector_fault(uint8_t exception,
@@ -8404,7 +8500,11 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 StepIP(2);
                 nestlev = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                r36sx_cpu_enter16(stacksize, nestlev);
+                if (operandSizeOverride) {
+                    r36sx_cpu_enter32(stacksize, nestlev);
+                } else {
+                    r36sx_cpu_enter16(stacksize, nestlev);
+                }
 
                 break;
 
