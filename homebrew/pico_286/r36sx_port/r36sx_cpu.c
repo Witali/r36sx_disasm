@@ -382,6 +382,12 @@ static r36sx_segment_cache_t r36sx_seg_cache[6];
 static uint32_t r36sx_cr0 = R36SX_CR0_ET;
 static uint32_t r36sx_cr2;
 static uint32_t r36sx_cr3;
+/*
+ * Intel 386 page faults push the EIP of the faulting instruction.  The
+ * interpreter advances CPU_IP while decoding ModRM/displacements/immediates,
+ * so memory helpers use this per-instruction context instead of CPU_IP.
+ */
+static uint32_t r36sx_cpu_fault_ip_context;
 static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint16_t r36sx_debug_resume_cs;
@@ -2044,7 +2050,8 @@ static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
 
     if ((pde & R36SX_PAGE_PRESENT) == 0) {
         r36sx_cr2 = linear;
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1,
+                                  r36sx_cpu_fault_ip_context);
         return 0;
     }
 
@@ -2053,7 +2060,8 @@ static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
     uint32_t pte = r36sx_cpu_phys_read32(pte_addr);
     if ((pte & R36SX_PAGE_PRESENT) == 0) {
         r36sx_cr2 = linear;
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1, CPU_IP);
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1,
+                                  r36sx_cpu_fault_ip_context);
         return 0;
     }
 
@@ -2065,7 +2073,8 @@ static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
               ((pte & R36SX_PAGE_WRITABLE) == 0)))) {
             r36sx_cr2 = linear;
             r36sx_cpu_raise_exception(
-                R36SX_EXCEPTION_PF, error_code | 0x01u, 1, CPU_IP);
+                R36SX_EXCEPTION_PF, error_code | 0x01u, 1,
+                r36sx_cpu_fault_ip_context);
             return 0;
         }
     }
@@ -5262,6 +5271,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
         uint8_t docontinue = 0;
         uint8_t prefix_exception = 0;
         firstip = CPU_IP;
+        r36sx_cpu_fault_ip_context = firstip;
         register uint8_t opcode;
 
         if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {
