@@ -551,7 +551,12 @@ static uint8_t r36sx_cpu_load_segment_at(uint8_t segid,
                 "[CPU] protected mode null selector rejected seg=%u selector=%04x",
                 segid, selector);
 #endif
+            /*
+             * Intel permits a null selector in DS/ES/FS/GS, but loading CS or
+             * SS with one faults immediately with #GP(0).
+             */
             r36sx_pm_diag_log_first_fault("null CS/SS selector load", fault_ip);
+            r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
             return 0;
         }
         r36sx_cpu_clear_segment_cache(segid, selector);
