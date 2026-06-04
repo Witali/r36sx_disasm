@@ -71,6 +71,11 @@ physical keyboard input, disk images, config loading, RTC, profiling, and debug
 logs are active; the R36SX `driver.so` video/audio paths, joypad Fn overlays,
 and device-only audio output are not used in this build.
 
+Current workflow rule: build Pico-286 for Windows by default while CPU, BIOS,
+VGA, disk, and DOS compatibility debugging is active.  Rebuild the MIPS/device
+binary only when a change is ready to be tested on the handheld or when the
+user explicitly asks for a firmware/device patch update.
+
 Build it from the repository root:
 
 ```powershell
