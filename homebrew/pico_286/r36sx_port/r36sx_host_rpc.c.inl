@@ -45,6 +45,7 @@
 #define R36SX_HOST_RPC_MAX_PATH 260u
 #define R36SX_HOST_RPC_MAX_HOST_PATH 512u
 #define R36SX_HOST_RPC_FIND_RESULT_SIZE 20u
+#define R36SX_HOST_RPC_FLAG_CREATE_NEW 0x0001u
 
 #if R36SX_DEBUG_HOSTRPC_TRACE
 extern void r36sx_pico286_debug_log(const char *format, ...);
@@ -712,6 +713,7 @@ static void r36sx_host_rpc_execute_request(void)
             const char *mode;
             int handle;
             FILE *fp;
+            struct stat st;
             if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
                                              sizeof(guest_path)) ||
                 !r36sx_host_rpc_build_host_path(guest_path, host_path,
@@ -729,13 +731,21 @@ static void r36sx_host_rpc_execute_request(void)
                                       4);
                 break;
             }
+            if (req.command == R36SX_HOST_RPC_CMD_CREATE &&
+                (req.flags & R36SX_HOST_RPC_FLAG_CREATE_NEW) &&
+                stat(host_path, &st) == 0) {
+                R36SX_HOSTRPC_LOG(
+                    "hostrpc: create-new exists host='%s' attr=%04x",
+                    host_path,
+                    (unsigned)req.attr);
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
+                                      0x50u); /* file already exists */
+                break;
+            }
             mode = req.command == R36SX_HOST_RPC_CMD_OPEN_RO ? "rb" :
                    req.command == R36SX_HOST_RPC_CMD_OPEN_RW ? "rb+" : "wb+";
             errno = 0;
             fp = fopen(host_path, mode);
-            if (!fp && req.command == R36SX_HOST_RPC_CMD_OPEN_RW) {
-                fp = fopen(host_path, "wb+");
-            }
             if (!fp) {
                 err = errno ? errno : EIO;
                 R36SX_HOSTRPC_LOG(
@@ -754,12 +764,25 @@ static void r36sx_host_rpc_execute_request(void)
                 req.file_size = size > 0 ? (uint32_t)size : 0u;
                 fseek(fp, 0, SEEK_SET);
             }
+            if (req.command == R36SX_HOST_RPC_CMD_CREATE) {
+                /*
+                 * DOS create attributes use the low byte of the redirector
+                 * stack word.  If the caller requested "normal" attributes,
+                 * report archive so later GETATTR/DIR sees a regular file.
+                 */
+                req.attr = (req.attr & 0x3fu) ? (req.attr & 0x3fu) : 0x20u;
+            } else if (stat(host_path, &st) == 0) {
+                req.attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x20u;
+            }
             R36SX_HOSTRPC_LOG(
-                "hostrpc: open/create ok cmd=%s host='%s' handle=%u size=%lu",
+                "hostrpc: open/create ok cmd=%s host='%s' handle=%u size=%lu attr=%04x mode=%04x flags=%04x",
                 r36sx_host_rpc_command_name(req.command),
                 host_path,
                 (unsigned)req.handle,
-                (unsigned long)req.file_size);
+                (unsigned long)req.file_size,
+                (unsigned)req.attr,
+                (unsigned)req.mode,
+                (unsigned)req.flags);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }

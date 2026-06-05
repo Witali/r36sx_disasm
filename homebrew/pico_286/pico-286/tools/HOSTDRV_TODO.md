@@ -6,7 +6,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
 - [x] Store `findfirst`/`findnext` state in the DOS DTA/Search Data Block instead
    of a single resident-global handle. SHSUCDX treats this state as per-DTA,
    which avoids nested or repeated searches trampling each other.
-- [ ] Implement `INT 2Fh AX=1116h` and `AX=1117h` stack parameters properly:
+- [x] Implement `INT 2Fh AX=1116h` and `AX=1117h` stack parameters properly:
    access/share mode, create attributes, and create-new vs truncate behavior.
 - [ ] Add `INT 2Fh AX=112Eh` extended open/create support for DOS versions and
    shells that prefer the extended redirector path.
