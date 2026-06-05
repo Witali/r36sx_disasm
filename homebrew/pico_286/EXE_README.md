@@ -260,7 +260,10 @@ and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 `homebrew/pico_286/tests/build_test386_r36sx.ps1`, which invokes the local NASM
 3.01 assembler.  `mapdrive.com`, when a standalone DOS copy is needed, is built
 from `homebrew/pico_286/pico-286/tools/mapdrive.asm` with the same NASM
-executable and copied to the Pico-286 patch directory.  See
+executable and copied to the Pico-286 patch directory.  `hostdrv.com` is the
+experimental DOS-side redirector that owns `INT 2Fh/AH=11h` and talks to the
+emulator through HOSTRPC ports `E360h..E36Fh`; it is built from
+`homebrew/pico_286/pico-286/tools/hostdrv.asm`.  See
 `homebrew/pico_286/README.md` for the exact commands.
 
 The `[memory]` values are in KB.  `total_memory_kb` is the physical PC memory

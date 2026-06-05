@@ -696,6 +696,19 @@ Build the patch copy with:
 .\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
 ```
 
+`hostdrv.com` is the experimental DOS-side redirector that replaces the old
+emulator-owned `INT 2Fh` file bridge.  It installs its own `INT 2Fh/AH=11h`
+handler inside DOS and talks to the emulator only through the private HOSTRPC
+ports `E360h..E36Fh`.  Build the patch copy with:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Run it inside DOS as `HOSTDRV H:`.  The long-term high-memory target is a
+`HOSTDRV.SYS` variant loaded with `DEVICEHIGH=` when UMBs are available, so the
+redirector does not permanently consume conventional memory.
+
 Then mirror it into the local disk-image working copy if needed:
 
 ```powershell
