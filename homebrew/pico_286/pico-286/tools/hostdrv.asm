@@ -95,8 +95,16 @@ DEFAULT_DRIVE_NUMBER equ 7
 CDS_ENTRY_SIZE       equ 058h
 CDS_OFF_FLAGS        equ 043h
 CDSFLAG_NET_PHY      equ 0C000h
-FIRST_FILENAME_OFF   equ 09Eh
-SECOND_FILENAME_OFF  equ 016Ah
+
+; SDA filename locations for DOS 3.1+ redirector callbacks.
+; RBIL names these as the "SDA first/second filename pointer".  The fields at
+; 27Ch/27Eh are WORD offsets in DOS DS, not inline strings.  The buffers at
+; 92h/112h are kept as fallbacks for DOS variants that do not fill the pointer
+; fields.  Reading from the old inline offsets made HOSTRPC receive guest=''.
+FIRST_FILENAME_OFF   equ 027Ch
+SECOND_FILENAME_OFF  equ 027Eh
+FIRST_FILENAME_BUF   equ 092h
+SECOND_FILENAME_BUF  equ 0112h
 
 ; System File Table (SFT) fields that DOS passes in ES:DI for open files.
 ; HOSTDRV stores the host-side handle in SFT_FILE_HANDLE and keeps the DOS file
@@ -767,13 +775,21 @@ store_dta_phys:
     ret
 
 copy_sda_string:
-    ; AX = SDA-relative offset, DI = near destination in CS.
-    ; Copies a NUL-terminated DOS path from the SDA into a resident buffer.
+    ; AX = SDA-relative offset of a WORD filename pointer, DI = destination.
+    ; The pointer value is an offset in DOS DS, the same segment that contains
+    ; the SDA.  DOS redirector docs describe this as "SDA first filename
+    ; pointer", so the string is not located at SDA+AX directly.
+    ;
+    ; If a DOS variant leaves that pointer empty, fall back to the known inline
+    ; filename buffers in the SDA.  This keeps HOSTDRV usable on DOS 3.x-like
+    ; layouts while still following the documented redirector convention.
+    ;
     ; The 127-byte limit keeps path_buf/path2_buf NUL-terminated and avoids
     ; scanning unbounded DOS memory if the SDA content is malformed.
     push ax
     push bx
     push cx
+    push dx
     push si
     push es
     mov bx, [sda_seg]
@@ -782,6 +798,21 @@ copy_sda_string:
     mov es, bx
     mov si, [sda_off]
     add si, ax
+    mov dx, ax
+    mov si, [es:si]
+    cmp si, 0
+    je .fallback
+    cmp si, 0FFFFh
+    jne .copy_ready
+.fallback:
+    mov si, [sda_off]
+    cmp dx, FIRST_FILENAME_OFF
+    jne .second_name
+    add si, FIRST_FILENAME_BUF
+    jmp .copy_ready
+.second_name:
+    add si, SECOND_FILENAME_BUF
+.copy_ready:
     mov cx, 127
 .copy:
     mov al, [es:si]
@@ -795,6 +826,7 @@ copy_sda_string:
 .done:
     pop es
     pop si
+    pop dx
     pop cx
     pop bx
     pop ax
