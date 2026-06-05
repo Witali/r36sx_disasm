@@ -39,6 +39,8 @@
 #define REDIRECTOR_CDS_FLAGS_OFFSET 0x43u
 #define REDIRECTOR_CDS_FLAG_NET 0x8000u
 FILE *open_files[MAX_FILES] = {0};
+static uint32_t open_file_sft_addr[MAX_FILES] = {0};
+static uint16_t open_file_device_info[MAX_FILES] = {0};
 
 #ifdef WIN32
 #ifndef mkdir
@@ -267,10 +269,14 @@ typedef struct __attribute__((packed)) {
 
 static uint32_t sda_addr = 0;
 
+static inline bool guest_sft_address(uint32_t *address) {
+    *address = ((uint32_t) CPU_ES << 4) + CPU_DI;
+    return guest_ram_range_ok(*address, sizeof(sftstruct));
+}
+
 static inline sftstruct *guest_sft_ptr(void) {
-    const uint32_t address = ((uint32_t) CPU_ES << 4) + CPU_DI;
-    return guest_ram_range_ok(address, sizeof(sftstruct)) ?
-           (sftstruct *) &RAM[address] : NULL;
+    uint32_t address = 0;
+    return guest_sft_address(&address) ? (sftstruct *) &RAM[address] : NULL;
 }
 
 static inline bool guest_read_u16_ram(uint32_t address, uint16_t *value) {
@@ -474,15 +480,56 @@ static inline bool redirector_update_mapped_drive_from_context(
 static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
 {
     /*
-     * The SFT handle number is local to this redirector table.  Guard all
-     * handle-based callbacks with the device marker we put into open/create,
-     * otherwise a local DOS file handle with the same number could be mistaken
-     * for a host-drive FILE*.
+     * The SFT handle number is a slot in this redirector's FILE* table, while
+     * DOS still owns the SFT structure around it.  Some DOS versions/tools can
+     * rewrite parts of the SFT after open/create, so accept either the exact
+     * device marker we wrote or the same SFT address that originally received
+     * the slot.  The address sidecar keeps local image-backed files from being
+     * mistaken for host files just because their cluster number is small.
      */
-    return sftptr &&
-           sftptr->device_info ==
-               redirector_device_info_for_drive(
-                   redirector_effective_drive_letter());
+    if (!sftptr || sftptr->file_handle >= MAX_FILES ||
+        !open_files[sftptr->file_handle]) {
+        return false;
+    }
+
+    uint32_t sft_addr = 0;
+    bool same_sft = guest_sft_address(&sft_addr) &&
+                    open_file_sft_addr[sftptr->file_handle] == sft_addr;
+    bool same_device =
+        open_file_device_info[sftptr->file_handle] &&
+        sftptr->device_info == open_file_device_info[sftptr->file_handle];
+
+    if (!same_sft && !same_device) {
+        redirector_error_log(
+            "redir: rejecting non-host SFT handle=%u device=%04x expected=%04x sft=%05lx expected_sft=%05lx",
+            sftptr->file_handle, sftptr->device_info,
+            open_file_device_info[sftptr->file_handle],
+            (unsigned long)sft_addr,
+            (unsigned long)open_file_sft_addr[sftptr->file_handle]);
+    }
+    return same_sft || same_device;
+}
+
+static inline void redirector_clear_file_slot(uint16_t file_handle)
+{
+    if (file_handle >= MAX_FILES) {
+        return;
+    }
+    open_files[file_handle] = NULL;
+    open_file_sft_addr[file_handle] = 0;
+    open_file_device_info[file_handle] = 0;
+}
+
+static inline void redirector_mark_file_slot(uint16_t file_handle,
+                                             uint16_t device_info)
+{
+    uint32_t sft_addr = 0;
+    if (file_handle >= MAX_FILES) {
+        return;
+    }
+    open_file_device_info[file_handle] = device_info;
+    open_file_sft_addr[file_handle] =
+        guest_sft_address(&sft_addr) ? sft_addr : 0;
 }
 
 static inline bool redirector_dta_is_mine(const sdbstruct *dta)
@@ -682,13 +729,13 @@ static inline bool redirector_handler() {
                     redirector_error_log(
                         "redir: close failed handle=%u err=%d",
                         file_handle, err);
-                    open_files[file_handle] = NULL;
+                    redirector_clear_file_slot(file_handle);
                     CPU_AX = redirector_dos_error_from_errno(err, 1);
                     CPU_FL_CF = 1;
                     break;
                 }
                 sftptr->total_handles = 0xffff;
-                open_files[file_handle] = NULL;
+                redirector_clear_file_slot(file_handle);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
@@ -911,12 +958,17 @@ static inline bool redirector_handler() {
                 return false;
             }
             get_full_path(path, dos_path);
+            errno = 0;
             int result = unlink(path);
             if (result == 0) {
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
-                CPU_AX = 2; // File not found (typical for unlink failure)
+                const int err = errno ? errno : EIO;
+                redirector_error_log(
+                    "redir: delete failed dos='%s' host='%s' err=%d",
+                    dos_path, path, err);
+                CPU_AX = redirector_dos_error_from_errno(err, 1);
                 CPU_FL_CF = 1;
             }
         }
@@ -950,7 +1002,7 @@ static inline bool redirector_handler() {
                     sftstruct *sftptr = guest_sft_ptr();
                     if (!sftptr) {
                         fclose(open_files[file_handle]);
-                        open_files[file_handle] = NULL;
+                        redirector_clear_file_slot(file_handle);
                         guest_memory_error();
                         break;
                     }
@@ -973,6 +1025,7 @@ static inline bool redirector_handler() {
                         redirector_device_info_for_drive(
                             redirector_effective_drive_letter());
                     sftptr->file_handle = file_handle; // Store our handle here
+                    redirector_mark_file_slot(file_handle, sftptr->device_info);
                     sftptr->file_size = file_size;
                     sftptr->file_time = 0x1000;
                     sftptr->file_date = 0x1000;
@@ -1016,7 +1069,7 @@ static inline bool redirector_handler() {
                     sftstruct *sftptr = guest_sft_ptr();
                     if (!sftptr) {
                         fclose(open_files[file_handle]);
-                        open_files[file_handle] = NULL;
+                        redirector_clear_file_slot(file_handle);
                         guest_memory_error();
                         break;
                     }
@@ -1038,6 +1091,7 @@ static inline bool redirector_handler() {
                         redirector_device_info_for_drive(
                             redirector_effective_drive_letter());
                     sftptr->file_handle = file_handle; // Store our handle here
+                    redirector_mark_file_slot(file_handle, sftptr->device_info);
                     sftptr->file_size = 0; // New file
                     sftptr->file_time = 0x1000;
                     sftptr->file_date = 0x1000;
