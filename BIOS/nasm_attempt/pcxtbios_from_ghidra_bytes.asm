@@ -2,6 +2,16 @@
 ; Ghidra disassembly is preserved as comments at instruction/data start offsets.
 ; Duplicate/overlapping Ghidra lines are deduplicated by ROM file offset.
 ;
+; This source intentionally emits bytes with db directives instead of symbolic
+; instructions.  It is the first safe rebuild step: NASM output must remain
+; byte-identical to BIOS/pcxtbios.bin while we gradually replace well-understood
+; ranges with labels, instructions, and data declarations.
+;
+; Physical BIOS ROM range: FE000h..FFFFFh.
+; NASM origin below is E000h because the ROM is viewed as F000:E000..F000:FFFF.
+; CPU reset starts at FFFF0h, where the far jump transfers control to
+; F000:E05B, physical FE05Bh.
+;
 ; Build: nasm -f bin pcxtbios_from_ghidra_bytes.asm -o pcxtbios_from_ghidra_bytes.bin
 bits 16
 org 0xe000
