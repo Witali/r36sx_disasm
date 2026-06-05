@@ -50,8 +50,8 @@ struct host_rpc_request {
     uint16_t attr;
     uint16_t dos_error;
     uint16_t result;
-    uint16_t reserved;
-    uint32_t bytes_done;
+    uint16_t reserved;   /* GETATTR/open response: DOS packed time */
+    uint32_t bytes_done; /* GETATTR/open low word: DOS packed date; read/write: byte count */
 };
 ```
 
@@ -69,7 +69,7 @@ struct host_rpc_request {
 | `7` | Delete | Deletes `path_phys`. |
 | `8` | Mkdir | Creates directory `path_phys`. |
 | `9` | Rmdir | Removes directory `path_phys`. |
-| `10` | Getattr | Returns file size and DOS directory attr bit. |
+| `10` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
 | `11` | Rename | Renames `path_phys` to `path2_phys`. |
 | `12` | Commit | Flushes the open file in `handle`. |
 | `13` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
@@ -83,8 +83,8 @@ Find commands write this fixed 20-byte result into `data_phys`, provided
 struct host_rpc_find_result {
     uint8_t name[11]; /* DOS 8.3 padded name */
     uint8_t attr;
-    uint16_t time;    /* currently deterministic placeholder 0x1000 */
-    uint16_t date;    /* currently deterministic placeholder 0x1000 */
+    uint16_t time;    /* DOS packed local time */
+    uint16_t date;    /* DOS packed local date */
     uint32_t size;
 };
 ```

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "findfirst.h"
 
 #ifdef _WIN32
@@ -213,6 +214,7 @@ static void r36sx_host_rpc_store_response(uint32_t address,
     r36sx_host_rpc_write_u16(address + 36u, req->attr);
     r36sx_host_rpc_write_u16(address + 38u, req->dos_error);
     r36sx_host_rpc_write_u16(address + 40u, req->result);
+    r36sx_host_rpc_write_u16(address + 42u, req->reserved);
     r36sx_host_rpc_write_u32(address + 44u, req->bytes_done);
 }
 
@@ -701,11 +703,94 @@ static void r36sx_host_rpc_to_dos_name(const char *input, uint8_t *output)
     }
 }
 
+static void r36sx_host_rpc_pack_dos_timestamp(time_t timestamp,
+                                              uint16_t *dos_time,
+                                              uint16_t *dos_date)
+{
+    struct tm value;
+    struct tm *tm_value;
+    int year;
+
+    if (!dos_time || !dos_date) {
+        return;
+    }
+
+#ifdef _WIN32
+    tm_value = localtime(&timestamp);
+    if (tm_value) {
+        value = *tm_value;
+    }
+#else
+    tm_value = localtime_r(&timestamp, &value);
+#endif
+    if (!tm_value) {
+        value.tm_year = 80;
+        value.tm_mon = 0;
+        value.tm_mday = 1;
+        value.tm_hour = 0;
+        value.tm_min = 0;
+        value.tm_sec = 0;
+    }
+
+    year = value.tm_year + 1900;
+    if (year < 1980) {
+        year = 1980;
+    } else if (year > 2107) {
+        year = 2107;
+    }
+
+    /*
+     * DOS packs local time as hhhhh mmmmmm sssss, with seconds counted in
+     * two-second units, and dates as yyyyyyy mmmm ddddd from year 1980.
+     */
+    *dos_time = (uint16_t)(((value.tm_hour & 0x1F) << 11) |
+                           ((value.tm_min & 0x3F) << 5) |
+                           ((value.tm_sec / 2) & 0x1F));
+    *dos_date = (uint16_t)((((year - 1980) & 0x7F) << 9) |
+                           (((value.tm_mon + 1) & 0x0F) << 5) |
+                           (value.tm_mday & 0x1F));
+}
+
+static uint16_t r36sx_host_rpc_attr_from_stat(const struct stat *st)
+{
+    uint16_t attr;
+
+    if (!st) {
+        return 0x20u;
+    }
+
+    attr = (st->st_mode & S_IFDIR) ? 0x10u : 0x20u;
+#ifdef S_IWUSR
+    if (!(st->st_mode & S_IWUSR)) {
+        attr |= 0x01u;
+    }
+#endif
+    return attr;
+}
+
+static void r36sx_host_rpc_apply_stat_metadata(r36sx_host_rpc_request_t *req,
+                                               const struct stat *st)
+{
+    uint16_t dos_time;
+    uint16_t dos_date;
+
+    if (!req || !st) {
+        return;
+    }
+    req->file_size = (uint32_t)st->st_size;
+    req->attr = r36sx_host_rpc_attr_from_stat(st);
+    r36sx_host_rpc_pack_dos_timestamp(st->st_mtime, &dos_time, &dos_date);
+    req->reserved = dos_time;
+    req->bytes_done = dos_date;
+}
+
 static int r36sx_host_rpc_store_find_result(uint32_t address,
                                             uint32_t bytes,
                                             const struct _finddata_t *fileinfo)
 {
     uint16_t attr;
+    uint16_t dos_time;
+    uint16_t dos_date;
     uint32_t size;
 
     if (!fileinfo || bytes < R36SX_HOST_RPC_FIND_RESULT_SIZE ||
@@ -717,14 +802,15 @@ static int r36sx_host_rpc_store_find_result(uint32_t address,
     /*
      * The guest redirector wants the same compact data that DOS puts into
      * the DTA: an 11-byte 8.3 name, attribute byte, time, date, and size.
-     * Timestamps stay deterministic for now, matching the legacy redirector.
      */
     r36sx_host_rpc_to_dos_name(fileinfo->name, &RAM[address]);
     attr = (uint16_t)(fileinfo->attrib & 0xffu);
     size = (uint32_t)fileinfo->size;
+    r36sx_host_rpc_pack_dos_timestamp(fileinfo->time_write, &dos_time,
+                                      &dos_date);
     RAM[address + 11u] = (uint8_t)attr;
-    r36sx_host_rpc_write_u16(address + 12u, 0x1000u);
-    r36sx_host_rpc_write_u16(address + 14u, 0x1000u);
+    r36sx_host_rpc_write_u16(address + 12u, dos_time);
+    r36sx_host_rpc_write_u16(address + 14u, dos_date);
     r36sx_host_rpc_write_u32(address + 16u, size);
     return 1;
 }
@@ -880,23 +966,20 @@ static void r36sx_host_rpc_execute_request(void)
                 req.file_size = size > 0 ? (uint32_t)size : 0u;
                 fseek(fp, 0, SEEK_SET);
             }
-            if (req.command == R36SX_HOST_RPC_CMD_CREATE) {
-                /*
-                 * DOS create attributes use the low byte of the redirector
-                 * stack word.  If the caller requested "normal" attributes,
-                 * report archive so later GETATTR/DIR sees a regular file.
-                 */
-                req.attr = (req.attr & 0x3fu) ? (req.attr & 0x3fu) : 0x20u;
-            } else if (stat(host_path, &st) == 0) {
-                req.attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x20u;
+            if (stat(host_path, &st) == 0) {
+                r36sx_host_rpc_apply_stat_metadata(&req, &st);
+            } else if (req.command == R36SX_HOST_RPC_CMD_CREATE) {
+                req.attr = 0x20u;
             }
             R36SX_HOSTRPC_LOG(
-                "hostrpc: open/create ok cmd=%s host='%s' handle=%u size=%lu attr=%04x mode=%04x flags=%04x",
+                "hostrpc: open/create ok cmd=%s host='%s' handle=%u size=%lu attr=%04x time=%04x date=%04lx mode=%04x flags=%04x",
                 r36sx_host_rpc_command_name(req.command),
                 host_path,
                 (unsigned)req.handle,
                 (unsigned long)req.file_size,
                 (unsigned)req.attr,
+                (unsigned)req.reserved,
+                (unsigned long)(req.bytes_done & 0xffffu),
                 (unsigned)req.mode,
                 (unsigned)req.flags);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
@@ -1058,8 +1141,7 @@ static void r36sx_host_rpc_execute_request(void)
             } else {
                 rc = stat(host_path, &st);
                 if (rc == 0) {
-                    req.file_size = (uint32_t)st.st_size;
-                    req.attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x20u;
+                    r36sx_host_rpc_apply_stat_metadata(&req, &st);
                 }
             }
             if (rc != 0) {

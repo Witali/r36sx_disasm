@@ -85,6 +85,11 @@ REQ_RESULT      equ 40
 REQ_RESERVED    equ 42
 REQ_BYTES_DONE  equ 44
 REQ_SIZE        equ 48
+; Metadata response aliases.  GETATTR/open store DOS packed time in the old
+; reserved word and DOS packed date in the low word of bytes_done.  Read/write
+; still use the full bytes_done dword for transfer counts.
+REQ_DOS_TIME    equ REQ_RESERVED
+REQ_DOS_DATE    equ REQ_BYTES_DONE
 
 ; HOSTRPC request flags.
 REQ_FLAG_CREATE_NEW equ 0001h
@@ -370,8 +375,16 @@ redir_getattr:
     mov ax, [request + REQ_ATTR]
     mov bx, [request + REQ_FILE_SIZE + 2]
     mov di, [request + REQ_FILE_SIZE]
+    mov cx, [request + REQ_DOS_TIME]
+    cmp cx, 0
+    jne .time_ready
     mov cx, 1000h
+.time_ready:
+    mov dx, [request + REQ_DOS_DATE]
+    cmp dx, 0
+    jne .date_ready
     mov dx, 1000h
+.date_ready:
     jmp redir_success
 
 redir_rename:
@@ -1003,8 +1016,18 @@ fill_sft_from_request:
     mov word [es:di + SFT_UNK0 + 2], 0
     mov ax, [request + REQ_HANDLE]
     mov [es:di + SFT_FILE_HANDLE], ax
-    mov word [es:di + SFT_FILE_TIME], 1000h
-    mov word [es:di + SFT_FILE_DATE], 1000h
+    mov ax, [request + REQ_DOS_TIME]
+    cmp ax, 0
+    jne .time_ready
+    mov ax, 1000h
+.time_ready:
+    mov word [es:di + SFT_FILE_TIME], ax
+    mov ax, [request + REQ_DOS_DATE]
+    cmp ax, 0
+    jne .date_ready
+    mov ax, 1000h
+.date_ready:
+    mov word [es:di + SFT_FILE_DATE], ax
     mov ax, [request + REQ_FILE_SIZE]
     mov [es:di + SFT_FILE_SIZE], ax
     mov ax, [request + REQ_FILE_SIZE + 2]

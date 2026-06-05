@@ -18,7 +18,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
    host handles and TSR installation cannot corrupt the caller frame.
 - [ ] Implement real `chdir` state for the mapped drive by updating CDS/current
    path or keeping equivalent per-drive path state in the guest driver.
-- [ ] Return real host attributes and timestamps, translating them to DOS
+- [x] Return real host attributes and timestamps, translating them to DOS
    attribute bits and packed DOS date/time values.
 - [x] Strengthen "not for us" checks for every path/SFT/DTA callback and chain to
    the previous `INT 2Fh` handler when the request belongs to another redirector.

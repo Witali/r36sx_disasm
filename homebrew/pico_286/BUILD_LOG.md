@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTRPC real DOS metadata
+
+Closed the HOSTDRV TODO item for real host metadata.  HOSTRPC now translates
+host `stat()` data to DOS attribute bits and packed DOS local date/time.  Find
+results carry real timestamps, while GETATTR/open responses return DOS time in
+the request block `reserved` word and DOS date in the low word of `bytes_done`.
+HOSTDRV now copies those values into GETATTR `CX/DX` and SFT time/date fields.
+
+Rebuild commands:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+bb3ec3a6acbc582b3de8ad8cc5003ee1c3393245d0e81f59c1ee93ea6de105a5  HOSTDRV.COM
+45da93dd6a9da55b195a372b232e0e74dd346fc2e3f8b8089f6d24e4bfff366b  pico_286
+```
+
 ## 2026-06-05 HOSTDRV not-for-us redirector chaining
 
 Closed the HOSTDRV TODO item for redirector ownership checks.  Path callbacks
