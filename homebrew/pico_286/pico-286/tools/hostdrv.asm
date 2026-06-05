@@ -313,6 +313,10 @@ redir_getattr:
     mov al, CMD_GETATTR
     call rpc_path_command
     jc redir_from_rpc
+    ; Do not return stale attr/size from an earlier successful request.  DOS
+    ; shells use GETATTR as the "does destination exist?" probe before copy.
+    cmp word [request + REQ_RESULT], 0
+    jne redir_from_rpc
     mov ax, [request + REQ_ATTR]
     mov bx, [request + REQ_FILE_SIZE + 2]
     mov di, [request + REQ_FILE_SIZE]
