@@ -523,9 +523,7 @@ static void r36sx_host_rpc_execute_request(void)
             if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
                                              sizeof(guest_path)) ||
                 !r36sx_host_rpc_build_host_path(guest_path, host_path,
-                                                sizeof(host_path)) ||
-                !r36sx_host_rpc_make_find_pattern(host_path,
-                                                  sizeof(host_path))) {
+                                                sizeof(host_path))) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
@@ -712,7 +710,9 @@ static void r36sx_host_rpc_execute_request(void)
             if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
                                              sizeof(guest_path)) ||
                 !r36sx_host_rpc_build_host_path(guest_path, host_path,
-                                                sizeof(host_path))) {
+                                                sizeof(host_path)) ||
+                !r36sx_host_rpc_make_find_pattern(host_path,
+                                                  sizeof(host_path))) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
