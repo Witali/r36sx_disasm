@@ -15,7 +15,11 @@ static uint8_t graphics_control_register = 0;
 static uint8_t color_index = 0, read_color_index = 0, vga_register;
 static uint8_t dac_write_component = 0, dac_read_component = 0, dac_state = 0;
 static uint8_t attribute_data_mode = 0;
-static uint8_t attribute_controller[0x20];
+#define R36SX_VGA_SEQUENCER_REGISTER_COUNT 5u
+#define R36SX_VGA_GRAPHICS_CONTROLLER_REGISTER_COUNT 9u
+#define R36SX_VGA_ATTRIBUTE_REGISTER_COUNT 0x20u
+
+static uint8_t attribute_controller[R36SX_VGA_ATTRIBUTE_REGISTER_COUNT];
 static uint8_t dac_mask = 0xFF;
 static uint8_t misc_output_register = 0x63;
 uint32_t vga_plane_offset = 0;
@@ -380,6 +384,16 @@ typedef struct {
 
 static vga_cache_t vga;
 
+static inline int vga_sequencer_register_valid(void)
+{
+    return sequencer_register < R36SX_VGA_SEQUENCER_REGISTER_COUNT;
+}
+
+static inline int vga_graphics_control_register_valid(void)
+{
+    return graphics_control_register <
+           R36SX_VGA_GRAPHICS_CONTROLLER_REGISTER_COUNT;
+}
 
 // Call whenever sequencer reg 2 or memory_mode changed
 static inline void vga_update_seq_cache(void) {
@@ -1091,6 +1105,14 @@ void vga_portout(uint16_t portnum, uint16_t value) {
             sequencer_register = value & 7;
             break;
         case 0x3C5:
+            /*
+             * VGA decodes a 3-bit sequencer index, but only registers 0..4
+             * exist in our model.  Undefined indices must not address past
+             * vga.sequencer[].
+             */
+            if (!vga_sequencer_register_valid()) {
+                break;
+            }
             // store raw
             vga.sequencer[sequencer_register] = value;
             // update derived cache for changes that matter
@@ -1129,6 +1151,13 @@ void vga_portout(uint16_t portnum, uint16_t value) {
             graphics_control_register = value & 15;
             break;
         case 0x3CF:
+            /*
+             * The graphics-controller index register is 4-bit wide, while the
+             * VGA graphics controller exposes registers 0..8 here.
+             */
+            if (!vga_graphics_control_register_valid()) {
+                break;
+            }
             vga.graphics_controller[graphics_control_register] = value;
             // If register affects derived cache, update
             // if (gc_index <= 8 || gc_index == 0 || gc_index == 1 || gc_index == 2 || gc_index == 3 ||
@@ -1148,12 +1177,16 @@ uint16_t vga_portin(uint16_t portnum) {
             return attribute_controller[vga_register & 0x1Fu];
         case 0x3C2:
             return 0;
-        case 0x3C5: return vga.sequencer[sequencer_register];
+        case 0x3C5:
+            return vga_sequencer_register_valid() ?
+                vga.sequencer[sequencer_register] : 0xFFu;
         case 0x3C6: return dac_mask;
         case 0x3C7:
             return dac_state;
         case 0x3CC: return misc_output_register;
-        case 0x3CF: return vga.graphics_controller[graphics_control_register];
+        case 0x3CF:
+            return vga_graphics_control_register_valid() ?
+                vga.graphics_controller[graphics_control_register] : 0xFFu;
         case 0x3C8:
             return color_index;
         case 0x3C9: {

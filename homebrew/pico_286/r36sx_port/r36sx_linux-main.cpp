@@ -76,6 +76,18 @@ static inline uint32_t vga_vram_cell(uint32_t index) {
     return VIDEORAM[index & 0xFFFFu];
 }
 
+static inline uint8_t vga_vram_byte(uint32_t index) {
+    return (uint8_t)(vga_vram_cell(index) & 0xFFu);
+}
+
+static inline void put_pixel_repeat(uint16_t **pixels, uint16_t color,
+                                    uint32_t count)
+{
+    while (count--) {
+        *(*pixels)++ = color;
+    }
+}
+
 extern "C" void adlib_getsample(int16_t *sndptr, intptr_t numsamples);
 
 extern "C" void r36sx_pico286_request_soft_reset(void) {
@@ -538,14 +550,15 @@ static inline void renderer() {
                 case 0x01: {
                     uint16_t y_div_16 = y / 16; // Precompute y / 16
                     uint8_t glyph_line = (y / 2) % 8; // Precompute y % 8 for font lookup
-                    // Calculate screen position
-                    uint32_t *text_buffer_line =
-                            &VIDEORAM[0x8000 + ((vram_offset & 0xffff) << 1) + y_div_16 * 80];
+                    uint32_t text_base =
+                        0x8000u + ((vram_offset & 0xffffu) << 1) +
+                        (uint32_t)y_div_16 * 80u;
 
                     for (int column = 0; column < 40; column++) {
-                        uint8_t charcode = (uint8_t)(*text_buffer_line++ & 0xffu);
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
+                        uint8_t charcode = vga_vram_byte(cell);
                         uint8_t glyph_pixels = font_8x8[charcode * 8 + glyph_line]; // Glyph row from font
-                        uint8_t color = (uint8_t)(*text_buffer_line++ & 0xffu); // Color attribute
+                        uint8_t color = vga_vram_byte(cell + 1u); // Color attribute
 
                         // Cursor blinking check
                         uint8_t cursor_active = cursor_blink_state &&
@@ -564,7 +577,8 @@ static inline void renderer() {
                             }
 
                             // Write the pixel twice (horizontal scaling)
-                            *pixels++ = *pixels++ = cga_palette565[pixel_color];
+                            put_pixel_repeat(&pixels,
+                                             cga_palette565[pixel_color], 2u);
                         }
                     }
 
@@ -578,14 +592,15 @@ static inline void renderer() {
                     uint16_t y_div_16 = y / 16; // Precompute y / 16
                     uint8_t glyph_line = y % 16; // Precompute y % 8 for font lookup
 
-                    // Calculate screen position
-                    uint32_t *text_row =
-                            &VIDEORAM[0x8000 + ((vram_offset & 0xffff) << 1) + y_div_16 * 160];
+                    uint32_t text_base =
+                        0x8000u + ((vram_offset & 0xffffu) << 1) +
+                        (uint32_t)y_div_16 * 160u;
                     for (uint8_t column = 0; column < 80; column++) {
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
                         // Access vidram and font data once per character
-                        uint8_t charcode = (uint8_t)(text_row[column * 2] & 0xffu); // Character code
+                        uint8_t charcode = vga_vram_byte(cell); // Character code
                         uint8_t glyph_row = font_8x16[charcode * 16 + glyph_line]; // Glyph row from font
-                        uint8_t color = (uint8_t)(text_row[column * 2 + 1] & 0xffu); // Color attribute
+                        uint8_t color = vga_vram_byte(cell + 1u); // Color attribute
 
                         // Cursor blinking check
                         uint8_t cursor_active =
@@ -618,36 +633,42 @@ static inline void renderer() {
                 }
                 case 0x04:
                 case 0x05: {
-                    uint32_t *cga_row = &VIDEORAM[cga_graphics_base() + cga_graphics_row_offset(y)];
+                    uint32_t cga_base =
+                        cga_graphics_base() + cga_graphics_row_offset(y);
                     uint8_t *current_cga_palette = (uint8_t *) cga_gfxpal[cga_colorset][cga_intensity];
 
                     // Each byte containing 4 pixels
-                    for (int x = 320 / 4; x--;) {
-                        uint8_t cga_byte = (uint8_t)(*cga_row++ & 0xffu);
+                    for (uint32_t x = 0; x < 320u / 4u; x++) {
+                        uint8_t cga_byte = vga_vram_byte(cga_base + x);
 
                         // Extract all four 2-bit pixels from the CGA byte
                         // and write each pixel twice for horizontal scaling
-                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 6 & 3
-                                                                ? current_cga_palette[cga_byte >> 6 & 3]
-                                                                : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 4 & 3
-                                                                ? current_cga_palette[cga_byte >> 4 & 3]
-                                                                : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 2 & 3
-                                                                ? current_cga_palette[cga_byte >> 2 & 3]
-                                                                : cga_foreground_color];
-                        *pixels++ = *pixels++ = cga_palette565[cga_byte >> 0 & 3
-                                                                ? current_cga_palette[cga_byte >> 0 & 3]
-                                                                : cga_foreground_color];
+                        put_pixel_repeat(&pixels,
+                            cga_palette565[cga_byte >> 6 & 3
+                                           ? current_cga_palette[cga_byte >> 6 & 3]
+                                           : cga_foreground_color], 2u);
+                        put_pixel_repeat(&pixels,
+                            cga_palette565[cga_byte >> 4 & 3
+                                           ? current_cga_palette[cga_byte >> 4 & 3]
+                                           : cga_foreground_color], 2u);
+                        put_pixel_repeat(&pixels,
+                            cga_palette565[cga_byte >> 2 & 3
+                                           ? current_cga_palette[cga_byte >> 2 & 3]
+                                           : cga_foreground_color], 2u);
+                        put_pixel_repeat(&pixels,
+                            cga_palette565[cga_byte >> 0 & 3
+                                           ? current_cga_palette[cga_byte >> 0 & 3]
+                                           : cga_foreground_color], 2u);
                     }
                     break;
                 }
                 case 0x06: {
-                    uint32_t *cga_row = &VIDEORAM[cga_graphics_base() + cga_graphics_row_offset(y)];
+                    uint32_t cga_base =
+                        cga_graphics_base() + cga_graphics_row_offset(y);
 
                     // Each byte containing 8 pixels
-                    for (int x = 640 / 8; x--;) {
-                        uint8_t cga_byte = (uint8_t)(*cga_row++ & 0xffu);
+                    for (uint32_t x = 0; x < 640u / 8u; x++) {
+                        uint8_t cga_byte = vga_vram_byte(cga_base + x);
 
                         *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * cga_foreground_color];
                         *pixels++ = cga_palette565[(cga_byte >> 6 & 1) * cga_foreground_color];
@@ -668,10 +689,14 @@ static inline void renderer() {
                         fill_black_row(pixels);
                         break;
                     }
-                    uint8_t *cga_row = (uint8_t *)VIDEORAM + vram_offset + (y & 3) * 8192 + y / 4 * cols;
+                    uint32_t cga_base = vram_offset +
+                        ((uint32_t)y & 3u) * 8192u +
+                        ((uint32_t)y / 4u) * (uint32_t)cols;
                     // Each byte containing 8 pixels
-                    for (int x = 640 / 8; x--;) {
-                        uint8_t cga_byte = *cga_row++;
+                    for (uint32_t x = 0; x < 640u / 8u; x++) {
+                        // The emulated video aperture is 64K; keep renderer
+                        // reads wrapped exactly like the write path.
+                        uint8_t cga_byte = vga_vram_byte(cga_base + x);
 
                         *pixels++ = cga_palette565[(cga_byte >> 7 & 1) * 15];
                         *pixels++ = cga_palette565[(cga_byte >> 6 & 1) * 15];
@@ -694,14 +719,14 @@ static inline void renderer() {
                     uint8_t glyph_line = (uint8_t)(y % 14);
                     uint8_t font_line = glyph_line + 1;
                     uint16_t text_row_index = (uint16_t)(y / 14);
-                    uint32_t *text_row = &VIDEORAM[((vram_offset & 0xffff) << 1) +
-                                                   text_row_index * 160];
+                    uint32_t text_base =
+                        ((vram_offset & 0xffffu) << 1) +
+                        (uint32_t)text_row_index * 160u;
 
                     for (uint8_t column = 0; column < 80; column++) {
-                        uint8_t charcode =
-                            (uint8_t)(text_row[column * 2] & 0xffu);
-                        uint8_t attr =
-                            (uint8_t)(text_row[column * 2 + 1] & 0xffu);
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
+                        uint8_t charcode = vga_vram_byte(cell);
+                        uint8_t attr = vga_vram_byte(cell + 1u);
                         uint8_t glyph_row =
                             font_8x16[charcode * 16 + font_line];
                         uint8_t cursor_active =
@@ -742,41 +767,48 @@ static inline void renderer() {
                             break;
                     }
 
-                    uint8_t *cga_row = (uint8_t *)VIDEORAM + tga_offset + (y / 2 >> 1) * 80 + (y / 2 & 1) * 8192; // Precompute row start
+                    uint32_t source_y = (uint32_t)y / 2u;
+                    uint32_t cga_base = tga_offset +
+                        (source_y >> 1) * 80u + (source_y & 1u) * 8192u;
 
                     // Each byte containing 8 pixels
-                    for (int x = 640 / 8; x--;) {
-                        uint8_t cga_byte = *cga_row++; // Fetch 8 pixels from TGA memory
+                    for (uint32_t x = 0; x < 640u / 8u; x++) {
+                        uint8_t cga_byte = vga_vram_byte(cga_base + x);
                         uint8_t color1 = cga_byte >> 4 & 15;
                         uint8_t color2 = cga_byte & 15;
 
                         if (!color1 && videomode == 0x8) color1 = cga_foreground_color;
                         if (!color2 && videomode == 0x8) color2 = cga_foreground_color;
 
-                        *pixels++ = *pixels++ = *pixels++ = *pixels++ = palette[color1];
-                        *pixels++ = *pixels++ = *pixels++ = *pixels++ = palette[color2];
+                        put_pixel_repeat(&pixels, palette[color1], 4u);
+                        put_pixel_repeat(&pixels, palette[color2], 4u);
                     }
 
                     break;
                 }
                 case 0x09: /* tandy 320x200 16 color */ {
-                    uint8_t *tga_row = (uint8_t *)VIDEORAM + tga_offset + (y / 2 & 3) * 8192 + y / 8 * 160;
-                    //                  uint8_t *tga_row = &VIDEORAM[tga_offset+(((y / 2) & 3) * 8192) + ((y / 8) * 160)];
+                    uint32_t tga_base = tga_offset +
+                        (((uint32_t)y / 2u) & 3u) * 8192u +
+                        ((uint32_t)y / 8u) * 160u;
 
                     // Each byte containing 4 pixels
-                    for (int x = 320 / 2; x--;) {
-                        uint8_t tga_byte = *tga_row++;
-                        *pixels++ = *pixels++ = tga_palette565[tga_palette_map[tga_byte >> 4 & 15]];
-                        *pixels++ = *pixels++ = tga_palette565[tga_palette_map[tga_byte & 15]];
+                    for (uint32_t x = 0; x < 320u / 2u; x++) {
+                        uint8_t tga_byte = vga_vram_byte(tga_base + x);
+                        put_pixel_repeat(&pixels,
+                            tga_palette565[tga_palette_map[tga_byte >> 4 & 15]],
+                            2u);
+                        put_pixel_repeat(&pixels,
+                            tga_palette565[tga_palette_map[tga_byte & 15]],
+                            2u);
                     }
                     break;
                 }
                 case 0x0a: /* tandy 640x200 16 color */ {
-                    uint8_t *tga_row = (uint8_t *)VIDEORAM + y / 2 * 320;
+                    uint32_t tga_base = ((uint32_t)y / 2u) * 320u;
 
                     // Each byte contains 2 pixels
-                    for (int x = 640 / 2; x--;) {
-                        uint8_t tga_byte = *tga_row++;
+                    for (uint32_t x = 0; x < 640u / 2u; x++) {
+                        uint8_t tga_byte = vga_vram_byte(tga_base + x);
                         *pixels++ = tga_palette565[tga_palette_map[tga_byte >> 4 & 15]];
                         *pixels++ = tga_palette565[tga_palette_map[tga_byte & 15]];
                     }
@@ -864,10 +896,18 @@ static inline void renderer() {
                                              ((uint32_t)y >> 1) * stride;
                         for (uint32_t x = 0; x < visible_cells; x++) {
                             uint32_t four_pixels = vga_vram_cell(vram_base + x);
-                            *pixels++ = *pixels++ = vga_palette565[four_pixels & 0xFFu];
-                            *pixels++ = *pixels++ = vga_palette565[(four_pixels >> 8) & 0xFFu];
-                            *pixels++ = *pixels++ = vga_palette565[(four_pixels >> 16) & 0xFFu];
-                            *pixels++ = *pixels++ = vga_palette565[(four_pixels >> 24) & 0xFFu];
+                            put_pixel_repeat(&pixels,
+                                             vga_palette565[four_pixels & 0xFFu],
+                                             2u);
+                            put_pixel_repeat(&pixels,
+                                             vga_palette565[(four_pixels >> 8) & 0xFFu],
+                                             2u);
+                            put_pixel_repeat(&pixels,
+                                             vga_palette565[(four_pixels >> 16) & 0xFFu],
+                                             2u);
+                            put_pixel_repeat(&pixels,
+                                             vga_palette565[(four_pixels >> 24) & 0xFFu],
+                                             2u);
                         }
                     } else {
                         uint32_t stride = vga_crtc_chunky_stride(320u);
@@ -875,7 +915,7 @@ static inline void renderer() {
                                              ((uint32_t)y >> 1) * stride;
                         for (int x = 0; x < 320; x++) {
                             uint16_t color = vga_palette565[vga_vram_cell(vram_base + x) & 0xFFu];
-                            *pixels++ = *pixels++ = color;
+                            put_pixel_repeat(&pixels, color, 2u);
                         }
                     }
 
@@ -887,12 +927,13 @@ static inline void renderer() {
                     uint16_t y_div_4 = y / 4; // Precompute y / 4
                     uint8_t odd_even = y / 2 & 1;
                     // Calculate screen position
-                    uint8_t *cga_row = (uint8_t *)VIDEORAM + 0x8000 + y_div_4 * 160;
+                    uint32_t text_base = 0x8000u + (uint32_t)y_div_4 * 160u;
                     for (uint8_t column = 0; column < cols; column++) {
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
                         // Access vidram and font data once per character
-                        uint8_t *charcode = cga_row + column * 2; // Character code
-                        uint8_t glyph_row = font_8x8[*charcode * 8 + odd_even]; // Glyph row from font
-                        uint8_t color = *++charcode;
+                        uint8_t charcode = vga_vram_byte(cell);
+                        uint8_t glyph_row = font_8x8[charcode * 8 + odd_even]; // Glyph row from font
+                        uint8_t color = vga_vram_byte(cell + 1u);
 
 #pragma GCC unroll(8)
                         for (uint8_t bit = 0; bit < 8; bit++) {
@@ -904,16 +945,21 @@ static inline void renderer() {
                 case 0x79: /* 80x200x16 textmode */ {
                     int y_div_2 = y / 2; // Precompute y / 2
                     // Calculate screen position
-                    uint8_t *cga_row = (uint8_t *)VIDEORAM + 0x8000 + y_div_2 * 80 + (y_div_2 & 1 * 8192);
+                    uint32_t text_base = 0x8000u + (uint32_t)y_div_2 * 80u +
+                        ((uint32_t)y_div_2 & (1u * 8192u));
                     for (int column = 0; column < 40; column++) {
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
                         // Access vidram and font data once per character
-                        uint8_t *charcode = cga_row + column * 2; // Character code
-                        uint8_t glyph_row = font_8x8[*charcode * 8]; // Glyph row from font
-                        uint8_t color = *++charcode;
+                        uint8_t charcode = vga_vram_byte(cell);
+                        uint8_t glyph_row = font_8x8[charcode * 8]; // Glyph row from font
+                        uint8_t color = vga_vram_byte(cell + 1u);
 
 #pragma GCC unroll(8)
                         for (int bit = 0; bit < 8; bit++) {
-                            *pixels++ = *pixels++ = cga_palette565[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
+                            put_pixel_repeat(&pixels,
+                                cga_palette565[glyph_row >> bit & 1
+                                               ? color & 0x0f : color >> 4],
+                                2u);
                         }
                     }
                     break;
@@ -922,16 +968,21 @@ static inline void renderer() {
                     /* 40x46 ??? */
                     int y_div_2 = y / 8; // Precompute y / 2
                     // Calculate screen position
-                    uint8_t *cga_row = (uint8_t *)VIDEORAM + 0x8000 + y_div_2 * 80 + (y_div_2 & 1 * 8192);
+                    uint32_t text_base = 0x8000u + (uint32_t)y_div_2 * 80u +
+                        ((uint32_t)y_div_2 & (1u * 8192u));
                     for (int column = 0; column < 40; column++) {
+                        uint32_t cell = text_base + (uint32_t)column * 2u;
                         // Access vidram and font data once per character
-                        uint8_t *charcode = cga_row + column * 2; // Character code
-                        uint8_t glyph_row = font_8x8[*charcode * 8 + (y_div_2 % 8)]; // Glyph row from font
-                        uint8_t color = *++charcode;
+                        uint8_t charcode = vga_vram_byte(cell);
+                        uint8_t glyph_row = font_8x8[charcode * 8 + (y_div_2 % 8)]; // Glyph row from font
+                        uint8_t color = vga_vram_byte(cell + 1u);
 
 #pragma GCC unroll(8)
                         for (int bit = 0; bit < 8; bit++) {
-                            *pixels++ = *pixels++ = cga_palette565[glyph_row >> bit & 1 ? color & 0x0f : color >> 4];
+                            put_pixel_repeat(&pixels,
+                                cga_palette565[glyph_row >> bit & 1
+                                               ? color & 0x0f : color >> 4],
+                                2u);
                         }
                     }
                     break;
