@@ -306,11 +306,7 @@ int2f_handler:
     cmp ax, 112Eh
     je redir_ext_open_create
 
-    pop si
-    pop es
-    pop ds
-    pop bp
-    jmp far [cs:old_2f]
+    jmp redir_chain
 
 redir_install_check:
     ; Installation check.  Some DOS versions also pass a refreshed SDA pointer
@@ -327,21 +323,33 @@ redir_install_check:
     jmp redir_success
 
 redir_rmdir:
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov al, CMD_RMDIR
     call rpc_path_command
     jmp redir_from_rpc
 
 redir_mkdir:
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov al, CMD_MKDIR
     call rpc_path_command
     jmp redir_from_rpc
 
 redir_chdir:
-    ; DOS keeps the selected path in the CDS. HOSTRPC path resolution is
-    ; root-based for now, so accepting the callback is enough for this stage.
+    ; DOS keeps the selected path in the CDS.  For now HOSTDRV accepts only
+    ; paths that belong to our mapped drive and lets other redirectors chain.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     jmp redir_success
 
 redir_delete:
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov al, CMD_DELETE
     call rpc_path_command
     jmp redir_from_rpc
@@ -349,6 +357,9 @@ redir_delete:
 redir_getattr:
     ; Attribute query returns DOS attributes in AX and file size in BX:DI.
     ; CX/DX are filled with stable placeholder time/date values for now.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov al, CMD_GETATTR
     call rpc_path_command
     jc redir_from_rpc
@@ -367,6 +378,12 @@ redir_rename:
     ; Rename has two SDA filenames: source at FIRST_FILENAME_OFF and target at
     ; SECOND_FILENAME_OFF.  Both are copied into resident near buffers before
     ; their physical addresses are placed in the HOSTRPC request.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
+    mov ax, SECOND_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     call clear_request
     mov word [request + REQ_COMMAND], CMD_RENAME
     mov ax, FIRST_FILENAME_OFF
@@ -389,6 +406,9 @@ redir_open:
     ; Access bits 0..2 match INT 21h/AH=3Dh: 0=read, 1=write, 2=read/write,
     ; 3=internal EXEC/case-sensitive open.  Only true write-capable opens use
     ; HOSTRPC OPEN_RW; EXEC/internal mode remains read-only.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov bx, [bp + REDIR_STACK_PARAM1]
     call select_open_command_from_mode
     call rpc_open_common
@@ -398,6 +418,9 @@ redir_create:
     ; RBIL: AX=1117h receives a create-mode stack word.  The low byte is the
     ; file attributes; high byte 01h means "create new" and must fail if the
     ; file already exists.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov bx, [bp + REDIR_STACK_PARAM1]
     mov al, CMD_CREATE
     call rpc_open_common
@@ -408,6 +431,9 @@ redir_ext_open_create:
     ; RBIL documents the action/mode fields in the SDA and the create
     ; attributes on the redirector stack.  The SDA attribute is preferred
     ; because some DOS versions pass a stale stack attribute for action 11h.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     mov ax, SDA_EXT_OPEN_ACTION
     call load_sda_word
     jc .bad_sda
@@ -505,6 +531,8 @@ redir_close:
     ; redirector must update the SFT open count.  DOS can have several JFT
     ; handles pointing at one SFT, so only the final reference releases the
     ; HOSTRPC file handle.  Earlier closes simply decrement the SFT refcount.
+    call sft_is_ours
+    jc redir_chain
     mov ax, [es:di + SFT_TOTAL_HANDLES]
     cmp ax, SFT_REFCOUNT_FREE
     je .invalid_sft
@@ -536,6 +564,8 @@ redir_close:
 redir_commit:
     ; DOS commit/flush.  HOSTRPC maps this to fflush/fsync-style behavior on
     ; the host side when possible.
+    call sft_is_ours
+    jc redir_chain
     call clear_request
     mov word [request + REQ_COMMAND], CMD_COMMIT
     mov ax, [es:di + SFT_FILE_HANDLE]
@@ -544,11 +574,15 @@ redir_commit:
     jmp redir_from_rpc
 
 redir_read:
+    call sft_is_ours
+    jc redir_chain
     mov al, CMD_READ
     call rpc_io_common
     jmp redir_from_rpc
 
 redir_write:
+    call sft_is_ours
+    jc redir_chain
     mov al, CMD_WRITE
     call rpc_io_common
     jmp redir_from_rpc
@@ -568,6 +602,9 @@ redir_find_first:
     ; Directory enumeration is stateful on the host side.  DOS redirectors keep
     ; the opaque continuation state in the DTA/SDB, not in one process-global
     ; variable, so repeated or nested searches do not trample each other.
+    mov ax, FIRST_FILENAME_OFF
+    call sda_path_is_ours
+    jc redir_chain
     call close_dta_find_state
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_FIRST
@@ -597,6 +634,8 @@ redir_find_first:
 redir_find_next:
     ; Continue the enumeration identified by the current DTA/SDB.  This mirrors
     ; SHSUCDX-style redirectors where the DTA owns the find continuation state.
+    call dta_find_state_is_ours
+    jc redir_chain
     call load_dta_find_handle
     jc .invalid_dta
     call clear_request
@@ -623,6 +662,8 @@ redir_find_next:
 redir_seek_end:
     ; CX:DX is a signed offset from EOF.  HOSTRPC keeps size in the SFT, so
     ; avoid another host round-trip and clamp negative seeks to zero.
+    call sft_is_ours
+    jc redir_chain
     mov ax, [es:di + SFT_FILE_SIZE]
     mov bx, [es:di + SFT_FILE_SIZE + 2]
     add ax, dx
@@ -670,6 +711,15 @@ redir_done:
     pop ds
     pop bp
     iret
+
+redir_chain:
+    ; This AH=11h callback is not for our mapped drive or SFT.  Restore the
+    ; caller's saved registers and continue through the redirector chain.
+    pop si
+    pop es
+    pop ds
+    pop bp
+    jmp far [cs:old_2f]
 
 rpc_path_command:
     ; Common helper for one-path operations: delete, mkdir, rmdir, getattr.
@@ -786,6 +836,79 @@ rpc_io_common:
     mov [es:di + SFT_FILE_SIZE + 2], ax
     mov cx, [request + REQ_BYTES_DONE]
 .done:
+    ret
+
+sda_path_is_ours:
+    ; AX = SDA-relative path offset.  If DOS supplied an explicit "X:" prefix,
+    ; only handle the path when X matches our mapped drive.  Root-relative
+    ; names are accepted because DOS may already have selected the target CDS
+    ; before entering the redirector callback.
+    push bx
+    push es
+    mov bx, [sda_seg]
+    cmp bx, 0
+    je .not_ours
+    mov es, bx
+    mov bx, [sda_off]
+    add bx, ax
+    mov al, [es:bx]
+    call upper_al
+    cmp al, 'A'
+    jb .ours
+    cmp al, 'Z'
+    ja .ours
+    cmp byte [es:bx + 1], ':'
+    jne .ours
+    cmp al, [drive_letter]
+    jne .not_ours
+.ours:
+    clc
+    jmp .done
+.not_ours:
+    stc
+.done:
+    pop es
+    pop bx
+    ret
+
+sft_is_ours:
+    ; HOSTDRV stamps SFT_DEVICE_INFO when opening a host-backed file.  Later
+    ; read/write/close/seek callbacks for other redirectors must continue down
+    ; the INT 2Fh chain instead of treating their SFT handle as a HOSTRPC one.
+    push ax
+    mov ax, [es:di + SFT_DEVICE_INFO]
+    cmp ax, [device_info]
+    jne .not_ours
+    clc
+    jmp .done
+.not_ours:
+    stc
+.done:
+    pop ax
+    ret
+
+dta_find_state_is_ours:
+    ; Find-next has no path parameter, so ownership comes from the hidden
+    ; DTA/SDB fields written by write_dta_find_result after our find-first.
+    push ax
+    push di
+    push es
+    call load_dta_esdi
+    jc .not_ours
+    mov al, [drive_letter]
+    or al, 80h
+    cmp [es:di + DTA_DRIVE], al
+    jne .not_ours
+    cmp word [es:di + DTA_FIND_MAGIC], DTA_FIND_MAGIC_VALUE
+    jne .not_ours
+    clc
+    jmp .done
+.not_ours:
+    stc
+.done:
+    pop es
+    pop di
+    pop ax
     ret
 
 close_dta_find_state:

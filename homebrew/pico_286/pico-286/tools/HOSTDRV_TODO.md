@@ -20,7 +20,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
    path or keeping equivalent per-drive path state in the guest driver.
 - [ ] Return real host attributes and timestamps, translating them to DOS
    attribute bits and packed DOS date/time values.
-- [ ] Strengthen "not for us" checks for every path/SFT/DTA callback and chain to
+- [x] Strengthen "not for us" checks for every path/SFT/DTA callback and chain to
    the previous `INT 2Fh` handler when the request belongs to another redirector.
 - [x] Audit `clear_request`: it uses `rep stosw`, which writes through `ES:DI`.
    Ensure it always targets the resident request block in `CS`, not the caller's

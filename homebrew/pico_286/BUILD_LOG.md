@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV not-for-us redirector chaining
+
+Closed the HOSTDRV TODO item for redirector ownership checks.  Path callbacks
+now inspect explicit `X:` prefixes in the SDA filenames, SFT callbacks verify
+HOSTDRV's `SFT_DEVICE_INFO` marker, and find-next checks the hidden DTA/SDB
+owner marker before touching HOSTRPC.  Non-HOSTDRV callbacks restore the saved
+registers and continue through the previous `INT 2Fh` handler.
+
+Rebuilt and updated `HOSTDRV.COM` in the patch and inside `hdd.hdd`:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+9637ca2a1fea4761ee27d6ed5ee878112a9602b10a26873ed6540c86169abb28  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV clear request segment fix
 
 Fixed the final `HOSTDRV_TODO.md` audit item: `clear_request` now sets `ES=CS`
