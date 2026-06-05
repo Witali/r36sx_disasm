@@ -261,6 +261,63 @@ static int r36sx_host_rpc_pop_segment(char *tail)
     return 1;
 }
 
+static int r36sx_host_rpc_dir_exists(const char *path)
+{
+    struct stat st;
+
+    return path && path[0] && stat(path, &st) == 0 && (st.st_mode & S_IFDIR);
+}
+
+static int r36sx_host_rpc_ensure_base_dir(const char *path)
+{
+    char temp[R36SX_HOST_RPC_MAX_HOST_PATH];
+    size_t len;
+
+    if (!path || !path[0]) {
+        return 0;
+    }
+    snprintf(temp, sizeof(temp), "%s", path);
+    temp[sizeof(temp) - 1u] = '\0';
+
+    len = strlen(temp);
+    while (len > 1u && (temp[len - 1u] == '\\' || temp[len - 1u] == '/')) {
+        temp[--len] = '\0';
+    }
+    if (r36sx_host_rpc_dir_exists(temp)) {
+        return 1;
+    }
+
+    /*
+     * Create only the configured host-drive root automatically.  Guest-visible
+     * subdirectories are still created by explicit DOS MKDIR requests.
+     */
+    for (size_t i = 0; i < len; ++i) {
+        char saved;
+
+        if (temp[i] != '\\' && temp[i] != '/') {
+            continue;
+        }
+        if (i == 0u || (i == 2u && temp[1] == ':')) {
+            continue;
+        }
+
+        saved = temp[i];
+        temp[i] = '\0';
+        if (!r36sx_host_rpc_dir_exists(temp) &&
+            mkdir(temp, 0777) != 0 && errno != EEXIST) {
+            temp[i] = saved;
+            return 0;
+        }
+        temp[i] = saved;
+    }
+
+    if (!r36sx_host_rpc_dir_exists(temp) &&
+        mkdir(temp, 0777) != 0 && errno != EEXIST) {
+        return 0;
+    }
+    return r36sx_host_rpc_dir_exists(temp);
+}
+
 static int r36sx_host_rpc_build_host_path(const char *guest_path,
                                           char *host_path,
                                           size_t host_path_size)
@@ -281,6 +338,9 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
     }
     if (!base || !base[0]) {
         base = "host";
+    }
+    if (!r36sx_host_rpc_ensure_base_dir(base)) {
+        return 0;
     }
 
     /* Drop an optional DOS drive prefix and root slashes. */
