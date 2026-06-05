@@ -91,6 +91,7 @@ REQ_FLAG_CREATE_NEW equ 0001h
 ; DOS error codes returned through redirected INT 2Fh callbacks.
 DOS_ERR_INVALID_FUNCTION equ 1
 DOS_ERR_FILE_NOT_FOUND   equ 2
+DOS_ERR_INVALID_HANDLE   equ 6
 DOS_ERR_FILE_EXISTS      equ 80
 
 ; Default mapping is H:, matching the project documentation.  DOS drive
@@ -144,6 +145,7 @@ SFT_UNK2             equ 27
 SFT_UNK3             equ 29
 SFT_UNK4             equ 31
 SFT_FILE_NAME        equ 32
+SFT_REFCOUNT_FREE    equ 0FFFFh
 
 ; Disk Transfer Area (DTA) / Search Data Block fields used by find-first and
 ; find-next.  The first 21 bytes are redirector-owned search state; DOS shells
@@ -498,16 +500,37 @@ redir_ext_open_create:
     jmp redir_fail
 
 redir_close:
-    ; Close releases the host-side file handle and marks the DOS SFT slot as
-    ; closed.  The host RPC layer owns the actual FILE*/descriptor lifetime.
+    ; RBIL documents AX=1106h as a redirector close callback where the
+    ; redirector must update the SFT open count.  DOS can have several JFT
+    ; handles pointing at one SFT, so only the final reference releases the
+    ; HOSTRPC file handle.  Earlier closes simply decrement the SFT refcount.
+    mov ax, [es:di + SFT_TOTAL_HANDLES]
+    cmp ax, SFT_REFCOUNT_FREE
+    je .invalid_sft
+    cmp ax, 0
+    je .invalid_sft
+    cmp ax, 1
+    je .last_reference
+    dec ax
+    mov [es:di + SFT_TOTAL_HANDLES], ax
+    xor ax, ax
+    jmp redir_success
+
+.last_reference:
     call clear_request
     mov word [request + REQ_COMMAND], CMD_CLOSE
     mov ax, [es:di + SFT_FILE_HANDLE]
     mov [request + REQ_HANDLE], ax
     call execute_request
     jc redir_from_rpc
-    mov word [es:di + SFT_TOTAL_HANDLES], 0FFFFh
+    cmp word [request + REQ_RESULT], 0
+    jne redir_from_rpc
+    mov word [es:di + SFT_TOTAL_HANDLES], SFT_REFCOUNT_FREE
     jmp redir_from_rpc
+
+.invalid_sft:
+    mov ax, DOS_ERR_INVALID_HANDLE
+    jmp redir_fail
 
 redir_commit:
     ; DOS commit/flush.  HOSTRPC maps this to fflush/fsync-style behavior on

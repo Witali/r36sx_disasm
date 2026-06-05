@@ -10,7 +10,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
    access/share mode, create attributes, and create-new vs truncate behavior.
 - [x] Add `INT 2Fh AX=112Eh` extended open/create support for DOS versions and
    shells that prefer the extended redirector path.
-- [ ] Make close semantics match DOS SFT expectations: decrement the SFT reference
+- [x] Make close semantics match DOS SFT expectations: decrement the SFT reference
    count or call the DOS helper where appropriate, instead of only marking the
    handle count as closed.
 - [ ] Reintroduce process cleanup safely: handle `AX=1122h`/`AX=111Dh` only after

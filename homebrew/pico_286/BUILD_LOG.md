@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV close reference count
+
+Implemented the fourth `HOSTDRV_TODO.md` item: `INT 2Fh AX=1106h` now follows
+the DOS SFT reference-count contract.  If several DOS handles still reference
+one SFT, HOSTDRV decrements `SFT_TOTAL_HANDLES` and leaves the HOSTRPC handle
+open.  The host-side handle is closed only when the SFT reaches its final
+reference, then the SFT count is marked free with `FFFFh`.
+
+Rebuilt the DOS driver:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd` using
+WSL `mtools`, no loop mount required:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified the image copy by reading it back with `mcopy`:
+
+```text
+d8168595a450f76b292680cff249a6cc343ef340374ea8d1385422380200a0c0  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV extended open/create
 
 Implemented the third `HOSTDRV_TODO.md` item: `hostdrv.asm` now handles

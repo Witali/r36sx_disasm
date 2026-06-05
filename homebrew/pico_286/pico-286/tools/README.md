@@ -35,6 +35,9 @@ Practical notes for this project:
   transfer buffer.
 - Open and create callbacks receive an SFT at `ES:DI`; the redirector must fill
   the SFT, but DOS owns the SFT handle-count field until close.
+- Close (`1106h`) must preserve `ES:DI` and update the SFT reference count.
+  HOSTDRV closes the HOSTRPC handle only when the SFT count reaches its final
+  reference.
 - Extended open/create (`112Eh`) uses the same SFT fill path, but its
   open/create decision comes from the DOS 4+ SDA action and mode words.
 - Find-first/find-next results must be written into the DTA search-data area;
