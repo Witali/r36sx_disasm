@@ -341,6 +341,49 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
     return 1;
 }
 
+static int r36sx_host_rpc_path_has_wildcard(const char *path)
+{
+    return path && (strchr(path, '*') || strchr(path, '?'));
+}
+
+static int r36sx_host_rpc_make_find_pattern(char *host_path,
+                                            size_t host_path_size)
+{
+    struct stat st;
+    size_t len;
+    char sep =
+#ifdef _WIN32
+        '\\';
+#else
+        '/';
+#endif
+
+    if (!host_path || host_path_size == 0 ||
+        r36sx_host_rpc_path_has_wildcard(host_path)) {
+        return 1;
+    }
+
+    /*
+     * DOS find-first on a directory means "enumerate this directory".
+     * Host CRT _findfirst("host") instead returns the directory entry named
+     * HOST, which looked like a self-recursive HOST\HOST\HOST path in VC.
+     */
+    if (stat(host_path, &st) != 0 || !(st.st_mode & S_IFDIR)) {
+        return 1;
+    }
+
+    len = strlen(host_path);
+    if (len + 2u >= host_path_size) {
+        return 0;
+    }
+    if (len > 0 && host_path[len - 1u] != '\\' && host_path[len - 1u] != '/') {
+        host_path[len++] = sep;
+    }
+    host_path[len++] = '*';
+    host_path[len] = '\0';
+    return 1;
+}
+
 static int r36sx_host_rpc_free_handle(void)
 {
     for (unsigned i = 0; i < R36SX_HOST_RPC_MAX_FILES; ++i) {
@@ -480,7 +523,9 @@ static void r36sx_host_rpc_execute_request(void)
             if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
                                              sizeof(guest_path)) ||
                 !r36sx_host_rpc_build_host_path(guest_path, host_path,
-                                                sizeof(host_path))) {
+                                                sizeof(host_path)) ||
+                !r36sx_host_rpc_make_find_pattern(host_path,
+                                                  sizeof(host_path))) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
