@@ -726,6 +726,15 @@ static inline void redirector_close_find_search(intptr_t *find_handle,
 static inline bool redirector_handler() {
     char path[256];
     /*
+     * INT 2Fh is a DOS multiplex interrupt, not just a redirector entry
+     * point.  Network redirector callbacks are AH=11h; everything else
+     * must pass through to DOS/other multiplex handlers untouched.
+     */
+    if (CPU_AH != 0x11) {
+        return false;
+    }
+
+    /*
  * Pointers to SDA fields. Layout:
  *                             DOS4+   DOS 3, DR-DOS
  * DTA ptr                      0Ch     0Ch
