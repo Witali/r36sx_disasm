@@ -1,6 +1,9 @@
 #include <time.h>
 #include <stdbool.h>
 #include <string.h>
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
 #include "emulator.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
@@ -4664,6 +4667,22 @@ static inline uint8_t r36sx_cpu_at_class_memory_available(void)
 #define R36SX_BIOS_E820_TYPE_MEMORY 1UL
 #define R36SX_BIOS_E820_TYPE_RESERVED 2UL
 #define R36SX_BIOS_EXTENDED_BELOW_16M_KB 0x3C00u
+#define R36SX_BIOS_WAIT_MAX_US 1000000u
+#define R36SX_BIOS_SYSTEM_CONFIG_SEG 0x0050u
+#define R36SX_BIOS_SYSTEM_CONFIG_OFF 0x0000u
+#define R36SX_BIOS_SYSTEM_CONFIG_LENGTH 8u
+#define R36SX_BIOS_MODEL_AT_286 0xFCu
+#define R36SX_BIOS_MODEL_386_OR_NEWER 0xF8u
+#define R36SX_BIOS_FEATURE_RTC_PRESENT 0x20u
+#define R36SX_BIOS_CPU_TYPE_386DX 0x03u
+#define R36SX_BIOS_CPU_STEPPING_386_B1_B10 0x03u
+#define R36SX_PC_CONVENTIONAL_END 0x000A0000u
+#define R36SX_PC_CONVENTIONAL_MAX_KB (R36SX_PC_CONVENTIONAL_END >> 10)
+#define R36SX_PC_VIDEO_HOLE_START 0x000A0000u
+#define R36SX_PC_VIDEO_HOLE_END 0x000C0000u
+#define R36SX_PC_UMB_START 0x000C0000u
+#define R36SX_PC_BIOS_RESERVED_START 0x000F0000u
+#define R36SX_PC_FIRST_MB 0x00100000u
 
 static inline uint32_t r36sx_bios_real_ptr(uint16_t segment, uint16_t offset)
 {
@@ -4699,6 +4718,47 @@ static inline uint32_t r36sx_bios_descriptor_limit(uint32_t descriptor)
      */
     return (uint32_t)read86_ob(descriptor) |
            ((uint32_t)read86_ob(descriptor + 1u) << 8);
+}
+
+static inline uint32_t r36sx_bios_clamp_conventional_kb(void)
+{
+    uint32_t conventional_kb = r36sx_pico286_conventional_memory_kb();
+
+    return conventional_kb > R36SX_PC_CONVENTIONAL_MAX_KB
+               ? R36SX_PC_CONVENTIONAL_MAX_KB
+               : conventional_kb;
+}
+
+static void r36sx_bios_wait_us(uint32_t microseconds)
+{
+    if (microseconds == 0u) {
+        return;
+    }
+    if (microseconds > R36SX_BIOS_WAIT_MAX_US) {
+        /*
+         * A real AT BIOS wait is asynchronous and reports "busy" while active.
+         * Our emulator handles the wait synchronously, so cap pathological
+         * waits to keep the host application responsive.
+         */
+        microseconds = R36SX_BIOS_WAIT_MAX_US;
+    }
+
+#if defined(_WIN32)
+    Sleep((DWORD)((microseconds + 999u) / 1000u));
+#else
+    usleep((useconds_t)microseconds);
+#endif
+}
+
+static void r36sx_bios_int15_wait(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    r36sx_bios_wait_us(((uint32_t)CPU_CX << 16) | (uint32_t)CPU_DX);
+    r36sx_bios_int15_success_status();
 }
 
 static void r36sx_bios_int15_move_extended_block(void)
@@ -4787,6 +4847,12 @@ static void r36sx_bios_int15_e801_memory_size(void)
     CPU_FL_CF = 0;
 }
 
+typedef struct {
+    uint32_t base;
+    uint32_t length;
+    uint32_t type;
+} r36sx_bios_e820_entry_t;
+
 static inline void r36sx_bios_write_e820_entry(uint32_t buffer,
                                                uint32_t base,
                                                uint32_t length,
@@ -4797,6 +4863,59 @@ static inline void r36sx_bios_write_e820_entry(uint32_t buffer,
     writedw86(buffer + 8u, length);
     writedw86(buffer + 12u, 0u);
     writedw86(buffer + 16u, type);
+}
+
+static uint32_t r36sx_bios_build_e820_entries(r36sx_bios_e820_entry_t *entries,
+                                              uint32_t max_entries)
+{
+    uint32_t count = 0u;
+    uint32_t conventional_bytes = r36sx_bios_clamp_conventional_kb() << 10;
+    uint32_t upper_kb = r36sx_pico286_upper_memory_kb();
+    uint32_t upper_bytes;
+    uint32_t upper_end;
+    uint32_t extended_kb = r36sx_pico286_extended_memory_kb();
+
+#define R36SX_E820_APPEND(_base, _length, _type)                 \
+    do {                                                         \
+        if ((_length) != 0u && count < max_entries) {            \
+            entries[count].base = (_base);                       \
+            entries[count].length = (_length);                   \
+            entries[count].type = (_type);                       \
+            count++;                                             \
+        }                                                        \
+    } while (0)
+
+    R36SX_E820_APPEND(0x00000000u, conventional_bytes,
+                      R36SX_BIOS_E820_TYPE_MEMORY);
+
+    /*
+     * The emulated VGA/TGA windows occupy A0000h-BFFFFh.  C0000h-EFFFFh is
+     * optional R36SX UMB RAM, so report it separately instead of folding the
+     * whole 384 KB upper area into one reserved range.
+     */
+    R36SX_E820_APPEND(R36SX_PC_VIDEO_HOLE_START,
+                      R36SX_PC_VIDEO_HOLE_END - R36SX_PC_VIDEO_HOLE_START,
+                      R36SX_BIOS_E820_TYPE_RESERVED);
+
+    if (upper_kb > 192u) {
+        upper_kb = 192u;
+    }
+    upper_bytes = upper_kb << 10;
+    upper_end = R36SX_PC_UMB_START + upper_bytes;
+    if (upper_end > R36SX_PC_BIOS_RESERVED_START) {
+        upper_end = R36SX_PC_BIOS_RESERVED_START;
+        upper_bytes = upper_end - R36SX_PC_UMB_START;
+    }
+
+    R36SX_E820_APPEND(R36SX_PC_UMB_START, upper_bytes,
+                      R36SX_BIOS_E820_TYPE_MEMORY);
+    R36SX_E820_APPEND(upper_end, R36SX_PC_FIRST_MB - upper_end,
+                      R36SX_BIOS_E820_TYPE_RESERVED);
+    R36SX_E820_APPEND(R36SX_PC_FIRST_MB, extended_kb << 10,
+                      R36SX_BIOS_E820_TYPE_MEMORY);
+
+#undef R36SX_E820_APPEND
+    return count;
 }
 
 static void r36sx_bios_int15_e820_memory_map(void)
@@ -4811,12 +4930,11 @@ static void r36sx_bios_int15_e820_memory_map(void)
         return;
     }
 
-    uint32_t conventional_kb = r36sx_pico286_conventional_memory_kb();
-    if (conventional_kb > 640u) {
-        conventional_kb = 640u;
-    }
-    uint32_t extended_kb = r36sx_pico286_extended_memory_kb();
-    uint32_t entry_count = extended_kb ? 3u : 2u;
+    r36sx_bios_e820_entry_t entries[5];
+    uint32_t entry_count =
+        r36sx_bios_build_e820_entries(entries,
+                                      (uint32_t)(sizeof(entries) /
+                                                 sizeof(entries[0])));
     uint32_t entry_index = CPU_EBX;
 
     if (entry_index >= entry_count) {
@@ -4825,23 +4943,10 @@ static void r36sx_bios_int15_e820_memory_map(void)
     }
 
     uint32_t buffer = r36sx_bios_real_ptr(CPU_ES, CPU_DI);
-    switch (entry_index) {
-        case 0:
-            r36sx_bios_write_e820_entry(
-                buffer, 0x00000000u, conventional_kb << 10,
-                R36SX_BIOS_E820_TYPE_MEMORY);
-            break;
-        case 1:
-            r36sx_bios_write_e820_entry(
-                buffer, 0x000A0000u, 0x00060000u,
-                R36SX_BIOS_E820_TYPE_RESERVED);
-            break;
-        default:
-            r36sx_bios_write_e820_entry(
-                buffer, 0x00100000u, extended_kb << 10,
-                R36SX_BIOS_E820_TYPE_MEMORY);
-            break;
-    }
+    r36sx_bios_write_e820_entry(buffer,
+                                entries[entry_index].base,
+                                entries[entry_index].length,
+                                entries[entry_index].type);
 
     CPU_EAX = R36SX_BIOS_E820_SIGNATURE;
     CPU_EBX = (entry_index + 1u < entry_count) ? entry_index + 1u : 0u;
@@ -4858,11 +4963,11 @@ static void r36sx_bios_int15_a20_service(void)
 
     switch (CPU_AX) {
         case 0x2400:
-            a20_enabled = 0;
+            r36sx_keyboard_controller_set_a20(0);
             r36sx_bios_int15_success_status();
             return;
         case 0x2401:
-            a20_enabled = 1;
+            r36sx_keyboard_controller_set_a20(1);
             r36sx_bios_int15_success_status();
             return;
         case 0x2402:
@@ -4878,6 +4983,63 @@ static void r36sx_bios_int15_a20_service(void)
             r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
             return;
     }
+}
+
+static void r36sx_bios_int15_system_config(void)
+{
+    if (!r36sx_cpu_at_class_memory_available()) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    uint32_t table =
+        r36sx_bios_real_ptr(R36SX_BIOS_SYSTEM_CONFIG_SEG,
+                            R36SX_BIOS_SYSTEM_CONFIG_OFF);
+    uint8_t model = r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)
+                        ? R36SX_BIOS_MODEL_386_OR_NEWER
+                        : R36SX_BIOS_MODEL_AT_286;
+    uint8_t features =
+        r36sx_pico286_rtc_enabled() ? R36SX_BIOS_FEATURE_RTC_PRESENT : 0u;
+
+    /*
+     * IBM-compatible INT 15h AH=C0h returns a ROM pointer.  Our built-in BIOS
+     * is intercepted in C, so place the small immutable descriptor in a low RAM
+     * scratch area and return a stable real-mode pointer to it.
+     */
+    writew86(table + 0u, R36SX_BIOS_SYSTEM_CONFIG_LENGTH);
+    write86(table + 2u, model);
+    write86(table + 3u, 0x01u); /* AT/ISA-style submodel. */
+    write86(table + 4u, 0x00u); /* BIOS revision, zero based. */
+    write86(table + 5u, features);
+    writedw86(table + 6u, 0x00000000u);
+
+    r36sx_cpu_load_segment(reges, R36SX_BIOS_SYSTEM_CONFIG_SEG);
+    CPU_BX = R36SX_BIOS_SYSTEM_CONFIG_OFF;
+    r36sx_bios_int15_success_status();
+}
+
+static void r36sx_bios_int15_ebda_segment(void)
+{
+    /*
+     * We do not reserve an EBDA block at the top of conventional memory.  Keep
+     * AH=C1h explicit so probes get a clean BIOS "unsupported" response instead
+     * of falling through to the ROM interrupt vector.
+     */
+    r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+}
+
+static void r36sx_bios_int15_cpu_type(void)
+{
+    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) ||
+        CPU_AL != 0x10u) {
+        r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+        return;
+    }
+
+    CPU_AH = R36SX_BIOS_INT15_STATUS_OK;
+    CPU_CH = R36SX_BIOS_CPU_TYPE_386DX;
+    CPU_CL = R36SX_BIOS_CPU_STEPPING_386_B1_B10;
+    CPU_FL_CF = 0;
 }
 
 void intcall86(uint8_t intnum) {
@@ -5154,6 +5316,10 @@ void intcall86(uint8_t intnum) {
                     /* AX=2400h..2403h: BIOS A20 gate disable/enable/query. */
                     r36sx_bios_int15_a20_service();
                     return;
+                case 0x86:
+                    /* AH=86h: AT elapsed-time wait, CX:DX microseconds. */
+                    r36sx_bios_int15_wait();
+                    return;
                 case 0x87:
                     /* AH=87h: copy words using source/destination GDT entries. */
                     r36sx_bios_int15_move_extended_block();
@@ -5161,6 +5327,26 @@ void intcall86(uint8_t intnum) {
                 case 0x88:
                     /* AH=88h: legacy extended-memory size in KB above 1 MB. */
                     r36sx_bios_int15_extended_memory_size();
+                    return;
+                case 0x89:
+                    /*
+                     * AH=89h switches the BIOS itself into protected mode using
+                     * a caller-supplied GDT.  CPU-level protected mode is
+                     * emulated elsewhere; this legacy BIOS trampoline is not.
+                     */
+                    r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
+                    return;
+                case 0xC0:
+                    /* AH=C0h: IBM-compatible system configuration table. */
+                    r36sx_bios_int15_system_config();
+                    return;
+                case 0xC1:
+                    /* AH=C1h: EBDA segment; unsupported because no EBDA exists. */
+                    r36sx_bios_int15_ebda_segment();
+                    return;
+                case 0xC9:
+                    /* AH=C9h/AL=10h: optional 386 CPU type and stepping. */
+                    r36sx_bios_int15_cpu_type();
                     return;
                 case 0xE8:
                     /* AX=E801h and E820h: later BIOS extended-memory reports. */

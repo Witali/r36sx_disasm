@@ -108,6 +108,12 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 #define BIOS_CRTCPU_PAGE        0x48A
 extern uint8_t log_debug;
 
+/*
+ * Keep the emulated 8042 keyboard-controller output port in step with BIOS
+ * A20 services.  Direct port 92h writes still go through the port layer.
+ */
+void r36sx_keyboard_controller_set_a20(int enabled);
+
 
 extern uint8_t RAM[RAM_SIZE];
 extern uint32_t VIDEORAM[VIDEORAM_SIZE];

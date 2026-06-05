@@ -274,6 +274,23 @@ static INLINE void r36sx_keyboard_output_port_write(uint8_t value) {
         (unsigned)value, a20_enabled);
 }
 
+void r36sx_keyboard_controller_set_a20(int enabled)
+{
+    /*
+     * INT 15h AX=2400h/2401h is a BIOS-level A20 service.  Expose the same
+     * state through the 8042 output-port read command so probes that mix BIOS
+     * and keyboard-controller methods do not observe stale A20 state.
+     */
+    if (enabled) {
+        keyboard_controller_output_port |= R36SX_FAST_A20_ENABLE_BIT;
+        a20_enabled = 1;
+    } else {
+        keyboard_controller_output_port &=
+            (uint8_t)~R36SX_FAST_A20_ENABLE_BIT;
+        a20_enabled = 0;
+    }
+}
+
 static uint16_t adlibregmem[5], adlib_register = 0;
 static uint8_t adlibstatus = 0;
 

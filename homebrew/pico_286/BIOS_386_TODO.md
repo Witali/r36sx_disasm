@@ -89,24 +89,28 @@ guest-side drivers or TSRs rather than emulator-side BIOS services.
 
 ### Priority 2: 286/386 Memory And Platform Services
 
-- `INT 15h AH=86h`: wait in microseconds.  Useful for installers and timing
-  loops that expect AT BIOS behavior.
-- `INT 15h AH=87h`: copy extended memory block.  Required by some 286/386-era
-  software and memory managers.
-- `INT 15h AH=88h`: report contiguous extended memory above 1 MiB.  Keep this
-  consistent with the configured memory map and below-16-MiB compatibility.
-- `INT 15h AX=E801h`: report memory above 1 MiB in the later AT-compatible
-  format.  Keep it consistent with E820.
-- `INT 15h EAX=E820h`: system address map.  This is the best modern way to
-  describe usable and reserved physical address ranges.
-- `INT 15h AX=2400h..2403h`: A20 gate disable, enable, query, and support.
-- `INT 15h AH=C0h`: get system configuration.  Optional but useful for probes.
-- `INT 15h AH=C1h`: return EBDA segment.  Optional but useful if we reserve an
-  EBDA-like area.
-- `INT 15h AH=C9h`: CPU type and mask revision.  Optional; useful for tools
-  that probe 386/486 class through BIOS rather than CPU instructions.
-- `INT 15h AH=89h`: BIOS switch to protected mode.  Optional and rare in DOS
-  games, but document any unsupported return carefully if not implemented.
+- Done: `INT 15h AH=86h`: wait in microseconds.  Useful for installers and
+  timing loops that expect AT BIOS behavior.  Pico-286 caps very large waits so
+  the host app stays responsive.
+- Done: `INT 15h AH=87h`: copy extended memory block.  Required by some
+  286/386-era software and memory managers.
+- Done: `INT 15h AH=88h`: report contiguous extended memory above 1 MiB.  Keep
+  this consistent with the configured memory map and below-16-MiB compatibility.
+- Done: `INT 15h AX=E801h`: report memory above 1 MiB in the later
+  AT-compatible format.  Keep it consistent with E820.
+- Done: `INT 15h EAX=E820h`: system address map.  This is the best modern way
+  to describe usable and reserved physical address ranges.
+- Done: `INT 15h AX=2400h..2403h`: A20 gate disable, enable, query, and
+  support.
+- Done: `INT 15h AH=C0h`: get system configuration.  Optional but useful for
+  probes.
+- Explicitly unsupported: `INT 15h AH=C1h`: return EBDA segment.  Pico-286 does
+  not currently reserve an EBDA-like area.
+- Done for 80386 mode: `INT 15h AH=C9h/AL=10h`: CPU type and mask revision.
+  Optional; useful for tools that probe 386/486 class through BIOS rather than
+  CPU instructions.
+- Explicitly unsupported: `INT 15h AH=89h`: BIOS switch to protected mode.
+  CPU-level protected mode is emulated, but this legacy BIOS trampoline is not.
 
 ### Priority 3: VGA/VBE Compatibility
 
@@ -139,15 +143,18 @@ guest-side drivers or TSRs rather than emulator-side BIOS services.
    - Done when DOS boot, keyboard, disk, timer, and basic video calls have
      clear supported/unsupported behavior and debug logging for failures.
 
-2. Make all memory-reporting paths share one memory-map source.
+2. Make all memory-reporting paths share one memory-map source.  Done for the
+   current `INT 15h` BIOS shims.
    - `INT 12h`, `INT 15h AH=88h`, `E801h`, `E820h`, and config comments must
      agree about conventional, reserved, upper, HMA, and extended memory.
 
-3. Keep E820 authoritative.
+3. Keep E820 authoritative.  Done for the current configured memory map.
    - If E820 disagrees with older calls, fix the older calls so their
      compatibility values do not contradict the E820 map.
 
-4. Review A20 behavior end-to-end.
+4. Review A20 behavior end-to-end.  BIOS services now sync the 8042 output-port
+   shadow; port `92h` and raw memory wrapping still need regression testing on
+   target programs.
    - `INT 15h AX=240x`, port `92h`, keyboard-controller-style toggles, and
      memory wrapping must all report the same state.
 
@@ -165,4 +172,3 @@ guest-side drivers or TSRs rather than emulator-side BIOS services.
 
 8. Keep DPMI/VCPI out of emulator BIOS.
    - Use guest-side drivers/hosts for DPMI, VCPI, XMS, EMS, and UMB linking.
-
