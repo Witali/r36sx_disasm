@@ -110,6 +110,7 @@ SFT_TOTAL_HANDLES    equ 0
 SFT_OPEN_MODE        equ 2
 SFT_ATTRIBUTE        equ 4
 SFT_DEVICE_INFO      equ 5
+SFT_UNK0             equ 7
 SFT_FILE_HANDLE      equ 11
 SFT_FILE_TIME        equ 13
 SFT_FILE_DATE        equ 15
@@ -626,6 +627,11 @@ fill_sft_from_request:
     mov byte [es:di + SFT_ATTRIBUTE], 08h
     mov ax, [device_info]
     mov [es:di + SFT_DEVICE_INFO], ax
+    ; Match the old emulator-owned redirector's DOS 4+ SFT layout: bytes
+    ; +7..+10 are an undocumented redirector field and must be cleared before
+    ; DOS starts routing later read/write/close callbacks through this entry.
+    mov word [es:di + SFT_UNK0], 0
+    mov word [es:di + SFT_UNK0 + 2], 0
     mov ax, [request + REQ_HANDLE]
     mov [es:di + SFT_FILE_HANDLE], ax
     mov word [es:di + SFT_FILE_TIME], 1000h

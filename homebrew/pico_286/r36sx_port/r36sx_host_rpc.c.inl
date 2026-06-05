@@ -227,10 +227,17 @@ static uint16_t r36sx_host_rpc_dos_error_from_errno(int err, int writing)
         case ENFILE:
             return 4; /* too many open files */
         case EACCES:
+        case EEXIST:
+        case EISDIR:
+#ifdef ENOTEMPTY
+        case ENOTEMPTY:
+#endif
         case EPERM:
             return 5; /* access denied */
         case EBADF:
             return 6; /* invalid handle */
+        case EINVAL:
+            return 13; /* invalid data */
         case EROFS:
             return 19; /* write protected */
         case ENOSPC:

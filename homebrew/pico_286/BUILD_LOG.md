@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV guest-to-host copy I/O error pass
+
+Reviewed `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.log`
+from a guest-to-host copy attempt.  The host side created
+`H:\ARK2\DOH.CFG` successfully, but no `WRITE` callback followed in the log,
+which pointed back to the SFT state returned by the DOS-side redirector.
+
+Two fixes were applied:
+
+- `hostdrv.asm` now clears the DOS 4+ SFT `unk0` dword at offsets `+7..+10`,
+  matching the old emulator-owned redirector before it publishes the host file
+  handle at offset `+11`.
+- HOSTRPC now maps common filesystem conditions such as `EEXIST`, `EISDIR`,
+  `ENOTEMPTY`, and `EINVAL` to conventional DOS error codes instead of the
+  generic read/write fault.  In the supplied log `_rmdir("host\\ARK")` returned
+  `errno=41`, which was being shown to DOS as error `29` / I/O error.
+
+Rebuilt the Windows debug executable with HOSTRPC tracing and rebuilt
+`HOSTDRV.COM`; the DOS driver was also copied into the FAT16 partition inside
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd`.
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+```
+
+Verified in-image `HOSTDRV.COM`:
+
+```text
+f220bcad7e704ca284bbfb1bf9045279300a3a694dc141eaa522f114c22ad887  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV 111Dh launch crash workaround
 
 Analyzed the patch log from `HOSTDRV.COM` startup.  The crash happened right
