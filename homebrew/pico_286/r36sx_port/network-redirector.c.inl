@@ -29,8 +29,15 @@
 #endif
 
 
-// Maximum number of open files
+// Maximum number of host files that may be open through the mapped DOS drive.
 #define MAX_FILES 32
+#define REDIRECTOR_DEFAULT_DRIVE_LETTER 'H'
+#define REDIRECTOR_DEVICE_INFO_BASE 0x8040u
+#define REDIRECTOR_CDS_PTR_DOS4_OFFSET 0x282u
+#define REDIRECTOR_CDS_PTR_DOS3_OFFSET 0x26cu
+#define REDIRECTOR_CDS_ENTRY_SIZE 0x58u
+#define REDIRECTOR_CDS_FLAGS_OFFSET 0x43u
+#define REDIRECTOR_CDS_FLAG_NET 0x8000u
 FILE *open_files[MAX_FILES] = {0};
 
 #ifdef WIN32
@@ -41,6 +48,7 @@ FILE *open_files[MAX_FILES] = {0};
 
 // Current working directory for the remote drive (relative to HOST_BASE_DIR)
 char current_remote_dir[256] = "";
+static char redirector_mapped_drive_letter = 0;
 
 static const char *redirector_host_base_dir(void)
 {
@@ -55,6 +63,27 @@ static const char *redirector_host_base_dir(void)
 static inline bool guest_ram_range_ok(uint32_t address, size_t bytes) {
     return bytes == 0 ? address <= RAM_SIZE :
            address < RAM_SIZE && bytes <= (size_t)(RAM_SIZE - address);
+}
+
+static inline char redirector_upper_drive(char drive)
+{
+    return (char)toupper((unsigned char)drive);
+}
+
+static inline bool redirector_guest_path_has_drive(const char *guest_path)
+{
+    return guest_path && isalpha((unsigned char)guest_path[0]) &&
+           guest_path[1] == ':';
+}
+
+static inline bool redirector_guest_path_is_mine(const char *guest_path)
+{
+    char drive = redirector_mapped_drive_letter ?
+                 redirector_mapped_drive_letter :
+                 REDIRECTOR_DEFAULT_DRIVE_LETTER;
+
+    return !redirector_guest_path_has_drive(guest_path) ||
+           redirector_upper_drive(guest_path[0]) == drive;
 }
 
 // Helper function to get a free file handle
@@ -289,6 +318,180 @@ static inline const char *guest_sda_string(uint32_t offset,
     return buffer;
 }
 
+static inline char redirector_effective_drive_letter(void)
+{
+    return redirector_mapped_drive_letter ?
+           redirector_mapped_drive_letter :
+           REDIRECTOR_DEFAULT_DRIVE_LETTER;
+}
+
+static inline uint16_t redirector_device_info_for_drive(char drive)
+{
+    return (uint16_t)(REDIRECTOR_DEVICE_INFO_BASE |
+                      (uint8_t)redirector_upper_drive(drive));
+}
+
+static inline bool redirector_read_far_ptr(uint32_t address,
+                                           uint32_t *linear)
+{
+    uint16_t offset = 0;
+    uint16_t segment = 0;
+
+    if (!guest_read_u16_ram(address, &offset) ||
+        !guest_read_u16_ram(address + 2u, &segment) ||
+        (offset == 0xffffu && segment == 0xffffu)) {
+        *linear = 0;
+        return false;
+    }
+
+    *linear = ((uint32_t)segment << 4) + offset;
+    return guest_ram_range_ok(*linear, REDIRECTOR_CDS_FLAGS_OFFSET + 2u);
+}
+
+static inline bool redirector_cds_path_drive(uint32_t cds_addr, char *drive)
+{
+    if (guest_ram_range_ok(cds_addr, 2u) &&
+        isalpha((unsigned char)RAM[cds_addr]) &&
+        RAM[cds_addr + 1u] == ':') {
+        *drive = redirector_upper_drive((char)RAM[cds_addr]);
+        return true;
+    }
+
+    return false;
+}
+
+static inline bool redirector_cds_is_network(uint32_t cds_addr)
+{
+    uint16_t flags = 0;
+    return guest_read_u16_ram(cds_addr + REDIRECTOR_CDS_FLAGS_OFFSET,
+                              &flags) &&
+           (flags & REDIRECTOR_CDS_FLAG_NET);
+}
+
+static inline bool redirector_current_cds_from_sda_offset(uint32_t offset,
+                                                          uint32_t *cds_addr)
+{
+    return redirector_read_far_ptr(sda_addr + offset, cds_addr);
+}
+
+static inline bool redirector_cds_drive_from_sda_offset(uint32_t offset,
+                                                        char *drive)
+{
+    uint32_t cds_addr = 0;
+
+    if (!redirector_current_cds_from_sda_offset(offset, &cds_addr) ||
+        !redirector_cds_is_network(cds_addr)) {
+        return false;
+    }
+
+    /*
+     * MAPDRIVE.COM writes "<drive>:\" at the beginning of the selected CDS
+     * entry after setting the NET|PHY flags.  Reading it here makes the C
+     * redirector follow whatever letter the DOS-side mapper selected.
+     */
+    return redirector_cds_path_drive(cds_addr, drive);
+}
+
+static inline bool redirector_drive_marked_network_from_sda_offset(
+    uint32_t offset,
+    char target_drive)
+{
+    uint32_t current_cds_addr = 0;
+    char current_drive = 0;
+
+    if (!redirector_current_cds_from_sda_offset(offset, &current_cds_addr) ||
+        !redirector_cds_path_drive(current_cds_addr, &current_drive)) {
+        return false;
+    }
+
+    uint32_t current_index = (uint32_t)(current_drive - 'A');
+    uint32_t target_index = (uint32_t)(target_drive - 'A');
+    uint32_t current_delta = current_index * REDIRECTOR_CDS_ENTRY_SIZE;
+
+    if (current_cds_addr < current_delta) {
+        return false;
+    }
+
+    uint32_t cds_base = current_cds_addr - current_delta;
+    uint32_t target_cds_addr = cds_base +
+        target_index * REDIRECTOR_CDS_ENTRY_SIZE;
+    return guest_ram_range_ok(target_cds_addr,
+                              REDIRECTOR_CDS_FLAGS_OFFSET + 2u) &&
+           redirector_cds_is_network(target_cds_addr);
+}
+
+static inline bool redirector_drive_marked_network(char drive)
+{
+    char target = redirector_upper_drive(drive);
+
+    if (target < 'A' || target > 'Z') {
+        return false;
+    }
+
+    return redirector_drive_marked_network_from_sda_offset(
+               REDIRECTOR_CDS_PTR_DOS4_OFFSET, target) ||
+           redirector_drive_marked_network_from_sda_offset(
+               REDIRECTOR_CDS_PTR_DOS3_OFFSET, target);
+}
+
+static inline bool redirector_update_mapped_drive_from_context(
+    const char *guest_path)
+{
+    char drive = 0;
+
+    if (redirector_cds_drive_from_sda_offset(
+            REDIRECTOR_CDS_PTR_DOS4_OFFSET, &drive) ||
+        redirector_cds_drive_from_sda_offset(
+            REDIRECTOR_CDS_PTR_DOS3_OFFSET, &drive)) {
+        redirector_mapped_drive_letter = drive;
+        if (!redirector_guest_path_has_drive(guest_path) ||
+            redirector_upper_drive(guest_path[0]) == drive) {
+            return true;
+        }
+        if (redirector_drive_marked_network(guest_path[0])) {
+            redirector_mapped_drive_letter =
+                redirector_upper_drive(guest_path[0]);
+            return true;
+        }
+        return false;
+    }
+
+    if (!guest_path || !guest_path[0]) {
+        return false;
+    }
+    if (redirector_guest_path_has_drive(guest_path) &&
+        redirector_drive_marked_network(guest_path[0])) {
+        redirector_mapped_drive_letter = redirector_upper_drive(guest_path[0]);
+        return true;
+    }
+    if (!redirector_guest_path_has_drive(guest_path)) {
+        return false;
+    }
+
+    return redirector_guest_path_is_mine(guest_path);
+}
+
+static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
+{
+    /*
+     * The SFT handle number is local to this redirector table.  Guard all
+     * handle-based callbacks with the device marker we put into open/create,
+     * otherwise a local DOS file handle with the same number could be mistaken
+     * for a host-drive FILE*.
+     */
+    return sftptr &&
+           sftptr->device_info ==
+               redirector_device_info_for_drive(
+                   redirector_effective_drive_letter());
+}
+
+static inline bool redirector_dta_is_mine(const sdbstruct *dta)
+{
+    return dta && (dta->drive_letter & 0x80u) &&
+           redirector_upper_drive((char)(dta->drive_letter & 0x7Fu)) ==
+               redirector_effective_drive_letter();
+}
+
 static inline void guest_memory_error(void) {
     CPU_AX = 8;
     CPU_FL_CF = 1;
@@ -392,8 +595,12 @@ static inline bool redirector_handler() {
         // Remove Remote Directory
         case 0x1101: {
             char guest_path[128];
-            get_full_path(path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
+            get_full_path(path, dos_path);
             debug_log("Removing directory %s\n", path);
 
             const int result = rmdir(path); // TODO recursive remove
@@ -410,8 +617,12 @@ static inline bool redirector_handler() {
         // Create Remote Directory
         case 0x1103: {
             char guest_path[128];
-            get_full_path(path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
+            get_full_path(path, dos_path);
             debug_log("Creating directory %s\n", path);
             const int result = mkdir(path, 0777);
             if (result == 0) {
@@ -429,6 +640,9 @@ static inline bool redirector_handler() {
             char dos_path_buf[128];
             const char *dos_path = guest_sda_string(
                 FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
             debug_log("Change directory to: '%s'\n", dos_path);
 
             // Handle different path formats
@@ -456,6 +670,9 @@ static inline bool redirector_handler() {
             if (!sftptr) {
                 guest_memory_error();
                 break;
+            }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
             }
             const uint16_t file_handle = sftptr->file_handle;
             if (file_handle < MAX_FILES && open_files[file_handle]) {
@@ -488,6 +705,9 @@ static inline bool redirector_handler() {
                 guest_memory_error();
                 break;
             }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
+            }
             const uint16_t file_handle = sftptr->file_handle;
             if (file_handle < MAX_FILES && open_files[file_handle]) {
                 // INT 2Fh/1107h is commit-only; the handle must stay open.
@@ -518,6 +738,9 @@ static inline bool redirector_handler() {
             if (!sftptr) {
                 guest_memory_error();
                 break;
+            }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
             }
             const uint16_t file_handle = sftptr->file_handle; // We store our handle here
             if (file_handle < MAX_FILES && open_files[file_handle]) {
@@ -573,6 +796,9 @@ static inline bool redirector_handler() {
             if (!sftptr) {
                 guest_memory_error();
                 break;
+            }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
             }
             uint16_t file_handle = sftptr->file_handle; // We store our handle here
 
@@ -647,13 +873,21 @@ static inline bool redirector_handler() {
             char old_guest_path[128], new_guest_path[128];
 
             // Get old filename from first filename buffer in SDA
-            get_full_path(old_path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, old_guest_path, sizeof(old_guest_path)));
+            const char *old_dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, old_guest_path, sizeof(old_guest_path));
+            if (!redirector_update_mapped_drive_from_context(old_dos_path)) {
+                return false;
+            }
+            get_full_path(old_path, old_dos_path);
 
             // Get new filename from second filename buffer in SDA (offset 0x16A for DOS 4+)
             // For DOS 3.x it's at offset 0x15E, but we'll use DOS 4+ layout
-            get_full_path(new_path, guest_sda_string(
-                0x16A, new_guest_path, sizeof(new_guest_path)));
+            const char *new_dos_path = guest_sda_string(
+                0x16A, new_guest_path, sizeof(new_guest_path));
+            if (!redirector_update_mapped_drive_from_context(new_dos_path)) {
+                return false;
+            }
+            get_full_path(new_path, new_dos_path);
 
             debug_log("Renaming '%s' to '%s'\n", old_path, new_path);
 
@@ -671,8 +905,12 @@ static inline bool redirector_handler() {
         // Delete Remote File
         case 0x1113: {
             char guest_path[128];
-            get_full_path(path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
+            get_full_path(path, dos_path);
             int result = unlink(path);
             if (result == 0) {
                 CPU_AX = 0;
@@ -689,6 +927,9 @@ static inline bool redirector_handler() {
             char dos_path_buf[128];
             const char *dos_path = guest_sda_string(
                 FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
             get_full_path(path, dos_path);
             debug_log("Opening %s %s\n", dos_path, path);
 
@@ -728,7 +969,9 @@ static inline bool redirector_handler() {
                     sftptr->open_mode |= 0xff02;
 
                     sftptr->attribute = 0x8;
-                    sftptr->device_info = 0x8040 | 'H';
+                    sftptr->device_info =
+                        redirector_device_info_for_drive(
+                            redirector_effective_drive_letter());
                     sftptr->file_handle = file_handle; // Store our handle here
                     sftptr->file_size = file_size;
                     sftptr->file_time = 0x1000;
@@ -757,11 +1000,14 @@ static inline bool redirector_handler() {
 
         // Create/Truncate File
         case 0x1117: {
+            char dos_path_buf[128];
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
             const int8_t file_handle = get_free_handle();
             if (file_handle != -1) {
-                char dos_path_buf[128];
-                const char *dos_path = guest_sda_string(
-                    FIRST_FILENAME_OFFSET, dos_path_buf, sizeof(dos_path_buf));
                 get_full_path(path, dos_path);
 
                 open_files[file_handle] = fopen(path, "wb+");
@@ -788,7 +1034,9 @@ static inline bool redirector_handler() {
                     sftptr->open_mode &= 0xff00;
                     sftptr->open_mode |= 0x0002; // Create/truncate file
                     sftptr->attribute = 0x08;
-                    sftptr->device_info = 0x8040 | 'H';
+                    sftptr->device_info =
+                        redirector_device_info_for_drive(
+                            redirector_effective_drive_letter());
                     sftptr->file_handle = file_handle; // Store our handle here
                     sftptr->file_size = 0; // New file
                     sftptr->file_time = 0x1000;
@@ -813,13 +1061,25 @@ static inline bool redirector_handler() {
         }
         break;
         // Lock/Unlock File Region (stub implementation)
-        case 0x110A:
+        case 0x110A: {
+            sftstruct *sftptr = guest_sft_ptr();
+            if (!sftptr) {
+                guest_memory_error();
+                break;
+            }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
+            }
             CPU_AX = 0;
             CPU_FL_CF = 0;
             break;
+        }
 
         // Get Disk Information (stub implementation)
         case 0x110C: {
+            if (!redirector_update_mapped_drive_from_context(NULL)) {
+                return false;
+            }
             CPU_AH = 2;
             CPU_AL = 255;
             CPU_BX = 4096;
@@ -830,10 +1090,17 @@ static inline bool redirector_handler() {
         break;
 
         // Set File Attributes (stub implementation)
-        case 0x110e:
+        case 0x110e: {
+            char guest_path[128];
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
             CPU_AX = 0;
             CPU_FL_CF = 0;
             break;
+        }
 
         // Get File Attributes and Size
         case 0x110F: {
@@ -842,8 +1109,12 @@ static inline bool redirector_handler() {
             // Output: CF=0 if success with AX=attributes, BX:DI=file size, CX=time, DX=date
             //         CF=1 if error with AX=DOS error code
             char guest_path[128];
-            get_full_path(path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
+            get_full_path(path, dos_path);
 
             // Get file attributes
             struct stat file_info;
@@ -878,8 +1149,12 @@ static inline bool redirector_handler() {
         case 0x111B: {
             struct _finddata_t fileinfo;
             char guest_path[128];
-            get_full_path(path, guest_sda_string(
-                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path)));
+            const char *dos_path = guest_sda_string(
+                FIRST_FILENAME_OFFSET, guest_path, sizeof(guest_path));
+            if (!redirector_update_mapped_drive_from_context(dos_path)) {
+                return false;
+            }
+            get_full_path(path, dos_path);
             debug_log("find first file: '%s'\n", path);
 
 
@@ -891,11 +1166,14 @@ static inline bool redirector_handler() {
                 uint32_t dta_addr = 0;
                 if (!guest_dta_address(&dta_addr) ||
                     !guest_ram_range_ok(dta_addr, sizeof(sdbstruct))) {
+                    redirector_close_find_search(&handle, &dta_ptr);
                     guest_memory_error();
                     break;
                 }
                 dta_ptr = (sdbstruct *) &RAM[dta_addr];
-                dta_ptr->drive_letter = 'H' | 128; /* bit 7 set means 'network drive' (RBIL6 compliance) */
+                dta_ptr->drive_letter =
+                    redirector_effective_drive_letter() | 128;
+                /* bit 7 set means 'network drive' (RBIL6 compliance) */
 
                 to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
                 dta_ptr->foundfile.fsize = fileinfo.size;
@@ -920,6 +1198,9 @@ static inline bool redirector_handler() {
             // Output: CF=0 if file found with DTA updated, CF=1 if no more files with AX=18
             //         Must preserve bit 7 in DTA first byte (RBIL6 requirement)
             struct _finddata_t fileinfo;
+            if (!redirector_dta_is_mine(dta_ptr)) {
+                return false;
+            }
             if (handle != -1 && dta_ptr && _findnext(handle, &fileinfo) == 0) {
                 dta_ptr->drive_letter |= 128; // Ensure bit 7 remains set (RBIL6 compliance)
                 to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
@@ -956,6 +1237,9 @@ static inline bool redirector_handler() {
             if (!sftptr) {
                 guest_memory_error();
                 break;
+            }
+            if (!redirector_sft_is_mine(sftptr)) {
+                return false;
             }
             const uint16_t file_handle = sftptr->file_handle;
 
