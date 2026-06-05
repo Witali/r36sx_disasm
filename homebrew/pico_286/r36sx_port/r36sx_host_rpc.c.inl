@@ -46,6 +46,13 @@
 #define R36SX_HOST_RPC_MAX_HOST_PATH 512u
 #define R36SX_HOST_RPC_FIND_RESULT_SIZE 20u
 
+#if R36SX_DEBUG_HOSTRPC_TRACE
+extern void r36sx_pico286_debug_log(const char *format, ...);
+#define R36SX_HOSTRPC_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_HOSTRPC_LOG(...) ((void)0)
+#endif
+
 #define R36SX_HOST_RPC_STATUS_IDLE 0x00u
 #define R36SX_HOST_RPC_STATUS_DONE 0x01u
 #define R36SX_HOST_RPC_STATUS_BAD_REQUEST 0x80u
@@ -68,6 +75,29 @@ typedef enum {
     R36SX_HOST_RPC_CMD_FIND_NEXT = 14,
     R36SX_HOST_RPC_CMD_FIND_CLOSE = 15,
 } r36sx_host_rpc_command_t;
+
+static const char *r36sx_host_rpc_command_name(uint16_t command)
+{
+    switch (command) {
+        case R36SX_HOST_RPC_CMD_PING: return "PING";
+        case R36SX_HOST_RPC_CMD_OPEN_RO: return "OPEN_RO";
+        case R36SX_HOST_RPC_CMD_OPEN_RW: return "OPEN_RW";
+        case R36SX_HOST_RPC_CMD_CREATE: return "CREATE";
+        case R36SX_HOST_RPC_CMD_CLOSE: return "CLOSE";
+        case R36SX_HOST_RPC_CMD_READ: return "READ";
+        case R36SX_HOST_RPC_CMD_WRITE: return "WRITE";
+        case R36SX_HOST_RPC_CMD_DELETE: return "DELETE";
+        case R36SX_HOST_RPC_CMD_MKDIR: return "MKDIR";
+        case R36SX_HOST_RPC_CMD_RMDIR: return "RMDIR";
+        case R36SX_HOST_RPC_CMD_GETATTR: return "GETATTR";
+        case R36SX_HOST_RPC_CMD_RENAME: return "RENAME";
+        case R36SX_HOST_RPC_CMD_COMMIT: return "COMMIT";
+        case R36SX_HOST_RPC_CMD_FIND_FIRST: return "FIND_FIRST";
+        case R36SX_HOST_RPC_CMD_FIND_NEXT: return "FIND_NEXT";
+        case R36SX_HOST_RPC_CMD_FIND_CLOSE: return "FIND_CLOSE";
+        default: return "UNKNOWN";
+    }
+}
 
 typedef enum {
     R36SX_HOST_RPC_OK = 0,
@@ -540,6 +570,48 @@ static int r36sx_host_rpc_store_find_result(uint32_t address,
     return 1;
 }
 
+static void r36sx_host_rpc_trace_buffer(const char *label,
+                                        uint32_t address,
+                                        uint32_t bytes)
+{
+#if R36SX_DEBUG_HOSTRPC_TRACE
+    char hex[16u * 3u + 1u];
+    uint32_t preview = bytes < 16u ? bytes : 16u;
+    uint32_t pos = 0;
+
+    if (!label || !r36sx_host_rpc_ram_range_ok(address, preview)) {
+        R36SX_HOSTRPC_LOG("hostrpc: %s data addr=%05lx len=%lu unavailable",
+                          label ? label : "buffer",
+                          (unsigned long)address,
+                          (unsigned long)bytes);
+        return;
+    }
+
+    for (uint32_t i = 0; i < preview && pos + 3u < sizeof(hex); ++i) {
+        static const char digits[] = "0123456789ABCDEF";
+        uint8_t value = RAM[address + i];
+        hex[pos++] = digits[value >> 4];
+        hex[pos++] = digits[value & 0x0Fu];
+        hex[pos++] = ' ';
+    }
+    if (pos > 0) {
+        hex[pos - 1u] = '\0';
+    } else {
+        hex[0] = '\0';
+    }
+    R36SX_HOSTRPC_LOG("hostrpc: %s data addr=%05lx len=%lu preview=%s%s",
+                      label,
+                      (unsigned long)address,
+                      (unsigned long)bytes,
+                      hex,
+                      bytes > preview ? " ..." : "");
+#else
+    (void)label;
+    (void)address;
+    (void)bytes;
+#endif
+}
+
 static void r36sx_host_rpc_finish(r36sx_host_rpc_request_t *req,
                                   uint16_t result, uint16_t dos_error)
 {
@@ -561,12 +633,30 @@ static void r36sx_host_rpc_execute_request(void)
     if (!r36sx_host_rpc_load_request(r36sx_host_rpc_request_addr, &req) ||
         req.magic != R36SX_HOST_RPC_MAGIC ||
         req.version != R36SX_HOST_RPC_VERSION) {
+        R36SX_HOSTRPC_LOG("hostrpc: bad request addr=%05lx",
+                          (unsigned long)r36sx_host_rpc_request_addr);
         return;
     }
 
     req.result = R36SX_HOST_RPC_OK;
     req.dos_error = 0;
     req.bytes_done = 0;
+
+    R36SX_HOSTRPC_LOG(
+        "hostrpc: req cmd=%s(%u) addr=%05lx path=%05lx path2=%05lx data=%05lx len=%lu pos=%lu size=%lu handle=%u mode=%u attr=%04x flags=%04x",
+        r36sx_host_rpc_command_name(req.command),
+        (unsigned)req.command,
+        (unsigned long)r36sx_host_rpc_request_addr,
+        (unsigned long)req.path_phys,
+        (unsigned long)req.path2_phys,
+        (unsigned long)req.data_phys,
+        (unsigned long)req.data_len,
+        (unsigned long)req.file_pos,
+        (unsigned long)req.file_size,
+        (unsigned)req.handle,
+        (unsigned)req.mode,
+        (unsigned)req.attr,
+        (unsigned)req.flags);
 
     switch (req.command) {
         case R36SX_HOST_RPC_CMD_PING:
@@ -587,6 +677,10 @@ static void r36sx_host_rpc_execute_request(void)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
+            R36SX_HOSTRPC_LOG("hostrpc: path cmd=%s guest='%s' host='%s'",
+                              r36sx_host_rpc_command_name(req.command),
+                              guest_path,
+                              host_path);
             handle = r36sx_host_rpc_free_handle();
             if (handle < 0) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_NO_FREE_HANDLE,
@@ -602,6 +696,11 @@ static void r36sx_host_rpc_execute_request(void)
             }
             if (!fp) {
                 err = errno ? errno : EIO;
+                R36SX_HOSTRPC_LOG(
+                    "hostrpc: open/create failed cmd=%s host='%s' errno=%d",
+                    r36sx_host_rpc_command_name(req.command),
+                    host_path,
+                    err);
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
                                       r36sx_host_rpc_dos_error_from_errno(err, 0));
                 break;
@@ -613,6 +712,12 @@ static void r36sx_host_rpc_execute_request(void)
                 req.file_size = size > 0 ? (uint32_t)size : 0u;
                 fseek(fp, 0, SEEK_SET);
             }
+            R36SX_HOSTRPC_LOG(
+                "hostrpc: open/create ok cmd=%s host='%s' handle=%u size=%lu",
+                r36sx_host_rpc_command_name(req.command),
+                host_path,
+                (unsigned)req.handle,
+                (unsigned long)req.file_size);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }
@@ -666,6 +771,10 @@ static void r36sx_host_rpc_execute_request(void)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_ADDRESS, 8);
                 break;
             }
+            if (writing) {
+                r36sx_host_rpc_trace_buffer("write-in", req.data_phys,
+                                            req.data_len);
+            }
             fp = r36sx_host_rpc_files[req.handle];
             errno = 0;
             clearerr(fp);
@@ -681,6 +790,10 @@ static void r36sx_host_rpc_execute_request(void)
                 fflush(fp);
             } else {
                 done = fread(&RAM[req.data_phys], 1, req.data_len, fp);
+            }
+            if (!writing) {
+                r36sx_host_rpc_trace_buffer("read-out", req.data_phys,
+                                            (uint32_t)done);
             }
             req.bytes_done = (uint32_t)done;
             req.file_pos += (uint32_t)done;
@@ -712,6 +825,12 @@ static void r36sx_host_rpc_execute_request(void)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
+            R36SX_HOSTRPC_LOG(
+                "hostrpc: rename guest='%s' -> '%s' host='%s' -> '%s'",
+                guest_path,
+                guest_path2,
+                host_path,
+                host_path2);
             errno = 0;
             if (rename(host_path, host_path2) != 0) {
                 err = errno ? errno : EIO;
@@ -737,6 +856,10 @@ static void r36sx_host_rpc_execute_request(void)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
+            R36SX_HOSTRPC_LOG("hostrpc: path cmd=%s guest='%s' host='%s'",
+                              r36sx_host_rpc_command_name(req.command),
+                              guest_path,
+                              host_path);
             errno = 0;
             if (req.command == R36SX_HOST_RPC_CMD_DELETE) {
                 rc = remove(host_path);
@@ -753,6 +876,11 @@ static void r36sx_host_rpc_execute_request(void)
             }
             if (rc != 0) {
                 err = errno ? errno : EIO;
+                R36SX_HOSTRPC_LOG(
+                    "hostrpc: path cmd=%s failed host='%s' errno=%d",
+                    r36sx_host_rpc_command_name(req.command),
+                    host_path,
+                    err);
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
                                       r36sx_host_rpc_dos_error_from_errno(
                                           err, req.command !=
@@ -776,6 +904,9 @@ static void r36sx_host_rpc_execute_request(void)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
                 break;
             }
+            R36SX_HOSTRPC_LOG("hostrpc: find_first guest='%s' pattern='%s'",
+                              guest_path,
+                              host_path);
             handle = r36sx_host_rpc_free_find_handle();
             if (handle < 0) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_NO_FREE_HANDLE,
@@ -785,6 +916,8 @@ static void r36sx_host_rpc_execute_request(void)
             errno = 0;
             host_find = _findfirst(host_path, &fileinfo);
             if (host_find == (intptr_t)-1) {
+                R36SX_HOSTRPC_LOG("hostrpc: find_first no_match pattern='%s'",
+                                  host_path);
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO, 18);
                 break;
             }
@@ -800,6 +933,12 @@ static void r36sx_host_rpc_execute_request(void)
             req.attr = (uint16_t)(fileinfo.attrib & 0xffu);
             req.file_size = (uint32_t)fileinfo.size;
             req.bytes_done = R36SX_HOST_RPC_FIND_RESULT_SIZE;
+            R36SX_HOSTRPC_LOG(
+                "hostrpc: find_first ok handle=%u name='%s' attr=%02x size=%lu",
+                (unsigned)req.handle,
+                fileinfo.name,
+                (unsigned)req.attr,
+                (unsigned long)req.file_size);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }
@@ -814,6 +953,8 @@ static void r36sx_host_rpc_execute_request(void)
             errno = 0;
             if (_findnext(r36sx_host_rpc_finds[req.handle], &fileinfo) != 0) {
                 r36sx_host_rpc_close_find_handle(req.handle);
+                R36SX_HOSTRPC_LOG("hostrpc: find_next done handle=%u",
+                                  (unsigned)req.handle);
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO, 18);
                 break;
             }
@@ -825,6 +966,12 @@ static void r36sx_host_rpc_execute_request(void)
             req.attr = (uint16_t)(fileinfo.attrib & 0xffu);
             req.file_size = (uint32_t)fileinfo.size;
             req.bytes_done = R36SX_HOST_RPC_FIND_RESULT_SIZE;
+            R36SX_HOSTRPC_LOG(
+                "hostrpc: find_next ok handle=%u name='%s' attr=%02x size=%lu",
+                (unsigned)req.handle,
+                fileinfo.name,
+                (unsigned)req.attr,
+                (unsigned long)req.file_size);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }
@@ -844,6 +991,16 @@ static void r36sx_host_rpc_execute_request(void)
             break;
     }
 
+    R36SX_HOSTRPC_LOG(
+        "hostrpc: done cmd=%s result=%u dos=%u bytes=%lu pos=%lu size=%lu handle=%u attr=%04x",
+        r36sx_host_rpc_command_name(req.command),
+        (unsigned)req.result,
+        (unsigned)req.dos_error,
+        (unsigned long)req.bytes_done,
+        (unsigned long)req.file_pos,
+        (unsigned long)req.file_size,
+        (unsigned)req.handle,
+        (unsigned)req.attr);
     r36sx_host_rpc_store_response(r36sx_host_rpc_request_addr, &req);
     r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_DONE;
 }

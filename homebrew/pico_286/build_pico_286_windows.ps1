@@ -6,6 +6,7 @@ param(
     [switch]$DisableProtectedMode,
     [switch]$DisableProtectedModeDebug,
     [switch]$RedirectorTrace,
+    [switch]$HostRpcTrace,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og")]
     [string]$OptLevel = "O2",
     [string]$Out,
@@ -36,8 +37,8 @@ if (!$PatchDir) {
     $PatchDir = $DefaultPatchDir
 }
 
-$DebugValue = if ($DebugLog -or $RedirectorTrace) { "1" } else { "0" }
-if (($DebugLog -or $RedirectorTrace) -and $OptLevel -ne "O2") {
+$DebugValue = if ($DebugLog -or $RedirectorTrace -or $HostRpcTrace) { "1" } else { "0" }
+if (($DebugLog -or $RedirectorTrace -or $HostRpcTrace) -and $OptLevel -ne "O2") {
     Write-Host "Debug build requested; forcing -O2 instead of -$OptLevel"
     $OptLevel = "O2"
 }
@@ -48,6 +49,7 @@ $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 $ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
 $ProtectedModeDebugValue = if ($DisableProtectedModeDebug) { "0" } else { "1" }
 $RedirectorTraceValue = if ($RedirectorTrace) { "1" } else { "0" }
+$HostRpcTraceValue = if ($HostRpcTrace) { "1" } else { "0" }
 $RootPath = $Root.Path
 
 function ConvertTo-CMacroString {
@@ -157,6 +159,7 @@ $CommonArgs = @(
     "-DR36SX_ENABLE_PROTECTED_MODE=$ProtectedModeValue",
     "-DR36SX_DEBUG_386_PROTECTED_MODE=$ProtectedModeDebugValue",
     "-DR36SX_DEBUG_REDIRECTOR_TRACE=$RedirectorTraceValue",
+    "-DR36SX_DEBUG_HOSTRPC_TRACE=$HostRpcTraceValue",
     "-DR36SX_SEGMENT_BASE_CACHE=1",
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",

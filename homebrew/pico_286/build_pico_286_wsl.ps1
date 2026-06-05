@@ -6,6 +6,7 @@ param(
     [switch]$DisableProtectedMode,
     [switch]$DisableProtectedModeDebug,
     [switch]$RedirectorTrace,
+    [switch]$HostRpcTrace,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og", "Ofast")]
     [string]$OptLevel = "O2",
     [switch]$EnableMipsDsp,
@@ -24,7 +25,7 @@ $WslRoot = (& wsl wslpath -a $RootWin).Trim()
 $WslScript = (& wsl wslpath -a $ScriptWin).Trim()
 
 $EffectiveOptLevel = $OptLevel
-if ($DebugLog -or $RedirectorTrace) {
+if ($DebugLog -or $RedirectorTrace -or $HostRpcTrace) {
     if ($EffectiveOptLevel -ne "O2") {
         Write-Warning "Debug build requested; forcing -OptLevel O2 instead of $EffectiveOptLevel"
     }
@@ -39,6 +40,7 @@ if ($DisableFastMemory) { $ArgsList += "--disable-fast-memory" }
 if ($DisableProtectedMode) { $ArgsList += "--disable-protected-mode" }
 if ($DisableProtectedModeDebug) { $ArgsList += "--disable-protected-mode-debug" }
 if ($RedirectorTrace) { $ArgsList += "--redirector-trace" }
+if ($HostRpcTrace) { $ArgsList += "--hostrpc-trace" }
 if ($EffectiveOptLevel) {
     $ArgsList += "--opt-level"
     $ArgsList += $EffectiveOptLevel
