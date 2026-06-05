@@ -44,6 +44,7 @@ typedef enum {
 typedef enum {
     R36SX_PICO286_BIOS_NORMAL = 0,
     R36SX_PICO286_BIOS_TEST386 = 1,
+    R36SX_PICO286_BIOS_TEST286 = 2,
 } r36sx_pico286_bios_mode_t;
 
 // Return the configured host image path for a BIOS disk drive, or fallback_path.

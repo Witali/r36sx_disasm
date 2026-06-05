@@ -110,10 +110,10 @@ static void r36sx_pico286_reset_pic(void)
     /*
      * The normal R36SX boot path uses BIOS services implemented in the emulator
      * instead of a full PC BIOS ROM, so keep the historical "ready PIC" state
-     * for DOS compatibility.  A diagnostic BIOS ROM such as test386 must not
+     * for DOS compatibility.  A diagnostic BIOS ROM such as test386/test286 must not
      * receive synthetic timer IRQs before it has explicitly initialized the PIC.
      */
-    if (r36sx_pico286_bios_mode() == R36SX_PICO286_BIOS_TEST386) {
+    if (r36sx_pico286_bios_mode() != R36SX_PICO286_BIOS_NORMAL) {
         i8259_controller.interrupt_mask_register = 0xFF;
         i8259_controller.controller_enabled = 0;
     } else {

@@ -245,7 +245,7 @@ Compile-Cpp (Join-Path $PortRoot "r36sx_linux-main.cpp")
 
 Invoke-Checked { & $Zig c++ -target x86_64-windows-gnu @Objects "-o" $Out "-luser32" "-lgdi32" "-lshell32" }
 
-foreach ($Asset in @("pico_286.conf", "keypresets.conf", "test386.bin")) {
+foreach ($Asset in @("pico_286.conf", "keypresets.conf", "test386.bin", "test286.bin")) {
     $Source = Join-Path $PSScriptRoot $Asset
     if (Test-Path $Source) {
         Copy-Item -LiteralPath $Source -Destination (Join-Path $BuildDir $Asset) -Force

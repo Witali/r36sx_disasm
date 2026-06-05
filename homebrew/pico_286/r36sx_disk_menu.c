@@ -36,6 +36,7 @@
 
 #define R36SX_DISK_BIOS_NORMAL 0u
 #define R36SX_DISK_BIOS_TEST386 1u
+#define R36SX_DISK_BIOS_TEST286 2u
 
 #define R36SX_DISK_IMAGE_FLOPPY 0x01u
 #define R36SX_DISK_IMAGE_HARD 0x02u
@@ -424,9 +425,18 @@ static void refresh_menu(struct r36sx_disk_menu *menu)
     }
     menu->boot_order_changed = 0;
 
-    menu->bios_choice =
-        r36sx_pico286_bios_mode() == R36SX_PICO286_BIOS_TEST386 ?
-        R36SX_DISK_BIOS_TEST386 : R36SX_DISK_BIOS_NORMAL;
+    switch (r36sx_pico286_bios_mode()) {
+        case R36SX_PICO286_BIOS_TEST386:
+            menu->bios_choice = R36SX_DISK_BIOS_TEST386;
+            break;
+        case R36SX_PICO286_BIOS_TEST286:
+            menu->bios_choice = R36SX_DISK_BIOS_TEST286;
+            break;
+        case R36SX_PICO286_BIOS_NORMAL:
+        default:
+            menu->bios_choice = R36SX_DISK_BIOS_NORMAL;
+            break;
+    }
     menu->bios_changed = 0;
 
     switch (r36sx_pico286_cpu_model()) {
@@ -599,20 +609,36 @@ static void cycle_bios(struct r36sx_disk_menu *menu)
     if (!menu) {
         return;
     }
-    menu->bios_choice = menu->bios_choice == R36SX_DISK_BIOS_TEST386 ?
-        R36SX_DISK_BIOS_NORMAL : R36SX_DISK_BIOS_TEST386;
+    if (menu->bios_choice == R36SX_DISK_BIOS_NORMAL) {
+        menu->bios_choice = R36SX_DISK_BIOS_TEST386;
+    } else if (menu->bios_choice == R36SX_DISK_BIOS_TEST386) {
+        menu->bios_choice = R36SX_DISK_BIOS_TEST286;
+    } else {
+        menu->bios_choice = R36SX_DISK_BIOS_NORMAL;
+    }
     menu->bios_changed = 1;
 }
 
 static const char *bios_label(uint8_t choice)
 {
-    return choice == R36SX_DISK_BIOS_TEST386 ? "TEST386" : "NORMAL";
+    if (choice == R36SX_DISK_BIOS_TEST386) {
+        return "TEST386";
+    }
+    if (choice == R36SX_DISK_BIOS_TEST286) {
+        return "TEST286";
+    }
+    return "NORMAL";
 }
 
 static r36sx_pico286_bios_mode_t bios_config_value(uint8_t choice)
 {
-    return choice == R36SX_DISK_BIOS_TEST386 ?
-        R36SX_PICO286_BIOS_TEST386 : R36SX_PICO286_BIOS_NORMAL;
+    if (choice == R36SX_DISK_BIOS_TEST386) {
+        return R36SX_PICO286_BIOS_TEST386;
+    }
+    if (choice == R36SX_DISK_BIOS_TEST286) {
+        return R36SX_PICO286_BIOS_TEST286;
+    }
+    return R36SX_PICO286_BIOS_NORMAL;
 }
 
 static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)

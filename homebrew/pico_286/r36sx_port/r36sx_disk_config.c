@@ -575,6 +575,14 @@ static int set_bios_mode_value(const char *value, int line_no)
         return 1;
     }
 
+    if (key_equals(value, "test286") ||
+        key_equals(value, "286test")) {
+        bios_mode = R36SX_PICO286_BIOS_TEST286;
+        snprintf(bios_mode_text, sizeof(bios_mode_text), "test286");
+        r36sx_pico286_debug_log("diskcfg: bios=test286");
+        return 1;
+    }
+
     r36sx_pico286_debug_log(
         "diskcfg: ignoring invalid bios '%s' at line %d",
         value, line_no);
@@ -1923,7 +1931,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "boot_mode=%s\n", boot_mode_text);
     fprintf(fp, "boot_order=%s\n\n", boot_order_text);
 
-    fprintf(fp, "# BIOS ROM provider: normal or test386.\n");
+    fprintf(fp, "# BIOS ROM provider: normal, test386, or test286.\n");
     fprintf(fp, "# test_bios_rom is resolved relative to this config file.\n");
     fprintf(fp, "[bios]\n");
     fprintf(fp, "bios=%s\n", bios_mode_text);
@@ -2188,7 +2196,12 @@ int r36sx_pico286_set_bios_mode(r36sx_pico286_bios_mode_t mode)
     load_disk_config();
 
     if (mode == R36SX_PICO286_BIOS_TEST386) {
+        set_test_bios_value("test386.bin");
         return set_bios_mode_value("test386", 0);
+    }
+    if (mode == R36SX_PICO286_BIOS_TEST286) {
+        set_test_bios_value("test286.bin");
+        return set_bios_mode_value("test286", 0);
     }
     return set_bios_mode_value("normal", 0);
 }
