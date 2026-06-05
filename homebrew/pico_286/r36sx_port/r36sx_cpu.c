@@ -3992,13 +3992,184 @@ static INLINE void decodeflagsdword_popfd(uint32_t x) {
 }
 
 #define R36SX_BIOS_TEXT_BASE 0x8000u
-#define R36SX_BIOS_TEXT_PAGE_CELLS 0x1000u
+#define R36SX_BIOS_TEXT_PAGE_BYTES_40 0x0800u
+#define R36SX_BIOS_TEXT_PAGE_BYTES_80 0x1000u
 #define R36SX_BIOS_MAX_TEXT_COLS 80u
 #define R36SX_BIOS_MAX_TEXT_ROWS 25u
 
+/*
+ * BIOS Data Area video fields are at segment 40h, which is FIRST_RAM_PAGE
+ * offset 400h in this emulator.  These names mirror the IBM/PC-compatible
+ * video BIOS layout used by INT 10h and by programs that read the BDA
+ * directly.
+ */
+#define R36SX_BDA_VIDEO_MODE 0x449u
+#define R36SX_BDA_VIDEO_COLUMNS 0x44Au
+#define R36SX_BDA_VIDEO_REGEN_SIZE 0x44Cu
+#define R36SX_BDA_VIDEO_REGEN_START 0x44Eu
+#define R36SX_BDA_CURSOR_POS_BASE 0x450u
+#define R36SX_BDA_CURSOR_END 0x460u
+#define R36SX_BDA_CURSOR_START 0x461u
+#define R36SX_BDA_ACTIVE_PAGE 0x462u
+#define R36SX_BDA_CRTC_BASE_PORT 0x463u
+#define R36SX_BDA_CRTC_MODE_CONTROL 0x465u
+#define R36SX_BDA_CGA_PALETTE 0x466u
+#define R36SX_BDA_ROWS_MINUS_ONE 0x484u
+#define R36SX_BDA_CHAR_HEIGHT 0x485u
+#define R36SX_BDA_VIDEO_OPTIONS 0x487u
+#define R36SX_BDA_VIDEO_DISPLAY_DATA 0x489u
+#define R36SX_BDA_DISPLAY_COMBINATION_CODE 0x48Au
+
+#define R36SX_BIOS_CRTC_BASE_MONO 0x03B4u
+#define R36SX_BIOS_CRTC_BASE_COLOR 0x03D4u
+#define R36SX_BIOS_DCC_CGA_COLOR 0x02u
+#define R36SX_BIOS_DCC_VGA_MONO 0x07u
+#define R36SX_BIOS_DCC_VGA_COLOR 0x08u
+
+static INLINE void r36sx_bios_bda_write16(uint16_t offset, uint16_t value)
+{
+    FIRST_RAM_PAGE[offset] = (uint8_t)(value & 0xffu);
+    FIRST_RAM_PAGE[offset + 1u] = (uint8_t)(value >> 8);
+}
+
+static uint8_t r36sx_bios_is_text_mode(uint8_t mode)
+{
+    return mode <= 0x03u || mode == 0x07u;
+}
+
+static uint8_t r36sx_bios_is_mono_display_mode(uint8_t mode)
+{
+    return mode == 0x07u;
+}
+
+static uint8_t r36sx_bios_columns_for_mode(uint8_t mode)
+{
+    switch (mode) {
+        case 0x00:
+        case 0x01:
+        case 0x04:
+        case 0x05:
+        case 0x08:
+        case 0x09:
+        case 0x0D:
+        case 0x13:
+            return 40u;
+        default:
+            return 80u;
+    }
+}
+
+static uint8_t r36sx_bios_char_height_for_mode(uint8_t mode)
+{
+    switch (mode) {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x11:
+        case 0x12:
+            return 16u;
+        case 0x07:
+        case 0x0F:
+        case 0x10:
+            return 14u;
+        default:
+            return 8u;
+    }
+}
+
+static uint16_t r36sx_bios_regen_size_for_mode(uint8_t mode)
+{
+    if (mode == 0x00u || mode == 0x01u) {
+        return R36SX_BIOS_TEXT_PAGE_BYTES_40;
+    }
+    if (mode == 0x02u || mode == 0x03u || mode == 0x07u) {
+        return R36SX_BIOS_TEXT_PAGE_BYTES_80;
+    }
+    if (mode == 0x13u) {
+        return 0xFA00u;
+    }
+    if (mode >= 0x04u && mode <= 0x12u) {
+        return 0x8000u;
+    }
+    return R36SX_BIOS_TEXT_PAGE_BYTES_80;
+}
+
+static uint8_t r36sx_bios_display_combination_code_for_mode(uint8_t mode)
+{
+    if (!ega_vga_enabled) {
+        return R36SX_BIOS_DCC_CGA_COLOR;
+    }
+    return r36sx_bios_is_mono_display_mode(mode) ? R36SX_BIOS_DCC_VGA_MONO
+                                                 : R36SX_BIOS_DCC_VGA_COLOR;
+}
+
+static uint8_t r36sx_bios_display_data_for_mode(uint8_t mode)
+{
+    uint8_t display_data = 0x01u; /* VGA active. */
+    uint8_t char_height = r36sx_bios_char_height_for_mode(mode);
+
+    if (r36sx_bios_is_mono_display_mode(mode)) {
+        display_data |= 0x04u;
+    }
+    if (char_height == 16u && r36sx_bios_is_text_mode(mode)) {
+        display_data |= 0x10u; /* VGA 400-scanline alphanumeric mode. */
+    } else if (char_height == 8u) {
+        display_data |= 0x80u; /* VGA 200-scanline mode. */
+    }
+    return display_data;
+}
+
+static void r36sx_bios_update_video_bda_for_mode(uint8_t requested_mode,
+                                                 uint8_t base_mode)
+{
+    uint8_t video_options = 0x61u; /* Cursor emulation + 256 KB EGA/VGA RAM. */
+
+    if (requested_mode & 0x80u) {
+        video_options |= 0x80u; /* INT 10h AH=00h no-clear request. */
+    }
+    if (r36sx_bios_is_mono_display_mode(base_mode)) {
+        video_options |= 0x02u;
+    }
+
+    FIRST_RAM_PAGE[R36SX_BDA_VIDEO_MODE] = base_mode;
+    r36sx_bios_bda_write16(R36SX_BDA_VIDEO_COLUMNS,
+                           r36sx_bios_columns_for_mode(base_mode));
+    r36sx_bios_bda_write16(R36SX_BDA_VIDEO_REGEN_SIZE,
+                           r36sx_bios_regen_size_for_mode(base_mode));
+    r36sx_bios_bda_write16(R36SX_BDA_VIDEO_REGEN_START, 0);
+    FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE] = 0;
+    r36sx_bios_bda_write16(R36SX_BDA_CRTC_BASE_PORT,
+                           r36sx_bios_is_mono_display_mode(base_mode)
+                               ? R36SX_BIOS_CRTC_BASE_MONO
+                               : R36SX_BIOS_CRTC_BASE_COLOR);
+    FIRST_RAM_PAGE[R36SX_BDA_CRTC_MODE_CONTROL] = 0;
+    FIRST_RAM_PAGE[R36SX_BDA_CGA_PALETTE] = 0;
+    FIRST_RAM_PAGE[R36SX_BDA_ROWS_MINUS_ONE] = R36SX_BIOS_MAX_TEXT_ROWS - 1u;
+    r36sx_bios_bda_write16(R36SX_BDA_CHAR_HEIGHT,
+                           r36sx_bios_char_height_for_mode(base_mode));
+    FIRST_RAM_PAGE[R36SX_BDA_VIDEO_OPTIONS] = video_options;
+    FIRST_RAM_PAGE[R36SX_BDA_VIDEO_DISPLAY_DATA] =
+        r36sx_bios_display_data_for_mode(base_mode);
+    /*
+     * 40:8A is the VGA Display Combination Code table index.  The old Tandy
+     * page-register helper also uses BIOS_CRTCPU_PAGE at this offset; standard
+     * VGA INT 10h calls keep it as DCC, and Tandy's AH=05h/AL>=80h path may
+     * still overwrite it when that non-VGA extension is used.
+     */
+    FIRST_RAM_PAGE[R36SX_BDA_DISPLAY_COMBINATION_CODE] =
+        r36sx_bios_display_combination_code_for_mode(base_mode);
+}
+
+static uint8_t r36sx_bios_video_status_mode(void)
+{
+    uint8_t mode = FIRST_RAM_PAGE[R36SX_BDA_VIDEO_MODE];
+    return mode | (FIRST_RAM_PAGE[R36SX_BDA_VIDEO_OPTIONS] & 0x80u);
+}
+
 static uint8_t r36sx_bios_active_page(void)
 {
-    return FIRST_RAM_PAGE[0x462] & 7u;
+    return FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE] & 7u;
 }
 
 static uint32_t r36sx_bios_text_base(void)
@@ -4008,7 +4179,7 @@ static uint32_t r36sx_bios_text_base(void)
 
 static uint8_t r36sx_bios_text_cols(void)
 {
-    uint8_t cols = FIRST_RAM_PAGE[0x44A];
+    uint8_t cols = FIRST_RAM_PAGE[R36SX_BDA_VIDEO_COLUMNS];
     if (videomode == 0x00 || videomode == 0x01) {
         return 40;
     }
@@ -4020,7 +4191,7 @@ static uint8_t r36sx_bios_text_cols(void)
 
 static uint8_t r36sx_bios_text_rows(void)
 {
-    uint8_t rows = FIRST_RAM_PAGE[0x484] + 1u;
+    uint8_t rows = FIRST_RAM_PAGE[R36SX_BDA_ROWS_MINUS_ONE] + 1u;
     if (rows == 0 || rows > R36SX_BIOS_MAX_TEXT_ROWS) {
         return 25;
     }
@@ -4040,8 +4211,8 @@ static void r36sx_bios_set_cursor(uint8_t page, uint8_t col, uint8_t row)
         row = rows - 1u;
     }
 
-    FIRST_RAM_PAGE[0x450 + page * 2u] = col;
-    FIRST_RAM_PAGE[0x451 + page * 2u] = row;
+    FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE + page * 2u] = col;
+    FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE + page * 2u + 1u] = row;
     if (page == r36sx_bios_active_page()) {
         uint8_t old_x = CURSOR_X;
         uint8_t old_y = CURSOR_Y;
@@ -4057,7 +4228,9 @@ static uint32_t r36sx_bios_text_index(uint8_t page, uint8_t col, uint8_t row)
 {
     const uint32_t stride = (uint32_t)r36sx_bios_text_cols() * 2u;
     return r36sx_bios_text_base() +
-           (uint32_t)(page & 7u) * R36SX_BIOS_TEXT_PAGE_CELLS +
+           (uint32_t)(page & 7u) *
+               (r36sx_bios_text_cols() <= 40u ? R36SX_BIOS_TEXT_PAGE_BYTES_40
+                                              : R36SX_BIOS_TEXT_PAGE_BYTES_80) +
            (uint32_t)row * stride +
            (uint32_t)col * 2u;
 }
@@ -4173,8 +4346,10 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
 {
     const uint8_t cols = r36sx_bios_text_cols();
     const uint8_t rows = r36sx_bios_text_rows();
-    uint8_t col = FIRST_RAM_PAGE[0x450 + (page & 7u) * 2u];
-    uint8_t row = FIRST_RAM_PAGE[0x451 + (page & 7u) * 2u];
+    uint8_t col = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                 (page & 7u) * 2u];
+    uint8_t row = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                 (page & 7u) * 2u + 1u];
 
     if (col >= cols) col = 0;
     if (row >= rows) row = rows - 1u;
@@ -4195,7 +4370,8 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
     } else if (ch == '\t') {
         do {
             r36sx_bios_teletype(page, ' ', attr);
-            col = FIRST_RAM_PAGE[0x450 + (page & 7u) * 2u];
+            col = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                 (page & 7u) * 2u];
         } while ((col & 7u) != 0);
         return;
     } else {
@@ -4384,11 +4560,9 @@ static void r36sx_vbe_set_mode(uint16_t mode)
     vga_planar_mode = 0;
     vga_plane_offset = 0;
     vram_offset = 0;
-    FIRST_RAM_PAGE[0x449] = 0x7Fu;
-    FIRST_RAM_PAGE[0x44A] = 80;
-    FIRST_RAM_PAGE[0x44B] = 0;
-    FIRST_RAM_PAGE[0x484] = 24;
-    FIRST_RAM_PAGE[0x462] = 0;
+    r36sx_bios_update_video_bda_for_mode((uint8_t)(0x7Fu |
+                                         (clear_memory ? 0u : 0x80u)),
+                                         0x7Fu);
     r36sx_bios_set_cursor(0, 0, 0);
     r36sx_pico286_video_mark_dirty();
     CPU_AX = R36SX_VBE_STATUS_OK;
@@ -5062,8 +5236,9 @@ void intcall86(uint8_t intnum) {
                         cursor_end = CPU_CL;
                         r36sx_pico286_video_mark_dirty();
                     }
-                    FIRST_RAM_PAGE[0x460] = CPU_CH;
-                    FIRST_RAM_PAGE[0x461] = CPU_CL;
+                    /* BDA stores cursor end at 40:60 and start at 40:61. */
+                    FIRST_RAM_PAGE[R36SX_BDA_CURSOR_END] = CPU_CL;
+                    FIRST_RAM_PAGE[R36SX_BDA_CURSOR_START] = CPU_CH;
                     return;
                 case 0x02:
                     r36sx_bios_set_cursor(CPU_BH, CPU_DL, CPU_DH);
@@ -5071,8 +5246,10 @@ void intcall86(uint8_t intnum) {
                 case 0x03:
                     CPU_CH = cursor_start;
                     CPU_CL = cursor_end;
-                    CPU_DH = FIRST_RAM_PAGE[0x451 + (CPU_BH & 7u) * 2u];
-                    CPU_DL = FIRST_RAM_PAGE[0x450 + (CPU_BH & 7u) * 2u];
+                    CPU_DH = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                            (CPU_BH & 7u) * 2u + 1u];
+                    CPU_DL = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                            (CPU_BH & 7u) * 2u];
                     return;
                 case 0x06:
                     r36sx_bios_scroll_text_window(r36sx_bios_active_page(),
@@ -5086,8 +5263,10 @@ void intcall86(uint8_t intnum) {
                     return;
                 case 0x08: {
                     uint8_t page = CPU_BH & 7u;
-                    uint8_t col = FIRST_RAM_PAGE[0x450 + page * 2u];
-                    uint8_t row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint8_t col = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                 page * 2u];
+                    uint8_t row = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                 page * 2u + 1u];
                     uint32_t index = r36sx_bios_text_index(page, col, row);
                     CPU_AL = index < VIDEORAM_SIZE ? (uint8_t)(VIDEORAM[index] & 0xffu) : ' ';
                     CPU_AH = index + 1u < VIDEORAM_SIZE ? (uint8_t)(VIDEORAM[index + 1u] & 0xffu) : 0x07;
@@ -5096,8 +5275,10 @@ void intcall86(uint8_t intnum) {
                 case 0x09:
                 case 0x0a: {
                     uint8_t page = CPU_BH & 7u;
-                    uint8_t col = FIRST_RAM_PAGE[0x450 + page * 2u];
-                    uint8_t row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint8_t col = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                 page * 2u];
+                    uint8_t row = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                 page * 2u + 1u];
                     uint8_t attr = CPU_AH == 0x09 ? CPU_BL :
                                    r36sx_bios_read_text_attr(page, col, row);
                     uint16_t count = CPU_CX ? CPU_CX : 1u;
@@ -5122,16 +5303,18 @@ void intcall86(uint8_t intnum) {
                     r36sx_bios_teletype(CPU_BH, CPU_AL, CPU_BL);
                     return;
                 case 0x0f:
-                    CPU_AL = (uint8_t)videomode;
-                    CPU_AH = r36sx_bios_text_cols();
+                    CPU_AL = r36sx_bios_video_status_mode();
+                    CPU_AH = FIRST_RAM_PAGE[R36SX_BDA_VIDEO_COLUMNS];
                     CPU_BH = r36sx_bios_active_page();
                     return;
                 case 0x13: {
                     uint8_t mode = CPU_AL;
                     uint8_t page = CPU_BH & 7u;
                     uint8_t attr = CPU_BL;
-                    uint8_t old_col = FIRST_RAM_PAGE[0x450 + page * 2u];
-                    uint8_t old_row = FIRST_RAM_PAGE[0x451 + page * 2u];
+                    uint8_t old_col = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                     page * 2u];
+                    uint8_t old_row = FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE +
+                                                     page * 2u + 1u];
                     uint32_t memloc = CPU_ES * 16u + CPU_BP;
 
                     r36sx_bios_set_cursor(page, CPU_DL, CPU_DH);
@@ -5151,21 +5334,29 @@ void intcall86(uint8_t intnum) {
                     // http://www.techhelpmanual.com/114-video_modes.html
                     // http://www.techhelpmanual.com/89-video_memory_layouts.html
 
-                    videomode = CPU_AL & 0x7F;
-                    vga_set_standard_mode((uint8_t)videomode);
+                    {
+                        uint8_t requested_mode = CPU_AL;
+                        uint8_t base_mode = requested_mode & 0x7Fu;
+                        uint8_t clear_display = (requested_mode & 0x80u) == 0;
 
-                    FIRST_RAM_PAGE[0x449] = CPU_AL;
-                    FIRST_RAM_PAGE[0x44A] = videomode <= 1 || (videomode >= 0x8 && videomode <= 0xa) ? 40 : 80;
-                    FIRST_RAM_PAGE[0x44B] = 0;
-                    FIRST_RAM_PAGE[0x484] = (25 - 1);
+                        videomode = base_mode;
+                        vga_set_standard_mode(base_mode);
+                        r36sx_bios_update_video_bda_for_mode(requested_mode,
+                                                             base_mode);
+                        vram_offset = 0;
+                        tga_offset = 0x8000;
 
-                    if ((CPU_AL & 0x80) == 0x00) {
-                        memset(VIDEORAM, 0x0, sizeof(VIDEORAM));
+                        if (clear_display) {
+                            memset(VIDEORAM, 0x0, sizeof(VIDEORAM));
+                            if (r36sx_bios_is_text_mode(base_mode)) {
+                                r36sx_bios_clear_text_window(0, 0, 0,
+                                    r36sx_bios_text_rows() - 1u,
+                                    r36sx_bios_text_cols() - 1u, 0x07u);
+                            }
+                        }
+                        r36sx_bios_set_cursor(0, 0, 0);
+                        r36sx_pico286_video_mark_dirty();
                     }
-                    tga_offset = 0x8000;
-                    FIRST_RAM_PAGE[0x462] = 0;
-                    r36sx_bios_set_cursor(0, 0, 0);
-                    r36sx_pico286_video_mark_dirty();
                     break;
                 case 0x05: /* Select Active Page */ {
                     if (CPU_AL >= 0x80) {
@@ -5190,10 +5381,10 @@ void intcall86(uint8_t intnum) {
                         return;
                     }
 
-                    FIRST_RAM_PAGE[0x462] = CPU_AL & 7u;
-                    r36sx_bios_set_cursor(FIRST_RAM_PAGE[0x462],
-                                          FIRST_RAM_PAGE[0x450 + FIRST_RAM_PAGE[0x462] * 2u],
-                                          FIRST_RAM_PAGE[0x451 + FIRST_RAM_PAGE[0x462] * 2u]);
+                    FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE] = CPU_AL & 7u;
+                    r36sx_bios_set_cursor(FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE],
+                                          FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE + FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE] * 2u],
+                                          FIRST_RAM_PAGE[R36SX_BDA_CURSOR_POS_BASE + FIRST_RAM_PAGE[R36SX_BDA_ACTIVE_PAGE] * 2u + 1u]);
                     r36sx_pico286_video_mark_dirty();
                     return;
                 }
@@ -5297,14 +5488,23 @@ void intcall86(uint8_t intnum) {
                     }
                     //printf("Unhandled 10h CPU_AL: 0x%x\r\n", CPU_AL);
                     break;
-                case 0x1A: //get display combination code (ps, vga/mcga)
-                    CPU_AL = 0x1A;
-                    if (ega_vga_enabled) {
-                        CPU_BL = 0x08;
-                    } else {
-                        CPU_BL = 0x05; // MCGA
+                case 0x1A: /* Video Display Combination Code (VGA/MCGA). */
+                    if (CPU_AL == 0x00u) {
+                        CPU_AL = 0x1A;
+                        CPU_BL = r36sx_bios_display_combination_code_for_mode(
+                            (uint8_t)videomode);
+                        CPU_BH = 0x00;
+                        FIRST_RAM_PAGE[R36SX_BDA_DISPLAY_COMBINATION_CODE] =
+                            CPU_BL;
+                        return;
                     }
-                    return;
+                    if (CPU_AL == 0x01u) {
+                        FIRST_RAM_PAGE[R36SX_BDA_DISPLAY_COMBINATION_CODE] =
+                            CPU_BL;
+                        CPU_AL = 0x1A;
+                        return;
+                    }
+                    break;
             }
             break;
         }
