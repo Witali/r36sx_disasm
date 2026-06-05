@@ -13,7 +13,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
 - [x] Make close semantics match DOS SFT expectations: decrement the SFT reference
    count or call the DOS helper where appropriate, instead of only marking the
    handle count as closed.
-- [ ] Reintroduce process cleanup safely: handle `AX=1122h`/`AX=111Dh` only after
+- [x] Reintroduce process cleanup safely: handle `AX=1122h`/`AX=111Dh` only after
    HOSTDRV tracks file ownership per PSP/SFT, so interrupted copies do not leak
    host handles and TSR installation cannot corrupt the caller frame.
 - [x] Implement real `chdir` state for the mapped drive by updating CDS/current

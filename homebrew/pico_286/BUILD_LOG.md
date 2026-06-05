@@ -1,5 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV process cleanup
+
+Closed the HOSTDRV TODO item for safe DOS process cleanup.  `HOSTDRV.COM` now
+keeps a small resident sidecar table that maps HOSTRPC file handles back to the
+SFT entries it opened, plus a count of live find handles.  `AX=1122h` and
+`AX=111Dh` only issue `CMD_CLOSE_ALL` when HOSTDRV actually owns live host
+resources, then clear the sidecar state and chain to the previous redirector.
+
+Rebuild command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+a4c4131fb995365001846d90ed2ea3933c84e651ac60e70d6f59fb4f81519124  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV chdir state
 
 Closed the HOSTDRV TODO item for mapped-drive current-directory state.

@@ -66,6 +66,11 @@ CMD_FIND_CLOSE  equ 15
 CMD_CLOSE_ALL   equ 16
 CMD_CHDIR       equ 17
 
+; HOSTRPC currently exposes 16 file handles.  HOSTDRV mirrors handle ownership
+; with a tiny SFT sidecar table so later callbacks can distinguish our SFTs
+; from another redirector's SFT even if DOS rewrites the device-info word.
+HOSTDRV_MAX_HANDLES equ 16
+
 ; HOSTRPC request block layout.  All pointers are real-mode physical
 ; addresses, not segment:offset pairs, so the emulator can read guest memory
 ; without knowing the caller's current segment registers.
@@ -100,6 +105,7 @@ REQ_FLAG_CREATE_NEW equ 0001h
 DOS_ERR_INVALID_FUNCTION equ 1
 DOS_ERR_FILE_NOT_FOUND   equ 2
 DOS_ERR_INVALID_HANDLE   equ 6
+DOS_ERR_NO_MORE_FILES    equ 18
 DOS_ERR_FILE_EXISTS      equ 80
 
 ; Default mapping is H:, matching the project documentation.  DOS drive
@@ -301,11 +307,13 @@ int2f_handler:
     je redir_find_first
     cmp ax, 111Ch
     je redir_find_next
-    ; AX=111Dh is DOS' abort/close-all callback after process termination.
-    ; FreeDOS reaches it while HOSTDRV itself is becoming resident; returning
-    ; through our temporary all-handles RPC path corrupted the caller frame on
-    ; that route.  Leave it to the existing INT 2Fh chain until HOSTDRV keeps
-    ; per-PSP ownership and can implement this DOS-internal callback safely.
+    ; DOS termination cleanup callbacks.  HOSTDRV handles them only when its
+    ; sidecar tables show open host resources, then chains onward so other
+    ; redirectors still see the same notification.
+    cmp ax, 111Dh
+    je redir_process_cleanup
+    cmp ax, 1122h
+    je redir_process_cleanup
     cmp ax, 1120h
     je redir_success
     cmp ax, 1121h
@@ -543,6 +551,35 @@ redir_ext_open_create:
     mov ax, DOS_ERR_INVALID_FUNCTION
     jmp redir_fail
 
+redir_process_cleanup:
+    ; AX=1122h/111Dh are process-termination cleanup notifications.  During
+    ; HOSTDRV installation DOS may call them before any host resource exists;
+    ; in that case do not touch HOSTRPC.  If we do own resources, close them
+    ; and clear sidecar state, then chain so older redirectors get notified.
+    cmp word [host_file_count], 0
+    jne .cleanup
+    cmp word [host_find_count], 0
+    jne .cleanup
+    jmp redir_chain
+.cleanup:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    call close_all_host_resources
+    call clear_host_tracking
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    jmp redir_chain
+
 redir_close:
     ; RBIL documents AX=1106h as a redirector close callback where the
     ; redirector must update the SFT open count.  DOS can have several JFT
@@ -571,6 +608,7 @@ redir_close:
     jc redir_from_rpc
     cmp word [request + REQ_RESULT], 0
     jne redir_from_rpc
+    call track_close_sft_from_request
     mov word [es:di + SFT_TOTAL_HANDLES], SFT_REFCOUNT_FREE
     jmp redir_from_rpc
 
@@ -640,6 +678,7 @@ redir_find_first:
     cmp word [request + REQ_RESULT], 0
     jne .not_found
     call write_dta_find_result
+    call track_find_open
     jmp redir_from_rpc
 .not_found:
     ; Leave the user-visible found-file area untouched, but invalidate our
@@ -670,10 +709,14 @@ redir_find_next:
     jmp redir_from_rpc
 .not_found:
     ; HOSTRPC closes the host find handle when enumeration is exhausted.
+    cmp word [request + REQ_DOS_ERROR], DOS_ERR_NO_MORE_FILES
+    jne .keep_find_count
+    call track_find_close
+.keep_find_count:
     call invalidate_dta_find_state
     jmp redir_from_rpc
 .invalid_dta:
-    mov ax, 18
+    mov ax, DOS_ERR_NO_MORE_FILES
     jmp redir_fail
 
 redir_seek_end:
@@ -814,6 +857,7 @@ rpc_open_common:
     cmp word [request + REQ_RESULT], 0
     jne .done
     call fill_sft_from_request
+    call track_open_sft
     clc
 .done:
     pop dx
@@ -889,10 +933,32 @@ sda_path_is_ours:
     ret
 
 sft_is_ours:
-    ; HOSTDRV stamps SFT_DEVICE_INFO when opening a host-backed file.  Later
-    ; read/write/close/seek callbacks for other redirectors must continue down
-    ; the INT 2Fh chain instead of treating their SFT handle as a HOSTRPC one.
+    ; HOSTDRV stamps SFT_DEVICE_INFO when opening a host-backed file, but DOS
+    ; redirector fields are partly undocumented and can be rewritten by DOS.
+    ; The sidecar table is authoritative: it maps the HOSTRPC handle stored in
+    ; the SFT back to the exact ES:DI SFT address that HOSTDRV opened.
     push ax
+    push bx
+    push cx
+    mov ax, [es:di + SFT_FILE_HANDLE]
+    cmp ax, HOSTDRV_MAX_HANDLES
+    jae .check_device_word
+    mov bx, ax
+    shl bx, 1
+    mov ax, [host_sft_seg + bx]
+    cmp ax, 0
+    je .check_device_word
+    mov cx, es
+    cmp ax, cx
+    jne .check_device_word
+    mov ax, [host_sft_off + bx]
+    cmp ax, di
+    jne .check_device_word
+    clc
+    jmp .done
+.check_device_word:
+    ; Keep the device-info word as a compatibility fallback for older SFTs
+    ; that were opened before sidecar tracking was introduced.
     mov ax, [es:di + SFT_DEVICE_INFO]
     cmp ax, [device_info]
     jne .not_ours
@@ -901,6 +967,8 @@ sft_is_ours:
 .not_ours:
     stc
 .done:
+    pop cx
+    pop bx
     pop ax
     ret
 
@@ -939,8 +1007,101 @@ close_dta_find_state:
     mov word [request + REQ_COMMAND], CMD_FIND_CLOSE
     mov [request + REQ_HANDLE], ax
     call execute_request
+    jc .invalidate
+    call track_find_close
+.invalidate:
     call invalidate_dta_find_state
 .done:
+    pop ax
+    ret
+
+track_open_sft:
+    ; Remember which live SFT owns each HOSTRPC file handle.  Process cleanup
+    ; uses this sidecar state to decide whether AX=1122h/111Dh belongs to us,
+    ; and sft_is_ours uses it to avoid stealing callbacks from another driver.
+    push ax
+    push bx
+    mov ax, [es:di + SFT_FILE_HANDLE]
+    cmp ax, HOSTDRV_MAX_HANDLES
+    jae .done
+    mov bx, ax
+    shl bx, 1
+    cmp word [host_sft_seg + bx], 0
+    jne .store
+    inc word [host_file_count]
+.store:
+    mov ax, es
+    mov [host_sft_seg + bx], ax
+    mov [host_sft_off + bx], di
+.done:
+    pop bx
+    pop ax
+    ret
+
+track_close_sft_from_request:
+    ; A successful HOSTRPC close means the host handle in REQ_HANDLE is no
+    ; longer valid.  Clear only that slot so repeated close callbacks cannot
+    ; underflow the resident resource counter.
+    push ax
+    push bx
+    mov ax, [request + REQ_HANDLE]
+    cmp ax, HOSTDRV_MAX_HANDLES
+    jae .done
+    mov bx, ax
+    shl bx, 1
+    cmp word [host_sft_seg + bx], 0
+    je .done
+    mov word [host_sft_seg + bx], 0
+    mov word [host_sft_off + bx], 0
+    cmp word [host_file_count], 0
+    je .done
+    dec word [host_file_count]
+.done:
+    pop bx
+    pop ax
+    ret
+
+track_find_open:
+    ; Find handles are stored in DTAs rather than SFTs.  A count is enough for
+    ; safe process cleanup because HOSTRPC closes every live find handle on
+    ; CMD_CLOSE_ALL.
+    inc word [host_find_count]
+    ret
+
+track_find_close:
+    cmp word [host_find_count], 0
+    je .done
+    dec word [host_find_count]
+.done:
+    ret
+
+close_all_host_resources:
+    ; Last-resort cleanup used from DOS process-termination notifications.
+    ; The emulator owns the actual FILE*/find handles, so a single HOSTRPC
+    ; command can close anything still associated with this HOSTDRV instance.
+    call clear_request
+    mov word [request + REQ_COMMAND], CMD_CLOSE_ALL
+    call execute_request
+    ret
+
+clear_host_tracking:
+    ; Clear the resident sidecar tables after HOSTRPC has closed every handle.
+    ; ES is made CS-local for rep stosw and restored for the redirector chain.
+    push ax
+    push cx
+    push di
+    push es
+    mov word [host_file_count], 0
+    mov word [host_find_count], 0
+    push cs
+    pop es
+    xor ax, ax
+    mov di, host_sft_seg
+    mov cx, HOSTDRV_MAX_HANDLES * 2
+    rep stosw
+    pop es
+    pop di
+    pop cx
     pop ax
     ret
 
@@ -1501,6 +1662,10 @@ ext_open_attr dw 0
 ext_open_status dw 0
 ext_open_missing_error dw DOS_ERR_FILE_NOT_FOUND
 phys_tmp     dd 0
+host_file_count dw 0
+host_find_count dw 0
+host_sft_seg times HOSTDRV_MAX_HANDLES dw 0
+host_sft_off times HOSTDRV_MAX_HANDLES dw 0
 
 drive_letter db DEFAULT_DRIVE_LETTER
 drive_number db DEFAULT_DRIVE_NUMBER
