@@ -187,7 +187,7 @@ int2f_handler:
     jmp far [cs:old_2f]
 
 .ours:
-    ; Stack after INT entry and pushes:
+    ; Stack after INT entry and BP setup:
     ;   [BP+0] old BP
     ;   [BP+2] return IP
     ;   [BP+4] return CS
@@ -198,6 +198,16 @@ int2f_handler:
     push ds
     push es
     push si
+    ; SHSUCDX restores the original register set when it chains a callback to
+    ; the previous INT 2Fh handler.  HOSTDRV's ownership checks also touch
+    ; general registers, so keep a private copy for redir_chain.  On handled
+    ; callbacks redir_done discards these saved values and returns the handler's
+    ; documented AX/BX/CX/DX/DI results instead.
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
     push cs
     pop ds
 
@@ -698,6 +708,7 @@ redir_fail:
     jmp redir_done
 
 redir_done:
+    add sp, 10
     pop si
     pop es
     pop ds
@@ -707,6 +718,11 @@ redir_done:
 redir_chain:
     ; This AH=11h callback is not for our mapped drive or SFT.  Restore the
     ; caller's saved registers and continue through the redirector chain.
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
     pop si
     pop es
     pop ds

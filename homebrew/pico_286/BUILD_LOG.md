@@ -1,5 +1,32 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV chained INT 2Fh register restore
+
+Compared HOSTDRV's `INT 2Fh/AH=11h` path with SHSUCDX's `New2F`/`Main2F`
+dispatch.  SHSUCDX restores the original caller register set before chaining a
+redirector callback to the previous `INT 2Fh` handler.  HOSTDRV now mirrors that
+behavior for `redir_chain`: it saves original `AX/BX/CX/DX/DI` on entry,
+discards them on handled callbacks, and restores them only when the callback is
+not for the mapped HOSTRPC drive/SFT/DTA.
+
+Rebuild command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+5aba4082b28f0f185c12a247b09c0586bfb39953112e74b7776774d298992325  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTRPC shared NASM include
 
 Moved the guest-side HOSTRPC port ABI constants out of `hostdrv.asm` into
