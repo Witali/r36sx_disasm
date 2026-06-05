@@ -61,7 +61,6 @@ CMD_COMMIT      equ 12
 CMD_FIND_FIRST  equ 13
 CMD_FIND_NEXT   equ 14
 CMD_FIND_CLOSE  equ 15
-CMD_CLOSE_ALL   equ 16
 
 ; HOSTRPC request block layout.  All pointers are real-mode physical
 ; addresses, not segment:offset pairs, so the emulator can read guest memory
@@ -263,8 +262,11 @@ int2f_handler:
     je redir_find_first
     cmp ax, 111Ch
     je redir_find_next
-    cmp ax, 111Dh
-    je redir_close_all
+    ; AX=111Dh is DOS' abort/close-all callback after process termination.
+    ; FreeDOS reaches it while HOSTDRV itself is becoming resident; returning
+    ; through our temporary all-handles RPC path corrupted the caller frame on
+    ; that route.  Leave it to the existing INT 2Fh chain until HOSTDRV keeps
+    ; per-PSP ownership and can implement this DOS-internal callback safely.
     cmp ax, 1120h
     je redir_success
     cmp ax, 1121h
@@ -370,15 +372,6 @@ redir_close:
     call execute_request
     jc redir_from_rpc
     mov word [es:di + SFT_TOTAL_HANDLES], 0FFFFh
-    jmp redir_from_rpc
-
-redir_close_all:
-    ; AX=111Dh is DOS' abort/close-all callback for remote files owned by the
-    ; current process.  HOSTRPC does not track PSP ownership yet, so close every
-    ; host-side file/find handle exposed by this tiny single-drive redirector.
-    call clear_request
-    mov word [request + REQ_COMMAND], CMD_CLOSE_ALL
-    call execute_request
     jmp redir_from_rpc
 
 redir_commit:

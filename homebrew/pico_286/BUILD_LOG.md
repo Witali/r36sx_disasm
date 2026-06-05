@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV 111Dh launch crash workaround
+
+Analyzed the patch log from `HOSTDRV.COM` startup.  The crash happened right
+after `HOSTRPC CLOSE_ALL` from the `INT 2Fh AX=111Dh` redirector callback:
+the CPU returned to `0000:0017`, i.e. into the interrupt-vector table, and then
+raised invalid opcode on IVT bytes.  RBIL describes `111Dh` as the
+abort/close-all callback used after process termination, and DOS reaches it
+while the TSR install path is still sensitive.
+
+Temporarily removed the guest-side `111Dh` handler from `hostdrv.asm`; normal
+open/read/write/close/find callbacks remain handled by HOSTDRV.  Rebuilt and
+deployed the DOS driver:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated the copy inside `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd`
+by mounting the FAT16 partition at offset `32256` through WSL as root.  Verified
+the in-image file:
+
+```text
+25946856284d9a3e40a5ba3d983d84809a349394195284f5c49bba22ec8a5607  HOSTDRV.COM
+```
+
 ## 2026-06-03 DPMI disabled fallback invalid-opcode confirmation
 
 Reviewed the new `C:/Temp/pico_286.log` run and screenshots from MK/SEA and the
