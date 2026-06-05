@@ -74,6 +74,7 @@ typedef enum {
     R36SX_HOST_RPC_CMD_FIND_FIRST = 13,
     R36SX_HOST_RPC_CMD_FIND_NEXT = 14,
     R36SX_HOST_RPC_CMD_FIND_CLOSE = 15,
+    R36SX_HOST_RPC_CMD_CLOSE_ALL = 16,
 } r36sx_host_rpc_command_t;
 
 static const char *r36sx_host_rpc_command_name(uint16_t command)
@@ -95,6 +96,7 @@ static const char *r36sx_host_rpc_command_name(uint16_t command)
         case R36SX_HOST_RPC_CMD_FIND_FIRST: return "FIND_FIRST";
         case R36SX_HOST_RPC_CMD_FIND_NEXT: return "FIND_NEXT";
         case R36SX_HOST_RPC_CMD_FIND_CLOSE: return "FIND_CLOSE";
+        case R36SX_HOST_RPC_CMD_CLOSE_ALL: return "CLOSE_ALL";
         default: return "UNKNOWN";
     }
 }
@@ -505,6 +507,39 @@ static void r36sx_host_rpc_close_find_handle(uint16_t handle)
     r36sx_host_rpc_find_active[handle] = 0;
 }
 
+static uint32_t r36sx_host_rpc_close_all_handles(void)
+{
+    uint32_t closed = 0;
+
+    /*
+     * DOS redirector callback 111Dh is an abort-style cleanup request.  Since
+     * the current HOSTRPC protocol does not carry PSP ownership, close every
+     * host-side resource owned by this single-drive redirector and leave no
+     * stale FILE pointers or find handles behind after interrupted copies.
+     */
+    for (unsigned i = 0; i < R36SX_HOST_RPC_MAX_FILES; ++i) {
+        if (!r36sx_host_rpc_files[i]) {
+            continue;
+        }
+        errno = 0;
+        if (fclose(r36sx_host_rpc_files[i]) != 0) {
+            R36SX_HOSTRPC_LOG("hostrpc: close_all file=%u fclose errno=%d",
+                              i, errno ? errno : EIO);
+        }
+        r36sx_host_rpc_files[i] = NULL;
+        ++closed;
+    }
+
+    for (unsigned i = 0; i < R36SX_HOST_RPC_MAX_FINDS; ++i) {
+        if (!r36sx_host_rpc_find_active[i]) {
+            continue;
+        }
+        r36sx_host_rpc_close_find_handle((uint16_t)i);
+        ++closed;
+    }
+    return closed;
+}
+
 static void r36sx_host_rpc_to_dos_name(const char *input, uint8_t *output)
 {
     int i;
@@ -737,6 +772,13 @@ static void r36sx_host_rpc_execute_request(void)
                 break;
             }
             r36sx_host_rpc_files[req.handle] = NULL;
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+
+        case R36SX_HOST_RPC_CMD_CLOSE_ALL:
+            req.bytes_done = r36sx_host_rpc_close_all_handles();
+            R36SX_HOSTRPC_LOG("hostrpc: close_all closed=%lu",
+                              (unsigned long)req.bytes_done);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
 

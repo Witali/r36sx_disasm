@@ -61,6 +61,7 @@ CMD_COMMIT      equ 12
 CMD_FIND_FIRST  equ 13
 CMD_FIND_NEXT   equ 14
 CMD_FIND_CLOSE  equ 15
+CMD_CLOSE_ALL   equ 16
 
 ; HOSTRPC request block layout.  All pointers are real-mode physical
 ; addresses, not segment:offset pairs, so the emulator can read guest memory
@@ -262,6 +263,8 @@ int2f_handler:
     je redir_find_first
     cmp ax, 111Ch
     je redir_find_next
+    cmp ax, 111Dh
+    je redir_close_all
     cmp ax, 1120h
     je redir_success
     cmp ax, 1121h
@@ -367,6 +370,15 @@ redir_close:
     call execute_request
     jc redir_from_rpc
     mov word [es:di + SFT_TOTAL_HANDLES], 0FFFFh
+    jmp redir_from_rpc
+
+redir_close_all:
+    ; AX=111Dh is DOS' abort/close-all callback for remote files owned by the
+    ; current process.  HOSTRPC does not track PSP ownership yet, so close every
+    ; host-side file/find handle exposed by this tiny single-drive redirector.
+    call clear_request
+    mov word [request + REQ_COMMAND], CMD_CLOSE_ALL
+    call execute_request
     jmp redir_from_rpc
 
 redir_commit:
@@ -526,8 +538,18 @@ rpc_open_common:
     push ax
     call clear_request
     pop ax
+    push bx
     xor ah, ah
     mov [request + REQ_COMMAND], ax
+    ; DOS expects a different SFT open-mode marker for create/truncate than
+    ; for open-existing.  The high byte of the original SFT field is owned by
+    ; DOS/SHARE, so preserve the old working redirector's low-word values.
+    mov bx, 0FF02h
+    cmp ax, CMD_CREATE
+    jne .mode_ready
+    mov bx, 0002h
+.mode_ready:
+    mov [sft_open_mode], bx
     mov ax, FIRST_FILENAME_OFF
     mov di, path_buf
     call copy_sda_string
@@ -540,6 +562,7 @@ rpc_open_common:
     jne .done
     call fill_sft_from_request
 .done:
+    pop bx
     ret
 
 rpc_io_common:
@@ -603,8 +626,10 @@ fill_sft_from_request:
     push cx
     push si
     push di
-    mov word [es:di + SFT_TOTAL_HANDLES], 1
-    mov word [es:di + SFT_OPEN_MODE], 0FF02h
+    ; INT 2Fh/1116h and 1117h require the redirector to fill the SFT except
+    ; for the handle count; DOS owns SFT_TOTAL_HANDLES until close.
+    mov ax, [sft_open_mode]
+    mov [es:di + SFT_OPEN_MODE], ax
     mov byte [es:di + SFT_ATTRIBUTE], 08h
     mov ax, [device_info]
     mov [es:di + SFT_DEVICE_INFO], ax
@@ -1045,6 +1070,7 @@ sda_seg      dw 0
 sda_off      dw 0
 active_find  dw 0FFFFh
 device_info  dw 8048h
+sft_open_mode dw 0FF02h
 phys_tmp     dd 0
 
 drive_letter db DEFAULT_DRIVE_LETTER
