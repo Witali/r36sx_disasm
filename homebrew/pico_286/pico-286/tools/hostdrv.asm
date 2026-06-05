@@ -5,6 +5,20 @@
 ; It is intentionally separate from MAPDRIVE.COM while the port-backed
 ; redirector is still being brought up.
 ;
+; DOS side:
+;   - The program patches the Current Directory Structure (CDS) entry for the
+;     requested drive and then stays resident as an INT 2Fh redirector.
+;   - DOS passes file operation state through SDA/SFT/DTA structures.  The
+;     offsets below are the small subset used by this driver.
+;
+; Emulator side:
+;   - The resident driver never touches host files directly.  It fills the
+;     request block below, writes its physical address to HOSTRPC ports, then
+;     waits for the emulator to execute the command and update the block.
+;
+; Keep this file 8086-compatible.  It is meant to run inside plain DOS before
+; any 286/386 extender or protected-mode helper is available.
+;
 ; Build:
 ;   nasm -f bin hostdrv.asm -o hostdrv.com
 
@@ -12,6 +26,10 @@
     bits 16
     cpu 8086
 
+; HOSTRPC I/O ports.  The emulator exposes a tiny device here:
+;   E360/E361 return signature bytes 'R'/'H'.
+;   E364..E367 receive the physical address of the request block.
+;   E368 executes the command currently stored in that request block.
 PORT_BASE       equ 0E360h
 PORT_ID0        equ PORT_BASE + 0
 PORT_ID1        equ PORT_BASE + 1
@@ -22,10 +40,12 @@ PORT_ADDR2      equ PORT_BASE + 6
 PORT_ADDR3      equ PORT_BASE + 7
 PORT_COMMAND    equ PORT_BASE + 8
 
+; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
 RPC_VERSION     equ 1
 RPC_EXECUTE     equ 1
 
+; HOSTRPC command identifiers understood by r36sx_host_rpc.c.inl.
 CMD_PING        equ 0
 CMD_OPEN_RO     equ 1
 CMD_CREATE      equ 3
@@ -42,6 +62,9 @@ CMD_FIND_FIRST  equ 13
 CMD_FIND_NEXT   equ 14
 CMD_FIND_CLOSE  equ 15
 
+; HOSTRPC request block layout.  All pointers are real-mode physical
+; addresses, not segment:offset pairs, so the emulator can read guest memory
+; without knowing the caller's current segment registers.
 REQ_MAGIC       equ 0
 REQ_VERSION     equ 2
 REQ_COMMAND     equ 4
@@ -61,14 +84,23 @@ REQ_RESERVED    equ 42
 REQ_BYTES_DONE  equ 44
 REQ_SIZE        equ 48
 
+; Default mapping is H:, matching the project documentation.  DOS drive
+; numbers are zero-based: A=0, B=1, ..., H=7.
 DEFAULT_DRIVE_LETTER equ 'H'
 DEFAULT_DRIVE_NUMBER equ 7
+
+; Current Directory Structure (CDS) fields used to mark the drive as a
+; network/physical redirector drive.  DOS then routes INT 21h file operations
+; for that drive through INT 2Fh/AH=11h callbacks.
 CDS_ENTRY_SIZE       equ 058h
 CDS_OFF_FLAGS        equ 043h
 CDSFLAG_NET_PHY      equ 0C000h
 FIRST_FILENAME_OFF   equ 09Eh
 SECOND_FILENAME_OFF  equ 016Ah
 
+; System File Table (SFT) fields that DOS passes in ES:DI for open files.
+; HOSTDRV stores the host-side handle in SFT_FILE_HANDLE and keeps the DOS file
+; position/size fields in sync after every read/write/seek.
 SFT_TOTAL_HANDLES    equ 0
 SFT_OPEN_MODE        equ 2
 SFT_ATTRIBUTE        equ 4
@@ -84,6 +116,8 @@ SFT_UNK3             equ 29
 SFT_UNK4             equ 31
 SFT_FILE_NAME        equ 32
 
+; Disk Transfer Area (DTA) / Search Data Block fields used by find-first and
+; find-next.  DOS shells read this buffer after successful directory searches.
 DTA_DRIVE            equ 0
 DTA_FOUND            equ 21
 FOUND_NAME           equ DTA_FOUND + 0
@@ -97,6 +131,8 @@ start:
     push cs
     pop ds
 
+    ; HOSTDRV is a .COM program, so DS initially points at our PSP.  Switch it
+    ; to CS and parse the optional command-line drive letter from PSP:80h.
     call parse_drive_arg
     jnc .args_ok
     mov dx, err_usage
@@ -105,13 +141,18 @@ start:
     jmp exit_error
 
 .args_ok:
+    ; Refuse to install if the emulator-side HOSTRPC device is absent.  This
+    ; avoids leaving a broken redirector resident on plain DOS/other emulators.
     call probe_rpc
     jc rpc_missing
 
+    ; Mark the selected drive in DOS CDS before hooking INT 2Fh.  Once this
+    ; succeeds, DOS will call our redirector for file operations on that drive.
     call install_cds_mapping
     jc exit_error
 
     ; FreeDOS/MS-DOS expose the SDA pointer through INT 21h AX=5D06h.
+    ; The SDA contains the redirector filenames and the current DTA pointer.
     mov ax, 5D06h
     int 21h
     mov ax, ds
@@ -121,6 +162,8 @@ start:
     mov [sda_seg], ax
     mov [sda_off], bx
 
+    ; Chain the previous INT 2Fh handler.  Only AH=11h redirector callbacks are
+    ; consumed here; everything else is forwarded unchanged.
     mov ax, 352Fh
     int 21h
     mov [old_2f], bx
@@ -136,6 +179,8 @@ start:
     mov ah, 09h
     int 21h
 
+    ; Stay resident.  DX is rounded up to paragraphs from PSP start, as DOS
+    ; expects for INT 21h/AH=31h.
     mov dx, resident_end
     add dx, 15
     mov cl, 4
@@ -153,11 +198,19 @@ exit_error:
     int 21h
 
 int2f_handler:
+    ; DOS multiplex interrupt.  Redirector calls use AH=11h; other multiplex
+    ; users must continue down the old INT 2Fh chain.
     cmp ah, 11h
     je .ours
     jmp far [cs:old_2f]
 
 .ours:
+    ; Stack after INT entry and pushes:
+    ;   [BP+0] old BP
+    ;   [BP+2] return IP
+    ;   [BP+4] return CS
+    ;   [BP+6] saved FLAGS
+    ; redir_success/redir_fail edit the carry bit in saved FLAGS before IRET.
     push bp
     mov bp, sp
     push ds
@@ -166,6 +219,8 @@ int2f_handler:
     push cs
     pop ds
 
+    ; INT 2Fh/AH=11h redirector subfunctions used by DOS.  Unsupported calls
+    ; are chained so another redirector may handle them.
     cmp ax, 1100h
     je redir_install_check
     cmp ax, 1101h
@@ -214,6 +269,8 @@ int2f_handler:
     jmp far [cs:old_2f]
 
 redir_install_check:
+    ; Installation check.  Some DOS versions also pass a refreshed SDA pointer
+    ; in BX:DX, so keep it if it is non-zero.
     cmp bx, 0
     jne .store_sda
     cmp dx, 0
@@ -246,6 +303,8 @@ redir_delete:
     jmp redir_from_rpc
 
 redir_getattr:
+    ; Attribute query returns DOS attributes in AX and file size in BX:DI.
+    ; CX/DX are filled with stable placeholder time/date values for now.
     mov al, CMD_GETATTR
     call rpc_path_command
     jc redir_from_rpc
@@ -257,6 +316,9 @@ redir_getattr:
     jmp redir_success
 
 redir_rename:
+    ; Rename has two SDA filenames: source at FIRST_FILENAME_OFF and target at
+    ; SECOND_FILENAME_OFF.  Both are copied into resident near buffers before
+    ; their physical addresses are placed in the HOSTRPC request.
     call clear_request
     mov word [request + REQ_COMMAND], CMD_RENAME
     mov ax, FIRST_FILENAME_OFF
@@ -287,6 +349,8 @@ redir_create:
     jmp redir_from_rpc
 
 redir_close:
+    ; Close releases the host-side file handle and marks the DOS SFT slot as
+    ; closed.  The host RPC layer owns the actual FILE*/descriptor lifetime.
     call clear_request
     mov word [request + REQ_COMMAND], CMD_CLOSE
     mov ax, [es:di + SFT_FILE_HANDLE]
@@ -297,6 +361,8 @@ redir_close:
     jmp redir_from_rpc
 
 redir_commit:
+    ; DOS commit/flush.  HOSTRPC maps this to fflush/fsync-style behavior on
+    ; the host side when possible.
     call clear_request
     mov word [request + REQ_COMMAND], CMD_COMMIT
     mov ax, [es:di + SFT_FILE_HANDLE]
@@ -315,6 +381,9 @@ redir_write:
     jmp redir_from_rpc
 
 redir_disk_info:
+    ; Return conservative fake free-space geometry.  DOS only needs plausible
+    ; non-zero values for many shell operations; real host free-space reporting
+    ; can be added later through HOSTRPC if needed.
     mov ah, 2
     mov al, 255
     mov bx, 4096
@@ -323,6 +392,9 @@ redir_disk_info:
     jmp redir_success
 
 redir_find_first:
+    ; Directory enumeration is stateful on the host side.  Always close any
+    ; previous active find before starting a new search; shells often probe
+    ; existence with find-first before copy/create operations.
     call close_active_find
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_FIRST
@@ -351,6 +423,8 @@ redir_find_first:
     jmp redir_from_rpc
 
 redir_find_next:
+    ; Continue the active enumeration.  active_find is the opaque host handle
+    ; returned by FIND_FIRST.
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_NEXT
     mov ax, [active_find]
@@ -388,6 +462,9 @@ redir_seek_end:
     jmp redir_success
 
 redir_from_rpc:
+    ; Translate HOSTRPC completion into the DOS redirector convention.  A
+    ; transport error (CF from execute_request) and a host-side DOS error in the
+    ; request block both become CF=1 for the original INT 2Fh caller.
     jc redir_fail
     cmp word [request + REQ_RESULT], 0
     jne .rpc_error
@@ -401,10 +478,13 @@ redir_from_rpc:
     jmp redir_fail
 
 redir_success:
+    ; Clear carry in the saved FLAGS image.  We cannot simply CLC before IRET
+    ; because IRET restores FLAGS from the interrupt frame.
     and word [bp + 6], 0FFFEh
     jmp redir_done
 
 redir_fail:
+    ; Set carry in the saved FLAGS image and return AX as DOS error code.
     or word [bp + 6], 0001h
     jmp redir_done
 
@@ -416,6 +496,9 @@ redir_done:
     iret
 
 rpc_path_command:
+    ; Common helper for one-path operations: delete, mkdir, rmdir, getattr.
+    ; AL contains the HOSTRPC command id.  DOS has already placed the path in
+    ; the SDA filename buffer; HOSTRPC receives a physical pointer to path_buf.
     call clear_request
     xor ah, ah
     mov [request + REQ_COMMAND], ax
@@ -429,6 +512,8 @@ rpc_path_command:
     ret
 
 rpc_open_common:
+    ; Common open/create path.  On success HOSTRPC returns an opaque handle and
+    ; file size.  fill_sft_from_request publishes that state to DOS in ES:DI.
     push ax
     call clear_request
     pop ax
@@ -449,6 +534,9 @@ rpc_open_common:
     ret
 
 rpc_io_common:
+    ; Common read/write path.  DOS passes byte count in CX and the current SFT
+    ; in ES:DI.  The actual transfer buffer is the current DTA pointer stored in
+    ; the SDA, so store_dta_phys converts that far pointer for HOSTRPC.
     push ax
     call clear_request
     pop ax
@@ -481,6 +569,9 @@ rpc_io_common:
     ret
 
 close_active_find:
+    ; Best-effort cleanup for an outstanding host find handle.  Errors are
+    ; deliberately ignored here because this is called before starting another
+    ; search and during recovery from failed enumeration.
     push ax
     mov ax, [active_find]
     cmp ax, 0FFFFh
@@ -495,6 +586,9 @@ close_active_find:
     ret
 
 fill_sft_from_request:
+    ; Populate the DOS System File Table entry for a file opened by HOSTRPC.
+    ; The exact SFT layout varies slightly between DOS versions, but these
+    ; fields are stable enough for FreeDOS/MS-DOS style redirector callbacks.
     push ax
     push bx
     push cx
@@ -530,6 +624,10 @@ fill_sft_from_request:
     ret
 
 write_dta_find_result:
+    ; Copy the compact 20-byte HOSTRPC find result into the DOS DTA/SDB format.
+    ; find_buf layout:
+    ;   00..10 = 8.3 filename, 11 = attr, 12..15 = time/date,
+    ;   16..19 = little-endian file size.
     push ax
     push bx
     push cx
@@ -630,6 +728,9 @@ path_to_dos_name_esdi:
     ret
 
 load_dta_esdi:
+    ; Load ES:DI with the caller's current DTA pointer from the SDA.  DOS uses
+    ; this same pointer for file transfer buffers in redirector read/write
+    ; calls and for search results in find-first/find-next.
     mov ax, [sda_seg]
     cmp ax, 0
     je .fail
@@ -646,6 +747,8 @@ load_dta_esdi:
     ret
 
 store_dta_phys:
+    ; Convert the DTA far pointer to a physical address and store it in the
+    ; request block as DATA_PHYS.
     push ax
     push bx
     push si
@@ -665,6 +768,9 @@ store_dta_phys:
 
 copy_sda_string:
     ; AX = SDA-relative offset, DI = near destination in CS.
+    ; Copies a NUL-terminated DOS path from the SDA into a resident buffer.
+    ; The 127-byte limit keeps path_buf/path2_buf NUL-terminated and avoids
+    ; scanning unbounded DOS memory if the SDA content is malformed.
     push ax
     push bx
     push cx
@@ -695,6 +801,8 @@ copy_sda_string:
     ret
 
 clear_request:
+    ; Reset the request block before each HOSTRPC operation.  This prevents
+    ; stale path/data/handle fields from leaking between redirector callbacks.
     push ax
     push cx
     push di
@@ -721,6 +829,8 @@ store_near_phys:
 
 store_far_phys:
     ; AX = segment, SI = offset, DI = dword destination in request.
+    ; Physical = segment * 16 + offset.  The split shift keeps the code valid
+    ; on 8086, where 32-bit arithmetic and 80186+ shifts are not available.
     push ax
     push bx
     push cx
@@ -739,6 +849,9 @@ store_far_phys:
     ret
 
 execute_request:
+    ; Submit the current request block to the emulator.  The protocol is
+    ; synchronous: after OUT PORT_COMMAND the emulator has already updated the
+    ; request block and status port by the time we read PORT_STATUS.
     push ax
     push dx
     push si
@@ -775,6 +888,8 @@ execute_request:
     ret
 
 probe_rpc:
+    ; Verify that the emulator exposes HOSTRPC and that the request/response
+    ; path is usable before installing a resident redirector.
     mov dx, PORT_ID0
     in al, dx
     cmp al, 'R'
@@ -796,6 +911,9 @@ probe_rpc:
     ret
 
 install_cds_mapping:
+    ; INT 21h/AH=52h returns the DOS List of Lists.  From there we locate the
+    ; CDS array and patch the selected drive entry to mark it as a redirected
+    ; network/physical drive.  LASTDRIVE must include the requested letter.
     mov ah, 52h
     int 21h
     mov si, 021h
@@ -839,6 +957,8 @@ install_cds_mapping:
     ret
 
 parse_drive_arg:
+    ; Parse optional "X:" from the .COM command tail at PSP:80h.  No DOS 2+
+    ; argument parser is used, keeping the resident loader tiny and portable.
     mov byte [drive_letter], DEFAULT_DRIVE_LETTER
     mov byte [drive_number], DEFAULT_DRIVE_NUMBER
     mov si, 081h
