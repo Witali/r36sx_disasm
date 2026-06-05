@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV chdir state
+
+Closed the HOSTDRV TODO item for mapped-drive current-directory state.
+`HOSTDRV.COM` now sends `CMD_CHDIR` to HOSTRPC instead of accepting CHDIR as a
+no-op.  HOSTRPC verifies that the target is a host directory, stores a
+normalized current path for the mapped drive, and applies it to later relative
+guest paths.
+
+Rebuild commands:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+e6fc2b2422f732ee875033a821fd70890cf3d45e23d0f3265b466d586b9d104a  HOSTDRV.COM
+c5d41c4defa8e146c9f3e46dd88ce0f1556f7ddd5f43215e8873240c17053abe  pico_286
+```
+
 ## 2026-06-05 HOSTRPC real DOS metadata
 
 Closed the HOSTDRV TODO item for real host metadata.  HOSTRPC now translates

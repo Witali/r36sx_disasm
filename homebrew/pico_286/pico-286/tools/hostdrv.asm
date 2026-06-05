@@ -63,6 +63,8 @@ CMD_COMMIT      equ 12
 CMD_FIND_FIRST  equ 13
 CMD_FIND_NEXT   equ 14
 CMD_FIND_CLOSE  equ 15
+CMD_CLOSE_ALL   equ 16
+CMD_CHDIR       equ 17
 
 ; HOSTRPC request block layout.  All pointers are real-mode physical
 ; addresses, not segment:offset pairs, so the emulator can read guest memory
@@ -344,12 +346,14 @@ redir_mkdir:
     jmp redir_from_rpc
 
 redir_chdir:
-    ; DOS keeps the selected path in the CDS.  For now HOSTDRV accepts only
-    ; paths that belong to our mapped drive and lets other redirectors chain.
+    ; Keep current-directory state in the HOSTRPC device.  It then applies the
+    ; mapped drive cwd to later relative paths before resolving them on host.
     mov ax, FIRST_FILENAME_OFF
     call sda_path_is_ours
     jc redir_chain
-    jmp redir_success
+    mov al, CMD_CHDIR
+    call rpc_path_command
+    jmp redir_from_rpc
 
 redir_delete:
     mov ax, FIRST_FILENAME_OFF

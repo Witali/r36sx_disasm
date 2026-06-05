@@ -75,6 +75,8 @@ struct host_rpc_request {
 | `13` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
 | `14` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
 | `15` | Find close | Closes a search handle from find first. |
+| `16` | Close all | Closes all host handles owned by the redirector instance. |
+| `17` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
 
 Find commands write this fixed 20-byte result into `data_phys`, provided
 `data_len >= 20`:

@@ -16,7 +16,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
 - [ ] Reintroduce process cleanup safely: handle `AX=1122h`/`AX=111Dh` only after
    HOSTDRV tracks file ownership per PSP/SFT, so interrupted copies do not leak
    host handles and TSR installation cannot corrupt the caller frame.
-- [ ] Implement real `chdir` state for the mapped drive by updating CDS/current
+- [x] Implement real `chdir` state for the mapped drive by updating CDS/current
    path or keeping equivalent per-drive path state in the guest driver.
 - [x] Return real host attributes and timestamps, translating them to DOS
    attribute bits and packed DOS date/time values.

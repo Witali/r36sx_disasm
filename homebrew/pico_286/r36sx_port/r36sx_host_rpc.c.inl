@@ -78,6 +78,7 @@ typedef enum {
     R36SX_HOST_RPC_CMD_FIND_NEXT = 14,
     R36SX_HOST_RPC_CMD_FIND_CLOSE = 15,
     R36SX_HOST_RPC_CMD_CLOSE_ALL = 16,
+    R36SX_HOST_RPC_CMD_CHDIR = 17,
 } r36sx_host_rpc_command_t;
 
 static const char *r36sx_host_rpc_command_name(uint16_t command)
@@ -100,6 +101,7 @@ static const char *r36sx_host_rpc_command_name(uint16_t command)
         case R36SX_HOST_RPC_CMD_FIND_NEXT: return "FIND_NEXT";
         case R36SX_HOST_RPC_CMD_FIND_CLOSE: return "FIND_CLOSE";
         case R36SX_HOST_RPC_CMD_CLOSE_ALL: return "CLOSE_ALL";
+        case R36SX_HOST_RPC_CMD_CHDIR: return "CHDIR";
         default: return "UNKNOWN";
     }
 }
@@ -140,6 +142,7 @@ static uint16_t r36sx_host_rpc_last_result = R36SX_HOST_RPC_OK;
 static FILE *r36sx_host_rpc_files[R36SX_HOST_RPC_MAX_FILES];
 static intptr_t r36sx_host_rpc_finds[R36SX_HOST_RPC_MAX_FINDS];
 static uint8_t r36sx_host_rpc_find_active[R36SX_HOST_RPC_MAX_FINDS];
+static char r36sx_host_rpc_cwd[R36SX_HOST_RPC_MAX_PATH];
 
 static inline int r36sx_host_rpc_ram_range_ok(uint32_t address, size_t bytes)
 {
@@ -452,19 +455,23 @@ static int r36sx_host_rpc_ensure_base_dir(const char *path)
     return r36sx_host_rpc_dir_exists(temp);
 }
 
-static int r36sx_host_rpc_build_host_path(const char *guest_path,
-                                          char *host_path,
-                                          size_t host_path_size)
+static int r36sx_host_rpc_build_host_path_ex(const char *guest_path,
+                                             char *host_path,
+                                             size_t host_path_size,
+                                             char *normalized_tail,
+                                             size_t normalized_tail_size)
 {
     const char *base = r36sx_pico286_host_drive_path();
 #if R36SX_DEBUG_HOSTRPC_TRACE
     const char *guest_path_start = guest_path;
 #endif
+    const char *path;
     char base_abs[R36SX_HOST_RPC_MAX_HOST_PATH];
     char tail[R36SX_HOST_RPC_MAX_PATH];
     char segment[R36SX_HOST_RPC_MAX_PATH];
     size_t seg_len = 0;
     int written;
+    int absolute = 0;
     char sep =
 #ifdef _WIN32
         '\\';
@@ -485,17 +492,29 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
         return 0;
     }
 
-    /* Drop an optional DOS drive prefix and root slashes. */
-    if (isalpha((unsigned char)guest_path[0]) && guest_path[1] == ':') {
-        guest_path += 2;
+    /*
+     * Drop an optional DOS drive prefix.  "X:\foo" is absolute on the mapped
+     * drive, while "X:foo" follows that drive's current directory.
+     */
+    path = guest_path;
+    if (isalpha((unsigned char)path[0]) && path[1] == ':') {
+        path += 2;
     }
-    while (*guest_path == '\\' || *guest_path == '/') {
-        ++guest_path;
+    if (*path == '\\' || *path == '/') {
+        absolute = 1;
+    }
+    while (*path == '\\' || *path == '/') {
+        ++path;
     }
 
-    tail[0] = '\0';
+    if (!absolute && r36sx_host_rpc_cwd[0]) {
+        snprintf(tail, sizeof(tail), "%s", r36sx_host_rpc_cwd);
+        tail[sizeof(tail) - 1u] = '\0';
+    } else {
+        tail[0] = '\0';
+    }
     while (1) {
-        char ch = *guest_path++;
+        char ch = *path++;
         if (ch == '\\' || ch == '/' || ch == '\0') {
             segment[seg_len] = '\0';
             if (seg_len == 0 || strcmp(segment, ".") == 0) {
@@ -531,6 +550,11 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
         segment[seg_len++] = ch;
     }
 
+    if (normalized_tail && normalized_tail_size > 0) {
+        snprintf(normalized_tail, normalized_tail_size, "%s", tail);
+        normalized_tail[normalized_tail_size - 1u] = '\0';
+    }
+
     if (tail[0] == '\0') {
         written = snprintf(host_path, host_path_size, "%s", base_abs);
     } else {
@@ -557,6 +581,14 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
         return 0;
     }
     return 1;
+}
+
+static int r36sx_host_rpc_build_host_path(const char *guest_path,
+                                          char *host_path,
+                                          size_t host_path_size)
+{
+    return r36sx_host_rpc_build_host_path_ex(guest_path, host_path,
+                                             host_path_size, NULL, 0);
 }
 
 static int r36sx_host_rpc_path_has_wildcard(const char *path)
@@ -1110,6 +1142,38 @@ static void r36sx_host_rpc_execute_request(void)
                                                                           1));
                 break;
             }
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+        }
+
+        case R36SX_HOST_RPC_CMD_CHDIR: {
+            struct stat st;
+            char normalized_tail[R36SX_HOST_RPC_MAX_PATH];
+            if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
+                                             sizeof(guest_path)) ||
+                !r36sx_host_rpc_build_host_path_ex(guest_path, host_path,
+                                                   sizeof(host_path),
+                                                   normalized_tail,
+                                                   sizeof(normalized_tail))) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
+                break;
+            }
+            R36SX_HOSTRPC_LOG("hostrpc: chdir guest='%s' host='%s' tail='%s'",
+                              guest_path,
+                              host_path,
+                              normalized_tail);
+            errno = 0;
+            if (stat(host_path, &st) != 0 || !(st.st_mode & S_IFDIR)) {
+                err = errno ? errno : ENOTDIR;
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
+                                      r36sx_host_rpc_dos_error_from_errno(err,
+                                                                          0));
+                break;
+            }
+            snprintf(r36sx_host_rpc_cwd, sizeof(r36sx_host_rpc_cwd), "%s",
+                     normalized_tail);
+            r36sx_host_rpc_cwd[sizeof(r36sx_host_rpc_cwd) - 1u] = '\0';
+            r36sx_host_rpc_apply_stat_metadata(&req, &st);
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }
