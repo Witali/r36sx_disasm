@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTRPC port pair layout
+
+Reordered the private HOSTRPC I/O ports to make 16-bit guest I/O more natural:
+
+```text
+E360/E361  signature bytes R/H
+E362       command write port, version readback
+E363       status
+E364-E367  request-block physical address
+E368-E369  last RPC result
+```
+
+The emulator-side decoder now executes commands from `PORT_BASE+2` instead of
+`PORT_BASE+8`; `HOSTDRV.COM` and `HOSTRPC.COM` were rebuilt with the same
+layout.  The address ports remain little-endian and can be written as two
+16-bit words at `E364h` and `E366h`.
+
+Rebuild commands:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostrpc_test.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostrpc.com
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\pico_286
+```
+
+Updated the DOS files inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostrpc.com ::/HOSTRPC.COM
+```
+
+Verified by copying both files back out of the image:
+
+```text
+3982c5d4179623d3dc37c2fb9761477ed17b66e0c83eb0cabecedad4fbfdb1e7  HOSTDRV.COM
+884792e0a6405bee9d4f4939a32183e68ad5186f0da10db6f59999db5de748a5  HOSTRPC.COM
+3c610d67737f1659256c5aa2750c0f1c12d36b181e96687769d63557d24b4f6c  pico_286
+```
+
 ## 2026-06-05 HOSTDRV close reference count
 
 Implemented the fourth `HOSTDRV_TODO.md` item: `INT 2Fh AX=1106h` now follows

@@ -19,11 +19,15 @@ debug-console conventions.
 | --- | --- | --- |
 | `E360h` | read | Signature byte `R` |
 | `E361h` | read | Signature byte `H` |
-| `E362h` | read | RPC version, currently `1` |
+| `E362h` | write/read | Command port; write `1` to execute request block. Reads return RPC version `1`. |
 | `E363h` | read | Status |
 | `E364h..E367h` | read/write | 32-bit physical request-block address, little-endian |
-| `E368h` | write | Command port; write `1` to execute request block |
-| `E369h..E36Ah` | read | Last RPC result, little-endian |
+| `E368h..E369h` | read | Last RPC result, little-endian |
+
+This layout keeps the useful 16-bit pairs aligned: `IN E360h` returns the
+`HR` signature word, `OUT E362h` can submit a command byte without disturbing
+the address registers, and `OUT E364h`/`OUT E366h` can write the 32-bit request
+address as two words.
 
 ## Request Block
 

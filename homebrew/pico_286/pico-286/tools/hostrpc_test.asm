@@ -13,12 +13,12 @@
 PORT_BASE       equ 0E360h
 PORT_ID0        equ PORT_BASE + 0
 PORT_ID1        equ PORT_BASE + 1
+PORT_COMMAND    equ PORT_BASE + 2
 PORT_STATUS     equ PORT_BASE + 3
 PORT_ADDR0      equ PORT_BASE + 4
 PORT_ADDR1      equ PORT_BASE + 5
 PORT_ADDR2      equ PORT_BASE + 6
 PORT_ADDR3      equ PORT_BASE + 7
-PORT_COMMAND    equ PORT_BASE + 8
 
 RPC_MAGIC       equ 05248h       ; "HR" little-endian
 RPC_VERSION     equ 1

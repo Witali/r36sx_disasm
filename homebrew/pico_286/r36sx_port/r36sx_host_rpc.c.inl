@@ -37,7 +37,7 @@
 #endif
 
 #define R36SX_HOST_RPC_PORT_BASE 0xE360u
-#define R36SX_HOST_RPC_PORT_LAST 0xE36Fu
+#define R36SX_HOST_RPC_PORT_LAST (R36SX_HOST_RPC_PORT_BASE + 9u)
 
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
 #define R36SX_HOST_RPC_VERSION 1u
@@ -455,7 +455,9 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
                                           size_t host_path_size)
 {
     const char *base = r36sx_pico286_host_drive_path();
+#if R36SX_DEBUG_HOSTRPC_TRACE
     const char *guest_path_start = guest_path;
+#endif
     char base_abs[R36SX_HOST_RPC_MAX_HOST_PATH];
     char tail[R36SX_HOST_RPC_MAX_PATH];
     char segment[R36SX_HOST_RPC_MAX_PATH];
@@ -1194,6 +1196,14 @@ static void r36sx_host_rpc_execute_request(void)
 static void r36sx_host_rpc_portout(uint16_t portnum, uint8_t value)
 {
     switch (portnum - R36SX_HOST_RPC_PORT_BASE) {
+        case 0x02:
+            if (value == 1u) {
+                r36sx_host_rpc_execute_request();
+            } else {
+                r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
+                r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
+            }
+            break;
         case 0x04:
             r36sx_host_rpc_request_addr =
                 (r36sx_host_rpc_request_addr & 0xFFFFFF00u) | value;
@@ -1212,14 +1222,6 @@ static void r36sx_host_rpc_portout(uint16_t portnum, uint8_t value)
             r36sx_host_rpc_request_addr =
                 (r36sx_host_rpc_request_addr & 0x00FFFFFFu) |
                 ((uint32_t)value << 24);
-            break;
-        case 0x08:
-            if (value == 1u) {
-                r36sx_host_rpc_execute_request();
-            } else {
-                r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
-                r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
-            }
             break;
         default:
             break;
@@ -1245,9 +1247,9 @@ static uint8_t r36sx_host_rpc_portin(uint16_t portnum)
             return (uint8_t)(r36sx_host_rpc_request_addr >> 16);
         case 0x07:
             return (uint8_t)(r36sx_host_rpc_request_addr >> 24);
-        case 0x09:
+        case 0x08:
             return (uint8_t)r36sx_host_rpc_last_result;
-        case 0x0A:
+        case 0x09:
             return (uint8_t)(r36sx_host_rpc_last_result >> 8);
         default:
             return 0xFFu;

@@ -27,18 +27,19 @@
     cpu 8086
 
 ; HOSTRPC I/O ports.  The emulator exposes a tiny device here:
-;   E360/E361 return signature bytes 'R'/'H'.
-;   E364..E367 receive the physical address of the request block.
-;   E368 executes the command currently stored in that request block.
+;   E360/E361 return signature bytes 'R'/'H' and can be read as one word.
+;   E362 executes the command currently stored in the request block.
+;   E363 returns status, so command/status sit on one 16-bit I/O pair.
+;   E364..E367 receive the physical request-block address, little-endian.
 PORT_BASE       equ 0E360h
 PORT_ID0        equ PORT_BASE + 0
 PORT_ID1        equ PORT_BASE + 1
+PORT_COMMAND    equ PORT_BASE + 2
 PORT_STATUS     equ PORT_BASE + 3
 PORT_ADDR0      equ PORT_BASE + 4
 PORT_ADDR1      equ PORT_BASE + 5
 PORT_ADDR2      equ PORT_BASE + 6
 PORT_ADDR3      equ PORT_BASE + 7
-PORT_COMMAND    equ PORT_BASE + 8
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
