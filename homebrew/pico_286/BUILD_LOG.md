@@ -1,5 +1,55 @@
 # pico-286 Build Log
 
+## 2026-06-05 hdd2 FAT16 rebuild
+
+Investigated failed guest-to-host copies where Volkov Commander printed
+`Run chkdsk: Bad FAT I/O: 0x000000dd` while copying from the guest `D:` disk.
+The HOSTRPC log showed the destination host file was created successfully, but
+no HOSTRPC `WRITE` request followed, so the failure happened while DOS was
+reading the source guest disk.
+
+External `mtools` reproduced the source-disk problem:
+
+```bash
+MTOOLS_SKIP_CHECK=0 mdir -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2.hdd@@16384 ::/
+```
+
+The old `hdd2.hdd` partition boot sector was FAT16 with 4 sectors per cluster
+on a 200 MB partition.  That produces about 102,183 data clusters, which is too
+many for FAT16.  A temporary read-only FAT16 parser recovered the existing
+files without warnings:
+
+```text
+recovered files=445 dirs=25 bytes=48696665 warnings=0
+```
+
+The image was rebuilt with the same MBR/partition size, but a valid FAT16
+layout using 8 sectors per cluster:
+
+```bash
+cp patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2.hdd .tmp/hdd2_new.hdd
+mkfs.fat -F 16 -s 8 -S 512 -f 2 -r 512 -h 32 -n "R36SX HDD2" --offset=32 .tmp/hdd2_new.hdd
+MTOOLS_SKIP_CHECK=0 mcopy -s -o -i .tmp/hdd2_new.hdd@@16384 .tmp/hdd2_recovered/* ::/
+```
+
+Verification:
+
+```bash
+dd if=.tmp/hdd2_new.hdd of=.tmp/hdd2_new_part.img bs=4M skip=16384 iflag=skip_bytes status=none
+fsck.fat -vn .tmp/hdd2_new_part.img
+MTOOLS_SKIP_CHECK=0 mcopy -n -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2.hdd@@16384 ::/SUPAPLEX/ADLIB.SND /tmp/r36sx_adlib_final.snd
+```
+
+Result:
+
+- Old corrupted-image backup: `.tmp/hdd2_corrupt_backup.hdd`
+- Old SHA256: `7C72965E5EDBEF367678BBB8D508C842FDE098CE9E0F223901EDDF5DE5EA4550`
+- New patch image: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2.hdd`
+- New SHA256: `5DF281B26FEC5F86ED1F227EEEE721C97EEA219F75CC7F422D5CA0A05E8E75AE`
+- `SUPAPLEX/ADLIB.SND` SHA256 after reading from the rebuilt image:
+  `c4fe7865157ee8f98282a847f055ef8ff5b75a729aed82b49913220a8fb5cf44`
+- `fsck.fat -n`: no filesystem errors; 51,141 data clusters.
+
 ## 2026-06-05 HOSTDRV SHSUCDX-style find state marker
 
 Compared HOSTDRV's find-first/find-next DTA/SDB state with SHSUCDX.  SHSUCDX
