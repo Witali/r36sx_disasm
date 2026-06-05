@@ -1,6 +1,6 @@
 param(
     [string]$InputPath = ".\BIOS\pcxtbios_init_annotated.asm",
-    [string]$OutputPath = ".\BIOS\pcxtbios_init_annotated_nasm.asm"
+    [string]$OutputPath = ".\homebrew\pico_286\bios\pcxtbios_init_annotated_nasm.asm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,7 +97,7 @@ $Output.Add("; Address prefixes are converted to loc_XXXX labels; unlisted gaps 
 $Output.Add("; byte-preserved from BIOS/pcxtbios.bin so the output can still rebuild") | Out-Null
 $Output.Add("; the complete 8 KiB ROM while selected init code is assembled as text.") | Out-Null
 $Output.Add(";") | Out-Null
-$Output.Add("; Build: nasm -f bin BIOS/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin") | Out-Null
+$Output.Add("; Build: nasm -f bin homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin") | Out-Null
 $Output.Add("bits 16") | Out-Null
 $Output.Add("org 0xe000") | Out-Null
 $Output.Add("") | Out-Null

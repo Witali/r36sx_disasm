@@ -3,7 +3,7 @@
 ; byte-preserved from BIOS/pcxtbios.bin so the output can still rebuild
 ; the complete 8 KiB ROM while selected init code is assembled as text.
 ;
-; Build: nasm -f bin BIOS/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin
+; Build: nasm -f bin homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin
 bits 16
 org 0xe000
 
