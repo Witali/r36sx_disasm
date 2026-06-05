@@ -10,12 +10,18 @@ $RepoRoot = Resolve-Path (Join-Path $PicoRoot "..\..")
 if ($LASTEXITCODE -ne 0) {
     throw "test386 build failed with exit code $LASTEXITCODE."
 }
+& (Join-Path $TestsRoot "build_test286_r36sx.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "test286 build failed with exit code $LASTEXITCODE."
+}
 
 $CreateFat = Join-Path $RepoRoot "tools\create_fat12_floppy.py"
 $ImagesDir = Join-Path $PicoRoot "images"
 $OutputImage = Join-Path $ImagesDir "cpu_tests.img"
 $Test386Bin = Join-Path $TestsRoot "test386.asm\build\test386.bin"
+$Test286Bin = Join-Path $TestsRoot "test286.asm\build\test286.bin"
 $ExeSideTest386Bin = Join-Path $PicoRoot "test386.bin"
+$ExeSideTest286Bin = Join-Path $PicoRoot "test286.bin"
 $Readme = Join-Path $PicoRoot "dos_files\cpu_tests_readme.txt"
 $PcjsRoot = Join-Path $RepoRoot "internet_sources\pcjs_cpu_tests\software\pcx86\test\cpu"
 
@@ -34,6 +40,7 @@ python $CreateFat `
     --file "ID.COM=$(Join-Path $PcjsRoot 'bin\id.com')" `
     --file "TEST386.COM=$(Join-Path $PcjsRoot 'bin\test386.com')" `
     --file "TEST386.BIN=$Test386Bin" `
+    --file "TEST286.BIN=$Test286Bin" `
     --file "CPUID.ASM=$(Join-Path $PcjsRoot 'cpuid.asm')" `
     --file "ID.ASM=$(Join-Path $PcjsRoot 'id.asm')" `
     --file "README.TXT=$Readme"
@@ -44,6 +51,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath $Test386Bin -Destination $ExeSideTest386Bin -Force
 Write-Host "Copied $ExeSideTest386Bin"
+Copy-Item -LiteralPath $Test286Bin -Destination $ExeSideTest286Bin -Force
+Write-Host "Copied $ExeSideTest286Bin"
 
 $Hash = Get-FileHash -Algorithm SHA256 -LiteralPath $OutputImage
 $Item = Get-Item -LiteralPath $OutputImage

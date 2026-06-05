@@ -52,6 +52,38 @@ work.  `rebuild_cpu_tests_disk.ps1` also copies the same ROM to
 `homebrew/pico_286/test386.bin`, which is the default `test_bios_rom` used by
 the native executable.
 
+## test286.asm
+
+`test286.asm` is a small R36SX-specific NASM BIOS replacement ROM for 80286
+smoke testing.  It is not a full instruction conformance suite like
+`test386.asm`; it focuses on compact POST-driven coverage for 286 behavior:
+
+- real-mode `PUSH SP`, `PUSHA`/`POPA`, 5-bit shift-count masking, `IMUL`,
+  `BOUND`, `SGDT`, `SIDT`, and `SMSW`;
+- raw protected-mode entry through `LMSW` and a far jump;
+- protected-mode `LSL`, `LAR`, `VERR`, `VERW`, and `ARPL` descriptor checks.
+
+Build the ROM payload with:
+
+```powershell
+.\homebrew\pico_286\tests\build_test286_r36sx.ps1
+```
+
+The script uses the local NASM 3.01 executable:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\tests\test286.asm\src\ -f bin .\homebrew\pico_286\tests\test286.asm\src\test286.asm -w-all -l .\homebrew\pico_286\tests\test286.asm\build\test286.lst -o .\homebrew\pico_286\tests\test286.asm\build\test286.bin
+```
+
+The generated `test286.bin` is also 64 KB and is copied to
+`homebrew/pico_286/test286.bin`, so it can be selected with:
+
+```ini
+bios=test286
+test_bios_rom=test286.bin
+cpu_model=80286
+```
+
 ## MAPDRIVE.COM
 
 `homebrew/pico_286/pico-286/tools/mapdrive.asm` is the standalone DOS utility
