@@ -22,6 +22,6 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
    attribute bits and packed DOS date/time values.
 - [ ] Strengthen "not for us" checks for every path/SFT/DTA callback and chain to
    the previous `INT 2Fh` handler when the request belongs to another redirector.
-- [ ] Audit `clear_request`: it uses `rep stosw`, which writes through `ES:DI`.
+- [x] Audit `clear_request`: it uses `rep stosw`, which writes through `ES:DI`.
    Ensure it always targets the resident request block in `CS`, not the caller's
    `ES` from DOS redirector callbacks.

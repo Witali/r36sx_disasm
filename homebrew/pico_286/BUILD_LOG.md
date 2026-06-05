@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV clear request segment fix
+
+Fixed the final `HOSTDRV_TODO.md` audit item: `clear_request` now sets `ES=CS`
+before clearing the resident request block with `rep stosw`.  DOS redirector
+callbacks may enter with `ES` pointing at caller-owned SFT/DTA data, so the
+helper now saves and restores `ES` explicitly.
+
+Rebuilt the DOS driver:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified patch copy and in-image copy:
+
+```text
+8f8ba977805140d2c408ca762f82babb287933031b90e6c2d342b95c895b6a0b  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTRPC port pair layout
 
 Reordered the private HOSTRPC I/O ports to make 16-bit guest I/O more natural:

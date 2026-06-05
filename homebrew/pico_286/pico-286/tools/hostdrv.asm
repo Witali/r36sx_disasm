@@ -1107,17 +1107,22 @@ copy_sda_string:
     ret
 
 clear_request:
-    ; Reset the request block before each HOSTRPC operation.  This prevents
-    ; stale path/data/handle fields from leaking between redirector callbacks.
+    ; Reset the resident request block before each HOSTRPC operation.  DOS
+    ; redirector callbacks often enter with ES pointing at caller-owned SFT/DTA
+    ; data, so make ES explicitly match CS before using rep stosw through ES:DI.
     push ax
     push cx
     push di
+    push es
+    push cs
+    pop es
     xor ax, ax
     mov di, request
     mov cx, REQ_SIZE / 2
     rep stosw
     mov word [request + REQ_MAGIC], RPC_MAGIC
     mov word [request + REQ_VERSION], RPC_VERSION
+    pop es
     pop di
     pop cx
     pop ax
