@@ -8,6 +8,7 @@
 
     org 100h
     bits 16
+    cpu 8086
 
 PORT_BASE       equ 0E360h
 PORT_ID0        equ PORT_BASE + 0
@@ -135,14 +136,18 @@ store_phys:
     ; Input: SI = near offset, DI = dword destination in the request block.
     push ax
     push bx
+    push cx
     mov ax, cs
     mov bx, ax
-    shl ax, 4
-    shr bx, 12
+    mov cl, 4
+    shl ax, cl
+    mov cl, 12
+    shr bx, cl
     add ax, si
     adc bx, 0
     mov [di], ax
     mov [di + 2], bx
+    pop cx
     pop bx
     pop ax
     ret

@@ -10,6 +10,7 @@
 
     org 100h
     bits 16
+    cpu 8086
 
 PORT_BASE       equ 0E360h
 PORT_ID0        equ PORT_BASE + 0
@@ -137,7 +138,8 @@ start:
 
     mov dx, resident_end
     add dx, 15
-    shr dx, 4
+    mov cl, 4
+    shr dx, cl
     mov ax, 3100h
     int 21h
 
@@ -693,13 +695,17 @@ store_far_phys:
     ; AX = segment, SI = offset, DI = dword destination in request.
     push ax
     push bx
+    push cx
     mov bx, ax
-    shl ax, 4
-    shr bx, 12
+    mov cl, 4
+    shl ax, cl
+    mov cl, 12
+    shr bx, cl
     add ax, si
     adc bx, 0
     mov [di], ax
     mov [di + 2], bx
+    pop cx
     pop bx
     pop ax
     ret

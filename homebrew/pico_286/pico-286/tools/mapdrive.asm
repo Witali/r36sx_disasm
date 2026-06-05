@@ -16,6 +16,7 @@
 
     org 100h
     use16
+    cpu 8086
 
     ; Constants
     DEFAULT_DRIVE_LETTER equ 'H'
