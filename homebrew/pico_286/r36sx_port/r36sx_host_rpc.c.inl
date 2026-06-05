@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include "findfirst.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -40,8 +41,10 @@
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
 #define R36SX_HOST_RPC_VERSION 1u
 #define R36SX_HOST_RPC_MAX_FILES 32u
+#define R36SX_HOST_RPC_MAX_FINDS 16u
 #define R36SX_HOST_RPC_MAX_PATH 260u
 #define R36SX_HOST_RPC_MAX_HOST_PATH 512u
+#define R36SX_HOST_RPC_FIND_RESULT_SIZE 20u
 
 #define R36SX_HOST_RPC_STATUS_IDLE 0x00u
 #define R36SX_HOST_RPC_STATUS_DONE 0x01u
@@ -59,6 +62,11 @@ typedef enum {
     R36SX_HOST_RPC_CMD_MKDIR = 8,
     R36SX_HOST_RPC_CMD_RMDIR = 9,
     R36SX_HOST_RPC_CMD_GETATTR = 10,
+    R36SX_HOST_RPC_CMD_RENAME = 11,
+    R36SX_HOST_RPC_CMD_COMMIT = 12,
+    R36SX_HOST_RPC_CMD_FIND_FIRST = 13,
+    R36SX_HOST_RPC_CMD_FIND_NEXT = 14,
+    R36SX_HOST_RPC_CMD_FIND_CLOSE = 15,
 } r36sx_host_rpc_command_t;
 
 typedef enum {
@@ -95,6 +103,8 @@ static uint32_t r36sx_host_rpc_request_addr;
 static uint8_t r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_IDLE;
 static uint16_t r36sx_host_rpc_last_result = R36SX_HOST_RPC_OK;
 static FILE *r36sx_host_rpc_files[R36SX_HOST_RPC_MAX_FILES];
+static intptr_t r36sx_host_rpc_finds[R36SX_HOST_RPC_MAX_FINDS];
+static uint8_t r36sx_host_rpc_find_active[R36SX_HOST_RPC_MAX_FINDS];
 
 static inline int r36sx_host_rpc_ram_range_ok(uint32_t address, size_t bytes)
 {
@@ -341,6 +351,92 @@ static int r36sx_host_rpc_free_handle(void)
     return -1;
 }
 
+static int r36sx_host_rpc_free_find_handle(void)
+{
+    for (unsigned i = 0; i < R36SX_HOST_RPC_MAX_FINDS; ++i) {
+        if (!r36sx_host_rpc_find_active[i]) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
+static void r36sx_host_rpc_close_find_handle(uint16_t handle)
+{
+    if (handle >= R36SX_HOST_RPC_MAX_FINDS ||
+        !r36sx_host_rpc_find_active[handle]) {
+        return;
+    }
+    _findclose(r36sx_host_rpc_finds[handle]);
+    r36sx_host_rpc_finds[handle] = 0;
+    r36sx_host_rpc_find_active[handle] = 0;
+}
+
+static void r36sx_host_rpc_to_dos_name(const char *input, uint8_t *output)
+{
+    int i;
+    int j;
+
+    if (!input || !output) {
+        return;
+    }
+    memset(output, ' ', 11);
+    if (strcmp(input, ".") == 0) {
+        output[0] = '.';
+        return;
+    }
+    if (strcmp(input, "..") == 0) {
+        output[0] = '.';
+        output[1] = '.';
+        return;
+    }
+
+    for (i = 0, j = 0; input[i] && input[i] != '.' && j < 8; ++i) {
+        if (input[i] != ' ') {
+            output[j++] = (uint8_t)toupper((unsigned char)input[i]);
+        }
+    }
+    while (input[i] && input[i] != '.') {
+        ++i;
+    }
+    if (input[i] == '.') {
+        ++i;
+        for (j = 8; input[i] && j < 11; ++i) {
+            if (input[i] != ' ') {
+                output[j++] = (uint8_t)toupper((unsigned char)input[i]);
+            }
+        }
+    }
+}
+
+static int r36sx_host_rpc_store_find_result(uint32_t address,
+                                            uint32_t bytes,
+                                            const struct _finddata_t *fileinfo)
+{
+    uint16_t attr;
+    uint32_t size;
+
+    if (!fileinfo || bytes < R36SX_HOST_RPC_FIND_RESULT_SIZE ||
+        !r36sx_host_rpc_ram_range_ok(address,
+                                     R36SX_HOST_RPC_FIND_RESULT_SIZE)) {
+        return 0;
+    }
+
+    /*
+     * The guest redirector wants the same compact data that DOS puts into
+     * the DTA: an 11-byte 8.3 name, attribute byte, time, date, and size.
+     * Timestamps stay deterministic for now, matching the legacy redirector.
+     */
+    r36sx_host_rpc_to_dos_name(fileinfo->name, &RAM[address]);
+    attr = (uint16_t)(fileinfo->attrib & 0xffu);
+    size = (uint32_t)fileinfo->size;
+    RAM[address + 11u] = (uint8_t)attr;
+    r36sx_host_rpc_write_u16(address + 12u, 0x1000u);
+    r36sx_host_rpc_write_u16(address + 14u, 0x1000u);
+    r36sx_host_rpc_write_u32(address + 16u, size);
+    return 1;
+}
+
 static void r36sx_host_rpc_finish(r36sx_host_rpc_request_t *req,
                                   uint16_t result, uint16_t dos_error)
 {
@@ -436,6 +532,23 @@ static void r36sx_host_rpc_execute_request(void)
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
 
+        case R36SX_HOST_RPC_CMD_COMMIT:
+            if (req.handle >= R36SX_HOST_RPC_MAX_FILES ||
+                !r36sx_host_rpc_files[req.handle]) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_HANDLE, 6);
+                break;
+            }
+            errno = 0;
+            if (fflush(r36sx_host_rpc_files[req.handle]) != 0) {
+                err = errno ? errno : EIO;
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
+                                      r36sx_host_rpc_dos_error_from_errno(err,
+                                                                          1));
+                break;
+            }
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+
         case R36SX_HOST_RPC_CMD_READ:
         case R36SX_HOST_RPC_CMD_WRITE: {
             FILE *fp;
@@ -482,6 +595,32 @@ static void r36sx_host_rpc_execute_request(void)
             break;
         }
 
+        case R36SX_HOST_RPC_CMD_RENAME: {
+            char guest_path2[R36SX_HOST_RPC_MAX_PATH];
+            char host_path2[R36SX_HOST_RPC_MAX_HOST_PATH];
+            if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
+                                             sizeof(guest_path)) ||
+                !r36sx_host_rpc_guest_string(req.path2_phys, guest_path2,
+                                             sizeof(guest_path2)) ||
+                !r36sx_host_rpc_build_host_path(guest_path, host_path,
+                                                sizeof(host_path)) ||
+                !r36sx_host_rpc_build_host_path(guest_path2, host_path2,
+                                                sizeof(host_path2))) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
+                break;
+            }
+            errno = 0;
+            if (rename(host_path, host_path2) != 0) {
+                err = errno ? errno : EIO;
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
+                                      r36sx_host_rpc_dos_error_from_errno(err,
+                                                                          1));
+                break;
+            }
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+        }
+
         case R36SX_HOST_RPC_CMD_DELETE:
         case R36SX_HOST_RPC_CMD_MKDIR:
         case R36SX_HOST_RPC_CMD_RMDIR:
@@ -506,7 +645,7 @@ static void r36sx_host_rpc_execute_request(void)
                 rc = stat(host_path, &st);
                 if (rc == 0) {
                     req.file_size = (uint32_t)st.st_size;
-                    req.attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x00u;
+                    req.attr = (st.st_mode & S_IFDIR) ? 0x10u : 0x20u;
                 }
             }
             if (rc != 0) {
@@ -520,6 +659,80 @@ static void r36sx_host_rpc_execute_request(void)
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
             break;
         }
+
+        case R36SX_HOST_RPC_CMD_FIND_FIRST: {
+            struct _finddata_t fileinfo;
+            intptr_t host_find;
+            int handle;
+            if (!r36sx_host_rpc_guest_string(req.path_phys, guest_path,
+                                             sizeof(guest_path)) ||
+                !r36sx_host_rpc_build_host_path(guest_path, host_path,
+                                                sizeof(host_path))) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_PATH, 3);
+                break;
+            }
+            handle = r36sx_host_rpc_free_find_handle();
+            if (handle < 0) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_NO_FREE_HANDLE,
+                                      4);
+                break;
+            }
+            errno = 0;
+            host_find = _findfirst(host_path, &fileinfo);
+            if (host_find == (intptr_t)-1) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO, 18);
+                break;
+            }
+            if (!r36sx_host_rpc_store_find_result(req.data_phys, req.data_len,
+                                                  &fileinfo)) {
+                _findclose(host_find);
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_ADDRESS, 8);
+                break;
+            }
+            r36sx_host_rpc_finds[handle] = host_find;
+            r36sx_host_rpc_find_active[handle] = 1;
+            req.handle = (uint16_t)handle;
+            req.attr = (uint16_t)(fileinfo.attrib & 0xffu);
+            req.file_size = (uint32_t)fileinfo.size;
+            req.bytes_done = R36SX_HOST_RPC_FIND_RESULT_SIZE;
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+        }
+
+        case R36SX_HOST_RPC_CMD_FIND_NEXT: {
+            struct _finddata_t fileinfo;
+            if (req.handle >= R36SX_HOST_RPC_MAX_FINDS ||
+                !r36sx_host_rpc_find_active[req.handle]) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_HANDLE, 6);
+                break;
+            }
+            errno = 0;
+            if (_findnext(r36sx_host_rpc_finds[req.handle], &fileinfo) != 0) {
+                r36sx_host_rpc_close_find_handle(req.handle);
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO, 18);
+                break;
+            }
+            if (!r36sx_host_rpc_store_find_result(req.data_phys, req.data_len,
+                                                  &fileinfo)) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_ADDRESS, 8);
+                break;
+            }
+            req.attr = (uint16_t)(fileinfo.attrib & 0xffu);
+            req.file_size = (uint32_t)fileinfo.size;
+            req.bytes_done = R36SX_HOST_RPC_FIND_RESULT_SIZE;
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
+        }
+
+        case R36SX_HOST_RPC_CMD_FIND_CLOSE:
+            if (req.handle >= R36SX_HOST_RPC_MAX_FINDS ||
+                !r36sx_host_rpc_find_active[req.handle]) {
+                r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_HANDLE, 6);
+                break;
+            }
+            r36sx_host_rpc_close_find_handle(req.handle);
+            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
+            break;
 
         default:
             r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_REQUEST, 1);

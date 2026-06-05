@@ -66,6 +66,24 @@ struct host_rpc_request {
 | `8` | Mkdir | Creates directory `path_phys`. |
 | `9` | Rmdir | Removes directory `path_phys`. |
 | `10` | Getattr | Returns file size and DOS directory attr bit. |
+| `11` | Rename | Renames `path_phys` to `path2_phys`. |
+| `12` | Commit | Flushes the open file in `handle`. |
+| `13` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
+| `14` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
+| `15` | Find close | Closes a search handle from find first. |
+
+Find commands write this fixed 20-byte result into `data_phys`, provided
+`data_len >= 20`:
+
+```c
+struct host_rpc_find_result {
+    uint8_t name[11]; /* DOS 8.3 padded name */
+    uint8_t attr;
+    uint16_t time;    /* currently deterministic placeholder 0x1000 */
+    uint16_t date;    /* currently deterministic placeholder 0x1000 */
+    uint32_t size;
+};
+```
 
 The current implementation resolves all guest paths inside
 `host_drive_path`.  `..` components are allowed only inside that mapped root,
@@ -80,3 +98,8 @@ writes one line, and closes it.
 This is only a diagnostic program.  The next step is a resident DOS
 redirector/driver that owns `INT 2Fh AH=11h` and translates DOS redirector
 callbacks into these host RPC requests.
+
+The resident redirector should be built as a DOS driver/TSR that can be loaded
+high.  Prefer a `HOSTDRV.SYS` form loaded with `DEVICEHIGH=` when UMBs are
+available, so the file bridge does not permanently consume conventional DOS
+memory.
