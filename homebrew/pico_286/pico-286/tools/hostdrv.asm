@@ -88,6 +88,11 @@ REQ_SIZE        equ 48
 ; HOSTRPC request flags.
 REQ_FLAG_CREATE_NEW equ 0001h
 
+; DOS error codes returned through redirected INT 2Fh callbacks.
+DOS_ERR_INVALID_FUNCTION equ 1
+DOS_ERR_FILE_NOT_FOUND   equ 2
+DOS_ERR_FILE_EXISTS      equ 80
+
 ; Default mapping is H:, matching the project documentation.  DOS drive
 ; numbers are zero-based: A=0, B=1, ..., H=7.
 DEFAULT_DRIVE_LETTER equ 'H'
@@ -110,6 +115,16 @@ CDSFLAG_NET_PHY      equ 0C000h
 ; image follows the DOS 4+ layout used here.
 FIRST_FILENAME_OFF   equ 09Eh
 SECOND_FILENAME_OFF  equ 016Ah
+; INT 21h/AX=6C00h stores its extended-open parameters in the DOS 4+ SDA.
+; DOS forwards them to redirectors through INT 2Fh/AX=112Eh.
+SDA_EXT_OPEN_ACTION  equ 02DDh
+SDA_EXT_OPEN_ATTR    equ 02DFh
+SDA_EXT_OPEN_MODE    equ 02E1h
+
+; INT 21h/AX=6C00h success status returned in CX.
+EXT_STATUS_OPENED    equ 1
+EXT_STATUS_CREATED   equ 2
+EXT_STATUS_REPLACED  equ 3
 
 ; System File Table (SFT) fields that DOS passes in ES:DI for open files.
 ; HOSTDRV stores the host-side handle in SFT_FILE_HANDLE and keeps the DOS file
@@ -285,6 +300,8 @@ int2f_handler:
     je redir_success
     cmp ax, 1121h
     je redir_seek_end
+    cmp ax, 112Eh
+    je redir_ext_open_create
 
     pop si
     pop es
@@ -369,16 +386,8 @@ redir_open:
     ; Access bits 0..2 match INT 21h/AH=3Dh: 0=read, 1=write, 2=read/write,
     ; 3=internal EXEC/case-sensitive open.  Only true write-capable opens use
     ; HOSTRPC OPEN_RW; EXEC/internal mode remains read-only.
-    mov al, CMD_OPEN_RO
     mov bx, [bp + REDIR_STACK_PARAM1]
-    and bl, 07h
-    cmp bl, 1
-    je .write_open
-    cmp bl, 2
-    jne .go
-.write_open:
-    mov al, CMD_OPEN_RW
-.go:
+    call select_open_command_from_mode
     call rpc_open_common
     jmp redir_from_rpc
 
@@ -386,9 +395,107 @@ redir_create:
     ; RBIL: AX=1117h receives a create-mode stack word.  The low byte is the
     ; file attributes; high byte 01h means "create new" and must fail if the
     ; file already exists.
+    mov bx, [bp + REDIR_STACK_PARAM1]
     mov al, CMD_CREATE
     call rpc_open_common
     jmp redir_from_rpc
+
+redir_ext_open_create:
+    ; DOS 4+ extended open/create (INT 21h/AX=6C00h) reaches redirectors here.
+    ; RBIL documents the action/mode fields in the SDA and the create
+    ; attributes on the redirector stack.  The SDA attribute is preferred
+    ; because some DOS versions pass a stale stack attribute for action 11h.
+    mov ax, SDA_EXT_OPEN_ACTION
+    call load_sda_word
+    jc .bad_sda
+    mov [ext_open_action], ax
+    mov ax, SDA_EXT_OPEN_MODE
+    call load_sda_word
+    jc .bad_sda
+    mov [ext_open_mode], ax
+    mov ax, SDA_EXT_OPEN_ATTR
+    call load_sda_word
+    jnc .have_attr
+    mov ax, [bp + REDIR_STACK_PARAM1]
+.have_attr:
+    ; INT 21h/6C create attributes use only bits 0..5.  Keep reserved bits out
+    ; of HOSTRPC and the SFT so DOS does not see impossible file attributes.
+    and ax, 003Fh
+    mov [ext_open_attr], ax
+
+    ; Probe existence first, then apply the extended action matrix:
+    ; low nibble = if file exists, high nibble = if file does not exist.
+    mov al, CMD_GETATTR
+    call rpc_path_command
+    jc redir_from_rpc
+    cmp word [request + REQ_RESULT], 0
+    jne .missing
+
+.exists:
+    mov ax, [ext_open_action]
+    and al, 0Fh
+    cmp al, 0
+    je .exists_fail
+    cmp al, 1
+    je .exists_open
+    cmp al, 2
+    je .exists_replace
+    jmp .bad_action
+
+.exists_open:
+    mov bx, [ext_open_mode]
+    call select_open_command_from_mode
+    mov word [ext_open_status], EXT_STATUS_OPENED
+    call rpc_open_common
+    mov cx, [ext_open_status]
+    jmp redir_from_rpc
+
+.exists_replace:
+    mov bx, [ext_open_attr]
+    mov al, CMD_CREATE
+    mov word [ext_open_status], EXT_STATUS_REPLACED
+    call rpc_open_common
+    mov cx, [ext_open_status]
+    jmp redir_from_rpc
+
+.exists_fail:
+    mov ax, DOS_ERR_FILE_EXISTS
+    jmp redir_fail
+
+.missing:
+    mov ax, [request + REQ_DOS_ERROR]
+    cmp ax, 0
+    jne .store_missing_error
+    mov ax, DOS_ERR_FILE_NOT_FOUND
+.store_missing_error:
+    mov [ext_open_missing_error], ax
+    mov ax, [ext_open_action]
+    and al, 0F0h
+    cmp al, 0
+    je .missing_fail
+    cmp al, 10h
+    je .missing_create
+    jmp .bad_action
+
+.missing_create:
+    mov bx, [ext_open_attr]
+    mov al, CMD_CREATE
+    mov word [ext_open_status], EXT_STATUS_CREATED
+    call rpc_open_common
+    mov cx, [ext_open_status]
+    jmp redir_from_rpc
+
+.missing_fail:
+    mov ax, [ext_open_missing_error]
+    jmp redir_fail
+
+.bad_sda:
+    mov ax, DOS_ERR_INVALID_FUNCTION
+    jmp redir_fail
+
+.bad_action:
+    mov ax, DOS_ERR_INVALID_FUNCTION
+    jmp redir_fail
 
 redir_close:
     ; Close releases the host-side file handle and marks the DOS SFT slot as
@@ -556,9 +663,28 @@ rpc_path_command:
     call execute_request
     ret
 
+select_open_command_from_mode:
+    ; BX = DOS open mode, return AL = HOSTRPC open command.  Preserve BX so the
+    ; caller can pass the exact documented mode word through REQ_MODE.
+    push dx
+    mov al, CMD_OPEN_RO
+    mov dx, bx
+    and dl, 07h
+    cmp dl, 1
+    je .write_open
+    cmp dl, 2
+    jne .done
+.write_open:
+    mov al, CMD_OPEN_RW
+.done:
+    pop dx
+    ret
+
 rpc_open_common:
     ; Common open/create path.  On success HOSTRPC returns an opaque handle and
-    ; file size.  fill_sft_from_request publishes that state to DOS in ES:DI.
+    ; file size.  AL contains the HOSTRPC command and BX contains the DOS
+    ; open/create mode word.  fill_sft_from_request publishes the state to DOS
+    ; in ES:DI.
     push ax
     call clear_request
     pop ax
@@ -566,7 +692,6 @@ rpc_open_common:
     push dx
     xor ah, ah
     mov [request + REQ_COMMAND], ax
-    mov bx, [bp + REDIR_STACK_PARAM1]
     mov [request + REQ_MODE], bx
     mov word [request + REQ_FLAGS], 0
     mov word [request + REQ_ATTR], 0
@@ -598,6 +723,7 @@ rpc_open_common:
     cmp word [request + REQ_RESULT], 0
     jne .done
     call fill_sft_from_request
+    clc
 .done:
     pop dx
     pop bx
@@ -898,6 +1024,27 @@ store_dta_phys:
     pop ax
     ret
 
+load_sda_word:
+    ; AX = SDA-relative offset, returns AX = word from DOS' SDA.  ES is
+    ; preserved because redirector callbacks keep the caller's SFT in ES:DI.
+    push bx
+    push es
+    mov bx, [sda_seg]
+    cmp bx, 0
+    je .fail
+    mov es, bx
+    mov bx, [sda_off]
+    add bx, ax
+    mov ax, [es:bx]
+    clc
+    jmp .done
+.fail:
+    stc
+.done:
+    pop es
+    pop bx
+    ret
+
 copy_sda_string:
     ; AX = SDA-relative inline filename offset, DI = destination in CS.
     ; The 127-byte limit keeps path_buf/path2_buf NUL-terminated and avoids
@@ -1169,6 +1316,11 @@ sda_off      dw 0
 device_info  dw 8048h
 sft_open_mode dw 0FF02h
 sft_file_attr dw 0020h
+ext_open_action dw 0
+ext_open_mode dw 0
+ext_open_attr dw 0
+ext_open_status dw 0
+ext_open_missing_error dw DOS_ERR_FILE_NOT_FOUND
 phys_tmp     dd 0
 
 drive_letter db DEFAULT_DRIVE_LETTER

@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV extended open/create
+
+Implemented the third `HOSTDRV_TODO.md` item: `hostdrv.asm` now handles
+`INT 2Fh AX=112Eh`, the DOS 4+ extended open/create redirector callback used
+by `INT 21h AX=6C00h`.  The handler reads action/mode/attribute words from the
+DOS 4+ SDA, probes file existence through HOSTRPC `GETATTR`, then reuses the
+existing SFT fill path for open/create/truncate and returns the documented
+`CX = 1/2/3` opened/created/replaced status.
+
+Rebuilt the DOS driver:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside the FAT16 partition in
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd` through
+WSL loop mount at partition offset `32256` bytes, then verified the in-image
+file against the patch copy:
+
+```text
+8e709fa372246742f15d1f788e29a801fd3ae4ccb4e210761e4e971d43e37365  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV guest-to-host copy I/O error pass
 
 Reviewed `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.log`

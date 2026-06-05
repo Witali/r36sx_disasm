@@ -26,6 +26,7 @@ reference while implementing `hostdrv.asm`.
 | [`INT 2Fh AX=111Bh` findfirst](https://fd.lod.bz/rbil/interrup/network/2f111b.html) | Start directory enumeration and write the first result into the caller's DTA/search data. |
 | [`INT 2Fh AX=111Ch` findnext](https://fd.lod.bz/rbil/interrup/network/2f111c.html) | Continue directory enumeration using redirector-maintained find state. |
 | [`INT 2Fh AX=1122h` process termination hook](https://fd.lod.bz/rbil/interrup/network/2f1122.html) | DOS termination path. DOS may subsequently issue `111Dh`; correct cleanup needs per-PSP ownership tracking. |
+| [`INT 2Fh AX=112Eh` extended open/create](https://fd.lod.bz/rbil/interrup/network/2f112e.html) | DOS 4+ extended open path. Read action/mode from the SDA, fill the SFT, and return `CX = 1/2/3` for opened/created/replaced. |
 | [`INT 21h AX=5D06h` get SDA](https://fd.lod.bz/rbil/interrup/dos_kernel/215d06.html) | Get the Swappable Data Area pointer. HOSTDRV uses the SDA filename buffers and current DTA pointer. |
 
 Practical notes for this project:
@@ -34,9 +35,10 @@ Practical notes for this project:
   transfer buffer.
 - Open and create callbacks receive an SFT at `ES:DI`; the redirector must fill
   the SFT, but DOS owns the SFT handle-count field until close.
+- Extended open/create (`112Eh`) uses the same SFT fill path, but its
+  open/create decision comes from the DOS 4+ SDA action and mode words.
 - Find-first/find-next results must be written into the DTA search-data area;
   the first byte marks a remote search result by setting bit 7.
 - `111Dh` is intentionally not handled yet in `hostdrv.asm`. A correct
   implementation must close only handles owned by the terminating PSP instead
   of blindly closing every host handle.
-

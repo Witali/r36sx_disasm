@@ -8,7 +8,7 @@ with FreeDOS SHSUCDX and RBIL `INT 2Fh/AH=11h` redirector notes.
    which avoids nested or repeated searches trampling each other.
 - [x] Implement `INT 2Fh AX=1116h` and `AX=1117h` stack parameters properly:
    access/share mode, create attributes, and create-new vs truncate behavior.
-- [ ] Add `INT 2Fh AX=112Eh` extended open/create support for DOS versions and
+- [x] Add `INT 2Fh AX=112Eh` extended open/create support for DOS versions and
    shells that prefer the extended redirector path.
 - [ ] Make close semantics match DOS SFT expectations: decrement the SFT reference
    count or call the DOS helper where appropriate, instead of only marking the
