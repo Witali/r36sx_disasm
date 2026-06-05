@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-05 Windows drive LED busy-state
+
+Enabled the drive LED for the Windows debug renderer and moved disk activity
+from an event pulse to an explicit busy lifetime.  The shared host disk I/O
+layer now calls `r36sx_pico286_disk_activity_begin()` immediately before
+`fseek`/`fread`/`fwrite`/`fflush` and
+`r36sx_pico286_disk_activity_end()` immediately after the host I/O completes.
+This covers CHS/LBA HDD/FDD transfers and BIOS boot-sector reads through the
+same path.
+
+The Windows renderer draws the same lower-right red LED as the device MiniFB
+renderer.  Real disk I/O keeps it solid while the operation is in progress; the
+older timed blink remains only as a fallback for any legacy event-style caller.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- SHA256: `089AAE686EFDD24DCA24D04B52403EBCB48B61AF620BA538DC951C2655C0B5CB`
+- Build succeeded with the existing `network-redirector.c.inl` unused-variable
+  warnings from debug tracing.
+
 ## 2026-06-05 hdd2 FAT16 rebuild
 
 Investigated failed guest-to-host copies where Volkov Commander printed

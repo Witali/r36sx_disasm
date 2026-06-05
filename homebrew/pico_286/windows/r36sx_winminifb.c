@@ -41,6 +41,10 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_POST_PAD 5
 #define R36SX_WIN_POST_MARGIN 8
 #define R36SX_WIN_POST_SUBCODE_PORT 0x190u
+#define R36SX_WIN_DISK_LED_HOLD_MS 350u
+#define R36SX_WIN_DISK_LED_BLINK_MS 120u
+#define R36SX_WIN_DISK_LED_RADIUS 8
+#define R36SX_WIN_DISK_LED_OUTER_RADIUS (R36SX_WIN_DISK_LED_RADIUS + 2)
 
 static HWND g_wnd;
 static HDC g_hdc;
@@ -66,6 +70,8 @@ static volatile LONG g_post_code_valid;
 static volatile LONG g_post_subcode_port;
 static volatile LONG g_post_subcode_value;
 static volatile LONG g_post_subcode_valid;
+static volatile LONG g_disk_activity_until_ms;
+static volatile LONG g_disk_activity_depth;
 
 static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
 {
@@ -125,6 +131,57 @@ static void r36sx_win_stroke_rect(uint16_t *target, int x, int y,
     r36sx_win_fill_rect(target, x, y + h - 1, w, 1, color);
     r36sx_win_fill_rect(target, x, y, 1, h, color);
     r36sx_win_fill_rect(target, x + w - 1, y, 1, h, color);
+}
+
+static int r36sx_win_disk_led_visible(uint32_t now_ms)
+{
+    /*
+     * GetTickCount wraps, so keep the same signed-delta comparison used by the
+     * device MiniFB backend.  Real disk I/O uses the busy-depth path; the
+     * timed branch is only a fallback for any older event-style callers.
+     */
+    if (InterlockedCompareExchange(&g_disk_activity_depth, 0, 0) > 0) {
+        return 1;
+    }
+    if ((int32_t)((uint32_t)g_disk_activity_until_ms - now_ms) <= 0) {
+        return 0;
+    }
+    return ((now_ms / R36SX_WIN_DISK_LED_BLINK_MS) & 1u) != 0u;
+}
+
+static void r36sx_win_draw_disk_led(uint16_t *target, uint32_t now_ms)
+{
+    const int radius = R36SX_WIN_DISK_LED_RADIUS;
+    const int outer_radius = R36SX_WIN_DISK_LED_OUTER_RADIUS;
+    const int cx = g_width - radius - 12;
+    const int cy = g_height - radius - 12;
+    const uint16_t red = 0xf800u;
+    const uint16_t dark_red = 0x6000u;
+    const uint16_t outline = 0x0000u;
+
+    if (!target || !r36sx_win_disk_led_visible(now_ms)) {
+        return;
+    }
+
+    for (int y = -outer_radius; y <= outer_radius; y++) {
+        int py = cy + y;
+        if (py < 0 || py >= g_height) {
+            continue;
+        }
+        for (int x = -outer_radius; x <= outer_radius; x++) {
+            int px = cx + x;
+            int dist2 = x * x + y * y;
+            if (px < 0 || px >= g_width) {
+                continue;
+            }
+            if (dist2 <= radius * radius) {
+                target[(size_t)py * (size_t)g_width + (size_t)px] =
+                    dist2 <= (radius - 3) * (radius - 3) ? red : dark_red;
+            } else if (dist2 <= outer_radius * outer_radius) {
+                target[(size_t)py * (size_t)g_width + (size_t)px] = outline;
+            }
+        }
+    }
 }
 
 static const uint8_t *r36sx_win_stats_glyph(char ch)
@@ -354,7 +411,23 @@ void r36sx_mfb_mark_frame_ready(void)
 
 void r36sx_pico286_disk_activity(void)
 {
-    /* The PC debug host currently keeps overlays off and logs disk activity. */
+    InterlockedExchange(&g_disk_activity_until_ms,
+                        (LONG)(GetTickCount() +
+                               R36SX_WIN_DISK_LED_HOLD_MS));
+}
+
+void r36sx_pico286_disk_activity_begin(void)
+{
+    InterlockedIncrement(&g_disk_activity_depth);
+}
+
+void r36sx_pico286_disk_activity_end(void)
+{
+    LONG depth = InterlockedDecrement(&g_disk_activity_depth);
+
+    if (depth < 0) {
+        InterlockedExchange(&g_disk_activity_depth, 0);
+    }
 }
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
@@ -813,6 +886,8 @@ int mfb_update(void *buffer, int fps_limit)
     const uint16_t *src = (const uint16_t *)buffer;
     const uint16_t *present_src;
     size_t pixels;
+    uint32_t now_ms;
+    int disk_led_visible;
     (void)fps_limit;
 
     if (!g_wnd || !g_frame32 || !g_overlay_frame || !src ||
@@ -821,9 +896,11 @@ int mfb_update(void *buffer, int fps_limit)
     }
 
     pixels = (size_t)g_width * (size_t)g_height;
+    now_ms = GetTickCount();
+    disk_led_visible = r36sx_win_disk_led_visible(now_ms);
     present_src = src;
     if (r36sx_win_menu_visible() || r36sx_app_stats_is_visible() ||
-        g_post_codes_visible) {
+        g_post_codes_visible || disk_led_visible) {
         /*
          * The Windows host draws debug overlays on a temporary RGB565 copy so
          * the emulated PC framebuffer stays untouched.
@@ -842,6 +919,7 @@ int mfb_update(void *buffer, int fps_limit)
             r36sx_win_draw_stats_overlay(g_overlay_frame);
             r36sx_win_draw_post_codes_overlay(g_overlay_frame);
         }
+        r36sx_win_draw_disk_led(g_overlay_frame, now_ms);
         present_src = g_overlay_frame;
     }
     if (g_screenshot_requested) {

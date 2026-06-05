@@ -3,8 +3,6 @@
 #include "emulator.h"
 #include "r36sx_host_disk_io.h"
 
-extern void r36sx_pico286_disk_activity(void);
-
 int hdcount = 0, fdcount = 0;
 
 static uint8_t sectorbuffer[512];
@@ -305,7 +303,6 @@ static void readdisk(uint8_t drivenum,
     }
 
     if (!is_verify && disk_memory_range_is_plain_ram(memdest, bytecount)) {
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -325,8 +322,6 @@ static void readdisk(uint8_t drivenum,
 
     // Process sectors
     for (cursect = 0; cursect < sectcount; cursect++) {
-        r36sx_pico286_disk_activity();
-
         // Read the sector into buffer
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &sectorbuffer[0], 512) != 0) {
@@ -434,7 +429,6 @@ static void writedisk(uint8_t drivenum,
     }
 
     if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -461,8 +455,6 @@ static void writedisk(uint8_t drivenum,
             // FIXME: segment overflow condition?
             sectorbuffer[sectoffset] = read86(memdest++);
         }
-
-        r36sx_pico286_disk_activity();
 
         // Write the buffer to the file
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
@@ -530,7 +522,6 @@ static void readdisk_lba(uint8_t drivenum,
     }
 
     if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -549,7 +540,6 @@ static void readdisk_lba(uint8_t drivenum,
 
     for (cursect = 0; cursect < sectcount; cursect++) {
         size_t sector_offset = fileoffset + (size_t)cursect * 512UL;
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, sector_offset,
                                     &sectorbuffer[0], 512) != 0) {
             r36sx_pico286_debug_log(
@@ -616,7 +606,6 @@ static void writedisk_lba(uint8_t drivenum,
     }
 
     if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -641,7 +630,6 @@ static void writedisk_lba(uint8_t drivenum,
             sectorbuffer[sectoffset] = read86(memdest++);
         }
 
-        r36sx_pico286_disk_activity();
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      sector_offset, sectorbuffer, 512, 1) != 0) {

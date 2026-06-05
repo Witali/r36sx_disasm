@@ -148,6 +148,7 @@ static struct r36sx_mfb_driver g_mfb;
 static uint16_t g_palette[256];
 static volatile uint32_t g_frame_generation;
 static volatile uint32_t g_disk_activity_until_ms;
+static volatile uint32_t g_disk_activity_depth;
 static volatile uint32_t g_post_code_generation;
 static volatile uint16_t g_post_code_port;
 static volatile uint8_t g_post_code_value;
@@ -187,6 +188,20 @@ void r36sx_pico286_disk_activity(void)
 {
     g_disk_activity_until_ms =
         r36sx_mfb_now_ms32() + R36SX_PICO286_DISK_LED_HOLD_MS;
+}
+
+void r36sx_pico286_disk_activity_begin(void)
+{
+    __sync_add_and_fetch(&g_disk_activity_depth, 1u);
+}
+
+void r36sx_pico286_disk_activity_end(void)
+{
+    uint32_t depth = __sync_sub_and_fetch(&g_disk_activity_depth, 1u);
+
+    if ((int32_t)depth < 0) {
+        __sync_lock_test_and_set(&g_disk_activity_depth, 0u);
+    }
 }
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
@@ -1301,12 +1316,18 @@ static void r36sx_mfb_toggle_post_codes(void)
 
 static int r36sx_mfb_disk_led_active(uint32_t now_ms)
 {
+    if (__sync_add_and_fetch(&g_disk_activity_depth, 0u) > 0) {
+        return 1;
+    }
     return (int32_t)(g_disk_activity_until_ms - now_ms) > 0;
 }
 
 static int r36sx_mfb_disk_led_visible(uint32_t now_ms)
 {
-    return r36sx_mfb_disk_led_active(now_ms) &&
+    if (__sync_add_and_fetch(&g_disk_activity_depth, 0u) > 0) {
+        return 1;
+    }
+    return (int32_t)(g_disk_activity_until_ms - now_ms) > 0 &&
            ((now_ms / R36SX_PICO286_DISK_LED_BLINK_MS) & 1u) != 0u;
 }
 

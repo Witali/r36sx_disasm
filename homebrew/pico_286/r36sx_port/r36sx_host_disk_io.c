@@ -18,6 +18,14 @@
 #include "r36sx_pico286_compat.h"
 #endif
 
+/*
+ * The framebuffer backend owns the actual LED drawing.  This disk layer owns
+ * the exact lifetime: busy begins immediately before host file I/O and ends as
+ * soon as that I/O call has completed.
+ */
+extern void r36sx_pico286_disk_activity_begin(void);
+extern void r36sx_pico286_disk_activity_end(void);
+
 static uint32_t r36sx_host_disk_now_ms(void)
 {
     struct timespec ts;
@@ -95,11 +103,17 @@ FILE *r36sx_host_disk_open(const char *path, r36sx_host_disk_cache_t *cache,
 int r36sx_host_disk_flush(FILE *file, r36sx_host_disk_cache_t *cache,
                           uint8_t drive, const char *reason)
 {
+    int flush_ok;
+
     if (!file || !cache || !cache->dirty) {
         return 0;
     }
 
-    if (fflush(file) != 0) {
+    r36sx_pico286_disk_activity_begin();
+    flush_ok = fflush(file) == 0;
+    r36sx_pico286_disk_activity_end();
+
+    if (!flush_ok) {
         r36sx_pico286_debug_log("hostdisk: fflush failed drive=%u reason=%s",
                                 drive, reason ? reason : "?");
         return -1;
@@ -132,13 +146,20 @@ void r36sx_host_disk_close(FILE **file, r36sx_host_disk_cache_t *cache,
 int r36sx_host_disk_read_at(FILE *file, size_t offset, void *dst,
                             size_t bytes)
 {
+    int read_ok = 0;
+
     if (!file || !dst) {
         return -1;
     }
-    if (fseek(file, (long)offset, SEEK_SET) != 0) {
-        return -1;
+
+    r36sx_pico286_disk_activity_begin();
+    if (fseek(file, (long)offset, SEEK_SET) == 0 &&
+        fread(dst, 1, bytes, file) == bytes) {
+        read_ok = 1;
     }
-    if (fread(dst, 1, bytes, file) != bytes) {
+    r36sx_pico286_disk_activity_end();
+
+    if (!read_ok) {
         return -1;
     }
     r36sx_app_stats_record_disk_read(bytes);
@@ -150,14 +171,20 @@ int r36sx_host_disk_write_at(FILE *file, r36sx_host_disk_cache_t *cache,
                              size_t bytes, uint32_t dirty_sectors)
 {
     uint32_t flush_sectors;
+    int write_ok = 0;
 
     if (!file || !src || !cache) {
         return -1;
     }
-    if (fseek(file, (long)offset, SEEK_SET) != 0) {
-        return -1;
+
+    r36sx_pico286_disk_activity_begin();
+    if (fseek(file, (long)offset, SEEK_SET) == 0 &&
+        fwrite(src, 1, bytes, file) == bytes) {
+        write_ok = 1;
     }
-    if (fwrite(src, 1, bytes, file) != bytes) {
+    r36sx_pico286_disk_activity_end();
+
+    if (!write_ok) {
         return -1;
     }
     r36sx_app_stats_record_disk_write(bytes);
