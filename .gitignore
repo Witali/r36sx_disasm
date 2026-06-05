@@ -80,6 +80,10 @@ homebrew/pico_286/tests/test386.asm/build/
 homebrew/pico_286/tests/test386.asm/build/*.lst
 homebrew/pico_286/tests/test386.asm/test386-EE-reference.txt
 
+# Pico-286 patch runtime data
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/host/
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/
+
 # OS/editor noise
 Thumbs.db
 Desktop.ini
