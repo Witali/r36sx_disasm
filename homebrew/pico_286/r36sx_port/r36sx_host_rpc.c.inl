@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include "findfirst.h"
@@ -270,20 +271,26 @@ static int r36sx_host_rpc_guest_string(uint32_t address, char *out,
     return 1;
 }
 
-static void r36sx_host_rpc_append_segment(char *tail, size_t tail_size,
-                                          const char *segment)
+static int r36sx_host_rpc_append_segment(char *tail, size_t tail_size,
+                                         const char *segment)
 {
     size_t len;
+    size_t segment_len;
     if (!tail || !segment || !segment[0] || tail_size == 0) {
-        return;
+        return 0;
     }
     len = strlen(tail);
-    if (len > 0 && len + 1 < tail_size) {
+    segment_len = strlen(segment);
+    if (len > 0) {
+        if (len + 1u + segment_len >= tail_size) {
+            return 0;
+        }
         tail[len++] = '\\';
-        tail[len] = '\0';
+    } else if (segment_len >= tail_size) {
+        return 0;
     }
-    snprintf(tail + len, tail_size - len, "%s", segment);
-    tail[tail_size - 1] = '\0';
+    memcpy(tail + len, segment, segment_len + 1u);
+    return 1;
 }
 
 static int r36sx_host_rpc_pop_segment(char *tail)
@@ -306,6 +313,91 @@ static int r36sx_host_rpc_dir_exists(const char *path)
     struct stat st;
 
     return path && path[0] && stat(path, &st) == 0 && (st.st_mode & S_IFDIR);
+}
+
+static void r36sx_host_rpc_normalize_host_separators(char *path)
+{
+    if (!path) {
+        return;
+    }
+    for (char *p = path; *p; ++p) {
+#ifdef _WIN32
+        if (*p == '/') {
+            *p = '\\';
+        }
+#else
+        if (*p == '\\') {
+            *p = '/';
+        }
+#endif
+    }
+}
+
+static void r36sx_host_rpc_trim_trailing_separator(char *path)
+{
+    size_t len;
+    if (!path) {
+        return;
+    }
+    len = strlen(path);
+    while (len > 1u && (path[len - 1u] == '\\' || path[len - 1u] == '/')) {
+#ifdef _WIN32
+        if (len == 3u && path[1] == ':') {
+            break;
+        }
+#endif
+        path[--len] = '\0';
+    }
+}
+
+static int r36sx_host_rpc_absolute_path(const char *path, char *out,
+                                        size_t out_size)
+{
+    if (!path || !path[0] || !out || out_size == 0) {
+        return 0;
+    }
+#ifdef _WIN32
+    if (!_fullpath(out, path, out_size)) {
+        return 0;
+    }
+#else
+    if (!realpath(path, out)) {
+        return 0;
+    }
+#endif
+    out[out_size - 1u] = '\0';
+    r36sx_host_rpc_normalize_host_separators(out);
+    r36sx_host_rpc_trim_trailing_separator(out);
+    return out[0] != '\0';
+}
+
+static int r36sx_host_rpc_path_has_root_prefix(const char *root,
+                                               const char *path)
+{
+    size_t root_len;
+    size_t path_len;
+    if (!root || !path) {
+        return 0;
+    }
+    root_len = strlen(root);
+    path_len = strlen(path);
+    if (root_len == 0 || path_len < root_len) {
+        return 0;
+    }
+    for (size_t i = 0; i < root_len; ++i) {
+        unsigned char a = (unsigned char)root[i];
+        unsigned char b = (unsigned char)path[i];
+#ifdef _WIN32
+        a = (unsigned char)tolower(a);
+        b = (unsigned char)tolower(b);
+#endif
+        if (a != b) {
+            return 0;
+        }
+    }
+    return path[root_len] == '\0' ||
+           path[root_len] == '\\' ||
+           path[root_len] == '/';
 }
 
 static int r36sx_host_rpc_ensure_base_dir(const char *path)
@@ -363,9 +455,12 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
                                           size_t host_path_size)
 {
     const char *base = r36sx_pico286_host_drive_path();
+    const char *guest_path_start = guest_path;
+    char base_abs[R36SX_HOST_RPC_MAX_HOST_PATH];
     char tail[R36SX_HOST_RPC_MAX_PATH];
     char segment[R36SX_HOST_RPC_MAX_PATH];
     size_t seg_len = 0;
+    int written;
     char sep =
 #ifdef _WIN32
         '\\';
@@ -380,6 +475,9 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
         base = "host";
     }
     if (!r36sx_host_rpc_ensure_base_dir(base)) {
+        return 0;
+    }
+    if (!r36sx_host_rpc_absolute_path(base, base_abs, sizeof(base_abs))) {
         return 0;
     }
 
@@ -400,12 +498,22 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
                 /* Ignore empty and current-directory segments. */
             } else if (strcmp(segment, "..") == 0) {
                 /*
-                 * Allow DOS-style parent traversal inside the mapped root, but
-                 * never let the resolved host path escape above host_drive_path.
+                 * DOS-style parent traversal is allowed inside the mapped root,
+                 * but trying to climb above host_drive_path is a bad path, not
+                 * a silent clamp to root.
                  */
-                r36sx_host_rpc_pop_segment(tail);
+                if (!r36sx_host_rpc_pop_segment(tail)) {
+                    R36SX_HOSTRPC_LOG(
+                        "hostrpc: reject path above root guest='%s'",
+                        guest_path_start);
+                    return 0;
+                }
             } else {
-                r36sx_host_rpc_append_segment(tail, sizeof(tail), segment);
+                if (strchr(segment, ':') ||
+                    !r36sx_host_rpc_append_segment(tail, sizeof(tail),
+                                                   segment)) {
+                    return 0;
+                }
             }
             seg_len = 0;
             if (ch == '\0') {
@@ -420,24 +528,30 @@ static int r36sx_host_rpc_build_host_path(const char *guest_path,
     }
 
     if (tail[0] == '\0') {
-        snprintf(host_path, host_path_size, "%s", base);
+        written = snprintf(host_path, host_path_size, "%s", base_abs);
     } else {
-        size_t base_len = strlen(base);
+        size_t base_len = strlen(base_abs);
         if (base_len > 0 &&
-            (base[base_len - 1] == '\\' || base[base_len - 1] == '/')) {
-            snprintf(host_path, host_path_size, "%s%s", base, tail);
+            (base_abs[base_len - 1] == '\\' ||
+             base_abs[base_len - 1] == '/')) {
+            written = snprintf(host_path, host_path_size, "%s%s", base_abs,
+                               tail);
         } else {
-            snprintf(host_path, host_path_size, "%s%c%s", base, sep, tail);
+            written = snprintf(host_path, host_path_size, "%s%c%s", base_abs,
+                               sep, tail);
         }
+    }
+    if (written < 0 || (size_t)written >= host_path_size) {
+        return 0;
     }
     host_path[host_path_size - 1] = '\0';
-#ifndef _WIN32
-    for (char *p = host_path; *p; ++p) {
-        if (*p == '\\') {
-            *p = '/';
-        }
+    r36sx_host_rpc_normalize_host_separators(host_path);
+    if (!r36sx_host_rpc_path_has_root_prefix(base_abs, host_path)) {
+        R36SX_HOSTRPC_LOG("hostrpc: reject escaped host path root='%s' path='%s'",
+                          base_abs,
+                          host_path);
+        return 0;
     }
-#endif
     return 1;
 }
 

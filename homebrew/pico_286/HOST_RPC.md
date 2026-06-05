@@ -86,8 +86,10 @@ struct host_rpc_find_result {
 ```
 
 The current implementation resolves all guest paths inside
-`host_drive_path`.  `..` components are allowed only inside that mapped root,
-so guest paths cannot escape above the configured host directory.
+`host_drive_path`.  `..` components are allowed only while they stay inside
+that mapped root; attempts such as `..\..\file` are rejected as bad paths
+instead of being clamped to the root or resolved outside the configured host
+directory.
 
 ## Diagnostic COM
 
