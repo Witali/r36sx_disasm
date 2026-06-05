@@ -3976,6 +3976,18 @@ static INLINE void decodeflagsdword(uint32_t x) {
     x86_flags.value = R36SX_FLAGS_ALWAYS_ONE | next;
 }
 
+static INLINE void decodeflagsdword_popfd(uint32_t x) {
+    /*
+     * Intel POPFD updates the ordinary EFLAGS bits, but VM and RF are not
+     * affected by POPF/POPFD.  IRETD and task switches intentionally keep the
+     * full decodeflagsdword() path because they can enter or leave V86 mode.
+     */
+    uint32_t preserved = x86_flags.value &
+                         (R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
+    decodeflagsdword((x & ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK)) |
+                     preserved);
+}
+
 #define R36SX_BIOS_TEXT_BASE 0x8000u
 #define R36SX_BIOS_TEXT_PAGE_CELLS 0x1000u
 #define R36SX_BIOS_MAX_TEXT_COLS 80u
@@ -7812,7 +7824,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
                 }
                 if (operandSizeOverride) {
-                    decodeflagsdword(pop32());
+                    decodeflagsdword_popfd(pop32());
                     break;
                 }
                 decodeflagsword(pop());
@@ -8586,6 +8598,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_CC: ;
 #endif
                 /* CC INT 3 */
+                /*
+                 * Intel documents INT3 as not IOPL-sensitive in V86 mode; it
+                 * generates interrupt 3 even when INT imm8 would #GP(0).
+                 */
                 r36sx_cpu_software_interrupt(3, firstip);
                 break;
 
@@ -8608,6 +8624,10 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* CE INTO */
                 if (of) {
+                    /*
+                     * INTO follows INT3 here: in V86 mode it is not
+                     * IOPL-sensitive and generates interrupt 4 only when OF=1.
+                     */
                     r36sx_cpu_software_interrupt(4, firstip);
                 }
                 break;
