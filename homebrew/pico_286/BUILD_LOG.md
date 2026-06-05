@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-06-05 C0000-EFFFF upper memory
+
+Freed the PC address range `C0000h..EFFFFh` for DOS upper memory blocks.  VGA
+memory remains reserved at `A0000h..BFFFFh`, and BIOS/test ROM code remains
+reserved at `F0000h..FFFFFh`.
+
+The old Lo-tech EMS page frame used `C0000h..CFFFFh`, so this build disables
+the first-megabyte EMS page-frame window while keeping the backing EMS/XMS
+storage code available.  That avoids overlapping an EMS window with the new UMB
+range.
+
+Memory layout changes:
+
+- UMB allocator range: `C0000h..EFFFFh`
+- `upper_kb` maximum: `192`
+- `upper_kb` default in configs: `192`
+- With `total_memory_kb=16384`, the physical RAM above 1 MB is `15360 KB`.
+  UMBs are carved from the first megabyte and do not increase that limit.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -HostRpcTrace -Out .\homebrew\pico_286\build\pico_286_win.exe
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Output SHA256:
+  `B502C4DA6109C96D0E2E7545CF45EB52DD2AB205F87AEC2539FB9C507A5E8552`
+- Patch copy SHA256:
+  `B502C4DA6109C96D0E2E7545CF45EB52DD2AB205F87AEC2539FB9C507A5E8552`
+- Build succeeded with the existing upstream/debug warnings.
+
 ## 2026-06-05 Windows drive LED busy-state
 
 Enabled the drive LED for the Windows debug renderer and moved disk activity

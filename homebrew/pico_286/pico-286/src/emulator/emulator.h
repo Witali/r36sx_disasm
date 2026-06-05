@@ -80,11 +80,17 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 #define VBIOS_START (0xC0000)
 #define VBIOS_END (0xC8000)
 
-#define EMS_START (0xC0000)
-#define EMS_END   (0xD0000)
+/*
+ * R36SX exposes C0000h-EFFFFh as DOS upper memory blocks.  The old Lo-tech
+ * EMS page frame also lived at C0000h-CFFFFh, so keep its memory backing but
+ * do not map a page frame into the first megabyte while this UMB layout is in
+ * use.
+ */
+#define EMS_START (0x00000)
+#define EMS_END   (0x00000)
 
-#define UMB_START (0xD0000)
-#define UMB_END (0xFC000)
+#define UMB_START (0xC0000)
+#define UMB_END (0xF0000)
 
 #define HMA_START (0x100000)
 #define HMA_END (0x110000-16)
@@ -92,7 +98,7 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 #define BIOS_START (0xFE000)
 
 #define EMS_MEMORY_SIZE (2048 << 10) // 2 MB
-#define XMS_MEMORY_KB 15568u // Keeps total usable RAM at 16 MB.
+#define XMS_MEMORY_KB 15360u // Physical RAM above 1 MB in a 16 MB PC map.
 #define XMS_MEMORY_SIZE (XMS_MEMORY_KB << 10)
 #define EXTENDED_MEMORY_START HMA_START
 #define EXTENDED_MEMORY_END (EXTENDED_MEMORY_START + XMS_MEMORY_SIZE)

@@ -160,7 +160,7 @@ test_bios_rom=test386.bin
 [memory]
 total_memory_kb=4912
 # conventional_kb=640
-# upper_kb=176
+# upper_kb=192
 # xms_kb=4096
 # extended_kb=4096
 
@@ -273,7 +273,7 @@ the first 1 MB address space, then maps XMS/extended RAM above the 1 MB
 boundary.  The individual `conventional_kb`, `upper_kb`, `xms_kb`, and
 `extended_kb` keys are optional overrides.  The total-memory limit is 16 MB;
 with full conventional and upper memory enabled, `xms_kb`/`extended_kb` can
-reach 15360 KB through `total_memory_kb` or 15568 KB by explicit override.
+reach 15360 KB through `total_memory_kb`.
 `xms_kb` also backs linear physical RAM above 1 MB, while `extended_kb` is the
 value returned by `INT 15h AH=88h`.  The XMS High Memory Area is backed by the
 first 64 KB minus 16 bytes above 1 MB; `REQUEST_HMA` reserves it and enables

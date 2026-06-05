@@ -315,7 +315,7 @@ test_bios_rom=test386.bin
 [memory]
 total_memory_kb=4912
 # conventional_kb=640
-# upper_kb=176
+# upper_kb=192
 # xms_kb=4096
 # extended_kb=4096
 
@@ -432,8 +432,8 @@ conventional DOS memory first, then upper/UMB memory, then XMS/extended RAM.
 If `conventional_kb`, `upper_kb`, `xms_kb`, or `extended_kb` are uncommented,
 those values override the automatic split.  The total-memory limit is 16 MB:
 with full conventional and upper memory enabled, the maximum XMS/extended pool
-is 15568 KB.  `conventional_kb` is reported through the BIOS Data Area,
-`upper_kb` limits the XMS UMB allocator from `D000:0000` upward, `xms_kb`
+is 15360 KB.  `conventional_kb` is reported through the BIOS Data Area,
+`upper_kb` limits the XMS UMB allocator from `C000:0000` upward, `xms_kb`
 backs both the built-in XMS handler and linear physical RAM above 1 MB, and
 `extended_kb` is returned by `INT 15h AH=88h`.
 

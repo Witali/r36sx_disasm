@@ -35,15 +35,14 @@
 #define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
 #define R36SX_PICO286_MAX_CONVENTIONAL_KB 640UL
 #define R36SX_PICO286_MIN_UPPER_KB 0UL
-#define R36SX_PICO286_MAX_UPPER_KB 176UL
+#define R36SX_PICO286_MAX_UPPER_KB 192UL
 #define R36SX_PICO286_FIRST_MB_KB 1024UL
-#define R36SX_PICO286_UMB_START_KB 832UL
+#define R36SX_PICO286_UMB_START_KB 768UL
 #define R36SX_PICO286_MIN_TOTAL_MEMORY_KB R36SX_PICO286_MIN_CONVENTIONAL_KB
 #define R36SX_PICO286_MAX_TOTAL_MEMORY_KB 16384UL
 #define R36SX_PICO286_MAX_LINEAR_EXTENDED_KB \
     (R36SX_PICO286_MAX_TOTAL_MEMORY_KB - \
-     R36SX_PICO286_MAX_CONVENTIONAL_KB - \
-     R36SX_PICO286_MAX_UPPER_KB)
+     R36SX_PICO286_FIRST_MB_KB)
 #define R36SX_PICO286_MIN_EXTENDED_KB 0UL
 #define R36SX_PICO286_MAX_EXTENDED_KB R36SX_PICO286_MAX_LINEAR_EXTENDED_KB
 #define R36SX_PICO286_MIN_XMS_KB 0UL
@@ -119,7 +118,7 @@ static char audio_covox_enabled_text[8] = "1";
 static char audio_sample_rate_text[16] = "44100";
 static char total_memory_kb_text[16] = "4912";
 static char conventional_memory_kb_text[16] = "640";
-static char upper_memory_kb_text[16] = "176";
+static char upper_memory_kb_text[16] = "192";
 static char extended_memory_kb_text[16] = "4096";
 static char xms_memory_kb_text[16] = "4096";
 static uint32_t cpu_exec_loops = 0;
@@ -154,7 +153,7 @@ static int audio_covox_enabled = 1;
 static uint32_t audio_sample_rate = 44100u;
 static uint32_t total_memory_kb = 4912u;
 static uint32_t conventional_memory_kb = 640u;
-static uint32_t upper_memory_kb = 176u;
+static uint32_t upper_memory_kb = 192u;
 static uint32_t extended_memory_kb = 4096u;
 static uint32_t xms_memory_kb = 4096u;
 static int total_memory_configured = 0;
@@ -2028,9 +2027,9 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# Allowed ranges:\n");
     fprintf(fp, "# total_memory_kb: 64..16384.\n");
     fprintf(fp, "# conventional_kb: 64..640, reported through the BIOS Data Area.\n");
-    fprintf(fp, "# upper_kb: 0..176, limits XMS UMB allocations from D000:0000 upward.\n");
-    fprintf(fp, "# xms_kb: 0..15568, also backs linear physical RAM above 1 MB.\n");
-    fprintf(fp, "# extended_kb: 0..15568, reported by INT 15h AH=88h; defaults to xms_kb.\n");
+    fprintf(fp, "# upper_kb: 0..192, limits XMS UMB allocations from C000:0000 upward.\n");
+    fprintf(fp, "# xms_kb: 0..15360, also backs linear physical RAM above 1 MB.\n");
+    fprintf(fp, "# extended_kb: 0..15360, reported by INT 15h AH=88h; defaults to xms_kb.\n");
     fprintf(fp, "[memory]\n");
     fprintf(fp, "total_memory_kb=%s\n", total_memory_kb_text);
     fprintf(fp, "%sconventional_kb=%s\n",
