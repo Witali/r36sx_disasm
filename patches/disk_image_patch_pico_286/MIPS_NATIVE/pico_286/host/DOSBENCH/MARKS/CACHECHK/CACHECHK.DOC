@@ -1,0 +1,347 @@
+		CACHECHK 
+		v4 2/7/96
+	Copyright (c) 1995 by Ray Van Tassle.
+
+    This is NOT freeware.  This is postcard-ware.  Send me a nice
+    picture post card as the registration fee.
+    But if you want to, or if this has been VERY valuable to you, a
+    money contribution will be gratefully accepted.  You decide if
+    you should send money, and how much.  How could I be any more fair??
+	Ray Van Tassle
+	1020 Fox Run Lane
+	Alqonuin, Il. 60102 USA
+	(708)658-4941
+
+
+CACHECHK performs memory access timing tests, to see if you have a 
+cache, how many caches, and to check the access speed.
+
+SAMPLE COMMAND LINES:
+	To log information to a file, for posting or printing---
+	>del mycpu.log	
+	>cachechk My 486, OPTI chipset >>mycpu.log
+	>cachechk -w My 486, memory write >>mycpu.log
+	>cachechk -f My 486, with cache disabled >>mycpu.log
+
+
+There are two kinds of caches,  the on-chip cache (level one, or L1) 
+which is in the CPU processor chip, and off-chip cache (level two, or 
+L2) which is on the motherboard.
+
+Some 386 motherboards have 64KB of off-chip cache.
+Some CYRIX 386/486 chips have a very small L1 cache.
+Most 486's have an on-chip cache, and most new motherboards also have a L2 
+cache.
+The Intel 486DX2/66 has 8KB of L1 cache.
+The Intel 486DX4/100 has 16KB of L1 cache.
+The AMD 486DX4/100 has 8KB of L1 cache.
+Intel Pentium has 16KB of L1 cache, 8KB for data and 8KB for code.
+
+The typical 486 MB has 256KB of L2 cache, although many will let you 
+install 512KB or even 1MB.
+  
+Q: HOW MUCH CACHE DO I NEED?
+For a 486, get a 256K cache.
+All the writeups that I have seen say:
+	64KB cache gets a LOT of improvement.
+	128KB gets a bit more.
+	256KB gets a teeny bit more.
+	512KB gets only a teensy weensy bit more.
+(Note: these are for DOS and WINDOWS3.  A real OS, like LINUX, OS/2, 
+and perhaps WIN-95 and WIN-NT may be different.)
+In general, this seems to be the way all caches work---the first bit 
+gets a lot of bang, and each additional bit gives smaller and smaller 
+improvements.
+It is claimed that, as long as you have a decent L2 cache, that an
+AMD 486/100 (with an 8k L1) is virtually identical in performance to an
+Intel 486/100 (with a 16K L1).
+
+At the time this was written......
+256K often uses 8-(32K x 8) SRAM chips (8 * 32K = 256KB), in two banks,
+and the MB can interleave accesses to the two banks.
+512K often uses 4-(128K x 8) SRAM chips (4 * 128K = 512KB, but this is only 
+one bank, so the access time is slower, because the MB can't do bank 
+interleaving.
+Whether the cache is in one bank or two, depends upon details of the 
+motherboard design, and the chips available at the time.  This is expected
+to change in the future, as different SRAM configurations enter the market.
+Note the careful use of the word "can"; a particular MB might _not_ do
+interleaving, een though it could.  Also, depending on the exact MB design,
+the interleaving may or may not be done properly (in the sense of attaining
+the benefits).
+
+Basically, 512K costs a LOT more than 256K and gives only a marginal
+improvement in performance, so stick with 256K.
+
+Q: Why does my main memory show faster with the cache enabled, even
+out beyond the cache size?
+A: The L1 cache (on a 486) is filled in granularity of 16 bytes (this
+is the "cache line size").  When you read a byte, all 16 bytes of that
+line are read into the cache, in 4 quadbyte (32 bit) units.  The quadbyte
+which is addressed is read from memory first, put into the cache, and
+transferred to the CPU.  Then the other 3 quadbytes are read into the cache.
+So, if you are accessing the memory in sequential order (like CACHECHK does),
+the next bytes have been (or are being) automatically sucked into the cache,
+a "read-ahead", if you will.
+If the cache is disabled, this read-ahead does not take place.
+
+Q: Why is my main RAM memory faster on writing than reading?
+A: I don't know.  If somebody can explain it to me, I'll put it in.
+
+Q: How much are the timings dependent on sheer CPU speed, as opposed
+to the actual memory access speed?
+A: Probably not very much.  There is some loop control overhead in the
+timing loop, but it is minimal.  Each different data point is executed
+for approximately the same length of time (1/2 second). So the 1kb block size
+loops for 16 more times than the 16kb block size.  So the loop overhead is
+16 times greater.  But the times are constant (10 us/kb in my system).  If the
+instruction overhead was significant, I would expect to see a "tilt" in the
+numbers.  But I don't, so it's not.
+And remember, the goal of CACHECHK is to
+measure the detectible timing improvements of the caching, and not to
+measure the raw cpu power.
+
+
+Q: How does it measure the CPU speed?
+A: By measuring how long it takes to do a particular "bsr" instruction
+1000 times.
+
+Q: No matter how I set the write cache policy (copy-back or write-through),
+CACHECHK reports the same speed.  Isn't copy-back (AKA write-back)
+supposed to be better?  What gives?
+A: It *is* better, but only when reads and writes are intermixed.  By 
+design, CACHECHK does not intermix operations.  It either reads in a
+sustained burst, or writes in a sustained burst, so the write policy never comes
+into play.  CACHECHK is designed to saturate the memory read/write channel and
+to report the timings in this condition.  In fact, in order to be able to
+detect and time the various stages of the memory system, it is absolutely
+necessary to throw as much cr*p at it as it can possibly handle.
+
+===================================================================
+CACHECHK will run the access tests using all the memory in your 
+machine, so that you can check to make sure that all the memory is 
+cached.
+
+
+Usage: CACHECHK -tn -4hfnvwqz? [Optional comments]
+Cache memory detector & timer.  Runs only on 80386 (or better) CPU.
+	-4  = Override CPU check, treat this as a 486.
+	-h? = Print this help text.
+	-f  = Perform tests with cache disabled.
+	-q  = Quick. Faster but not as accurate.
+	-qq = Each 'q' is 2 times quicker. But less accurate.
+	-tn = Top of memory to test. n = nth MB
+	-v  = Verbose.  -vv = positively chatty!
+	-xN = Extra tests. N is bitmapped number.  "-x7" does all three
+	  1 =   --write.
+	  2 =   --read with cache off.
+	  4 =   --read with byte offsets.
+	-w  = Do memory write (otherwise memory read).
+	-z  = Slower.  Like q, but the other direction.
+	      Probably won't be needed on anything less than a 786DX4/200.
+
+The "optional comments" just get logged, so you can identify test information
+along with the results.  Mostly useful if you redirect the output to
+a file. For example:
+	cachechk -q Test with bios set to 1 wait state >before.dat
+
+The basic timing loop is 1/2 second per size.  Each 'q' cuts the time 
+in half.  Each 'z' doubles the time.  If the timing figures aren't 
+steady, you probably have too many q's.
+
+You can run the tests with the cache disabled, with the 'f' option (on 
+a 486 or Pentium).  Naturally, it is re-enabled again when it's done.
+This generally turns off BOTH the L1 and L2 cache.  Your bios setup 
+may (or may not) let you individually enable/disable the caches.
+
+Times cache & memory access, and figures out cache size(s).
+Results are in:
+   microseconds per KB, MB per seconds, and nanoseconds per byte.
+
+Memory is access in quadbytes, in flat 32-bit protected mode. For base 
+memory (first MB, MB#0) only 640KB is accessed. Memory accesses are in 
+various block sizes, from 1KB to 2MB. Each megabyte is tested starting 
+at the beginning of that megabyte.  CACHECHK will work under a memory 
+manager (HIMEM, EMM386, QEMM, Windows, etc.), but the results may be 
+inaccurate, the machine might crash, and it won't be able to test all 
+of the memory. It will run under WINDOWS, but results are wildly 
+inaccurate. For best results, boot clean--on DOS 6 & above, hit F5 
+while it boots.
+
+It will NOT touch extended memory that is already allocated or in use.
+If you have a memory manager installed, it usually occupies the first
+portion of the 2nd megabyte, so CACHECHK will not be able to check that.
+
+
+SOME TIMINGS I HAVE TAKEN
+
+CPU	L1	L1speed	L2	L2speed	Mem	Speeds    (taken from the
+type	siz	ns/byte	size	ns/byt	ns/byt	æsec/KB    printout)
+------	----	-------	----	------	------	----------
+386/25SL  0	n/a	 64k	80.2	108	84.....114	(Laptop)
+386/25	  0	n/a	 64k	59.2	90	62......94	(Desktop)
+486/33	  8k	30.7	128k	43.6	70	31..45..73	(Intel)
+486/66	  8k	16.1	0	n/a	50	15......52	(Intel)
+486/100	  8k	11.1	0	n/a	46	10......48	(AMD)
+486/100	 16k	10.0	256k	18.8	26	10..19..27	(Intel)
+P-75	  8k	10.2	256k	16.4	24	10..17..24
+
+
+Timer
+-----
+CACHECHK directly accesses the timer chip to get a high-precision timer
+(0.838 microsec resolution).  In some motherboards (notibly reported
+to be "UMC with fake cache chips"), there is a problem with this timer.
+I worked around this in version 2, but there may be some boards where my
+work-around still doesn't work.
+
+
+Cache basics
+------------
+The CPU cache is generally organized in "lines" of 16 bytes.  An access
+to any byte which is not in the cache causes a "cache line fill" operation,
+which reads in the entire 16 byte chunk.
+On a 486, memory is 4 bytes wide (32 bits).  Using burst-mode, the CPU
+reads four 32-bit chunks.  The numbers you sometimes see, such as 3-2-2-2
+or 2-1-1-1, refer to the number of clock cycles to read these chunks.  The
+first one takes longer because of setup time.
+The 486 CPU can do "out-of-order line fill".  If you access the 4th chunk,
+the memory system will read that chunk in first, pass the addressed bytes
+to the CPU, then read in the other 3 chunks.
+
+The L1 cache is on the CPU itself (AKA on-chip cache), and is usually
+4-way set associative.  This means that a line can go into any one of four
+different places in the cache, using an LRU (least-recently-used) algorithm.
+The L2 cache is on the motherboard.  Almost always these are direct-mapped
+(or "1-way").  This means that a line can go into just one place in the cache.
+Four-way set associative is better.  Actually, the more "ways", the better.
+Also, more expensive.  "Fully associative" is the absolute best.  The Cyrix
+686 has a small (256 byte) fully-associative instruction-line cache (for
+instructions only), and a 16KB 4-way set associative cache.  The Pentium
+has 8KB for instructions and 8KB for data, totalling 16K.
+
+The other terms you hear are "write-back" (AKA "copy-back"), and
+"write-through".  In write-through, when the CPU changes a byte in memory,
+it first writes it into the cache, then that cache line is written to
+the RAM.  In write-back, when the CPU changes a byte in memory, it writes
+it into the cache, and sets the "dirty-bit" for that cache line.  Later
+on, when some other piece of RAM needs to be put in the cache, the memory
+system will notice that the line is "dirty", and write it to RAM, before
+reading the new data into the cache line.
+Write-back is better.
+Most motherboards have write-back L2 cache.
+The Cyrix CPUs, and the "enhanced" AMD and Intel CPUs have write-back 
+L1 cache.  Other AMD and Intel cpus have write-through cache.
+Very advanced CPUs and motherboards do other tricks in the write-back stage.
+Instead of writing the cache line to RAM, then reading the new data into
+the cache, it will move the data from the cache into a write-buffer, then
+do the read, then finally write into RAM when there is no read activity.
+More of these write buffers will give the memory system more chances to delay
+a write cycle in favor of a read cycle.
+Again, depending on the exact MB design,
+the write-back may or may not be done properly (in the sense of attaining
+the benefits).
+
+Motherboard Specsmanship
+------------------------
+Back in the early days of transistor radios, one selling point was how
+many transistors a radio had.  Some manufacturers (especially Korean and
+Japanese) would incorporate non-functional transistors, just to be able
+to be able to (legitimately) claim a higher count.
+The same thing is possible with MB designs.  A "write-back" design without
+a dirty-tag-ram, or without posted write buffers, will not perform much
+(or any!) better than a write-through.  Ditto for interleaving.
+
+Further Reading
+---------------
+I have reluctantly provided more technical detail above that I had originally
+planned.  However, it's by no means a complete discussion.
+Refer to the pc hardware FAQ (PCHWFAQ, filename PCFAQnnn.ZIP) for much
+more detailed information.
+
+Interpreting the printout
+-------------------------
+
+CACHECHK v3beta2 11/11/95  Copyright (c) 1995 by Ray Van Tassle. (-h for help)
+****** WARNING *******
+	CPU is in V86 mode!	Timings may not be accurate!
+CMOS reports: conv_mem= 640K, ext_mem= 15,360K, Total RAM= 16,000K
+### This is the memory size, as listed in the CMOS (via setup)
+
+"GenuineIntel" 486DX4 100 MHz
+### The cpu type & speed.  Advanced CPUs will identify themselves. For
+### others, the type is derived.
+### The speed is determined by instruction timing, and is fairly accurate
+### (plus/minus 3 mhz) from 386/16 to P5/120.
+
+Reading from memory.  
+MegaByte#:      --------- Memory Access Block sizes (KB)-----
+       1    2    4    8   16   32   64  128  256  512 1024 2048 4096 <-- KB
+ 0:   11   11   11   11   11   20   20   20   20   28   --   --   --    æs/KB
+### "n:" is the megabyte number. 0 = base memory, 1 = 2nd MB, etc.
+### The numbers are how many microseconds it takes to read/write a certain
+### number of bytes.
+### We can see that 1KB through 16KB takes 11us/KB, 32KB through 256KB takes
+### 20us/KB, and 512 KB takes 28us/KB.  This is the base memory, so we can't
+### go beyond 640KB. So we stop at 512KB.
+### The "--" (for blocks of 1MB, 2MB, and 4MB) means that blocks of this size
+### were not tested (because they could not be).
+### I go up to 4MB, because some lucky folks have 1MB of cache, and if I 
+### stopped at a 2MB block, there is only one data point of RAM speed.
+
+ 2:   11   11   11   11   11   20   20   20   20   28   28   28   28    æs/KB
+### Megabyte #1 is skipped here.  Because I have a memory manager (QEMM)
+### loaded.  It occupies some of the memory at the beginning of MB#1, therefore
+### this MB cannot be allocated, therefore I don't test it.
+### However, I can check a blocksize of 4MB.  This means that it reads from
+### address 0x0200000 through 0x05fffff.
+### We now have 4 data-points of actual RAM speed.
+### By inspection, we see that there are two breakpoints in the memory
+### access speed.  The first at 16kb, the second at 256kb.  This is as it
+### should be, as this is an Intel 486/100 (with 16kb of L1 cache), and 256kb
+### of L2 cache on the motherboard.  An AMD 486/100 has 8KB of L1 cache.
+### A Pentium has 8kb data cache and 8kb of instruction cache.
+### CACHECHK only tests data, so P5's will show 8kb of L1 cache.
+
+ 3  4  5  6  7  8  9  <--- same as above.
+### The speeds of megabyte 2 thru megabyte 9 are all the same.
+### Actually, this is a small fib.  Since mb#9 is the last full mb being
+### tested, we clearly can't be using block sizes of 2MB or 4MB.  And for
+### mb#8, we can't use block size of 4MB.  Those entries actually have
+### "--".  But the numbers which *are* there are the same.
+
+ This machine seems to have both L1 and L2 cache. [read]
+### This is reading.  Writing will say ["write]".
+    L1 cache is  16KB -- 103.3 MB/s  10.2 ns/byte  (262%) (186%)   3.9 clks
+    L2 cache is 256KB --  55.3 MB/s  19.0 ns/byte  (140%) (100%)   7.2 clks
+    Main memory speed --  39.3 MB/s  26.7 ns/byte  (100%) [read]  10.2 clks
+	L1 cache is  16KB --	102.8 MB/s  10.2 ns/byte  (261%)  (185%)
+	L2 cache is 256KB --	 55.3 MB/s  19.0 ns/byte  (140%)  (100%)
+	Main memory speed --	 39.3 MB/s  26.7 ns/byte  (100%) [read]
+### The L1 cache is 262% (two and a half times) faster than RAM.
+### The L2 cache is 140% (one and a half times) faster than RAM.
+### The L1 cache is 186% faster (almost twice as fast) as the L2 cache.
+### It takes an average of 3.9 clock cycles to read a 32-bit longword from
+### the L1 cache into a 32-bit register, 7.2 cycles from L2, and 10.2 from RAM.
+
+	Effective read RAM access time is 106ns (a RAM bank is 4 bytes wide). 
+### This is the *measured* access speed of the RAM.  On a 486, this
+### is 4 times the "main memory speed" (above example is 4 * 26.7), because
+### a 486 has a 32-bit (4 byte) path between RAM and the CPU.  For a P5,
+### this will be 8 times, because the P5 has a 64-bit (8 byte) path.
+### Note that this is NOT the speed of your RAM chips---it is the measure of
+### how fast your RAM is being driven.  
+###
+### This is VERY dependent on the "DRAM Burst Cycle" settings in your BIOS
+### setup.  This computer has an AMI bios, where I can set it to certain
+### values.  The fastest it will allow is 3-2-2-2.  The slowest
+### it will allow is 5-4-4-4.  With this slow setting, I get:
+###	Main memory speed --	 24.9 MB/s  42.1 ns/byte  (100%) [read]
+###	Effective read RAM access time is 168ns (a RAM bank is 4 bytes wide). 
+### This is much slower, BUT it might let me use slower (i.e., cheaper) RAM
+### chips.
+### Note that *many* motherboards will NOT let you fiddle with these settings.
+### The 486 (and Pentium) always fill the entire cache line (16 bytes), so
+### it is NOT possible to get just one byte from the memory; it always
+### grabs all 16 bytes in that block.
+
