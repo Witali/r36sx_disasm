@@ -123,8 +123,13 @@ SFT_UNK4             equ 31
 SFT_FILE_NAME        equ 32
 
 ; Disk Transfer Area (DTA) / Search Data Block fields used by find-first and
-; find-next.  DOS shells read this buffer after successful directory searches.
+; find-next.  The first 21 bytes are redirector-owned search state; DOS shells
+; read the standard found-file data that starts at DTA_FOUND.
 DTA_DRIVE            equ 0
+DTA_FIND_HANDLE      equ 13
+DTA_FIND_MAGIC       equ 15
+DTA_FIND_MAGIC_VALUE equ 04852h
+DTA_INVALID_HANDLE   equ 0FFFFh
 DTA_FOUND            equ 21
 FOUND_NAME           equ DTA_FOUND + 0
 FOUND_ATTR           equ DTA_FOUND + 11
@@ -407,10 +412,10 @@ redir_disk_info:
     jmp redir_success
 
 redir_find_first:
-    ; Directory enumeration is stateful on the host side.  Always close any
-    ; previous active find before starting a new search; shells often probe
-    ; existence with find-first before copy/create operations.
-    call close_active_find
+    ; Directory enumeration is stateful on the host side.  DOS redirectors keep
+    ; the opaque continuation state in the DTA/SDB, not in one process-global
+    ; variable, so repeated or nested searches do not trample each other.
+    call close_dta_find_state
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_FIRST
     mov ax, FIRST_FILENAME_OFF
@@ -427,22 +432,22 @@ redir_find_first:
     jc redir_from_rpc
     cmp word [request + REQ_RESULT], 0
     jne .not_found
-    mov ax, [request + REQ_HANDLE]
-    mov [active_find], ax
     call write_dta_find_result
     jmp redir_from_rpc
 .not_found:
-    ; Do not touch the DOS DTA on failed search.  Some shells inspect stale
-    ; search data even after CF=1 and may report a phantom "file exists".
-    mov word [active_find], 0FFFFh
+    ; Leave the user-visible found-file area untouched, but invalidate our
+    ; hidden SDB continuation state so a later FIND_NEXT cannot reuse a stale
+    ; host handle after a failed FIND_FIRST.
+    call invalidate_dta_find_state
     jmp redir_from_rpc
 
 redir_find_next:
-    ; Continue the active enumeration.  active_find is the opaque host handle
-    ; returned by FIND_FIRST.
+    ; Continue the enumeration identified by the current DTA/SDB.  This mirrors
+    ; SHSUCDX-style redirectors where the DTA owns the find continuation state.
+    call load_dta_find_handle
+    jc .invalid_dta
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_NEXT
-    mov ax, [active_find]
     mov [request + REQ_HANDLE], ax
     mov si, find_buf
     mov di, request + REQ_DATA_PHYS
@@ -456,8 +461,11 @@ redir_find_next:
     jmp redir_from_rpc
 .not_found:
     ; HOSTRPC closes the host find handle when enumeration is exhausted.
-    mov word [active_find], 0FFFFh
+    call invalidate_dta_find_state
     jmp redir_from_rpc
+.invalid_dta:
+    mov ax, 18
+    jmp redir_fail
 
 redir_seek_end:
     ; CX:DX is a signed offset from EOF.  HOSTRPC keeps size in the SFT, so
@@ -594,20 +602,64 @@ rpc_io_common:
 .done:
     ret
 
-close_active_find:
-    ; Best-effort cleanup for an outstanding host find handle.  Errors are
-    ; deliberately ignored here because this is called before starting another
-    ; search and during recovery from failed enumeration.
+close_dta_find_state:
+    ; Best-effort cleanup for the host find handle stored in the current DTA.
+    ; Errors are deliberately ignored here because this runs before a new
+    ; search reuses the same DTA/SDB.
     push ax
-    mov ax, [active_find]
-    cmp ax, 0FFFFh
-    je .done
+    call load_dta_find_handle
+    jc .done
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_CLOSE
     mov [request + REQ_HANDLE], ax
     call execute_request
-    mov word [active_find], 0FFFFh
+    call invalidate_dta_find_state
 .done:
+    pop ax
+    ret
+
+load_dta_find_handle:
+    ; Return AX = HOSTRPC find handle if the current DTA belongs to HOSTDRV.
+    ; The first byte keeps the ASCII drive letter with bit 7 set, matching the
+    ; old redirector and RBIL note that bit 7 marks network search state.
+    push bx
+    push di
+    push es
+    call load_dta_esdi
+    jc .fail
+    mov al, [drive_letter]
+    or al, 80h
+    cmp [es:di + DTA_DRIVE], al
+    jne .fail
+    cmp word [es:di + DTA_FIND_MAGIC], DTA_FIND_MAGIC_VALUE
+    jne .fail
+    mov ax, [es:di + DTA_FIND_HANDLE]
+    cmp ax, DTA_INVALID_HANDLE
+    je .fail
+    clc
+    jmp .done
+.fail:
+    stc
+.done:
+    pop es
+    pop di
+    pop bx
+    ret
+
+invalidate_dta_find_state:
+    ; Clear only HOSTDRV's hidden continuation fields.  The visible
+    ; found-file bytes at DTA+21 stay intact for DOS programs that inspect
+    ; stale data after CF=1.
+    push ax
+    push di
+    push es
+    call load_dta_esdi
+    jc .done
+    mov word [es:di + DTA_FIND_HANDLE], DTA_INVALID_HANDLE
+    mov word [es:di + DTA_FIND_MAGIC], 0
+.done:
+    pop es
+    pop di
     pop ax
     ret
 
@@ -673,6 +725,9 @@ write_dta_find_result:
     mov al, [drive_letter]
     or al, 80h
     mov [es:bx + DTA_DRIVE], al
+    mov ax, [request + REQ_HANDLE]
+    mov [es:bx + DTA_FIND_HANDLE], ax
+    mov word [es:bx + DTA_FIND_MAGIC], DTA_FIND_MAGIC_VALUE
     mov si, find_buf
     lea di, [bx + FOUND_NAME]
     mov cx, 11
@@ -1067,7 +1122,6 @@ upper_al:
 old_2f       dd 0
 sda_seg      dw 0
 sda_off      dw 0
-active_find  dw 0FFFFh
 device_info  dw 8048h
 sft_open_mode dw 0FF02h
 phys_tmp     dd 0
