@@ -18,6 +18,7 @@ OPL *emu8950_opl;
 #include "audio/mpu401.c.inl"
 #include "audio/sound_blaster.c.inl"
 #include "i8237.c.inl"
+#include "r36sx_host_rpc.c.inl"
 
 uint8_t crt_controller_idx, crt_controller[32];
 uint8_t port60, port61, port64;
@@ -732,6 +733,12 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 }
 
 void portout(uint16_t portnum, uint16_t value) {
+    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
+        portnum <= R36SX_HOST_RPC_PORT_LAST) {
+        r36sx_host_rpc_portout(portnum, (uint8_t)value);
+        return;
+    }
+
     switch (portnum) {
         case R36SX_PC_POST_PORT:
             r36sx_test386_current_post = (uint8_t)value;
@@ -1119,6 +1126,11 @@ if (sound_chips_clock) {
 }
 
 uint16_t portin(uint16_t portnum) {
+    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
+        portnum <= R36SX_HOST_RPC_PORT_LAST) {
+        return r36sx_host_rpc_portin(portnum);
+    }
+
     switch (portnum) {
         case 0x00:
         case 0x01:
