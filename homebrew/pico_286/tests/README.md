@@ -84,6 +84,30 @@ test_bios_rom=test286.bin
 cpu_model=80286
 ```
 
+## pcxtbios
+
+`pcxtbios/pcxtbios_from_ghidra_bytes.asm` is a byte-preserving NASM rebuild
+source for the embedded 8 KB PC/XT-style BIOS ROM used by Pico-286.  It was
+generated from `BIOS/pcxtbios_ghidra_full.s` and emits the original ROM bytes
+with `db` directives while keeping Ghidra/ndisasm context as comments.
+
+This source is intentionally conservative: it rebuilds byte-identically to
+`BIOS/pcxtbios.bin` before we start replacing understood ranges with symbolic
+labels and real instructions.
+
+Build it with WSL NASM or any NASM-compatible binary:
+
+```sh
+nasm -f bin homebrew/pico_286/tests/pcxtbios/pcxtbios_from_ghidra_bytes.asm \
+  -o BIOS/nasm_attempt/pcxtbios_from_ghidra_bytes.bin
+```
+
+Expected SHA-256 for the rebuilt ROM:
+
+```text
+468396458c74542e6fdf675fa53e9552b3037a5d6119e3232f486e8543922b96
+```
+
 ## MAPDRIVE.COM
 
 `homebrew/pico_286/pico-286/tools/mapdrive.asm` is the standalone DOS utility

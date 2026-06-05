@@ -21,9 +21,9 @@ It is closer to NASM syntax than the Ghidra dump, but it is still a listing,
 not a ready source file.  It also linearly decodes banner strings and tables as
 instructions until a human marks those ranges as data.
 
-The working first step is:
+The working source was moved next to the Pico-286 test BIOS sources:
 
-- `pcxtbios_from_ghidra_bytes.asm`
+- `homebrew/pico_286/tests/pcxtbios/pcxtbios_from_ghidra_bytes.asm`
 
 This file is a byte-preserving NASM source.  It emits the BIOS bytes with `db`
 directives and preserves the Ghidra disassembly as comments.  It is not yet a
@@ -33,7 +33,7 @@ can be rebuilt through NASM.
 ## Build
 
 ```sh
-nasm -f bin BIOS/nasm_attempt/pcxtbios_from_ghidra_bytes.asm \
+nasm -f bin homebrew/pico_286/tests/pcxtbios/pcxtbios_from_ghidra_bytes.asm \
   -o BIOS/nasm_attempt/pcxtbios_from_ghidra_bytes.bin
 ```
 
