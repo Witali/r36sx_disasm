@@ -16,11 +16,15 @@
 #define HOST_BASE_DIR "/tmp/"
 #include "findfirst.h"
 #endif
-#if R36SX_DEBUG_REDIRECTOR_TRACE
-#define debug_log(...) printf(__VA_ARGS__)
+#if defined(R36SX_PICO286_HOST_DRIVE_CONFIG) && R36SX_DEBUG_REDIRECTOR_TRACE
+#define redirector_trace_log(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#elif R36SX_DEBUG_REDIRECTOR_TRACE
+#define redirector_trace_log(...) printf(__VA_ARGS__)
 #else
-#define debug_log(...) ((void)0)
+#define redirector_trace_log(...) ((void)0)
 #endif
+
+#define debug_log(...) redirector_trace_log(__VA_ARGS__)
 
 #if defined(R36SX_PICO286_HOST_DRIVE_CONFIG) && R36SX_DEBUG_REDIRECTOR_ERRORS
 #define redirector_error_log(...) r36sx_pico286_debug_log(__VA_ARGS__)
@@ -41,6 +45,60 @@
 FILE *open_files[MAX_FILES] = {0};
 static uint32_t open_file_sft_addr[MAX_FILES] = {0};
 static uint16_t open_file_device_info[MAX_FILES] = {0};
+
+#if R36SX_DEBUG_REDIRECTOR_TRACE
+static uint32_t redirector_trace_seq = 0;
+
+static inline unsigned redirector_open_file_count(void)
+{
+    unsigned count = 0;
+    for (unsigned i = 0; i < MAX_FILES; ++i) {
+        if (open_files[i]) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+static inline void redirector_trace_slots(const char *event)
+{
+#if R36SX_DEBUG_REDIRECTOR_TRACE_SLOTS
+    char slots[256];
+    size_t used = 0;
+
+    if (!event) {
+        event = "slots";
+    }
+    slots[0] = '\0';
+    for (unsigned i = 0; i < MAX_FILES && used + 1 < sizeof(slots); ++i) {
+        if (!open_files[i]) {
+            continue;
+        }
+        int written = snprintf(slots + used, sizeof(slots) - used,
+                               "%s%u:%05lx/%04x",
+                               used ? "," : "",
+                               i,
+                               (unsigned long)open_file_sft_addr[i],
+                               open_file_device_info[i]);
+        if (written < 0) {
+            break;
+        }
+        if ((size_t)written >= sizeof(slots) - used) {
+            used = sizeof(slots) - 1;
+            break;
+        }
+        used += (size_t)written;
+    }
+    redirector_trace_log("redir: %s open_count=%u slots=[%s]",
+                         event, redirector_open_file_count(), slots);
+#else
+    (void)event;
+#endif
+}
+#else
+#define redirector_open_file_count() 0u
+#define redirector_trace_slots(event) ((void)0)
+#endif
 
 #ifdef WIN32
 #ifndef mkdir
@@ -279,6 +337,49 @@ static inline sftstruct *guest_sft_ptr(void) {
     return guest_sft_address(&address) ? (sftstruct *) &RAM[address] : NULL;
 }
 
+#if R36SX_DEBUG_REDIRECTOR_TRACE
+static inline void redirector_trace_sft(const char *event,
+                                        const sftstruct *sftptr)
+{
+    uint32_t sft_addr = 0;
+    bool have_sft_addr = guest_sft_address(&sft_addr);
+
+    if (!event) {
+        event = "sft";
+    }
+    if (!sftptr) {
+        redirector_trace_log("redir: %s sft=null sft_addr_ok=%u",
+                             event, have_sft_addr ? 1u : 0u);
+        return;
+    }
+
+    /*
+     * SFT state is the main DOS/redirector contract. When a second or later
+     * copy fails, these fields tell us whether DOS changed the slot number,
+     * position, size, or device marker before the next callback.
+     */
+    redirector_trace_log(
+        "redir: %s sft=%05lx handle=%u open=%u mode=%04x attr=%02x dev=%04x pos=%lu size=%lu total=%04x slot_sft=%05lx slot_dev=%04x",
+        event,
+        have_sft_addr ? (unsigned long)sft_addr : 0ul,
+        sftptr->file_handle,
+        (sftptr->file_handle < MAX_FILES &&
+         open_files[sftptr->file_handle]) ? 1u : 0u,
+        sftptr->open_mode,
+        sftptr->attribute,
+        sftptr->device_info,
+        (unsigned long)sftptr->file_position,
+        (unsigned long)sftptr->file_size,
+        sftptr->total_handles,
+        (sftptr->file_handle < MAX_FILES) ?
+            (unsigned long)open_file_sft_addr[sftptr->file_handle] : 0ul,
+        (sftptr->file_handle < MAX_FILES) ?
+            open_file_device_info[sftptr->file_handle] : 0u);
+}
+#else
+#define redirector_trace_sft(event, sftptr) ((void)0)
+#endif
+
 static inline bool guest_read_u16_ram(uint32_t address, uint16_t *value) {
     if (!guest_ram_range_ok(address, 2u)) {
         *value = 0;
@@ -489,6 +590,8 @@ static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
      */
     if (!sftptr || sftptr->file_handle >= MAX_FILES ||
         !open_files[sftptr->file_handle]) {
+        redirector_trace_sft("sft_not_mine_no_slot", sftptr);
+        redirector_trace_slots("sft_not_mine_no_slot");
         return false;
     }
 
@@ -513,11 +616,19 @@ static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
 static inline void redirector_clear_file_slot(uint16_t file_handle)
 {
     if (file_handle >= MAX_FILES) {
+        redirector_trace_log("redir: clear slot ignored invalid handle=%u",
+                             file_handle);
         return;
     }
+    redirector_trace_log("redir: clear slot handle=%u file=%p sft=%05lx dev=%04x",
+                         file_handle,
+                         (void *)open_files[file_handle],
+                         (unsigned long)open_file_sft_addr[file_handle],
+                         open_file_device_info[file_handle]);
     open_files[file_handle] = NULL;
     open_file_sft_addr[file_handle] = 0;
     open_file_device_info[file_handle] = 0;
+    redirector_trace_slots("after clear slot");
 }
 
 static inline void redirector_mark_file_slot(uint16_t file_handle,
@@ -525,11 +636,19 @@ static inline void redirector_mark_file_slot(uint16_t file_handle,
 {
     uint32_t sft_addr = 0;
     if (file_handle >= MAX_FILES) {
+        redirector_trace_log("redir: mark slot ignored invalid handle=%u",
+                             file_handle);
         return;
     }
     open_file_device_info[file_handle] = device_info;
     open_file_sft_addr[file_handle] =
         guest_sft_address(&sft_addr) ? sft_addr : 0;
+    redirector_trace_log("redir: mark slot handle=%u file=%p sft=%05lx dev=%04x",
+                         file_handle,
+                         (void *)open_files[file_handle],
+                         (unsigned long)open_file_sft_addr[file_handle],
+                         device_info);
+    redirector_trace_slots("after mark slot");
 }
 
 static inline bool redirector_dta_is_mine(const sdbstruct *dta)
@@ -622,8 +741,28 @@ static inline bool redirector_handler() {
     static sdbstruct *dta_ptr;
     static intptr_t handle = -1;
 
+#if R36SX_DEBUG_REDIRECTOR_TRACE
+    const uint16_t request_ax = CPU_AX;
+    const uint32_t trace_id = ++redirector_trace_seq;
+    redirector_trace_log(
+        "redir#%lu enter ax=%04x bx=%04x cx=%04x dx=%04x es:di=%04x:%04x sda=%05lx drive=%c cwd='%s' open=%u",
+        (unsigned long)trace_id,
+        request_ax,
+        CPU_BX,
+        CPU_CX,
+        CPU_DX,
+        CPU_ES,
+        CPU_DI,
+        (unsigned long)sda_addr,
+        redirector_effective_drive_letter(),
+        current_remote_dir,
+        redirector_open_file_count());
+#endif
+
     if (CPU_AX != 0x1100 &&
         (!sda_addr || !guest_ram_range_ok(sda_addr, SDA_MIN_SAFE_SIZE))) {
+        redirector_trace_log("redir: invalid SDA ax=%04x sda=%05lx",
+                             CPU_AX, (unsigned long)sda_addr);
         guest_memory_error();
         return true;
     }
@@ -714,6 +853,7 @@ static inline bool redirector_handler() {
         // Close Remote File
         case 0x1106: {
             sftstruct *sftptr = guest_sft_ptr();
+            redirector_trace_sft("close enter", sftptr);
             if (!sftptr) {
                 guest_memory_error();
                 break;
@@ -736,9 +876,12 @@ static inline bool redirector_handler() {
                 }
                 sftptr->total_handles = 0xffff;
                 redirector_clear_file_slot(file_handle);
+                redirector_trace_sft("close ok", sftptr);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
+                redirector_trace_log("redir: close invalid handle=%u",
+                                     file_handle);
                 CPU_AX = 6; // Invalid handle
                 CPU_FL_CF = 1;
             }
@@ -748,6 +891,7 @@ static inline bool redirector_handler() {
         // Commit Remote File
         case 0x1107: {
             sftstruct *sftptr = guest_sft_ptr();
+            redirector_trace_sft("commit enter", sftptr);
             if (!sftptr) {
                 guest_memory_error();
                 break;
@@ -770,9 +914,12 @@ static inline bool redirector_handler() {
                     CPU_FL_CF = 1;
                     break;
                 }
+                redirector_trace_sft("commit ok", sftptr);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
+                redirector_trace_log("redir: commit invalid handle=%u",
+                                     file_handle);
                 CPU_AX = 6; // Invalid handle
                 CPU_FL_CF = 1;
             }
@@ -782,6 +929,7 @@ static inline bool redirector_handler() {
         // Read Remote File
         case 0x1108: {
             sftstruct *sftptr = guest_sft_ptr();
+            redirector_trace_sft("read enter", sftptr);
             if (!sftptr) {
                 guest_memory_error();
                 break;
@@ -792,11 +940,17 @@ static inline bool redirector_handler() {
             const uint16_t file_handle = sftptr->file_handle; // We store our handle here
             if (file_handle < MAX_FILES && open_files[file_handle]) {
                 uint16_t bytes_to_read = CPU_CX;
+                uint32_t pos_before = sftptr->file_position;
                 debug_log("HANDLE COUNT %X %i (file_pos: %ld)\n", file_handle, bytes_to_read, sftptr->file_position);
 
                 // Ensure file pointer is at the correct position
                 if (fseek(open_files[file_handle], sftptr->file_position, SEEK_SET) != 0) {
-                    debug_log("Seek error to position %ld\n", sftptr->file_position);
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: read seek failed handle=%u pos=%lu err=%d",
+                        file_handle,
+                        (unsigned long)sftptr->file_position,
+                        err);
                     CPU_AX = 6; // Invalid handle or seek error
                     CPU_FL_CF = 1;
                     break;
@@ -805,9 +959,19 @@ static inline bool redirector_handler() {
                 uint32_t dta_addr = 0;
                 if (!guest_dta_address(&dta_addr) ||
                     !guest_ram_range_ok(dta_addr, bytes_to_read)) {
+                    redirector_error_log(
+                        "redir: read bad DTA handle=%u requested=%u",
+                        file_handle, bytes_to_read);
                     guest_memory_error();
                     break;
                 }
+                redirector_trace_log(
+                    "redir: read io handle=%u request=%u pos=%lu dta=%05lx file=%p",
+                    file_handle,
+                    bytes_to_read,
+                    (unsigned long)pos_before,
+                    (unsigned long)dta_addr,
+                    (void *)open_files[file_handle]);
                 errno = 0;
                 clearerr(open_files[file_handle]);
                 size_t bytes_read = fread(&RAM[dta_addr], 1, bytes_to_read, open_files[file_handle]);
@@ -827,10 +991,20 @@ static inline bool redirector_handler() {
 
                 // Update file position in SFT
                 redirector_sft_advance(sftptr, bytes_read, 0);
+                redirector_trace_log(
+                    "redir: read ok handle=%u requested=%u read=%lu pos_before=%lu pos_after=%lu eof=%u",
+                    file_handle,
+                    bytes_to_read,
+                    (unsigned long)bytes_read,
+                    (unsigned long)pos_before,
+                    (unsigned long)sftptr->file_position,
+                    feof(open_files[file_handle]) ? 1u : 0u);
                 CPU_AX = 0;
                 CPU_CX = bytes_read;
                 CPU_FL_CF = 0;
             } else {
+                redirector_trace_log("redir: read invalid handle=%u",
+                                     file_handle);
                 CPU_AX = 6; // Invalid handle
                 CPU_FL_CF = 1;
             }
@@ -840,6 +1014,7 @@ static inline bool redirector_handler() {
         // Write Remote File
         case 0x1109: {
             sftstruct *sftptr = guest_sft_ptr();
+            redirector_trace_sft("write enter", sftptr);
             if (!sftptr) {
                 guest_memory_error();
                 break;
@@ -851,11 +1026,17 @@ static inline bool redirector_handler() {
 
             if (file_handle < MAX_FILES && open_files[file_handle]) {
                 uint16_t bytes_to_write = CPU_CX;
+                uint32_t pos_before = sftptr->file_position;
                 debug_log("WRITE HANDLE %X %i (file_pos: %ld)\n", file_handle, bytes_to_write, sftptr->file_position);
 
                 // Ensure file pointer is at the correct position
                 if (fseek(open_files[file_handle], sftptr->file_position, SEEK_SET) != 0) {
-                    debug_log("Write seek error to position %ld\n", sftptr->file_position);
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: write seek failed handle=%u pos=%lu err=%d",
+                        file_handle,
+                        (unsigned long)sftptr->file_position,
+                        err);
                     CPU_AX = 6; // Invalid handle or seek error
                     CPU_FL_CF = 1;
                     break;
@@ -864,9 +1045,19 @@ static inline bool redirector_handler() {
                 uint32_t dta_addr = 0;
                 if (!guest_dta_address(&dta_addr) ||
                     !guest_ram_range_ok(dta_addr, bytes_to_write)) {
+                    redirector_error_log(
+                        "redir: write bad DTA handle=%u requested=%u",
+                        file_handle, bytes_to_write);
                     guest_memory_error();
                     break;
                 }
+                redirector_trace_log(
+                    "redir: write io handle=%u request=%u pos=%lu dta=%05lx file=%p",
+                    file_handle,
+                    bytes_to_write,
+                    (unsigned long)pos_before,
+                    (unsigned long)dta_addr,
+                    (void *)open_files[file_handle]);
                 errno = 0;
                 clearerr(open_files[file_handle]);
                 size_t bytes_written = fwrite(&RAM[dta_addr], 1, bytes_to_write, open_files[file_handle]);
@@ -874,6 +1065,14 @@ static inline bool redirector_handler() {
 
                 // Update file position in SFT and force write to disk
                 redirector_sft_advance(sftptr, bytes_written, 1);
+                redirector_trace_log(
+                    "redir: write result handle=%u requested=%u written=%lu pos_before=%lu pos_after=%lu size=%lu",
+                    file_handle,
+                    bytes_to_write,
+                    (unsigned long)bytes_written,
+                    (unsigned long)pos_before,
+                    (unsigned long)sftptr->file_position,
+                    (unsigned long)sftptr->file_size);
                 CPU_CX = bytes_written; // RBIL6: return bytes written in CX, not AX
                 // Short writes usually mean disk full; do not let DOS continue
                 // as if the destination accepted the whole buffer.
@@ -905,9 +1104,12 @@ static inline bool redirector_handler() {
                     CPU_FL_CF = 1;
                     break;
                 }
+                redirector_trace_sft("write ok", sftptr);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
+                redirector_trace_log("redir: write invalid handle=%u",
+                                     file_handle);
                 CPU_AX = 6; // Invalid handle
                 CPU_FL_CF = 1;
             }
@@ -936,13 +1138,19 @@ static inline bool redirector_handler() {
             }
             get_full_path(new_path, new_dos_path);
 
-            debug_log("Renaming '%s' to '%s'\n", old_path, new_path);
+            redirector_trace_log("redir: rename dos='%s' -> '%s' host='%s' -> '%s'",
+                                 old_dos_path, new_dos_path,
+                                 old_path, new_path);
 
             int result = rename(old_path, new_path);
             if (result == 0) {
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
+                const int err = errno ? errno : EIO;
+                redirector_error_log(
+                    "redir: rename failed old='%s' new='%s' err=%d",
+                    old_path, new_path, err);
                 CPU_AX = 5; // Access denied (typical for rename failure)
                 CPU_FL_CF = 1;
             }
@@ -959,8 +1167,11 @@ static inline bool redirector_handler() {
             }
             get_full_path(path, dos_path);
             errno = 0;
+            redirector_trace_log("redir: delete dos='%s' host='%s'",
+                                 dos_path, path);
             int result = unlink(path);
             if (result == 0) {
+                redirector_trace_log("redir: delete ok host='%s'", path);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
@@ -983,20 +1194,36 @@ static inline bool redirector_handler() {
                 return false;
             }
             get_full_path(path, dos_path);
-            debug_log("Opening %s %s\n", dos_path, path);
+            redirector_trace_log("redir: open dos='%s' host='%s'",
+                                 dos_path, path);
 
             const int8_t file_handle = get_free_handle();
             if (file_handle != -1) {
+                redirector_trace_log("redir: open free_slot=%d", file_handle);
+                errno = 0;
                 open_files[file_handle] = fopen(path, "rb+");
                 if (!open_files[file_handle]) {
+                    const int rw_err = errno ? errno : EIO;
                     // Try read-only mode if read-write fails
+                    errno = 0;
                     open_files[file_handle] = fopen(path, "rb");
-                    debug_log("Tried rb+ failed, trying rb: %s\n", open_files[file_handle] ? "SUCCESS" : "FAILED");
+                    redirector_trace_log(
+                        "redir: open rb+ failed err=%d rb=%s err=%d",
+                        rw_err,
+                        open_files[file_handle] ? "ok" : "fail",
+                        open_files[file_handle] ? 0 : (errno ? errno : EIO));
                 }
                 if (open_files[file_handle]) {
                     // Get file size
-                    fseek(open_files[file_handle], 0, SEEK_END);
-                    const size_t file_size = ftell(open_files[file_handle]);
+                    if (fseek(open_files[file_handle], 0, SEEK_END) != 0) {
+                        const int err = errno ? errno : EIO;
+                        redirector_error_log(
+                            "redir: open size seek failed handle=%u host='%s' err=%d",
+                            (unsigned)file_handle, path, err);
+                    }
+                    const long file_size_long = ftell(open_files[file_handle]);
+                    const size_t file_size = file_size_long >= 0 ?
+                        (size_t)file_size_long : 0u;
                     rewind(open_files[file_handle]);
 
                     sftstruct *sftptr = guest_sft_ptr();
@@ -1036,15 +1263,16 @@ static inline bool redirector_handler() {
                     sftptr->unk3 = 0;
                     sftptr->unk4 = 0xff;
 
+                    redirector_trace_sft("open ok", sftptr);
                     CPU_AX = 0;
                     CPU_FL_CF = 0;
                 } else {
-                    debug_log("not found\n");
+                    redirector_trace_log("redir: open not found host='%s'", path);
                     CPU_AX = 2; // File not found
                     CPU_FL_CF = 1;
                 }
             } else {
-                debug_log("too many open files\n");
+                redirector_trace_slots("open failed no free slot");
                 CPU_AX = 4; // Too many open files
                 CPU_FL_CF = 1;
             }
@@ -1063,6 +1291,9 @@ static inline bool redirector_handler() {
             if (file_handle != -1) {
                 get_full_path(path, dos_path);
 
+                redirector_trace_log("redir: create dos='%s' host='%s' slot=%d",
+                                     dos_path, path, file_handle);
+                errno = 0;
                 open_files[file_handle] = fopen(path, "wb+");
                 if (open_files[file_handle]) {
                     // Initialize SFT structure
@@ -1102,13 +1333,19 @@ static inline bool redirector_handler() {
                     sftptr->unk3 = 0;
                     sftptr->unk4 = 0xff;
 
+                    redirector_trace_sft("create ok", sftptr);
                     CPU_AX = 0;
                     CPU_FL_CF = 0;
                 } else {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: create failed dos='%s' host='%s' err=%d",
+                        dos_path, path, err);
                     CPU_AX = 3; // Path not found
                     CPU_FL_CF = 1;
                 }
             } else {
+                redirector_trace_slots("create failed no free slot");
                 CPU_AX = 4; // Too many open files
                 CPU_FL_CF = 1;
             }
@@ -1209,7 +1446,8 @@ static inline bool redirector_handler() {
                 return false;
             }
             get_full_path(path, dos_path);
-            debug_log("find first file: '%s'\n", path);
+            redirector_trace_log("redir: find_first dos='%s' host='%s'",
+                                 dos_path, path);
 
 
             redirector_close_find_search(&handle, &dta_ptr);
@@ -1234,10 +1472,17 @@ static inline bool redirector_handler() {
                 dta_ptr->foundfile.fattr = fileinfo.attrib;
 
                 // Other attributes can be set here if needed
+                redirector_trace_log(
+                    "redir: find_first ok handle=%ld dta=%p name='%.11s' size=%lu attr=%02x",
+                    (long)handle,
+                    (void *)dta_ptr,
+                    dta_ptr->foundfile.fname,
+                    (unsigned long)dta_ptr->foundfile.fsize,
+                    dta_ptr->foundfile.fattr);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
-                debug_log("error finding file: '%s'\n", path);
+                redirector_trace_log("redir: find_first no_match host='%s'", path);
                 dta_ptr = NULL;
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
@@ -1263,10 +1508,18 @@ static inline bool redirector_handler() {
                 dta_ptr->foundfile.fsize = fileinfo.size;
                 dta_ptr->foundfile.start_clstr = 0;
 
+                redirector_trace_log(
+                    "redir: find_next ok handle=%ld dta=%p name='%.11s' size=%lu attr=%02x",
+                    (long)handle,
+                    (void *)dta_ptr,
+                    dta_ptr->foundfile.fname,
+                    (unsigned long)dta_ptr->foundfile.fsize,
+                    dta_ptr->foundfile.fattr);
                 CPU_AX = 0;
                 CPU_FL_CF = 0;
             } else {
-                debug_log("no more files for: '%s'\n", path);
+                redirector_trace_log("redir: find_next done handle=%ld dta=%p",
+                                     (long)handle, (void *)dta_ptr);
                 redirector_close_find_search(&handle, &dta_ptr);
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
@@ -1276,9 +1529,16 @@ static inline bool redirector_handler() {
 
         // Flush All Remote Disk Buffers
         case 0x1120:
+            redirector_trace_slots("flush all enter");
             for (int i = 0; i < MAX_FILES; i++) {
                 if (open_files[i]) {
-                    fflush(open_files[i]);
+                    errno = 0;
+                    if (fflush(open_files[i]) != 0) {
+                        const int err = errno ? errno : EIO;
+                        redirector_error_log(
+                            "redir: flush all failed handle=%d err=%d",
+                            i, err);
+                    }
                 }
             }
             CPU_AX = 0;
@@ -1288,6 +1548,7 @@ static inline bool redirector_handler() {
         // Seek from File End
         case 0x1121: {
             sftstruct *sftptr = guest_sft_ptr();
+            redirector_trace_sft("seek_end enter", sftptr);
             if (!sftptr) {
                 guest_memory_error();
                 break;
@@ -1302,9 +1563,18 @@ static inline bool redirector_handler() {
                 int32_t offset_from_end = ((int32_t) CPU_CX << 16) | CPU_DX;
 
                 debug_log("Seek from end: handle %d, offset %ld\n", file_handle, offset_from_end);
+                redirector_trace_log(
+                    "redir: seek_end handle=%u offset=%ld file=%p",
+                    file_handle,
+                    (long)offset_from_end,
+                    (void *)open_files[file_handle]);
 
                 // Get current file size
                 if (fseek(open_files[file_handle], 0, SEEK_END) != 0) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: seek_end size seek failed handle=%u err=%d",
+                        file_handle, err);
                     CPU_AX = 6; // Invalid handle
                     CPU_FL_CF = 1;
                     break;
@@ -1312,6 +1582,10 @@ static inline bool redirector_handler() {
 
                 long file_size = ftell(open_files[file_handle]);
                 if (file_size == -1) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: seek_end ftell failed handle=%u err=%d",
+                        file_handle, err);
                     CPU_AX = 6; // Invalid handle
                     CPU_FL_CF = 1;
                     break;
@@ -1327,6 +1601,10 @@ static inline bool redirector_handler() {
 
                 // Seek to new position
                 if (fseek(open_files[file_handle], new_position, SEEK_SET) != 0) {
+                    const int err = errno ? errno : EIO;
+                    redirector_error_log(
+                        "redir: seek_end set failed handle=%u new_pos=%ld err=%d",
+                        file_handle, new_position, err);
                     CPU_AX = 6; // Invalid handle
                     CPU_FL_CF = 1;
                     break;
@@ -1340,7 +1618,10 @@ static inline bool redirector_handler() {
 
                 debug_log("Seek result: new position %ld (DX:AX = %04X:%04X)\n",
                           new_position, CPU_DX, CPU_AX);
+                redirector_trace_sft("seek_end ok", sftptr);
             } else {
+                redirector_trace_log("redir: seek_end invalid handle=%u",
+                                     file_handle);
                 CPU_AX = 6; // Invalid handle
                 CPU_FL_CF = 1;
             }
@@ -1352,5 +1633,17 @@ static inline bool redirector_handler() {
                 debug_log("UNIMPLEMENTED Redirector handler 0x%04x\n", CPU_AX);
             return false;
     }
+#if R36SX_DEBUG_REDIRECTOR_TRACE
+    redirector_trace_log(
+        "redir#%lu leave req=%04x ax=%04x bx=%04x cx=%04x dx=%04x cf=%u open=%u",
+        (unsigned long)trace_id,
+        request_ax,
+        CPU_AX,
+        CPU_BX,
+        CPU_CX,
+        CPU_DX,
+        CPU_FL_CF ? 1u : 0u,
+        redirector_open_file_count());
+#endif
     return true;
 }

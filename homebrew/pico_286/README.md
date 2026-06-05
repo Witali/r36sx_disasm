@@ -586,6 +586,12 @@ Protected-mode CPU diagnostics are controlled by the compile-time
 shell script) to compile out the noisy protected-mode diagnostic logs while
 leaving protected-mode execution enabled.
 
+Host-drive redirector diagnostics are controlled by
+`R36SX_DEBUG_REDIRECTOR_TRACE`.  Pass `-RedirectorTrace` (or
+`--redirector-trace` in the WSL shell script) to force a `DEBUG=1` build and log
+INT 2Fh redirector callbacks, SFT state, host paths, byte counts, and open-file
+slots.
+
 The normal build enables the computed-goto opcode dispatch table.  To compare
 against the old switch-based decoder, pass `-DisableComputedGoto`:
 

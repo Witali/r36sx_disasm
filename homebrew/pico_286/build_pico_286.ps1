@@ -5,6 +5,7 @@ param(
     [switch]$DisableFastMemory,
     [switch]$DisableProtectedMode,
     [switch]$DisableProtectedModeDebug,
+    [switch]$RedirectorTrace,
     [switch]$TryStrip
 )
 
@@ -35,12 +36,13 @@ $Crtn = Join-Path $Sysroot "usr\lib\crtn.o"
 $CrtBegin = Join-Path $GccLib "crtbegin.o"
 $CrtEnd = Join-Path $GccLib "crtend.o"
 $CompatHeader = Join-Path $PSScriptRoot "r36sx_pico286_compat.h"
-$DebugValue = if ($DebugLog) { "1" } else { "0" }
+$DebugValue = if ($DebugLog -or $RedirectorTrace) { "1" } else { "0" }
 $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 $ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
 $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 $ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
 $ProtectedModeDebugValue = if ($DisableProtectedModeDebug) { "0" } else { "1" }
+$RedirectorTraceValue = if ($RedirectorTrace) { "1" } else { "0" }
 $RootPath = $Root.Path
 
 function ConvertTo-CMacroString {
@@ -142,6 +144,7 @@ $CommonArgs = @(
     "-DR36SX_NATIVE_FAST_MEMORY=$FastMemoryValue",
     "-DR36SX_ENABLE_PROTECTED_MODE=$ProtectedModeValue",
     "-DR36SX_DEBUG_386_PROTECTED_MODE=$ProtectedModeDebugValue",
+    "-DR36SX_DEBUG_REDIRECTOR_TRACE=$RedirectorTraceValue",
     "-DR36SX_SEGMENT_BASE_CACHE=1",
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",

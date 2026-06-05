@@ -15,6 +15,7 @@ Options:
   --disable-protected-mode Compile out CR0.PE protected-mode switching.
   --disable-protected-mode-debug
                            Compile out noisy 386 protected-mode diagnostics.
+  --redirector-trace       Log host-drive redirector operations to debug log.
   --opt-level LEVEL        GCC optimization level. Default: O2.
   --enable-mips-dsp        Experimental buffer helpers with MIPS DSP Rev2.
   --rebuild-screenshot     Rebuild common screenshot.so and screenshot.a.
@@ -54,6 +55,7 @@ COMPUTED_GOTO_VALUE=1
 FAST_MEMORY_VALUE=1
 PROTECTED_MODE_VALUE=1
 PROTECTED_MODE_DEBUG_VALUE=1
+REDIRECTOR_TRACE_VALUE=0
 DO_STRIP=0
 OPT_LEVEL=O2
 MIPS_DSP_VALUE=0
@@ -83,6 +85,10 @@ while (($#)); do
             ;;
         --disable-protected-mode-debug)
             PROTECTED_MODE_DEBUG_VALUE=0
+            shift
+            ;;
+        --redirector-trace)
+            REDIRECTOR_TRACE_VALUE=1
             shift
             ;;
         --opt-level)
@@ -133,7 +139,8 @@ while (($#)); do
     esac
 done
 
-if ((DEBUG_VALUE)); then
+if ((DEBUG_VALUE || REDIRECTOR_TRACE_VALUE)); then
+    DEBUG_VALUE=1
     if [[ "$OPT_LEVEL" != "O2" ]]; then
         echo "Debug build requested; forcing --opt-level O2 instead of $OPT_LEVEL" >&2
     fi
@@ -212,6 +219,7 @@ common_args=(
     "-DR36SX_NATIVE_FAST_MEMORY=$FAST_MEMORY_VALUE"
     "-DR36SX_ENABLE_PROTECTED_MODE=$PROTECTED_MODE_VALUE"
     "-DR36SX_DEBUG_386_PROTECTED_MODE=$PROTECTED_MODE_DEBUG_VALUE"
+    "-DR36SX_DEBUG_REDIRECTOR_TRACE=$REDIRECTOR_TRACE_VALUE"
     "-DR36SX_SEGMENT_BASE_CACHE=1"
     "-DCPU_386_EXTENDED_OPS=1"
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1"
