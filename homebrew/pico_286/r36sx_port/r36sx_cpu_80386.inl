@@ -306,6 +306,23 @@ static inline uint32_t r36sx_read_moffs(void)
     return offset;
 }
 
+static inline uint32_t r36sx_cpu_portin32(uint16_t port)
+{
+    /*
+     * The emulator exposes 16-bit port helpers, so a 386 dword I/O transfer is
+     * represented as two adjacent word accesses after the permission check has
+     * approved the whole four-byte port range.
+     */
+    return (uint32_t)portin16(port) |
+           ((uint32_t)portin16((uint16_t)(port + 2u)) << 16);
+}
+
+static inline void r36sx_cpu_portout32(uint16_t port, uint32_t value)
+{
+    portout16(port, (uint16_t)value);
+    portout16((uint16_t)(port + 2u), (uint16_t)(value >> 16));
+}
+
 static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                                                              uint32_t fault_ip,
                                                              uint32_t execloops,
@@ -328,10 +345,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 return true;
             }
             uint32_t di = r36sx_dst_index();
-            uint32_t value = (uint32_t)portin16(CPU_DX) |
-                             ((uint32_t)portin16((uint16_t)(CPU_DX + 2u))
-                              << 16);
-            putmem32(CPU_ES, di, value);
+            putmem32(CPU_ES, di, r36sx_cpu_portin32(CPU_DX));
             r36sx_set_dst_index(df ? di - 4 : di + 4);
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
@@ -356,9 +370,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                 return true;
             }
             uint32_t si = r36sx_src_index();
-            uint32_t value = getmem32(useseg, si);
-            portout16(CPU_DX, (uint16_t)value);
-            portout16((uint16_t)(CPU_DX + 2u), (uint16_t)(value >> 16));
+            r36sx_cpu_portout32(CPU_DX, getmem32(useseg, si));
             r36sx_set_src_index(df ? si - 4 : si + 4);
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
@@ -802,6 +814,28 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             decodeflagsdword(pop32());
             return true;
 
+        /* IN EAX, imm8 */
+        case 0xE5: {
+            uint8_t port = getmem8(CPU_CS, CPU_IP);
+            StepIP(1);
+            if (!r36sx_cpu_require_io_permission(port, 4u, fault_ip)) {
+                return true;
+            }
+            CPU_EAX = r36sx_cpu_portin32(port);
+            return true;
+        }
+
+        /* OUT imm8, EAX */
+        case 0xE7: {
+            uint8_t port = getmem8(CPU_CS, CPU_IP);
+            StepIP(1);
+            if (!r36sx_cpu_require_io_permission(port, 4u, fault_ip)) {
+                return true;
+            }
+            r36sx_cpu_portout32(port, CPU_EAX);
+            return true;
+        }
+
         /* SHL/SHR/SAR/ROL/ROR/RCL/RCR r/m32, 1 */
         case 0xD1:
             modregrm();
@@ -845,6 +879,22 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             r36sx_cpu_set_ip(target_ip);
             return true;
         }
+
+        /* IN EAX, DX */
+        case 0xED:
+            if (!r36sx_cpu_require_io_permission(CPU_DX, 4u, fault_ip)) {
+                return true;
+            }
+            CPU_EAX = r36sx_cpu_portin32(CPU_DX);
+            return true;
+
+        /* OUT DX, EAX */
+        case 0xEF:
+            if (!r36sx_cpu_require_io_permission(CPU_DX, 4u, fault_ip)) {
+                return true;
+            }
+            r36sx_cpu_portout32(CPU_DX, CPU_EAX);
+            return true;
 
         /* TEST/NOT/NEG/MUL/IMUL/DIV/IDIV r/m32 */
         case 0xF7:
