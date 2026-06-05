@@ -188,7 +188,7 @@ F000:E26D  mov ds,dx                   ; Start scanning option ROM at C000h.
 F000:E2C6  xor bx,bx
 F000:E2C8  cmp word ptr [bx],0AA55h    ; Option ROM signature.
 F000:E2E2  call F000:E5C3              ; ROM checksum helper.
-F000:E2FA  call far [0067h]            ; Invoke accepted expansion ROM entry.
+F000:E2FA  call far es:[0067h]         ; Invoke accepted expansion ROM entry.
 F000:E312  jmp F000:E26D              ; Continue option ROM scan.
 
 ; After option ROM scanning the BIOS initializes visible text mode, prints

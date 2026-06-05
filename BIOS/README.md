@@ -11,6 +11,10 @@ This directory contains the 8 KiB BIOS ROM extracted from the embedded
 - `pcxtbios_ghidra_full.s` - Ghidra linear disassembly of the full ROM range.
 - `pcxtbios_ghidra_reset.s` - Ghidra disassembly starting at the reset entry.
 - `pcxtbios_init_annotated.asm` - hand-annotated init/reset notes.
+- `pcxtbios_init_annotated_nasm.asm` - NASM rebuild source generated from the
+  annotated notes.  It converts leading `F000:XXXX` listing addresses into
+  `loc_XXXX` labels and preserves unannotated ROM gaps from `pcxtbios.bin`.
+- `make_pcxtbios_init_nasm.ps1` - generator for the NASM rebuild source above.
 - `ghidra_pcxtbios/` - Ghidra summary, symbols, function list, disassembly,
   and decompiler output exported by the existing project script.
 
@@ -114,4 +118,13 @@ Ghidra was run as:
   -postScript DumpDisasmRanges.java .\BIOS\pcxtbios_ghidra_full.s 0xFE000 0x2000 `
   -postScript ExportDisasmAndDecompile.java .\BIOS\ghidra_pcxtbios `
   -deleteProject
+```
+
+The annotated init notes can be converted into a compilable NASM source and
+rebuilt as a byte-identical ROM:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\BIOS\make_pcxtbios_init_nasm.ps1
+wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && nasm -f bin BIOS/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin'
+wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && cmp -s BIOS/pcxtbios.bin BIOS/pcxtbios_init_annotated.bin && echo cmp_identical'
 ```
