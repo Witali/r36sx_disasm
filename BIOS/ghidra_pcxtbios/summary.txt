@@ -1,0 +1,9 @@
+PROGRAM	pcxtbios.bin
+LANGUAGE	x86:LE:16:Real Mode
+COMPILER	default
+IMAGE_BASE	0000:0000
+MIN_ADDRESS	f000:e000
+MAX_ADDRESS	f000:ffff
+
+MEMORY_BLOCKS
+ram	f000:e000	f000:ffff	R=true	W=true	X=true

@@ -1,0 +1,3902 @@
+f000:e01f:	c3	RET
+f000:e036:	c3	RET
+f000:e045:	c3	RET
+f000:e059:	90	NOP
+f000:e05a:	90	NOP
+
+### IN FUNCTION FUN_f000_ef3c
+f000:e05b:	fa	CLI
+f000:e05c:	fc	CLD
+f000:e05d:	b0 00	MOV AL,0x0
+f000:e05f:	e6 a0	OUT 0xa0,AL
+f000:e061:	ba d8 03	MOV DX,0x3d8
+f000:e064:	ee	OUT DX,AL
+f000:e065:	b2 b8	MOV DL,0xb8
+f000:e067:	fe c0	INC AL
+f000:e069:	ee	OUT DX,AL
+f000:e06a:	b0 99	MOV AL,0x99
+f000:e06c:	e6 63	OUT 0x63,AL
+f000:e06e:	b0 a5	MOV AL,0xa5
+f000:e070:	e6 61	OUT 0x61,AL
+f000:e072:	b0 54	MOV AL,0x54
+f000:e074:	e6 43	OUT 0x43,AL
+f000:e076:	b0 12	MOV AL,0x12
+f000:e078:	e6 41	OUT 0x41,AL
+f000:e07a:	b0 40	MOV AL,0x40
+f000:e07c:	e6 43	OUT 0x43,AL
+f000:e07e:	b0 00	MOV AL,0x0
+f000:e080:	e6 81	OUT 0x81,AL
+f000:e082:	e6 82	OUT 0x82,AL
+f000:e084:	e6 83	OUT 0x83,AL
+f000:e086:	e6 0d	OUT 0xd,AL
+f000:e088:	b0 58	MOV AL,0x58
+f000:e08a:	e6 0b	OUT 0xb,AL
+f000:e08c:	b0 41	MOV AL,0x41
+f000:e08e:	e6 0b	OUT 0xb,AL
+f000:e090:	b0 42	MOV AL,0x42
+f000:e092:	e6 0b	OUT 0xb,AL
+f000:e094:	b0 43	MOV AL,0x43
+f000:e096:	e6 0b	OUT 0xb,AL
+f000:e098:	b0 ff	MOV AL,0xff
+f000:e09a:	e6 01	OUT 0x1,AL
+f000:e09c:	e6 01	OUT 0x1,AL
+f000:e09e:	40	INC AX
+f000:e09f:	e6 08	OUT 0x8,AL
+f000:e0a1:	e6 0a	OUT 0xa,AL
+f000:e0a3:	b0 36	MOV AL,0x36
+f000:e0a5:	e6 43	OUT 0x43,AL
+f000:e0a7:	b0 00	MOV AL,0x0
+f000:e0a9:	e6 40	OUT 0x40,AL
+f000:e0ab:	e6 40	OUT 0x40,AL
+f000:e0ad:	ba 13 02	MOV DX,0x213
+f000:e0b0:	40	INC AX
+f000:e0b1:	ee	OUT DX,AL
+f000:e0b2:	b8 40 00	MOV AX,0x40
+f000:e0b5:	8e d8	MOV DS,AX
+f000:e0b7:	8b 36 72 00	MOV SI,word ptr [0x72]
+f000:e0bb:	33 c0	XOR AX,AX
+f000:e0bd:	8b e8	MOV BP,AX
+f000:e0bf:	8b d8	MOV BX,AX
+f000:e0c1:	ba aa 55	MOV DX,0x55aa
+f000:e0c4:	fc	CLD
+f000:e0c5:	33 ff	XOR DI,DI
+f000:e0c7:	8e c3	MOV ES,BX
+f000:e0c9:	26 89 15	MOV word ptr ES:[DI],DX
+f000:e0cc:	26 3b 15	CMP DX,word ptr ES:[DI]
+f000:e0cf:	75 0d	JNZ 0xf000:e0de
+f000:e0d1:	b9 00 20	MOV CX,0x2000
+f000:e0d4:	f3 ab	STOSW.REP ES:DI
+f000:e0d6:	80 c7 04	ADD BH,0x4
+f000:e0d9:	80 ff a0	CMP BH,0xa0
+f000:e0dc:	72 e7	JC 0xf000:e0c5
+f000:e0de:	33 c0	XOR AX,AX
+f000:e0e0:	8e c0	MOV ES,AX
+f000:e0e2:	8e d0	MOV SS,AX
+f000:e0e4:	bc 00 09	MOV SP,0x900
+f000:e0e7:	55	PUSH BP
+f000:e0e8:	53	PUSH BX
+f000:e0e9:	bd 02 00	MOV BP,0x2
+f000:e0ec:	e8 3c 18	CALL 0xf000:f92b
+f000:e0ef:	89 36 72 00	MOV word ptr [0x72],SI
+f000:e0f3:	58	POP AX
+f000:e0f4:	b1 06	MOV CL,0x6
+f000:e0f6:	d3 e8	SHR AX,CL
+f000:e0f8:	a3 13 00	MOV [0x13],AX
+f000:e0fb:	58	POP AX
+f000:e0fc:	73 02	JNC 0xf000:e100
+f000:e0fe:	0c 10	OR AL,0x10
+f000:e100:	a2 15 00	MOV [0x15],AL
+f000:e103:	33 c0	XOR AX,AX
+f000:e105:	50	PUSH AX
+f000:e106:	50	PUSH AX
+f000:e107:	50	PUSH AX
+f000:e108:	50	PUSH AX
+f000:e109:	50	PUSH AX
+f000:e10a:	b0 30	MOV AL,0x30
+f000:e10c:	8e d0	MOV SS,AX
+f000:e10e:	bc 00 01	MOV SP,0x100
+f000:e111:	1e	PUSH DS
+f000:e112:	bb 00 e0	MOV BX,0xe000
+f000:e115:	0e	PUSH CS
+f000:e116:	1f	POP DS
+f000:e117:	b4 01	MOV AH,0x1
+f000:e119:	e8 a4 04	CALL 0xf000:e5c0
+f000:e11c:	1f	POP DS
+f000:e11d:	74 05	JZ 0xf000:e124
+f000:e11f:	80 0e 15 00 01	OR byte ptr [0x15],0x1
+f000:e124:	fa	CLI
+f000:e125:	b0 13	MOV AL,0x13
+f000:e127:	e6 20	OUT 0x20,AL
+f000:e129:	b0 08	MOV AL,0x8
+f000:e12b:	e6 21	OUT 0x21,AL
+f000:e12d:	b0 09	MOV AL,0x9
+f000:e12f:	e6 21	OUT 0x21,AL
+f000:e131:	b0 ff	MOV AL,0xff
+f000:e133:	e6 21	OUT 0x21,AL
+f000:e135:	1e	PUSH DS
+f000:e136:	33 c0	XOR AX,AX
+f000:e138:	8e c0	MOV ES,AX
+f000:e13a:	0e	PUSH CS
+f000:e13b:	1f	POP DS
+f000:e13c:	b9 08 00	MOV CX,0x8
+f000:e13f:	33 ff	XOR DI,DI
+f000:e141:	b8 23 ff	MOV AX,0xff23
+f000:e144:	ab	STOSW ES:DI
+f000:e145:	8c c8	MOV AX,CS
+f000:e147:	ab	STOSW ES:DI
+f000:e148:	e2 f7	LOOP 0xf000:e141
+f000:e14a:	be f3 fe	MOV SI,0xfef3
+f000:e14d:	b1 18	MOV CL,0x18
+f000:e14f:	a5	MOVSW ES:DI,SI
+f000:e150:	8c c8	MOV AX,CS
+f000:e152:	ab	STOSW ES:DI
+f000:e153:	e2 fa	LOOP 0xf000:e14f
+f000:e155:	b4 f6	MOV AH,0xf6
+f000:e157:	8e d8	MOV DS,AX
+f000:e159:	33 db	XOR BX,BX
+f000:e15b:	b4 04	MOV AH,0x4
+f000:e15d:	8b 17	MOV DX,word ptr [BX]
+f000:e15f:	3a d6	CMP DL,DH
+f000:e161:	74 18	JZ 0xf000:e17b
+f000:e163:	81 fa 55 aa	CMP DX,0xaa55
+f000:e167:	74 12	JZ 0xf000:e17b
+f000:e169:	e8 54 04	CALL 0xf000:e5c0
+f000:e16c:	75 0d	JNZ 0xf000:e17b
+f000:e16e:	fe cc	DEC AH
+f000:e170:	75 eb	JNZ 0xf000:e15d
+f000:e172:	bf 60 00	MOV DI,0x60
+f000:e175:	33 c0	XOR AX,AX
+f000:e177:	ab	STOSW ES:DI
+f000:e178:	b4 f6	MOV AH,0xf6
+f000:e17a:	ab	STOSW ES:DI
+f000:e17b:	1f	POP DS
+f000:e17c:	33 d2	XOR DX,DX
+f000:e17e:	26 c7 06 08 00 5f f8	MOV word ptr ES:[0x8],0xf85f
+f000:e185:	26 c7 06 14 00 54 ff	MOV word ptr ES:[0x14],0xff54
+f000:e18c:	26 89 16 7c 00	MOV word ptr ES:[0x7c],DX
+f000:e191:	26 89 16 7e 00	MOV word ptr ES:[0x7e],DX
+f000:e196:	b2 61	MOV DL,0x61
+f000:e198:	ec	IN AL,DX
+f000:e199:	0c 30	OR AL,0x30
+f000:e19b:	ee	OUT DX,AL
+f000:e19c:	24 cf	AND AL,0xcf
+f000:e19e:	ee	OUT DX,AL
+f000:e19f:	b0 80	MOV AL,0x80
+f000:e1a1:	e6 a0	OUT 0xa0,AL
+f000:e1a3:	b8 30 00	MOV AX,0x30
+f000:e1a6:	a3 10 00	MOV [0x10],AX
+f000:e1a9:	cd 10	INT 0x10
+f000:e1ab:	b8 20 00	MOV AX,0x20
+f000:e1ae:	a3 10 00	MOV [0x10],AX
+f000:e1b1:	cd 10	INT 0x10
+f000:e1b3:	e4 62	IN AL,0x62
+f000:e1b5:	24 0f	AND AL,0xf
+f000:e1b7:	8a e0	MOV AH,AL
+f000:e1b9:	b0 ad	MOV AL,0xad
+f000:e1bb:	ee	OUT DX,AL
+f000:e1bc:	b0 61	MOV AL,0x61
+f000:e1be:	b4 00	MOV AH,0x0
+f000:e1c0:	a3 10 00	MOV [0x10],AX
+f000:e1c3:	24 30	AND AL,0x30
+f000:e1c5:	75 09	JNZ 0xf000:e1d0
+f000:e1c7:	b8 53 ff	MOV AX,0xff53
+f000:e1ca:	26 a3 40 00	MOV ES:[0x40],AX
+f000:e1ce:	eb 03	JMP 0xf000:e1d3
+f000:e1d0:	e8 c0 15	CALL 0xf000:f793
+f000:e1d3:	b0 08	MOV AL,0x8
+f000:e1d5:	ee	OUT DX,AL
+f000:e1d6:	b9 56 29	MOV CX,0x2956
+f000:e1d9:	e2 fe	LOOP 0xf000:e1d9
+f000:e1db:	b0 c8	MOV AL,0xc8
+f000:e1dd:	ee	OUT DX,AL
+f000:e1de:	34 80	XOR AL,0x80
+f000:e1e0:	ee	OUT DX,AL
+f000:e1e1:	b8 1e 00	MOV AX,0x1e
+f000:e1e4:	a3 1a 00	MOV [0x1a],AX
+f000:e1e7:	a3 1c 00	MOV [0x1c],AX
+f000:e1ea:	a3 80 00	MOV [0x80],AX
+f000:e1ed:	04 20	ADD AL,0x20
+f000:e1ef:	a3 82 00	MOV [0x82],AX
+f000:e1f2:	b8 14 14	MOV AX,0x1414
+f000:e1f5:	a3 78 00	MOV [0x78],AX
+f000:e1f8:	a3 7a 00	MOV [0x7a],AX
+f000:e1fb:	b8 01 01	MOV AX,0x101
+f000:e1fe:	a3 7c 00	MOV [0x7c],AX
+f000:e201:	a3 7e 00	MOV [0x7e],AX
+f000:e204:	c7 06 08 00 78 03	MOV word ptr [0x8],0x378
+f000:e20a:	c7 06 0a 00 78 02	MOV word ptr [0xa],0x278
+f000:e210:	c6 06 11 00 80	MOV byte ptr [0x11],0x80
+f000:e215:	33 ff	XOR DI,DI
+f000:e217:	ba fb 03	MOV DX,0x3fb
+f000:e21a:	b0 1a	MOV AL,0x1a
+f000:e21c:	ee	OUT DX,AL
+f000:e21d:	b0 ff	MOV AL,0xff
+f000:e21f:	e6 c0	OUT 0xc0,AL
+f000:e221:	ec	IN AL,DX
+f000:e222:	3c 1a	CMP AL,0x1a
+f000:e224:	75 06	JNZ 0xf000:e22c
+f000:e226:	c7 05 f8 03	MOV word ptr [DI],0x3f8
+f000:e22a:	47	INC DI
+f000:e22b:	47	INC DI
+f000:e22c:	ba fb 02	MOV DX,0x2fb
+f000:e22f:	b0 1a	MOV AL,0x1a
+f000:e231:	ee	OUT DX,AL
+f000:e232:	b0 ff	MOV AL,0xff
+f000:e234:	e6 c0	OUT 0xc0,AL
+f000:e236:	ec	IN AL,DX
+f000:e237:	3c 1a	CMP AL,0x1a
+f000:e239:	75 06	JNZ 0xf000:e241
+f000:e23b:	c7 05 f8 02	MOV word ptr [DI],0x2f8
+f000:e23f:	47	INC DI
+f000:e240:	47	INC DI
+f000:e241:	8b c7	MOV AX,DI
+f000:e243:	08 06 11 00	OR byte ptr [0x11],AL
+f000:e247:	b1 64	MOV CL,0x64
+f000:e249:	ba 01 02	MOV DX,0x201
+f000:e24c:	ec	IN AL,DX
+f000:e24d:	3c ff	CMP AL,0xff
+f000:e24f:	75 05	JNZ 0xf000:e256
+f000:e251:	49	DEC CX
+f000:e252:	e3 07	JCXZ 0xf000:e25b
+f000:e254:	eb f6	JMP 0xf000:e24c
+f000:e256:	80 0e 11 00 10	OR byte ptr [0x11],0x10
+f000:e25b:	e8 26 03	CALL 0xf000:e584
+f000:e25e:	8b 1e 72 00	MOV BX,word ptr [0x72]
+f000:e262:	53	PUSH BX
+f000:e263:	1e	PUSH DS
+f000:e264:	e4 61	IN AL,0x61
+f000:e266:	34 0c	XOR AL,0xc
+f000:e268:	e6 61	OUT 0x61,AL
+f000:e26a:	ba 00 c0	MOV DX,0xc000
+f000:e26d:	8e da	MOV DS,DX
+f000:e26f:	eb 55	JMP 0xf000:e2c6
+
+### FUNCTION FUN_f000_e271 @ f000:e271
+f000:e271:	33 c0	XOR AX,AX
+f000:e273:	8e d8	MOV DS,AX
+f000:e275:	a3 72 04	MOV [0x472],AX
+f000:e278:	e9 e0 fd	JMP 0xf000:e05b
+
+### NO FUNCTION
+f000:e29e:	90	NOP
+f000:e29f:	90	NOP
+f000:e2a0:	90	NOP
+f000:e2a1:	90	NOP
+f000:e2a2:	90	NOP
+f000:e2a3:	90	NOP
+f000:e2a4:	90	NOP
+f000:e2a5:	90	NOP
+f000:e2a6:	90	NOP
+f000:e2a7:	90	NOP
+f000:e2a8:	90	NOP
+f000:e2a9:	90	NOP
+f000:e2aa:	90	NOP
+f000:e2ab:	90	NOP
+f000:e2ac:	90	NOP
+f000:e2ad:	90	NOP
+f000:e2ae:	90	NOP
+f000:e2af:	90	NOP
+f000:e2b0:	90	NOP
+f000:e2b1:	90	NOP
+f000:e2b2:	90	NOP
+f000:e2b3:	90	NOP
+f000:e2b4:	90	NOP
+f000:e2b5:	90	NOP
+f000:e2b6:	90	NOP
+f000:e2b7:	90	NOP
+f000:e2b8:	90	NOP
+f000:e2b9:	90	NOP
+f000:e2ba:	90	NOP
+f000:e2bb:	90	NOP
+f000:e2bc:	90	NOP
+f000:e2bd:	90	NOP
+f000:e2be:	90	NOP
+f000:e2bf:	90	NOP
+f000:e2c0:	90	NOP
+f000:e2c1:	90	NOP
+f000:e2c2:	90	NOP
+f000:e2c3:	e9 99 15	JMP 0xf000:f85f
+
+### FUNCTION FUN_f000_e2c6 @ f000:e2c6
+f000:e2c6:	33 db	XOR BX,BX
+f000:e2c8:	81 3f 55 aa	CMP word ptr [BX],0xaa55
+f000:e2cc:	75 3a	JNZ 0xf000:e308
+f000:e2ce:	b8 40 00	MOV AX,0x40
+f000:e2d1:	8e c0	MOV ES,AX
+f000:e2d3:	8a 47 02	MOV AL,byte ptr [BX + 0x2]
+f000:e2d6:	b1 05	MOV CL,0x5
+f000:e2d8:	d3 e0	SHL AX,CL
+f000:e2da:	03 d0	ADD DX,AX
+f000:e2dc:	b1 04	MOV CL,0x4
+f000:e2de:	d3 e0	SHL AX,CL
+f000:e2e0:	8b c8	MOV CX,AX
+f000:e2e2:	e8 de 02	CALL 0xf000:e5c3
+f000:e2e5:	75 1b	JNZ 0xf000:e302
+f000:e2e7:	52	PUSH DX
+f000:e2e8:	26 c6 06 12 00 01	MOV byte ptr ES:[0x12],0x1
+f000:e2ee:	26 c7 06 67 00 03 00	MOV word ptr ES:[0x67],0x3
+f000:e2f5:	26 8c 1e 69 00	MOV word ptr ES:[0x69],DS
+f000:e2fa:	26 ff 1e 67 00	CALLF [0x67]
+f000:e2ff:	5a	POP DX
+f000:e300:	eb 0a	JMP 0xf000:e30c
+f000:e302:	26 80 0e 15 00 20	OR byte ptr ES:[0x15],0x20
+f000:e308:	81 c2 80 00	ADD DX,0x80
+f000:e30c:	81 fa 00 fe	CMP DX,0xfe00
+f000:e310:	7d 03	JGE 0xf000:e315
+f000:e312:	e9 58 ff	JMP 0xf000:e26d
+f000:e315:	1f	POP DS
+f000:e316:	5b	POP BX
+f000:e317:	89 1e 72 00	MOV word ptr [0x72],BX
+f000:e31b:	e4 21	IN AL,0x21
+f000:e31d:	24 bc	AND AL,0xbc
+f000:e31f:	e6 21	OUT 0x21,AL
+f000:e321:	33 db	XOR BX,BX
+f000:e323:	38 1e 12 00	CMP byte ptr [0x12],BL
+f000:e327:	74 07	JZ 0xf000:e330
+f000:e329:	8e c3	MOV ES,BX
+f000:e32b:	b3 00	MOV BL,0x0
+f000:e32d:	e8 83 16	CALL 0xf000:f9b3
+f000:e330:	b4 12	MOV AH,0x12
+f000:e332:	bb 10 ff	MOV BX,0xff10
+f000:e335:	cd 10	INT 0x10
+f000:e337:	80 ff ff	CMP BH,0xff
+f000:e33a:	74 07	JZ 0xf000:e343
+f000:e33c:	80 26 10 00 cf	AND byte ptr [0x10],0xcf
+f000:e341:	eb 09	JMP 0xf000:e34c
+f000:e343:	a0 49 00	MOV AL,[0x49]
+f000:e346:	e8 c7 0b	CALL 0xf000:ef10
+f000:e349:	e8 47 14	CALL 0xf000:f793
+f000:e34c:	b4 01	MOV AH,0x1
+f000:e34e:	b5 f0	MOV CH,0xf0
+f000:e350:	cd 10	INT 0x10
+f000:e352:	e8 7b 16	CALL 0xf000:f9d0
+f000:e355:	c6 06 96 00 10	MOV byte ptr [0x96],0x10
+f000:e35a:	81 3e 72 00 34 12	CMP word ptr [0x72],0x1234
+f000:e360:	1e	PUSH DS
+f000:e361:	07	POP ES
+f000:e362:	0e	PUSH CS
+f000:e363:	1f	POP DS
+f000:e364:	75 05	JNZ 0xf000:e36b
+f000:e366:	b7 fd	MOV BH,0xfd
+f000:e368:	e9 33 01	JMP 0xf000:e49e
+f000:e36b:	be 00 e0	MOV SI,0xe000
+f000:e36e:	e8 79 16	CALL 0xf000:f9ea
+f000:e371:	be ff eb	MOV SI,0xebff
+f000:e374:	e8 6b 01	CALL 0xf000:e4e2
+f000:e377:	26 f6 06 15 00 ff	TEST byte ptr ES:[0x15],0xff
+f000:e37d:	74 3e	JZ 0xf000:e3bd
+f000:e37f:	b8 00 03	MOV AX,0x300
+f000:e382:	e8 68 01	CALL 0xf000:e4ed
+f000:e385:	be 09 f8	MOV SI,0xf809
+f000:e388:	e8 57 01	CALL 0xf000:e4e2
+f000:e38b:	26 a0 15 00	MOV AL,ES:[0x15]
+f000:e38f:	e8 68 01	CALL 0xf000:e4fa
+f000:e392:	be 2f f8	MOV SI,0xf82f
+f000:e395:	e8 4a 01	CALL 0xf000:e4e2
+f000:e398:	b3 02	MOV BL,0x2
+f000:e39a:	e8 12 14	CALL 0xf000:f7af
+f000:e39d:	e8 4e 1b	CALL 0xf000:feee
+f000:e3a0:	50	PUSH AX
+f000:e3a1:	e8 33 01	CALL 0xf000:e4d7
+f000:e3a4:	58	POP AX
+f000:e3a5:	3c 59	CMP AL,0x59
+f000:e3a7:	74 09	JZ 0xf000:e3b2
+f000:e3a9:	3c 79	CMP AL,0x79
+f000:e3ab:	74 05	JZ 0xf000:e3b2
+f000:e3ad:	ea 71 e2 00 f0	JMPF 0xf000:e271
+f000:e3b2:	26 c6 06 15 00 00	MOV byte ptr ES:[0x15],0x0
+f000:e3b8:	e8 15 16	CALL 0xf000:f9d0
+f000:e3bb:	eb ae	JMP 0xf000:e36b
+f000:e3bd:	b8 00 03	MOV AX,0x300
+f000:e3c0:	e8 2a 01	CALL 0xf000:e4ed
+f000:e3c3:	e8 a0 01	CALL 0xf000:e566
+f000:e3c6:	be d3 f7	MOV SI,0xf7d3
+f000:e3c9:	b8 07 04	MOV AX,0x407
+f000:e3cc:	e8 1e 01	CALL 0xf000:e4ed
+f000:e3cf:	26 a0 49 00	MOV AL,ES:[0x49]
+f000:e3d3:	3c 07	CMP AL,0x7
+f000:e3d5:	74 10	JZ 0xf000:e3e7
+f000:e3d7:	26 a0 10 00	MOV AL,ES:[0x10]
+f000:e3db:	24 30	AND AL,0x30
+f000:e3dd:	75 05	JNZ 0xf000:e3e4
+f000:e3df:	be 1f e0	MOV SI,0xe01f
+f000:e3e2:	eb 03	JMP 0xf000:e3e7
+f000:e3e4:	be 1f e0	MOV SI,0xe01f
+f000:e3e7:	e8 f8 00	CALL 0xf000:e4e2
+f000:e3ea:	bb 07 05	MOV BX,0x507
+f000:e3ed:	26 a0 11 00	MOV AL,ES:[0x11]
+f000:e3f1:	50	PUSH AX
+f000:e3f2:	b1 06	MOV CL,0x6
+f000:e3f4:	d2 c8	ROR AL,CL
+f000:e3f6:	24 03	AND AL,0x3
+f000:e3f8:	74 09	JZ 0xf000:e403
+f000:e3fa:	bd 08 00	MOV BP,0x8
+f000:e3fd:	be 36 e0	MOV SI,0xe036
+f000:e400:	e8 17 01	CALL 0xf000:e51a
+f000:e403:	58	POP AX
+f000:e404:	50	PUSH AX
+f000:e405:	be f9 e7	MOV SI,0xe7f9
+f000:e408:	d0 c8	ROR AL,0x1
+f000:e40a:	24 03	AND AL,0x3
+f000:e40c:	74 05	JZ 0xf000:e413
+f000:e40e:	33 ed	XOR BP,BP
+f000:e410:	e8 07 01	CALL 0xf000:e51a
+f000:e413:	58	POP AX
+f000:e414:	be 45 e0	MOV SI,0xe045
+f000:e417:	a8 10	TEST AL,0x10
+f000:e419:	74 0a	JZ 0xf000:e425
+f000:e41b:	8b c3	MOV AX,BX
+f000:e41d:	e8 cd 00	CALL 0xf000:e4ed
+f000:e420:	e8 bf 00	CALL 0xf000:e4e2
+f000:e423:	fe c7	INC BH
+f000:e425:	e8 7b 01	CALL 0xf000:e5a3
+f000:e428:	72 0d	JC 0xf000:e437
+f000:e42a:	8b c3	MOV AX,BX
+f000:e42c:	e8 be 00	CALL 0xf000:e4ed
+f000:e42f:	fe c7	INC BH
+f000:e431:	be ec f7	MOV SI,0xf7ec
+f000:e434:	e8 ab 00	CALL 0xf000:e4e2
+f000:e437:	fe cf	DEC BH
+f000:e439:	b3 07	MOV BL,0x7
+f000:e43b:	8b c3	MOV AX,BX
+f000:e43d:	e8 ad 00	CALL 0xf000:e4ed
+f000:e440:	be a1 f0	MOV SI,0xf0a1
+f000:e443:	e8 9c 00	CALL 0xf000:e4e2
+f000:e446:	fe c7	INC BH
+f000:e448:	fe c7	INC BH
+f000:e44a:	32 db	XOR BL,BL
+f000:e44c:	8b c3	MOV AX,BX
+f000:e44e:	e8 9c 00	CALL 0xf000:e4ed
+f000:e451:	be f4 f7	MOV SI,0xf7f4
+f000:e454:	e8 8b 00	CALL 0xf000:e4e2
+f000:e457:	06	PUSH ES
+f000:e458:	26 8b 2e 13 00	MOV BP,word ptr ES:[0x13]
+f000:e45d:	4d	DEC BP
+f000:e45e:	4d	DEC BP
+f000:e45f:	be 02 00	MOV SI,0x2
+f000:e462:	8b d6	MOV DX,SI
+f000:e464:	b8 80 00	MOV AX,0x80
+f000:e467:	8e c0	MOV ES,AX
+f000:e469:	80 c3 0d	ADD BL,0xd
+f000:e46c:	53	PUSH BX
+f000:e46d:	58	POP AX
+f000:e46e:	50	PUSH AX
+f000:e46f:	8c c1	MOV CX,ES
+f000:e471:	83 fd 01	CMP BP,0x1
+f000:e474:	74 09	JZ 0xf000:e47f
+f000:e476:	f7 c1 ff 01	TEST CX,0x1ff
+f000:e47a:	74 02	JZ 0xf000:e47e
+f000:e47c:	32 ed	XOR CH,CH
+f000:e47e:	4a	DEC DX
+f000:e47f:	e8 6b 00	CALL 0xf000:e4ed
+f000:e482:	e8 b7 00	CALL 0xf000:e53c
+f000:e485:	42	INC DX
+f000:e486:	e8 a2 14	CALL 0xf000:f92b
+f000:e489:	72 38	JC 0xf000:e4c3
+f000:e48b:	4d	DEC BP
+f000:e48c:	75 df	JNZ 0xf000:e46d
+f000:e48e:	5b	POP BX
+f000:e48f:	07	POP ES
+f000:e490:	b8 1e 00	MOV AX,0x1e
+f000:e493:	26 a3 1a 00	MOV ES:[0x1a],AX
+f000:e497:	26 a3 1c 00	MOV ES:[0x1c],AX
+f000:e49b:	e8 2f 01	CALL 0xf000:e5cd
+f000:e49e:	b3 01	MOV BL,0x1
+f000:e4a0:	e8 0c 13	CALL 0xf000:f7af
+f000:e4a3:	e8 2a 15	CALL 0xf000:f9d0
+f000:e4a6:	33 c0	XOR AX,AX
+f000:e4a8:	8e d8	MOV DS,AX
+f000:e4aa:	c7 06 72 04 34 12	MOV word ptr [0x472],0x1234
+f000:e4b0:	b4 01	MOV AH,0x1
+f000:e4b2:	b9 0c 0b	MOV CX,0xb0c
+f000:e4b5:	80 3e 49 04 07	CMP byte ptr [0x449],0x7
+f000:e4ba:	74 03	JZ 0xf000:e4bf
+f000:e4bc:	b9 07 06	MOV CX,0x607
+f000:e4bf:	cd 10	INT 0x10
+f000:e4c1:	cd 19	INT 0x19
+f000:e4c3:	4d	DEC BP
+f000:e4c4:	5b	POP BX
+f000:e4c5:	07	POP ES
+f000:e4c6:	26 80 0e 15 00 02	OR byte ptr ES:[0x15],0x2
+f000:e4cc:	fe c7	INC BH
+f000:e4ce:	fe c7	INC BH
+f000:e4d0:	32 db	XOR BL,BL
+f000:e4d2:	8b c3	MOV AX,BX
+f000:e4d4:	e9 ab fe	JMP 0xf000:e382
+
+### FUNCTION FUN_f000_e4d7 @ f000:e4d7
+f000:e4d7:	53	PUSH BX
+f000:e4d8:	50	PUSH AX
+f000:e4d9:	b4 0e	MOV AH,0xe
+f000:e4db:	b3 07	MOV BL,0x7
+f000:e4dd:	cd 10	INT 0x10
+f000:e4df:	58	POP AX
+f000:e4e0:	5b	POP BX
+f000:e4e1:	c3	RET
+
+### FUNCTION FUN_f000_e4e2 @ f000:e4e2
+f000:e4e2:	ac	LODSB SI
+f000:e4e3:	0a c0	OR AL,AL
+f000:e4e5:	74 05	JZ 0xf000:e4ec
+f000:e4e7:	e8 ed ff	CALL 0xf000:e4d7
+f000:e4ea:	eb f6	JMP 0xf000:e4e2
+f000:e4ec:	c3	RET
+
+### FUNCTION FUN_f000_e4ed @ f000:e4ed
+f000:e4ed:	52	PUSH DX
+f000:e4ee:	53	PUSH BX
+f000:e4ef:	8b d0	MOV DX,AX
+f000:e4f1:	b4 02	MOV AH,0x2
+f000:e4f3:	b7 00	MOV BH,0x0
+f000:e4f5:	cd 10	INT 0x10
+f000:e4f7:	5b	POP BX
+f000:e4f8:	5a	POP DX
+f000:e4f9:	c3	RET
+
+### FUNCTION FUN_f000_e4fa @ f000:e4fa
+f000:e4fa:	50	PUSH AX
+f000:e4fb:	b1 04	MOV CL,0x4
+f000:e4fd:	d2 e8	SHR AL,CL
+f000:e4ff:	e8 e0 01	CALL 0xf000:e6e2
+f000:e502:	58	POP AX
+f000:e503:	e8 dc 01	CALL 0xf000:e6e2
+f000:e506:	c3	RET
+
+### FUNCTION FUN_f000_e507 @ f000:e507
+f000:e507:	50	PUSH AX
+f000:e508:	8a c4	MOV AL,AH
+f000:e50a:	e8 d5 01	CALL 0xf000:e6e2
+f000:e50d:	58	POP AX
+f000:e50e:	e8 e9 ff	CALL 0xf000:e4fa
+f000:e511:	c3	RET
+
+### FUNCTION FUN_f000_e512 @ f000:e512
+f000:e512:	50	PUSH AX
+f000:e513:	8a c4	MOV AL,AH
+f000:e515:	e8 e2 ff	CALL 0xf000:e4fa
+f000:e518:	eb f3	JMP 0xf000:e50d
+
+### FUNCTION FUN_f000_e51a @ f000:e51a
+f000:e51a:	8a d0	MOV DL,AL
+f000:e51c:	8b c3	MOV AX,BX
+f000:e51e:	e8 cc ff	CALL 0xf000:e4ed
+f000:e521:	56	PUSH SI
+f000:e522:	e8 bd ff	CALL 0xf000:e4e2
+f000:e525:	26 8b 46 00	MOV AX,word ptr ES:[BP + 0x0]
+f000:e529:	e8 db ff	CALL 0xf000:e507
+f000:e52c:	be a3 fe	MOV SI,0xfea3
+f000:e52f:	e8 b0 ff	CALL 0xf000:e4e2
+f000:e532:	5e	POP SI
+f000:e533:	45	INC BP
+f000:e534:	45	INC BP
+f000:e535:	fe c7	INC BH
+f000:e537:	fe ca	DEC DL
+f000:e539:	75 e1	JNZ 0xf000:e51c
+f000:e53b:	c3	RET
+
+### FUNCTION FUN_f000_e53c @ f000:e53c
+f000:e53c:	f8	CLC
+f000:e53d:	8a c2	MOV AL,DL
+f000:e53f:	fe c0	INC AL
+f000:e541:	27	DAA
+f000:e542:	8a d0	MOV DL,AL
+f000:e544:	73 07	JNC 0xf000:e54d
+f000:e546:	8a c6	MOV AL,DH
+f000:e548:	14 00	ADC AL,0x0
+f000:e54a:	27	DAA
+f000:e54b:	8a f0	MOV DH,AL
+f000:e54d:	80 fd 00	CMP CH,0x0
+f000:e550:	74 13	JZ 0xf000:e565
+f000:e552:	8a c6	MOV AL,DH
+f000:e554:	e8 8b 01	CALL 0xf000:e6e2
+f000:e557:	8a c2	MOV AL,DL
+f000:e559:	b1 04	MOV CL,0x4
+f000:e55b:	d2 c8	ROR AL,CL
+f000:e55d:	e8 82 01	CALL 0xf000:e6e2
+f000:e560:	8a c2	MOV AL,DL
+f000:e562:	e8 7d 01	CALL 0xf000:e6e2
+f000:e565:	c3	RET
+
+### FUNCTION FUN_f000_e566 @ f000:e566
+f000:e566:	be c1 ff	MOV SI,0xffc1
+f000:e569:	e8 76 ff	CALL 0xf000:e4e2
+f000:e56c:	e8 ac 13	CALL 0xf000:f91b
+f000:e56f:	e8 70 ff	CALL 0xf000:e4e2
+f000:e572:	be 13 f9	MOV SI,0xf913
+f000:e575:	26 f6 06 10 00 02	TEST byte ptr ES:[0x10],0x2
+f000:e57b:	74 03	JZ 0xf000:e580
+f000:e57d:	be e6 ff	MOV SI,0xffe6
+f000:e580:	e8 5f ff	CALL 0xf000:e4e2
+f000:e583:	c3	RET
+
+### FUNCTION FUN_f000_e584 @ f000:e584
+f000:e584:	db e3	FNINIT
+f000:e586:	be 00 02	MOV SI,0x200
+f000:e589:	c6 44 01 00	MOV byte ptr [SI + 0x1],0x0
+f000:e58d:	d9 3c	FNSTCW word ptr [SI]
+f000:e58f:	8a 64 01	MOV AH,byte ptr [SI + 0x1]
+f000:e592:	80 fc 03	CMP AH,0x3
+f000:e595:	75 06	JNZ 0xf000:e59d
+f000:e597:	80 0e 10 00 02	OR byte ptr [0x10],0x2
+f000:e59c:	c3	RET
+f000:e59d:	80 26 10 00 fd	AND byte ptr [0x10],0xfd
+f000:e5a2:	c3	RET
+
+### FUNCTION FUN_f000_e5a3 @ f000:e5a3
+f000:e5a3:	fa	CLI
+f000:e5a4:	ba c1 02	MOV DX,0x2c1
+f000:e5a7:	ec	IN AL,DX
+f000:e5a8:	3c 99	CMP AL,0x99
+f000:e5aa:	76 11	JBE 0xf000:e5bd
+f000:e5ac:	b2 41	MOV DL,0x41
+f000:e5ae:	ec	IN AL,DX
+f000:e5af:	3c 99	CMP AL,0x99
+f000:e5b1:	76 0a	JBE 0xf000:e5bd
+f000:e5b3:	b6 03	MOV DH,0x3
+f000:e5b5:	ec	IN AL,DX
+f000:e5b6:	3c 99	CMP AL,0x99
+f000:e5b8:	76 03	JBE 0xf000:e5bd
+f000:e5ba:	fb	STI
+f000:e5bb:	f9	STC
+f000:e5bc:	c3	RET
+f000:e5bd:	fb	STI
+f000:e5be:	f8	CLC
+f000:e5bf:	c3	RET
+
+### FUNCTION FUN_f000_e5c0 @ f000:e5c0
+f000:e5c0:	b9 00 20	MOV CX,0x2000
+
+### FUNCTION FUN_f000_e5c3 @ f000:e5c3
+f000:e5c3:	b0 00	MOV AL,0x0
+f000:e5c5:	02 07	ADD AL,byte ptr [BX]
+f000:e5c7:	43	INC BX
+f000:e5c8:	e2 fb	LOOP 0xf000:e5c5
+f000:e5ca:	0a c0	OR AL,AL
+f000:e5cc:	c3	RET
+
+### FUNCTION FUN_f000_e5cd @ f000:e5cd
+f000:e5cd:	33 c9	XOR CX,CX
+f000:e5cf:	8e c1	MOV ES,CX
+f000:e5d1:	26 8a 2e 63 00	MOV CH,byte ptr ES:[0x63]
+f000:e5d6:	32 db	XOR BL,BL
+f000:e5d8:	80 c7 03	ADD BH,0x3
+f000:e5db:	8b c3	MOV AX,BX
+f000:e5dd:	e8 0d ff	CALL 0xf000:e4ed
+f000:e5e0:	be 7b e2	MOV SI,0xe27b
+f000:e5e3:	32 d2	XOR DL,DL
+f000:e5e5:	80 fd f6	CMP CH,0xf6
+f000:e5e8:	75 05	JNZ 0xf000:e5ef
+f000:e5ea:	be 42 ec	MOV SI,0xec42
+f000:e5ed:	fe c2	INC DL
+f000:e5ef:	e8 f0 fe	CALL 0xf000:e4e2
+f000:e5f2:	bb 12 00	MOV BX,0x12
+f000:e5f5:	e8 bb 13	CALL 0xf000:f9b3
+f000:e5f8:	3c 20	CMP AL,0x20
+f000:e5fa:	74 01	JZ 0xf000:e5fd
+f000:e5fc:	c3	RET
+f000:e5fd:	cd 18	INT 0x18
+f000:e5ff:	90	NOP
+f000:e600:	fb	STI
+f000:e601:	33 c0	XOR AX,AX
+f000:e603:	8e d8	MOV DS,AX
+f000:e605:	c7 06 78 00 c7 ef	MOV word ptr [0x78],0xefc7
+f000:e60b:	8c 0e 7a 00	MOV word ptr [0x7a],CS
+f000:e60f:	b0 06	MOV AL,0x6
+f000:e611:	50	PUSH AX
+f000:e612:	33 d2	XOR DX,DX
+f000:e614:	3c 02	CMP AL,0x2
+f000:e616:	77 03	JA 0xf000:e61b
+f000:e618:	80 ca 80	OR DL,0x80
+f000:e61b:	52	PUSH DX
+f000:e61c:	b4 00	MOV AH,0x0
+f000:e61e:	cd 13	INT 0x13
+f000:e620:	5a	POP DX
+f000:e621:	72 17	JC 0xf000:e63a
+f000:e623:	33 c0	XOR AX,AX
+f000:e625:	8e c0	MOV ES,AX
+f000:e627:	b8 01 02	MOV AX,0x201
+f000:e62a:	bb 00 7c	MOV BX,0x7c00
+f000:e62d:	b1 01	MOV CL,0x1
+f000:e62f:	b5 00	MOV CH,0x0
+f000:e631:	cd 13	INT 0x13
+f000:e633:	72 05	JC 0xf000:e63a
+f000:e635:	ea 00 7c 00 00	JMPF 0x0000:7c00
+f000:e63a:	58	POP AX
+f000:e63b:	fe c8	DEC AL
+f000:e63d:	75 d2	JNZ 0xf000:e611
+f000:e63f:	0a e4	OR AH,AH
+f000:e641:	75 10	JNZ 0xf000:e653
+f000:e643:	0e	PUSH CS
+f000:e644:	1f	POP DS
+f000:e645:	be f5 e6	MOV SI,0xe6f5
+f000:e648:	e8 97 fe	CALL 0xf000:e4e2
+f000:e64b:	e8 a0 18	CALL 0xf000:feee
+f000:e64e:	b8 06 ff	MOV AX,0xff06
+f000:e651:	eb be	JMP 0xf000:e611
+f000:e653:	33 c0	XOR AX,AX
+f000:e655:	8e d8	MOV DS,AX
+f000:e657:	a0 63 00	MOV AL,[0x63]
+f000:e65a:	3c f6	CMP AL,0xf6
+f000:e65c:	75 e5	JNZ 0xf000:e643
+f000:e65e:	cd 18	INT 0x18
+
+### FUNCTION FUN_f000_e660 @ f000:e660
+f000:e660:	3c e0	CMP AL,0xe0
+f000:e662:	75 0a	JNZ 0xf000:e66e
+f000:e664:	80 cb 02	OR BL,0x2
+f000:e667:	59	POP CX
+f000:e668:	ba b3 e9	MOV DX,0xe9b3
+f000:e66b:	52	PUSH DX
+f000:e66c:	eb 4e	JMP 0xf000:e6bc
+f000:e66e:	3c 57	CMP AL,0x57
+f000:e670:	74 4f	JZ 0xf000:e6c1
+f000:e672:	3c 58	CMP AL,0x58
+f000:e674:	74 4b	JZ 0xf000:e6c1
+f000:e676:	f6 c3 02	TEST BL,0x2
+f000:e679:	74 41	JZ 0xf000:e6bc
+f000:e67b:	80 e3 fd	AND BL,0xfd
+f000:e67e:	3c aa	CMP AL,0xaa
+f000:e680:	75 06	JNZ 0xf000:e688
+f000:e682:	8a c7	MOV AL,BH
+f000:e684:	0c 80	OR AL,0x80
+f000:e686:	8a e0	MOV AH,AL
+f000:e688:	8a f8	MOV BH,AL
+f000:e68a:	8a c8	MOV CL,AL
+f000:e68c:	80 e1 7f	AND CL,0x7f
+f000:e68f:	80 f9 2a	CMP CL,0x2a
+f000:e692:	74 d3	JZ 0xf000:e667
+f000:e694:	80 f9 36	CMP CL,0x36
+f000:e697:	74 ce	JZ 0xf000:e667
+f000:e699:	3c 35	CMP AL,0x35
+f000:e69b:	74 1f	JZ 0xf000:e6bc
+f000:e69d:	3c 1c	CMP AL,0x1c
+f000:e69f:	74 1b	JZ 0xf000:e6bc
+f000:e6a1:	3c 1d	CMP AL,0x1d
+f000:e6a3:	74 17	JZ 0xf000:e6bc
+f000:e6a5:	3c 38	CMP AL,0x38
+f000:e6a7:	74 13	JZ 0xf000:e6bc
+f000:e6a9:	3c 46	CMP AL,0x46
+f000:e6ab:	74 0f	JZ 0xf000:e6bc
+f000:e6ad:	e8 8c 08	CALL 0xf000:ef3c
+f000:e6b0:	e8 02 05	CALL 0xf000:ebb5
+f000:e6b3:	72 07	JC 0xf000:e6bc
+f000:e6b5:	b0 e0	MOV AL,0xe0
+f000:e6b7:	59	POP CX
+f000:e6b8:	ba a4 eb	MOV DX,0xeba4
+f000:e6bb:	52	PUSH DX
+f000:e6bc:	89 1e 96 00	MOV word ptr [0x96],BX
+f000:e6c0:	c3	RET
+f000:e6c1:	80 c4 2e	ADD AH,0x2e
+f000:e6c4:	a0 17 00	MOV AL,[0x17]
+f000:e6c7:	a8 08	TEST AL,0x8
+f000:e6c9:	75 0a	JNZ 0xf000:e6d5
+f000:e6cb:	a8 04	TEST AL,0x4
+f000:e6cd:	75 09	JNZ 0xf000:e6d8
+f000:e6cf:	a8 03	TEST AL,0x3
+f000:e6d1:	75 08	JNZ 0xf000:e6db
+f000:e6d3:	eb 09	JMP 0xf000:e6de
+f000:e6d5:	80 c4 02	ADD AH,0x2
+f000:e6d8:	80 c4 02	ADD AH,0x2
+f000:e6db:	80 c4 02	ADD AH,0x2
+f000:e6de:	32 c0	XOR AL,AL
+f000:e6e0:	eb d5	JMP 0xf000:e6b7
+
+### FUNCTION FUN_f000_e6e2 @ f000:e6e2
+f000:e6e2:	50	PUSH AX
+f000:e6e3:	24 0f	AND AL,0xf
+f000:e6e5:	3c 09	CMP AL,0x9
+f000:e6e7:	76 02	JBE 0xf000:e6eb
+f000:e6e9:	04 07	ADD AL,0x7
+f000:e6eb:	04 30	ADD AL,0x30
+f000:e6ed:	e8 e7 fd	CALL 0xf000:e4d7
+f000:e6f0:	58	POP AX
+f000:e6f1:	c3	RET
+
+### NO FUNCTION
+f000:e6f2:	e9 0b ff	JMP 0xf000:e600
+f000:e729:	17	POP SS
+f000:e72a:	04 00	ADD AL,0x0
+f000:e72c:	03 80 01 c0	ADD AX,word ptr [BX + SI + 0xc001]
+f000:e730:	00 60 00	ADD byte ptr [BX + SI + 0x0],AH
+f000:e733:	30 00	XOR byte ptr [BX + SI],AL
+f000:e735:	18 00	SBB byte ptr [BX + SI],AL
+f000:e737:	0c 00	OR AL,0x0
+f000:e739:	fb	STI
+f000:e73a:	1e	PUSH DS
+f000:e73b:	52	PUSH DX
+f000:e73c:	56	PUSH SI
+f000:e73d:	57	PUSH DI
+f000:e73e:	51	PUSH CX
+f000:e73f:	53	PUSH BX
+f000:e740:	bb 40 00	MOV BX,0x40
+f000:e743:	8e db	MOV DS,BX
+f000:e745:	8b fa	MOV DI,DX
+f000:e747:	8b da	MOV BX,DX
+f000:e749:	d1 e3	SHL BX,0x1
+f000:e74b:	8b 17	MOV DX,word ptr [BX]
+f000:e74d:	0b d2	OR DX,DX
+f000:e74f:	74 10	JZ 0xf000:e761
+f000:e751:	0a e4	OR AH,AH
+f000:e753:	74 13	JZ 0xf000:e768
+f000:e755:	fe cc	DEC AH
+f000:e757:	74 3a	JZ 0xf000:e793
+f000:e759:	fe cc	DEC AH
+f000:e75b:	74 53	JZ 0xf000:e7b0
+f000:e75d:	fe cc	DEC AH
+f000:e75f:	74 63	JZ 0xf000:e7c4
+f000:e761:	5b	POP BX
+f000:e762:	59	POP CX
+f000:e763:	5f	POP DI
+f000:e764:	5e	POP SI
+f000:e765:	5a	POP DX
+f000:e766:	1f	POP DS
+f000:e767:	cf	IRET
+f000:e768:	50	PUSH AX
+f000:e769:	8a d8	MOV BL,AL
+f000:e76b:	83 c2 03	ADD DX,0x3
+f000:e76e:	b0 80	MOV AL,0x80
+f000:e770:	ee	OUT DX,AL
+f000:e771:	b1 04	MOV CL,0x4
+f000:e773:	d2 c3	ROL BL,CL
+f000:e775:	83 e3 0e	AND BX,0xe
+f000:e778:	2e 8b 87 29 e7	MOV AX,word ptr CS:[BX + 0xe729]
+f000:e77d:	83 ea 03	SUB DX,0x3
+f000:e780:	ee	OUT DX,AL
+f000:e781:	42	INC DX
+f000:e782:	8a c4	MOV AL,AH
+f000:e784:	ee	OUT DX,AL
+f000:e785:	58	POP AX
+f000:e786:	42	INC DX
+f000:e787:	42	INC DX
+f000:e788:	24 1f	AND AL,0x1f
+f000:e78a:	ee	OUT DX,AL
+f000:e78b:	b0 00	MOV AL,0x0
+f000:e78d:	4a	DEC DX
+f000:e78e:	4a	DEC DX
+f000:e78f:	ee	OUT DX,AL
+f000:e790:	4a	DEC DX
+f000:e791:	eb 31	JMP 0xf000:e7c4
+f000:e793:	50	PUSH AX
+f000:e794:	b0 03	MOV AL,0x3
+f000:e796:	b7 30	MOV BH,0x30
+f000:e798:	b3 20	MOV BL,0x20
+f000:e79a:	e8 48 00	CALL 0xf000:e7e5
+f000:e79d:	75 09	JNZ 0xf000:e7a8
+f000:e79f:	83 ea 05	SUB DX,0x5
+f000:e7a2:	59	POP CX
+f000:e7a3:	8a c1	MOV AL,CL
+f000:e7a5:	ee	OUT DX,AL
+f000:e7a6:	eb b9	JMP 0xf000:e761
+f000:e7a8:	59	POP CX
+f000:e7a9:	8a c1	MOV AL,CL
+f000:e7ab:	80 cc 80	OR AH,0x80
+f000:e7ae:	eb b1	JMP 0xf000:e761
+f000:e7b0:	b0 01	MOV AL,0x1
+f000:e7b2:	b7 20	MOV BH,0x20
+f000:e7b4:	b3 01	MOV BL,0x1
+f000:e7b6:	e8 2c 00	CALL 0xf000:e7e5
+f000:e7b9:	75 f0	JNZ 0xf000:e7ab
+f000:e7bb:	80 e4 1e	AND AH,0x1e
+f000:e7be:	83 ea 05	SUB DX,0x5
+f000:e7c1:	ec	IN AL,DX
+f000:e7c2:	eb 9d	JMP 0xf000:e761
+f000:e7c4:	83 c2 05	ADD DX,0x5
+f000:e7c7:	ec	IN AL,DX
+f000:e7c8:	8a e0	MOV AH,AL
+f000:e7ca:	42	INC DX
+f000:e7cb:	ec	IN AL,DX
+f000:e7cc:	eb 93	JMP 0xf000:e761
+
+### FUNCTION FUN_f000_e7ce @ f000:e7ce
+f000:e7ce:	8a 5d 7c	MOV BL,byte ptr [DI + 0x7c]
+f000:e7d1:	2b c9	SUB CX,CX
+f000:e7d3:	ec	IN AL,DX
+f000:e7d4:	8a e0	MOV AH,AL
+f000:e7d6:	22 c7	AND AL,BH
+f000:e7d8:	3a c7	CMP AL,BH
+f000:e7da:	74 08	JZ 0xf000:e7e4
+f000:e7dc:	e2 f5	LOOP 0xf000:e7d3
+f000:e7de:	fe cb	DEC BL
+f000:e7e0:	75 ef	JNZ 0xf000:e7d1
+f000:e7e2:	0a ff	OR BH,BH
+f000:e7e4:	c3	RET
+
+### FUNCTION FUN_f000_e7e5 @ f000:e7e5
+f000:e7e5:	83 c2 04	ADD DX,0x4
+f000:e7e8:	ee	OUT DX,AL
+f000:e7e9:	42	INC DX
+f000:e7ea:	42	INC DX
+f000:e7eb:	53	PUSH BX
+f000:e7ec:	e8 df ff	CALL 0xf000:e7ce
+f000:e7ef:	5b	POP BX
+f000:e7f0:	75 06	JNZ 0xf000:e7f8
+f000:e7f2:	4a	DEC DX
+f000:e7f3:	8a fb	MOV BH,BL
+f000:e7f5:	e8 d6 ff	CALL 0xf000:e7ce
+f000:e7f8:	c3	RET
+
+### NO FUNCTION
+f000:e7f9:	c3	RET
+f000:e808:	fa	CLI
+f000:e809:	8b 1e 1a 00	MOV BX,word ptr [0x1a]
+f000:e80d:	3b 1e 1c 00	CMP BX,word ptr [0x1c]
+f000:e811:	8b 07	MOV AX,word ptr [BX]
+f000:e813:	fb	STI
+f000:e814:	5b	POP BX
+f000:e815:	1f	POP DS
+f000:e816:	ca 02 00	RETF 0x2
+f000:e819:	a1 17 00	MOV AX,[0x17]
+f000:e81c:	eb 2e	JMP 0xf000:e84c
+f000:e81e:	8b c1	MOV AX,CX
+f000:e820:	e8 ba 03	CALL 0xf000:ebdd
+f000:e823:	b0 00	MOV AL,0x0
+f000:e825:	73 25	JNC 0xf000:e84c
+f000:e827:	fe c0	INC AL
+f000:e829:	eb 21	JMP 0xf000:e84c
+f000:e82b:	90	NOP
+f000:e82c:	90	NOP
+f000:e82d:	90	NOP
+f000:e82e:	fb	STI
+f000:e82f:	1e	PUSH DS
+f000:e830:	53	PUSH BX
+f000:e831:	bb 40 00	MOV BX,0x40
+f000:e834:	8e db	MOV DS,BX
+f000:e836:	80 fc 05	CMP AH,0x5
+f000:e839:	74 e3	JZ 0xf000:e81e
+f000:e83b:	8b d8	MOV BX,AX
+f000:e83d:	80 e4 0f	AND AH,0xf
+f000:e840:	0a e4	OR AH,AH
+f000:e842:	74 0b	JZ 0xf000:e84f
+f000:e844:	fe cc	DEC AH
+f000:e846:	74 c0	JZ 0xf000:e808
+f000:e848:	fe cc	DEC AH
+f000:e84a:	74 cd	JZ 0xf000:e819
+f000:e84c:	5b	POP BX
+f000:e84d:	1f	POP DS
+f000:e84e:	cf	IRET
+f000:e84f:	fa	CLI
+f000:e850:	a1 1a 00	MOV AX,[0x1a]
+f000:e853:	3b 06 1c 00	CMP AX,word ptr [0x1c]
+f000:e857:	75 03	JNZ 0xf000:e85c
+f000:e859:	fb	STI
+f000:e85a:	eb f3	JMP 0xf000:e84f
+f000:e85c:	f6 c7 10	TEST BH,0x10
+f000:e85f:	9c	PUSHF
+f000:e860:	93	XCHG AX,BX
+f000:e861:	8b 07	MOV AX,word ptr [BX]
+f000:e863:	9d	POPF
+f000:e864:	75 06	JNZ 0xf000:e86c
+f000:e866:	3c e0	CMP AL,0xe0
+f000:e868:	75 02	JNZ 0xf000:e86c
+f000:e86a:	32 c0	XOR AL,AL
+f000:e86c:	43	INC BX
+f000:e86d:	43	INC BX
+f000:e86e:	89 1e 1a 00	MOV word ptr [0x1a],BX
+f000:e872:	3b 1e 82 00	CMP BX,word ptr [0x82]
+f000:e876:	75 d4	JNZ 0xf000:e84c
+f000:e878:	8b 1e 80 00	MOV BX,word ptr [0x80]
+f000:e87c:	89 1e 1a 00	MOV word ptr [0x1a],BX
+f000:e880:	eb ca	JMP 0xf000:e84c
+f000:e882:	90	NOP
+f000:e883:	90	NOP
+f000:e884:	90	NOP
+f000:e885:	00 37	ADD byte ptr [BX],DH
+f000:e887:	2e 20 2f	AND byte ptr CS:[BX],CH
+f000:e88a:	30 31	XOR byte ptr [BX + DI],DH
+f000:e88c:	21 32	AND word ptr [BP + SI],SI
+f000:e88e:	33 34	XOR SI,word ptr [SI]
+f000:e890:	35 22 36	XOR AX,0x3622
+f000:e893:	38 3e 11 17	CMP byte ptr [0x1711],BH
+f000:e897:	05 12 14	ADD AX,0x1412
+f000:e89a:	19 15	SBB word ptr [DI],DX
+f000:e89c:	09 0f	OR word ptr [BX],CX
+f000:e89e:	10 39	ADC byte ptr [BX + DI],BH
+f000:e8a0:	3a 3b	CMP BH,byte ptr [BP + DI]
+f000:e8a2:	84 01	TEST byte ptr [BX + DI],AL
+f000:e8a4:	13 04	ADC AX,word ptr [SI]
+f000:e8a6:	06	PUSH ES
+f000:e8a7:	07	POP ES
+f000:e8a8:	08 0a	OR byte ptr [BP + SI],CL
+f000:e8aa:	0b 0c	OR CX,word ptr [SI]
+f000:e8ac:	3f	AAS
+f000:e8ad:	40	INC AX
+f000:e8ae:	41	INC CX
+f000:e8af:	82 3c 1a	CMP byte ptr [SI],0x1a
+f000:e8b2:	18 03	SBB byte ptr [BP + DI],AL
+f000:e8b4:	16	PUSH SS
+f000:e8b5:	02 0e 0d 42	ADD CL,byte ptr [0x420d]
+f000:e8b9:	43	INC BX
+f000:e8ba:	44	INC SP
+f000:e8bb:	81 3d 88 2d	CMP word ptr [DI],0x2d88
+f000:e8bf:	c0 23 24	SHL byte ptr [BP + DI],0x24
+f000:e8c2:	25 26 27	AND AX,0x2726
+f000:e8c5:	28 29	SUB byte ptr [BX + DI],CH
+f000:e8c7:	2a 2b	SUB CH,byte ptr [BP + DI]
+f000:e8c9:	2c a0	SUB AL,0xa0
+f000:e8cb:	90	NOP
+f000:e8cc:	32 36 2d bb	XOR DH,byte ptr [0xbb2d]
+f000:e8d0:	bc bd be	MOV SP,0xbebd
+f000:e8d3:	bf c0 c1	MOV DI,0xc1c0
+f000:e8d6:	c2 c3 c4	RET 0xc4c3
+f000:e8d9:	20 31	AND byte ptr [BX + DI],DH
+f000:e8db:	33 34	XOR SI,word ptr [SI]
+f000:e8dd:	35 37 38	XOR AX,0x3837
+f000:e8e0:	39 30	CMP word ptr [BX + SI],SI
+f000:e8e2:	3d 1b 08	CMP AX,0x81b
+f000:e8e5:	5b	POP BX
+f000:e8e6:	5d	POP BP
+f000:e8e7:	0d 5c 2a	OR AX,0x2a5c
+f000:e8ea:	09 3b	OR word ptr [BP + DI],DI
+f000:e8ec:	27	DAA
+f000:e8ed:	60	PUSHA
+f000:e8ee:	2c 2e	SUB AL,0x2e
+f000:e8f0:	2f	DAS
+f000:e8f1:	40	INC AX
+f000:e8f2:	5e	POP SI
+f000:e8f3:	5f	POP DI
+f000:e8f4:	d4 d5	AAM 0xd5
+f000:e8f6:	d6	SALC
+f000:e8f7:	d7	XLAT BX
+f000:e8f8:	d8 d9	FCOMP
+f000:e8fa:	da db	FCMOVU ST0,ST3
+f000:e8fd:	dd 20	FRSTOR [BX + SI]
+f000:e8ff:	21 23	AND word ptr [BP + DI],SP
+f000:e901:	24 25	AND AL,0x25
+f000:e903:	26 2a 28	SUB CH,byte ptr ES:[BX + SI]
+f000:e906:	29 2b	SUB word ptr [BP + DI],BP
+f000:e908:	1b 08	SBB CX,word ptr [BX + SI]
+f000:e90a:	7b 7d	JNP 0xf000:e989
+f000:e90c:	0d 7c 05	OR AX,0x57c
+f000:e910:	3a 22	CMP AH,byte ptr [BP + SI]
+f000:e912:	7e 3c	JLE 0xf000:e950
+f000:e914:	3e 3f	AAS
+f000:e916:	03 1e 1f de	ADD BX,word ptr [0xde1f]
+f000:e91a:	df e0	FNSTSW AX
+f000:e91c:	e1 e2	LOOPZ 0xf000:e900
+f000:e91e:	e3 e4	JCXZ 0xf000:e904
+f000:e920:	e5 e6	IN AX,0xe6
+f000:e922:	e7 20	OUT 0x20,AX
+f000:e924:	05 05 05	ADD AX,0x505
+f000:e927:	05 05 05	ADD AX,0x505
+f000:e92a:	05 05 05	ADD AX,0x505
+f000:e92d:	1b 7f 1b	SBB DI,word ptr [BX + 0x1b]
+f000:e930:	1d 0a 1c	SBB AX,0x1c0a
+f000:e933:	f2 05 05 05	ADD AX,0x505
+f000:e937:	05 05 05	ADD AX,0x505
+f000:e93a:	05 f9 fd	ADD AX,0xfdf9
+f000:e93d:	02 e8	ADD CH,AL
+f000:e93f:	e9 ea eb	JMP 0xf000:d52c
+f000:e942:	ec	IN AL,DX
+f000:e943:	ed	IN AX,DX
+f000:e944:	ee	OUT DX,AL
+f000:e945:	ef	OUT DX,AX
+f000:e947:	f1	INT1
+f000:e948:	20 f8	AND AL,BH
+f000:e94a:	fa	CLI
+f000:e94b:	fb	STI
+f000:e94c:	fc	CLD
+f000:e94e:	ff 00	INC word ptr [BX + SI]
+f000:e950:	01 03	ADD word ptr [BP + DI],AX
+f000:e952:	05 05 05	ADD AX,0x505
+f000:e955:	05 05 05	ADD AX,0x505
+f000:e958:	05 05 05	ADD AX,0x505
+f000:e95b:	05 05 05	ADD AX,0x505
+f000:e95e:	05 05 37	ADD AX,0x3705
+f000:e961:	38 39	CMP byte ptr [BX + DI],BH
+f000:e963:	2d 34 35	SUB AX,0x3534
+f000:e966:	36 2b 31	SUB SI,word ptr SS:[BX + DI]
+f000:e969:	32 33	XOR DH,byte ptr [BP + DI]
+f000:e96b:	30 2e f7 05	XOR byte ptr [0x5f7],CH
+f000:e96f:	04 05	ADD AL,0x5
+f000:e971:	f3 05 f4 05	ADD AX,0x5f4
+f000:e975:	f5	CMC
+f000:e976:	05 f6 05	ADD AX,0x5f6
+f000:e979:	05 c7 c8	ADD AX,0xc8c7
+f000:e97c:	c9	LEAVE
+f000:e97d:	2d cb 05	SUB AX,0x5cb
+f000:e980:	cd 2b	INT 0x2b
+f000:e982:	cf	IRET
+f000:e983:	d0 d1	RCL CL,0x1
+f000:e985:	d2 d3	RCL BL,CL
+f000:e987:	fb	STI
+f000:e988:	50	PUSH AX
+f000:e989:	53	PUSH BX
+f000:e98a:	51	PUSH CX
+f000:e98b:	52	PUSH DX
+f000:e98c:	56	PUSH SI
+f000:e98d:	57	PUSH DI
+f000:e98e:	1e	PUSH DS
+f000:e98f:	fc	CLD
+f000:e990:	b8 40 00	MOV AX,0x40
+f000:e993:	8e d8	MOV DS,AX
+f000:e995:	e4 60	IN AL,0x60
+f000:e997:	50	PUSH AX
+f000:e998:	e4 61	IN AL,0x61
+f000:e99a:	50	PUSH AX
+f000:e99b:	0c 80	OR AL,0x80
+f000:e99d:	e6 61	OUT 0x61,AL
+f000:e99f:	58	POP AX
+f000:e9a0:	e6 61	OUT 0x61,AL
+f000:e9a2:	58	POP AX
+f000:e9a3:	8a e0	MOV AH,AL
+f000:e9a5:	8b 1e 96 00	MOV BX,word ptr [0x96]
+f000:e9a9:	e8 b4 fc	CALL 0xf000:e660
+f000:e9ac:	3c ff	CMP AL,0xff
+f000:e9ae:	75 0f	JNZ 0xf000:e9bf
+f000:e9b0:	e9 f6 01	JMP 0xf000:eba9
+f000:e9b3:	b0 20	MOV AL,0x20
+f000:e9b5:	e6 20	OUT 0x20,AL
+f000:e9b7:	1f	POP DS
+f000:e9b8:	5f	POP DI
+f000:e9b9:	5e	POP SI
+f000:e9ba:	5a	POP DX
+f000:e9bb:	59	POP CX
+f000:e9bc:	5b	POP BX
+f000:e9bd:	58	POP AX
+f000:e9be:	cf	IRET
+f000:e9bf:	24 7f	AND AL,0x7f
+f000:e9c1:	3c 46	CMP AL,0x46
+f000:e9c3:	76 03	JBE 0xf000:e9c8
+f000:e9c5:	e9 22 01	JMP 0xf000:eaea
+f000:e9c8:	bb 85 e8	MOV BX,0xe885
+f000:e9cb:	2e d7	XLAT CS:BX
+f000:e9cd:	0a c0	OR AL,AL
+f000:e9cf:	78 06	JS 0xf000:e9d7
+f000:e9d1:	0a e4	OR AH,AH
+f000:e9d3:	78 de	JS 0xf000:e9b3
+f000:e9d5:	eb 4d	JMP 0xf000:ea24
+f000:e9d7:	24 7f	AND AL,0x7f
+f000:e9d9:	0a e4	OR AH,AH
+f000:e9db:	78 21	JS 0xf000:e9fe
+f000:e9dd:	3c 10	CMP AL,0x10
+f000:e9df:	73 06	JNC 0xf000:e9e7
+f000:e9e1:	08 06 17 00	OR byte ptr [0x17],AL
+f000:e9e5:	eb cc	JMP 0xf000:e9b3
+f000:e9e7:	f6 06 17 00 04	TEST byte ptr [0x17],0x4
+f000:e9ec:	75 36	JNZ 0xf000:ea24
+f000:e9ee:	84 06 18 00	TEST byte ptr [0x18],AL
+f000:e9f2:	75 bf	JNZ 0xf000:e9b3
+f000:e9f4:	08 06 18 00	OR byte ptr [0x18],AL
+f000:e9f8:	30 06 17 00	XOR byte ptr [0x17],AL
+f000:e9fc:	eb b5	JMP 0xf000:e9b3
+f000:e9fe:	3c 10	CMP AL,0x10
+f000:ea00:	73 1a	JNC 0xf000:ea1c
+f000:ea02:	f6 d0	NOT AL
+f000:ea04:	20 06 17 00	AND byte ptr [0x17],AL
+f000:ea08:	3c f7	CMP AL,0xf7
+f000:ea0a:	75 a7	JNZ 0xf000:e9b3
+f000:ea0c:	a0 19 00	MOV AL,[0x19]
+f000:ea0f:	b4 00	MOV AH,0x0
+f000:ea11:	88 26 19 00	MOV byte ptr [0x19],AH
+f000:ea15:	3a c4	CMP AL,AH
+f000:ea17:	74 9a	JZ 0xf000:e9b3
+f000:ea19:	e9 95 01	JMP 0xf000:ebb1
+f000:ea1c:	f6 d0	NOT AL
+f000:ea1e:	20 06 18 00	AND byte ptr [0x18],AL
+f000:ea22:	eb 8f	JMP 0xf000:e9b3
+f000:ea24:	f6 06 18 00 08	TEST byte ptr [0x18],0x8
+f000:ea29:	74 0d	JZ 0xf000:ea38
+f000:ea2b:	80 fc 45	CMP AH,0x45
+f000:ea2e:	74 05	JZ 0xf000:ea35
+f000:ea30:	80 26 18 00 f7	AND byte ptr [0x18],0xf7
+f000:ea35:	e9 7b ff	JMP 0xf000:e9b3
+f000:ea38:	8a 16 17 00	MOV DL,byte ptr [0x17]
+f000:ea3c:	f6 c2 08	TEST DL,0x8
+f000:ea3f:	75 1d	JNZ 0xf000:ea5e
+f000:ea41:	f6 c2 04	TEST DL,0x4
+f000:ea44:	75 2b	JNZ 0xf000:ea71
+f000:ea46:	f6 c2 03	TEST DL,0x3
+f000:ea49:	75 7e	JNZ 0xf000:eac9
+f000:ea4b:	3c 1a	CMP AL,0x1a
+f000:ea4d:	77 05	JA 0xf000:ea54
+f000:ea4f:	04 60	ADD AL,0x60
+f000:ea51:	e9 16 01	JMP 0xf000:eb6a
+f000:ea54:	bb cc e8	MOV BX,0xe8cc
+f000:ea57:	2c 20	SUB AL,0x20
+f000:ea59:	2e d7	XLAT CS:BX
+f000:ea5b:	e9 0c 01	JMP 0xf000:eb6a
+f000:ea5e:	3c 1a	CMP AL,0x1a
+f000:ea60:	77 05	JA 0xf000:ea67
+f000:ea62:	b0 00	MOV AL,0x0
+f000:ea64:	e9 3d 01	JMP 0xf000:eba4
+f000:ea67:	bb 3b e9	MOV BX,0xe93b
+f000:ea6a:	2c 20	SUB AL,0x20
+f000:ea6c:	2e d7	XLAT CS:BX
+f000:ea6e:	e9 f9 00	JMP 0xf000:eb6a
+f000:ea71:	80 fc 46	CMP AH,0x46
+f000:ea74:	75 15	JNZ 0xf000:ea8b
+f000:ea76:	c6 06 71 00 80	MOV byte ptr [0x71],0x80
+f000:ea7b:	a1 80 00	MOV AX,[0x80]
+f000:ea7e:	a3 1c 00	MOV [0x1c],AX
+f000:ea81:	a3 1a 00	MOV [0x1a],AX
+f000:ea84:	cd 1b	INT 0x1b
+f000:ea86:	2b c0	SUB AX,AX
+f000:ea88:	e9 f1 00	JMP 0xf000:eb7c
+f000:ea8b:	80 fc 45	CMP AH,0x45
+f000:ea8e:	75 21	JNZ 0xf000:eab1
+f000:ea90:	80 0e 18 00 08	OR byte ptr [0x18],0x8
+f000:ea95:	b0 20	MOV AL,0x20
+f000:ea97:	e6 20	OUT 0x20,AL
+f000:ea99:	80 3e 49 00 07	CMP byte ptr [0x49],0x7
+f000:ea9e:	74 07	JZ 0xf000:eaa7
+f000:eaa0:	ba d8 03	MOV DX,0x3d8
+f000:eaa3:	a0 65 00	MOV AL,[0x65]
+f000:eaa6:	ee	OUT DX,AL
+f000:eaa7:	f6 06 18 00 08	TEST byte ptr [0x18],0x8
+f000:eaac:	75 f9	JNZ 0xf000:eaa7
+f000:eaae:	e9 06 ff	JMP 0xf000:e9b7
+f000:eab1:	80 fc 03	CMP AH,0x3
+f000:eab4:	75 05	JNZ 0xf000:eabb
+f000:eab6:	b0 00	MOV AL,0x0
+f000:eab8:	e9 e9 00	JMP 0xf000:eba4
+f000:eabb:	3c 1a	CMP AL,0x1a
+f000:eabd:	76 f9	JBE 0xf000:eab8
+f000:eabf:	bb 16 e9	MOV BX,0xe916
+f000:eac2:	2c 20	SUB AL,0x20
+f000:eac4:	2e d7	XLAT CS:BX
+f000:eac6:	e9 a1 00	JMP 0xf000:eb6a
+f000:eac9:	80 fc 37	CMP AH,0x37
+f000:eacc:	75 09	JNZ 0xf000:ead7
+f000:eace:	b0 20	MOV AL,0x20
+f000:ead0:	e6 20	OUT 0x20,AL
+f000:ead2:	cd 05	INT 0x5
+f000:ead4:	e9 e0 fe	JMP 0xf000:e9b7
+f000:ead7:	3c 1a	CMP AL,0x1a
+f000:ead9:	77 05	JA 0xf000:eae0
+f000:eadb:	04 40	ADD AL,0x40
+f000:eadd:	e9 8a 00	JMP 0xf000:eb6a
+f000:eae0:	bb f1 e8	MOV BX,0xe8f1
+f000:eae3:	2c 20	SUB AL,0x20
+f000:eae5:	2e d7	XLAT CS:BX
+f000:eae7:	e9 80 00	JMP 0xf000:eb6a
+f000:eaea:	2c 47	SUB AL,0x47
+f000:eaec:	8a 1e 17 00	MOV BL,byte ptr [0x17]
+f000:eaf0:	f6 c3 08	TEST BL,0x8
+f000:eaf3:	75 18	JNZ 0xf000:eb0d
+f000:eaf5:	f6 c3 04	TEST BL,0x4
+f000:eaf8:	75 50	JNZ 0xf000:eb4a
+f000:eafa:	f6 c3 20	TEST BL,0x20
+f000:eafd:	74 07	JZ 0xf000:eb06
+f000:eaff:	f6 c3 03	TEST BL,0x3
+f000:eb02:	75 51	JNZ 0xf000:eb55
+f000:eb04:	eb 5b	JMP 0xf000:eb61
+f000:eb06:	f6 c3 03	TEST BL,0x3
+f000:eb09:	74 4a	JZ 0xf000:eb55
+f000:eb0b:	eb 54	JMP 0xf000:eb61
+f000:eb0d:	0a e4	OR AH,AH
+f000:eb0f:	78 36	JS 0xf000:eb47
+f000:eb11:	f6 06 17 00 04	TEST byte ptr [0x17],0x4
+f000:eb16:	74 16	JZ 0xf000:eb2e
+f000:eb18:	80 fc 53	CMP AH,0x53
+f000:eb1b:	75 09	JNZ 0xf000:eb26
+f000:eb1d:	c7 06 72 00 34 12	MOV word ptr [0x72],0x1234
+f000:eb23:	e9 35 f5	JMP 0xf000:e05b
+f000:eb26:	80 fc 4a	CMP AH,0x4a
+f000:eb29:	75 03	JNZ 0xf000:eb2e
+f000:eb2b:	e8 53 0e	CALL 0xf000:f981
+f000:eb2e:	bb 60 e9	MOV BX,0xe960
+f000:eb31:	2e d7	XLAT CS:BX
+f000:eb33:	3c 30	CMP AL,0x30
+f000:eb35:	72 10	JC 0xf000:eb47
+f000:eb37:	2c 30	SUB AL,0x30
+f000:eb39:	8a d8	MOV BL,AL
+f000:eb3b:	a0 19 00	MOV AL,[0x19]
+f000:eb3e:	b4 0a	MOV AH,0xa
+f000:eb40:	f6 e4	MUL AH
+f000:eb42:	02 c3	ADD AL,BL
+f000:eb44:	a2 19 00	MOV [0x19],AL
+f000:eb47:	e9 69 fe	JMP 0xf000:e9b3
+f000:eb4a:	0a e4	OR AH,AH
+f000:eb4c:	78 f9	JS 0xf000:eb47
+f000:eb4e:	bb 6d e9	MOV BX,0xe96d
+f000:eb51:	2e d7	XLAT CS:BX
+f000:eb53:	eb 15	JMP 0xf000:eb6a
+f000:eb55:	e8 5d 00	CALL 0xf000:ebb5
+f000:eb58:	72 ed	JC 0xf000:eb47
+f000:eb5a:	bb 7a e9	MOV BX,0xe97a
+f000:eb5d:	2e d7	XLAT CS:BX
+f000:eb5f:	eb 09	JMP 0xf000:eb6a
+f000:eb61:	0a e4	OR AH,AH
+f000:eb63:	78 e2	JS 0xf000:eb47
+f000:eb65:	bb 60 e9	MOV BX,0xe960
+f000:eb68:	2e d7	XLAT CS:BX
+f000:eb6a:	3c 05	CMP AL,0x5
+f000:eb6c:	74 40	JZ 0xf000:ebae
+f000:eb6e:	3c 04	CMP AL,0x4
+f000:eb70:	77 04	JA 0xf000:eb76
+f000:eb72:	0c 80	OR AL,0x80
+f000:eb74:	eb 06	JMP 0xf000:eb7c
+f000:eb76:	a8 80	TEST AL,0x80
+f000:eb78:	74 06	JZ 0xf000:eb80
+f000:eb7a:	24 7f	AND AL,0x7f
+f000:eb7c:	8a e0	MOV AH,AL
+f000:eb7e:	b0 00	MOV AL,0x0
+f000:eb80:	f6 06 17 00 40	TEST byte ptr [0x17],0x40
+f000:eb85:	74 1d	JZ 0xf000:eba4
+f000:eb87:	f6 06 17 00 03	TEST byte ptr [0x17],0x3
+f000:eb8c:	74 0c	JZ 0xf000:eb9a
+f000:eb8e:	3c 41	CMP AL,0x41
+f000:eb90:	72 12	JC 0xf000:eba4
+f000:eb92:	3c 5a	CMP AL,0x5a
+f000:eb94:	77 0e	JA 0xf000:eba4
+f000:eb96:	04 20	ADD AL,0x20
+f000:eb98:	eb 0a	JMP 0xf000:eba4
+f000:eb9a:	3c 61	CMP AL,0x61
+f000:eb9c:	72 06	JC 0xf000:eba4
+f000:eb9e:	3c 7a	CMP AL,0x7a
+f000:eba0:	77 02	JA 0xf000:eba4
+f000:eba2:	2c 20	SUB AL,0x20
+f000:eba4:	e8 36 00	CALL 0xf000:ebdd
+f000:eba7:	73 05	JNC 0xf000:ebae
+f000:eba9:	b3 01	MOV BL,0x1
+f000:ebab:	e8 01 0c	CALL 0xf000:f7af
+f000:ebae:	e9 02 fe	JMP 0xf000:e9b3
+f000:ebb1:	b4 38	MOV AH,0x38
+f000:ebb3:	eb ef	JMP 0xf000:eba4
+
+### FUNCTION FUN_f000_ebb5 @ f000:ebb5
+f000:ebb5:	80 fc d2	CMP AH,0xd2
+f000:ebb8:	75 07	JNZ 0xf000:ebc1
+f000:ebba:	80 26 18 00 7f	AND byte ptr [0x18],0x7f
+f000:ebbf:	f9	STC
+f000:ebc0:	c3	RET
+f000:ebc1:	0a e4	OR AH,AH
+f000:ebc3:	78 fa	JS 0xf000:ebbf
+f000:ebc5:	80 fc 52	CMP AH,0x52
+f000:ebc8:	75 11	JNZ 0xf000:ebdb
+f000:ebca:	f6 06 18 00 80	TEST byte ptr [0x18],0x80
+f000:ebcf:	75 0a	JNZ 0xf000:ebdb
+f000:ebd1:	80 36 17 00 80	XOR byte ptr [0x17],0x80
+f000:ebd6:	80 0e 18 00 80	OR byte ptr [0x18],0x80
+f000:ebdb:	f8	CLC
+f000:ebdc:	c3	RET
+
+### FUNCTION FUN_f000_ebdd @ f000:ebdd
+f000:ebdd:	8b 1e 1c 00	MOV BX,word ptr [0x1c]
+f000:ebe1:	8b fb	MOV DI,BX
+f000:ebe3:	43	INC BX
+f000:ebe4:	43	INC BX
+f000:ebe5:	3b 1e 82 00	CMP BX,word ptr [0x82]
+f000:ebe9:	75 04	JNZ 0xf000:ebef
+f000:ebeb:	8b 1e 80 00	MOV BX,word ptr [0x80]
+f000:ebef:	3b 1e 1a 00	CMP BX,word ptr [0x1a]
+f000:ebf3:	75 02	JNZ 0xf000:ebf7
+f000:ebf5:	f9	STC
+f000:ebf6:	c3	RET
+f000:ebf7:	89 05	MOV word ptr [DI],AX
+f000:ebf9:	89 1e 1c 00	MOV word ptr [0x1c],BX
+f000:ebfd:	f8	CLC
+f000:ebfe:	c3	RET
+
+### NO FUNCTION
+f000:ec40:	00 00	ADD byte ptr [BX + SI],AL
+f000:ec55:	90	NOP
+f000:ec56:	90	NOP
+f000:ec57:	90	NOP
+f000:ec58:	90	NOP
+f000:ec59:	fb	STI
+f000:ec5a:	55	PUSH BP
+f000:ec5b:	56	PUSH SI
+f000:ec5c:	57	PUSH DI
+f000:ec5d:	1e	PUSH DS
+f000:ec5e:	06	PUSH ES
+f000:ec5f:	53	PUSH BX
+f000:ec60:	8b f8	MOV DI,AX
+f000:ec62:	33 db	XOR BX,BX
+f000:ec64:	8e db	MOV DS,BX
+f000:ec66:	c4 36 78 00	LES SI,[0x78]
+f000:ec6a:	b3 40	MOV BL,0x40
+f000:ec6c:	8e db	MOV DS,BX
+f000:ec6e:	b3 05	MOV BL,0x5
+f000:ec70:	26 8b 00	MOV AX,word ptr ES:[BX + SI]
+f000:ec73:	50	PUSH AX
+f000:ec74:	4b	DEC BX
+f000:ec75:	4b	DEC BX
+f000:ec76:	26 8b 00	MOV AX,word ptr ES:[BX + SI]
+f000:ec79:	50	PUSH AX
+f000:ec7a:	86 f1	XCHG CL,DH
+f000:ec7c:	86 ca	XCHG DL,CL
+f000:ec7e:	52	PUSH DX
+f000:ec7f:	51	PUSH CX
+f000:ec80:	57	PUSH DI
+f000:ec81:	8b ec	MOV BP,SP
+f000:ec83:	e8 22 00	CALL 0xf000:eca8
+f000:ec86:	26 8a 64 02	MOV AH,byte ptr ES:[SI + 0x2]
+f000:ec8a:	88 26 40 00	MOV byte ptr [0x40],AH
+f000:ec8e:	8a 26 41 00	MOV AH,byte ptr [0x41]
+f000:ec92:	80 fc 01	CMP AH,0x1
+f000:ec95:	f5	CMC
+f000:ec96:	5b	POP BX
+f000:ec97:	59	POP CX
+f000:ec98:	5a	POP DX
+f000:ec99:	86 ca	XCHG DL,CL
+f000:ec9b:	86 f1	XCHG CL,DH
+f000:ec9d:	5b	POP BX
+f000:ec9e:	5b	POP BX
+f000:ec9f:	5b	POP BX
+f000:eca0:	07	POP ES
+f000:eca1:	1f	POP DS
+f000:eca2:	5f	POP DI
+f000:eca3:	5e	POP SI
+f000:eca4:	5d	POP BP
+f000:eca5:	ca 02 00	RETF 0x2
+
+### FUNCTION FUN_f000_eca8 @ f000:eca8
+f000:eca8:	8a 46 01	MOV AL,byte ptr [BP + 0x1]
+f000:ecab:	0a c0	OR AL,AL
+f000:ecad:	74 1b	JZ 0xf000:ecca
+f000:ecaf:	fe c8	DEC AL
+f000:ecb1:	74 13	JZ 0xf000:ecc6
+f000:ecb3:	80 7e 02 03	CMP byte ptr [BP + 0x2],0x3
+f000:ecb7:	77 04	JA 0xf000:ecbd
+f000:ecb9:	3c 05	CMP AL,0x5
+f000:ecbb:	76 06	JBE 0xf000:ecc3
+f000:ecbd:	c6 06 41 00 01	MOV byte ptr [0x41],0x1
+f000:ecc2:	c3	RET
+f000:ecc3:	e9 81 00	JMP 0xf000:ed47
+f000:ecc6:	a0 41 00	MOV AL,[0x41]
+f000:ecc9:	c3	RET
+f000:ecca:	ba f2 03	MOV DX,0x3f2
+f000:eccd:	fa	CLI
+f000:ecce:	80 26 3f 00 0f	AND byte ptr [0x3f],0xf
+f000:ecd3:	a0 3f 00	MOV AL,[0x3f]
+f000:ecd6:	b1 04	MOV CL,0x4
+f000:ecd8:	d2 e0	SHL AL,CL
+f000:ecda:	a8 20	TEST AL,0x20
+f000:ecdc:	75 0c	JNZ 0xf000:ecea
+f000:ecde:	a8 40	TEST AL,0x40
+f000:ece0:	75 06	JNZ 0xf000:ece8
+f000:ece2:	a8 80	TEST AL,0x80
+f000:ece4:	74 06	JZ 0xf000:ecec
+f000:ece6:	fe c0	INC AL
+f000:ece8:	fe c0	INC AL
+f000:ecea:	fe c0	INC AL
+f000:ecec:	c6 06 3e 00 00	MOV byte ptr [0x3e],0x0
+f000:ecf1:	c6 06 41 00 00	MOV byte ptr [0x41],0x0
+f000:ecf6:	0c 08	OR AL,0x8
+f000:ecf8:	ee	OUT DX,AL
+f000:ecf9:	0c 04	OR AL,0x4
+f000:ecfb:	ee	OUT DX,AL
+f000:ecfc:	fb	STI
+f000:ecfd:	e8 b2 01	CALL 0xf000:eeb2
+f000:ed00:	e8 67 02	CALL 0xf000:ef6a
+f000:ed03:	a0 42 00	MOV AL,[0x42]
+f000:ed06:	3c c0	CMP AL,0xc0
+f000:ed08:	74 07	JZ 0xf000:ed11
+f000:ed0a:	c6 06 41 00 20	MOV byte ptr [0x41],0x20
+f000:ed0f:	eb 12	JMP 0xf000:ed23
+f000:ed11:	b0 03	MOV AL,0x3
+f000:ed13:	e8 7c 02	CALL 0xf000:ef92
+f000:ed16:	26 8a 04	MOV AL,byte ptr ES:[SI]
+f000:ed19:	e8 76 02	CALL 0xf000:ef92
+f000:ed1c:	26 8a 44 01	MOV AL,byte ptr ES:[SI + 0x1]
+f000:ed20:	e8 6f 02	CALL 0xf000:ef92
+f000:ed23:	c3	RET
+
+### NO FUNCTION
+f000:ed24:	03 00	ADD AX,word ptr [BX + SI]
+f000:ed26:	e6 c5	OUT 0xc5,AL
+f000:ed28:	e6 4d	OUT 0x4d,AL
+f000:ed2a:	00 00	ADD byte ptr [BX + SI],AL
+f000:ed2c:	46	INC SI
+f000:ed2d:	4a	DEC DX
+f000:ed2e:	42	INC DX
+f000:ed2f:	4a	DEC DX
+f000:ed30:	00 00	ADD byte ptr [BX + SI],AL
+f000:ed32:	00 80 00 80	ADD byte ptr [BX + SI + 0x8000],AL
+f000:ed36:	01 02	ADD word ptr [BP + SI],AX
+f000:ed38:	04 08	ADD AL,0x8
+f000:ed3a:	80 20 10	AND byte ptr [BX + SI],0x10
+f000:ed3d:	04 02	ADD AL,0x2
+f000:ed3f:	01 04	ADD word ptr [SI],AX
+f000:ed41:	10 08	ADC byte ptr [BX + SI],CL
+f000:ed43:	04 03	ADD AL,0x3
+f000:ed45:	02 20	ADD AH,byte ptr [BX + SI]
+
+### IN FUNCTION FUN_f000_eca8
+f000:ed47:	fa	CLI
+f000:ed48:	b4 00	MOV AH,0x0
+f000:ed4a:	8a 46 01	MOV AL,byte ptr [BP + 0x1]
+f000:ed4d:	88 26 41 00	MOV byte ptr [0x41],AH
+f000:ed51:	8b f8	MOV DI,AX
+f000:ed53:	e6 0c	OUT 0xc,AL
+f000:ed55:	2e 8a 85 2a ed	MOV AL,byte ptr CS:[DI + 0xed2a]
+f000:ed5a:	e6 0b	OUT 0xb,AL
+f000:ed5c:	8b 46 0c	MOV AX,word ptr [BP + 0xc]
+f000:ed5f:	b1 04	MOV CL,0x4
+f000:ed61:	d3 c0	ROL AX,CL
+f000:ed63:	8a e8	MOV CH,AL
+f000:ed65:	80 e5 0f	AND CH,0xf
+f000:ed68:	24 f0	AND AL,0xf0
+f000:ed6a:	03 46 0a	ADD AX,word ptr [BP + 0xa]
+f000:ed6d:	80 d5 00	ADC CH,0x0
+f000:ed70:	8b d0	MOV DX,AX
+f000:ed72:	e6 04	OUT 0x4,AL
+f000:ed74:	8a c4	MOV AL,AH
+f000:ed76:	e6 04	OUT 0x4,AL
+f000:ed78:	8a c5	MOV AL,CH
+f000:ed7a:	e6 81	OUT 0x81,AL
+f000:ed7c:	8a 66 00	MOV AH,byte ptr [BP + 0x0]
+f000:ed7f:	b0 00	MOV AL,0x0
+f000:ed81:	d1 e8	SHR AX,0x1
+f000:ed83:	8a 4e 06	MOV CL,byte ptr [BP + 0x6]
+f000:ed86:	d3 e0	SHL AX,CL
+f000:ed88:	48	DEC AX
+f000:ed89:	e6 05	OUT 0x5,AL
+f000:ed8b:	86 e0	XCHG AL,AH
+f000:ed8d:	e6 05	OUT 0x5,AL
+f000:ed8f:	86 e0	XCHG AL,AH
+f000:ed91:	03 c2	ADD AX,DX
+f000:ed93:	73 09	JNC 0xf000:ed9e
+f000:ed95:	fb	STI
+f000:ed96:	c6 06 41 00 09	MOV byte ptr [0x41],0x9
+f000:ed9b:	e9 11 01	JMP 0xf000:eeaf
+f000:ed9e:	b0 02	MOV AL,0x2
+f000:eda0:	e6 0a	OUT 0xa,AL
+f000:eda2:	c6 06 40 00 ff	MOV byte ptr [0x40],0xff
+f000:eda7:	8a 5e 02	MOV BL,byte ptr [BP + 0x2]
+f000:edaa:	b7 00	MOV BH,0x0
+f000:edac:	2e 8a 87 36 ed	MOV AL,byte ptr CS:[BX + 0xed36]
+f000:edb1:	8a e8	MOV CH,AL
+f000:edb3:	b1 04	MOV CL,0x4
+f000:edb5:	d2 e0	SHL AL,CL
+f000:edb7:	0a c3	OR AL,BL
+f000:edb9:	0c 0c	OR AL,0xc
+f000:edbb:	ba f2 03	MOV DX,0x3f2
+f000:edbe:	ee	OUT DX,AL
+f000:edbf:	fb	STI
+f000:edc0:	2e 8a 85 30 ed	MOV AL,byte ptr CS:[DI + 0xed30]
+f000:edc5:	08 06 3f 00	OR byte ptr [0x3f],AL
+f000:edc9:	0a c0	OR AL,AL
+f000:edcb:	79 11	JNS 0xf000:edde
+f000:edcd:	26 8a 64 0a	MOV AH,byte ptr ES:[SI + 0xa]
+f000:edd1:	0a e4	OR AH,AH
+f000:edd3:	74 09	JZ 0xf000:edde
+f000:edd5:	84 2e 3f 00	TEST byte ptr [0x3f],CH
+f000:edd9:	75 03	JNZ 0xf000:edde
+f000:eddb:	e8 27 01	CALL 0xf000:ef05
+f000:edde:	08 2e 3f 00	OR byte ptr [0x3f],CH
+f000:ede2:	84 2e 3e 00	TEST byte ptr [0x3e],CH
+f000:ede6:	75 14	JNZ 0xf000:edfc
+f000:ede8:	08 2e 3e 00	OR byte ptr [0x3e],CH
+f000:edec:	b0 07	MOV AL,0x7
+f000:edee:	e8 a1 01	CALL 0xf000:ef92
+f000:edf1:	8a c3	MOV AL,BL
+f000:edf3:	e8 9c 01	CALL 0xf000:ef92
+f000:edf6:	e8 b9 00	CALL 0xf000:eeb2
+f000:edf9:	e8 bd 01	CALL 0xf000:efb9
+f000:edfc:	b0 0f	MOV AL,0xf
+f000:edfe:	e8 91 01	CALL 0xf000:ef92
+f000:ee01:	8a c3	MOV AL,BL
+f000:ee03:	e8 8c 01	CALL 0xf000:ef92
+f000:ee06:	8a 46 03	MOV AL,byte ptr [BP + 0x3]
+f000:ee09:	e8 86 01	CALL 0xf000:ef92
+f000:ee0c:	e8 a3 00	CALL 0xf000:eeb2
+f000:ee0f:	e8 58 01	CALL 0xf000:ef6a
+f000:ee12:	26 8a 44 09	MOV AL,byte ptr ES:[SI + 0x9]
+f000:ee16:	0a c0	OR AL,AL
+f000:ee18:	74 09	JZ 0xf000:ee23
+f000:ee1a:	b9 26 02	MOV CX,0x226
+f000:ee1d:	e2 fe	LOOP 0xf000:ee1d
+f000:ee1f:	fe c8	DEC AL
+f000:ee21:	75 f7	JNZ 0xf000:ee1a
+f000:ee23:	2e 8a 85 24 ed	MOV AL,byte ptr CS:[DI + 0xed24]
+f000:ee28:	e8 67 01	CALL 0xf000:ef92
+f000:ee2b:	8a 46 04	MOV AL,byte ptr [BP + 0x4]
+f000:ee2e:	24 01	AND AL,0x1
+f000:ee30:	d0 e0	SHL AL,0x1
+f000:ee32:	d0 e0	SHL AL,0x1
+f000:ee34:	0a c3	OR AL,BL
+f000:ee36:	e8 59 01	CALL 0xf000:ef92
+f000:ee39:	80 7e 01 05	CMP byte ptr [BP + 0x1],0x5
+f000:ee3d:	75 1c	JNZ 0xf000:ee5b
+f000:ee3f:	8a 46 06	MOV AL,byte ptr [BP + 0x6]
+f000:ee42:	e8 4d 01	CALL 0xf000:ef92
+f000:ee45:	8a 46 07	MOV AL,byte ptr [BP + 0x7]
+f000:ee48:	e8 47 01	CALL 0xf000:ef92
+f000:ee4b:	26 8a 44 07	MOV AL,byte ptr ES:[SI + 0x7]
+f000:ee4f:	e8 40 01	CALL 0xf000:ef92
+f000:ee52:	26 8a 44 08	MOV AL,byte ptr ES:[SI + 0x8]
+f000:ee56:	e8 39 01	CALL 0xf000:ef92
+f000:ee59:	eb 0e	JMP 0xf000:ee69
+f000:ee5b:	b9 07 00	MOV CX,0x7
+f000:ee5e:	bf 03 00	MOV DI,0x3
+f000:ee61:	8a 03	MOV AL,byte ptr [BP + DI]
+f000:ee63:	e8 2c 01	CALL 0xf000:ef92
+f000:ee66:	47	INC DI
+f000:ee67:	e2 f8	LOOP 0xf000:ee61
+f000:ee69:	e8 46 00	CALL 0xf000:eeb2
+f000:ee6c:	e8 00 01	CALL 0xf000:ef6f
+f000:ee6f:	a0 42 00	MOV AL,[0x42]
+f000:ee72:	24 c0	AND AL,0xc0
+f000:ee74:	74 25	JZ 0xf000:ee9b
+f000:ee76:	3c 40	CMP AL,0x40
+f000:ee78:	74 07	JZ 0xf000:ee81
+f000:ee7a:	c6 06 41 00 20	MOV byte ptr [0x41],0x20
+f000:ee7f:	eb 1a	JMP 0xf000:ee9b
+f000:ee81:	a0 43 00	MOV AL,[0x43]
+f000:ee84:	b9 06 00	MOV CX,0x6
+f000:ee87:	33 db	XOR BX,BX
+f000:ee89:	2e 84 87 3a ed	TEST byte ptr CS:[BX + 0xed3a],AL
+f000:ee8e:	75 03	JNZ 0xf000:ee93
+f000:ee90:	43	INC BX
+f000:ee91:	e2 f6	LOOP 0xf000:ee89
+f000:ee93:	2e 8a 87 40 ed	MOV AL,byte ptr CS:[BX + 0xed40]
+f000:ee98:	a2 41 00	MOV [0x41],AL
+f000:ee9b:	a0 45 00	MOV AL,[0x45]
+f000:ee9e:	3a 46 03	CMP AL,byte ptr [BP + 0x3]
+f000:eea1:	a0 47 00	MOV AL,[0x47]
+f000:eea4:	74 05	JZ 0xf000:eeab
+f000:eea6:	8a 46 07	MOV AL,byte ptr [BP + 0x7]
+f000:eea9:	fe c0	INC AL
+f000:eeab:	2a 46 05	SUB AL,byte ptr [BP + 0x5]
+f000:eeae:	c3	RET
+f000:eeaf:	b0 00	MOV AL,0x0
+f000:eeb1:	c3	RET
+
+### FUNCTION FUN_f000_eeb2 @ f000:eeb2
+f000:eeb2:	fb	STI
+f000:eeb3:	33 c9	XOR CX,CX
+f000:eeb5:	b0 02	MOV AL,0x2
+f000:eeb7:	f6 06 3e 00 80	TEST byte ptr [0x3e],0x80
+f000:eebc:	f8	CLC
+f000:eebd:	75 10	JNZ 0xf000:eecf
+f000:eebf:	e2 f6	LOOP 0xf000:eeb7
+f000:eec1:	fe c8	DEC AL
+f000:eec3:	75 f2	JNZ 0xf000:eeb7
+f000:eec5:	c6 06 41 00 80	MOV byte ptr [0x41],0x80
+f000:eeca:	58	POP AX
+f000:eecb:	b0 00	MOV AL,0x0
+f000:eecd:	f9	STC
+f000:eece:	c3	RET
+f000:eecf:	80 26 3e 00 7f	AND byte ptr [0x3e],0x7f
+f000:eed4:	c3	RET
+
+### FUNCTION FUN_f000_eed5 @ f000:eed5
+f000:eed5:	51	PUSH CX
+f000:eed6:	33 c9	XOR CX,CX
+f000:eed8:	ba f4 03	MOV DX,0x3f4
+f000:eedb:	ec	IN AL,DX
+f000:eedc:	0a c0	OR AL,AL
+f000:eede:	78 09	JS 0xf000:eee9
+f000:eee0:	e2 f9	LOOP 0xf000:eedb
+f000:eee2:	c6 06 41 00 80	MOV byte ptr [0x41],0x80
+f000:eee7:	eb 09	JMP 0xf000:eef2
+f000:eee9:	a8 40	TEST AL,0x40
+f000:eeeb:	75 08	JNZ 0xf000:eef5
+f000:eeed:	c6 06 41 00 20	MOV byte ptr [0x41],0x20
+f000:eef2:	59	POP CX
+f000:eef3:	f9	STC
+f000:eef4:	c3	RET
+f000:eef5:	42	INC DX
+f000:eef6:	ec	IN AL,DX
+f000:eef7:	50	PUSH AX
+f000:eef8:	b9 0a 00	MOV CX,0xa
+f000:eefb:	e2 fe	LOOP 0xf000:eefb
+f000:eefd:	4a	DEC DX
+f000:eefe:	ec	IN AL,DX
+f000:eeff:	a8 10	TEST AL,0x10
+f000:ef01:	f8	CLC
+f000:ef02:	58	POP AX
+f000:ef03:	59	POP CX
+f000:ef04:	c3	RET
+
+### FUNCTION FUN_f000_ef05 @ f000:ef05
+f000:ef05:	51	PUSH CX
+f000:ef06:	33 c9	XOR CX,CX
+f000:ef08:	e2 fe	LOOP 0xf000:ef08
+f000:ef0a:	fe cc	DEC AH
+f000:ef0c:	75 f8	JNZ 0xf000:ef06
+f000:ef0e:	59	POP CX
+f000:ef0f:	c3	RET
+
+### FUNCTION FUN_f000_ef10 @ f000:ef10
+f000:ef10:	bd 04 00	MOV BP,0x4
+f000:ef13:	bb 00 b0	MOV BX,0xb000
+f000:ef16:	3c 07	CMP AL,0x7
+f000:ef18:	74 05	JZ 0xf000:ef1f
+f000:ef1a:	bd 10 00	MOV BP,0x10
+f000:ef1d:	b7 b8	MOV BH,0xb8
+f000:ef1f:	53	PUSH BX
+f000:ef20:	07	POP ES
+f000:ef21:	a0 65 00	MOV AL,[0x65]
+f000:ef24:	24 f7	AND AL,0xf7
+f000:ef26:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:ef2a:	83 c2 04	ADD DX,0x4
+f000:ef2d:	ee	OUT DX,AL
+f000:ef2e:	e8 fa 09	CALL 0xf000:f92b
+f000:ef31:	4d	DEC BP
+f000:ef32:	75 fa	JNZ 0xf000:ef2e
+f000:ef34:	73 05	JNC 0xf000:ef3b
+f000:ef36:	80 0e 15 00 04	OR byte ptr [0x15],0x4
+f000:ef3b:	c3	RET
+
+### FUNCTION FUN_f000_ef3c @ f000:ef3c
+f000:ef3c:	3c 53	CMP AL,0x53
+f000:ef3e:	75 11	JNZ 0xf000:ef51
+f000:ef40:	8a 0e 17 00	MOV CL,byte ptr [0x17]
+f000:ef44:	f6 c1 04	TEST CL,0x4
+f000:ef47:	74 08	JZ 0xf000:ef51
+f000:ef49:	f6 c1 08	TEST CL,0x8
+f000:ef4c:	74 03	JZ 0xf000:ef51
+f000:ef4e:	e9 cc fb	JMP 0xf000:eb1d
+f000:ef51:	c3	RET
+
+### NO FUNCTION
+f000:ef52:	90	NOP
+f000:ef53:	90	NOP
+f000:ef54:	90	NOP
+f000:ef55:	90	NOP
+f000:ef56:	90	NOP
+f000:ef57:	fb	STI
+f000:ef58:	1e	PUSH DS
+f000:ef59:	50	PUSH AX
+f000:ef5a:	33 c0	XOR AX,AX
+f000:ef5c:	8e d8	MOV DS,AX
+f000:ef5e:	80 0e 3e 04 80	OR byte ptr [0x43e],0x80
+f000:ef63:	b0 20	MOV AL,0x20
+f000:ef65:	e6 20	OUT 0x20,AL
+f000:ef67:	58	POP AX
+f000:ef68:	1f	POP DS
+f000:ef69:	cf	IRET
+
+### FUNCTION FUN_f000_ef6a @ f000:ef6a
+f000:ef6a:	b0 08	MOV AL,0x8
+f000:ef6c:	e8 23 00	CALL 0xf000:ef92
+
+### FUNCTION FUN_f000_ef6f @ f000:ef6f
+f000:ef6f:	53	PUSH BX
+f000:ef70:	51	PUSH CX
+f000:ef71:	b9 07 00	MOV CX,0x7
+f000:ef74:	33 db	XOR BX,BX
+f000:ef76:	e8 5c ff	CALL 0xf000:eed5
+f000:ef79:	72 0d	JC 0xf000:ef88
+f000:ef7b:	88 47 42	MOV byte ptr [BX + 0x42],AL
+f000:ef7e:	74 0f	JZ 0xf000:ef8f
+f000:ef80:	43	INC BX
+f000:ef81:	e2 f3	LOOP 0xf000:ef76
+f000:ef83:	c6 06 41 00 20	MOV byte ptr [0x41],0x20
+f000:ef88:	f9	STC
+f000:ef89:	59	POP CX
+f000:ef8a:	5b	POP BX
+f000:ef8b:	58	POP AX
+f000:ef8c:	b0 00	MOV AL,0x0
+f000:ef8e:	c3	RET
+f000:ef8f:	59	POP CX
+f000:ef90:	5b	POP BX
+f000:ef91:	c3	RET
+
+### FUNCTION FUN_f000_ef92 @ f000:ef92
+f000:ef92:	51	PUSH CX
+f000:ef93:	52	PUSH DX
+f000:ef94:	50	PUSH AX
+f000:ef95:	33 c9	XOR CX,CX
+f000:ef97:	ba f4 03	MOV DX,0x3f4
+f000:ef9a:	ec	IN AL,DX
+f000:ef9b:	0a c0	OR AL,AL
+f000:ef9d:	78 09	JS 0xf000:efa8
+f000:ef9f:	e2 f9	LOOP 0xf000:ef9a
+f000:efa1:	c6 06 41 00 80	MOV byte ptr [0x41],0x80
+f000:efa6:	eb 12	JMP 0xf000:efba
+f000:efa8:	a8 40	TEST AL,0x40
+f000:efaa:	74 07	JZ 0xf000:efb3
+f000:efac:	c6 06 41 00 20	MOV byte ptr [0x41],0x20
+f000:efb1:	eb 07	JMP 0xf000:efba
+f000:efb3:	42	INC DX
+f000:efb4:	58	POP AX
+f000:efb5:	ee	OUT DX,AL
+f000:efb6:	f8	CLC
+f000:efb7:	5a	POP DX
+f000:efb8:	59	POP CX
+
+### FUNCTION FUN_f000_efb9 @ f000:efb9
+f000:efb9:	c3	RET
+
+### FUNCTION FUN_f000_efba @ f000:efba
+f000:efba:	58	POP AX
+f000:efbb:	5a	POP DX
+f000:efbc:	59	POP CX
+f000:efbd:	58	POP AX
+f000:efbe:	b0 00	MOV AL,0x0
+f000:efc0:	f9	STC
+f000:efc1:	c3	RET
+
+### NO FUNCTION
+f000:efc2:	90	NOP
+f000:efc3:	90	NOP
+f000:efc4:	90	NOP
+f000:efc5:	90	NOP
+f000:efc6:	90	NOP
+f000:efc7:	cf	IRET
+f000:efc8:	02 25	ADD AH,byte ptr [DI]
+f000:efca:	02 08	ADD CL,byte ptr [BX + SI]
+f000:efcc:	2a ff	SUB BH,BH
+f000:efce:	50	PUSH AX
+f000:efcf:	f6 19	NEG byte ptr [BX + DI]
+f000:efd1:	04 fb	ADD AL,0xfb
+f000:efd3:	1e	PUSH DS
+f000:efd4:	53	PUSH BX
+f000:efd5:	51	PUSH CX
+f000:efd6:	52	PUSH DX
+f000:efd7:	bb 40 00	MOV BX,0x40
+f000:efda:	8e db	MOV DS,BX
+f000:efdc:	8b da	MOV BX,DX
+f000:efde:	d1 e3	SHL BX,0x1
+f000:efe0:	8b 57 08	MOV DX,word ptr [BX + 0x8]
+f000:efe3:	0b d2	OR DX,DX
+f000:efe5:	74 0c	JZ 0xf000:eff3
+f000:efe7:	0a e4	OR AH,AH
+f000:efe9:	74 0d	JZ 0xf000:eff8
+f000:efeb:	fe cc	DEC AH
+f000:efed:	74 39	JZ 0xf000:f028
+f000:efef:	fe cc	DEC AH
+f000:eff1:	74 29	JZ 0xf000:f01c
+f000:eff3:	5a	POP DX
+f000:eff4:	59	POP CX
+f000:eff5:	5b	POP BX
+f000:eff6:	1f	POP DS
+f000:eff7:	cf	IRET
+f000:eff8:	ee	OUT DX,AL
+f000:eff9:	42	INC DX
+f000:effa:	8a 7f 78	MOV BH,byte ptr [BX + 0x78]
+f000:effd:	8a e0	MOV AH,AL
+f000:efff:	33 c9	XOR CX,CX
+f000:f001:	ec	IN AL,DX
+f000:f002:	0a c0	OR AL,AL
+f000:f004:	78 0c	JS 0xf000:f012
+f000:f006:	e2 f9	LOOP 0xf000:f001
+f000:f008:	fe cf	DEC BH
+f000:f00a:	75 f3	JNZ 0xf000:efff
+f000:f00c:	0c 01	OR AL,0x1
+f000:f00e:	24 f9	AND AL,0xf9
+f000:f010:	eb 10	JMP 0xf000:f022
+f000:f012:	42	INC DX
+f000:f013:	b0 0d	MOV AL,0xd
+f000:f015:	ee	OUT DX,AL
+f000:f016:	b0 0c	MOV AL,0xc
+f000:f018:	ee	OUT DX,AL
+f000:f019:	4a	DEC DX
+f000:f01a:	eb 03	JMP 0xf000:f01f
+f000:f01c:	8a e0	MOV AH,AL
+f000:f01e:	42	INC DX
+f000:f01f:	ec	IN AL,DX
+f000:f020:	24 f8	AND AL,0xf8
+f000:f022:	34 48	XOR AL,0x48
+f000:f024:	86 e0	XCHG AL,AH
+f000:f026:	eb cb	JMP 0xf000:eff3
+f000:f028:	8a e0	MOV AH,AL
+f000:f02a:	42	INC DX
+f000:f02b:	42	INC DX
+f000:f02c:	b0 08	MOV AL,0x8
+f000:f02e:	ee	OUT DX,AL
+f000:f02f:	b9 dc 05	MOV CX,0x5dc
+f000:f032:	e2 fe	LOOP 0xf000:f032
+f000:f034:	eb e0	JMP 0xf000:f016
+f000:f036:	90	NOP
+f000:f037:	90	NOP
+f000:f038:	90	NOP
+f000:f039:	90	NOP
+f000:f03a:	90	NOP
+f000:f03b:	90	NOP
+f000:f03c:	90	NOP
+f000:f03d:	90	NOP
+f000:f03e:	90	NOP
+f000:f03f:	90	NOP
+f000:f040:	90	NOP
+f000:f041:	90	NOP
+f000:f042:	90	NOP
+f000:f043:	90	NOP
+f000:f044:	90	NOP
+f000:f045:	15 f1 be	ADC AX,0xbef1
+f000:f048:	f1	INT1
+f000:f049:	cb	RETF
+f000:f04a:	f1	INT1
+f000:f04b:	db f1	FCOMI ST0,ST1
+f000:f04d:	f7 f1	DIV CX
+f000:f04f:	78 f2	JS 0xf000:f043
+f000:f051:	98	CBW
+f000:f052:	f2 98	CBW
+f000:f054:	f2 e4 f3	IN AL,0xf3
+f000:f057:	e4 f3	IN AL,0xf3
+f000:f059:	e4 f3	IN AL,0xf3
+f000:f05b:	be f5 e9	MOV SI,0xe9f5
+f000:f05e:	f5	CMC
+f000:f05f:	2c f6	SUB AL,0xf6
+f000:f061:	55	PUSH BP
+f000:f062:	f6 d3	NOT BL
+f000:f064:	f6 fb	IDIV BL
+f000:f066:	fc	CLD
+f000:f067:	55	PUSH BP
+f000:f068:	06	PUSH ES
+f000:f069:	1e	PUSH DS
+f000:f06a:	56	PUSH SI
+f000:f06b:	57	PUSH DI
+f000:f06c:	52	PUSH DX
+f000:f06d:	51	PUSH CX
+f000:f06e:	53	PUSH BX
+f000:f06f:	50	PUSH AX
+f000:f070:	bb 40 00	MOV BX,0x40
+f000:f073:	8e db	MOV DS,BX
+f000:f075:	8a 1e 10 00	MOV BL,byte ptr [0x10]
+f000:f079:	80 e3 30	AND BL,0x30
+f000:f07c:	80 fb 30	CMP BL,0x30
+f000:f07f:	bb 00 b8	MOV BX,0xb800
+f000:f082:	75 02	JNZ 0xf000:f086
+f000:f084:	b7 b0	MOV BH,0xb0
+f000:f086:	53	PUSH BX
+f000:f087:	8b ec	MOV BP,SP
+f000:f089:	e8 78 00	CALL 0xf000:f104
+f000:f08c:	5e	POP SI
+f000:f08d:	58	POP AX
+f000:f08e:	5b	POP BX
+f000:f08f:	59	POP CX
+f000:f090:	5a	POP DX
+f000:f091:	5f	POP DI
+f000:f092:	5e	POP SI
+f000:f093:	1f	POP DS
+f000:f094:	07	POP ES
+f000:f095:	5d	POP BP
+f000:f096:	cf	IRET
+
+### FUNCTION FUN_f000_f097 @ f000:f097
+f000:f097:	52	PUSH DX
+f000:f098:	b4 00	MOV AH,0x0
+f000:f09a:	f7 e3	MUL BX
+f000:f09c:	5a	POP DX
+f000:f09d:	8b 4e 00	MOV CX,word ptr [BP + 0x0]
+f000:f0a0:	c3	RET
+
+### NO FUNCTION
+f000:f0a1:	c0 00 90	ROL byte ptr [BX + SI],0x90
+f000:f0a4:	38 28	CMP byte ptr [BX + SI],CH
+f000:f0a6:	2d 0a 1f	SUB AX,0x1f0a
+f000:f0a9:	06	PUSH ES
+f000:f0aa:	19 1c	SBB word ptr [SI],BX
+f000:f0ac:	02 07	ADD AL,byte ptr [BX]
+f000:f0ae:	06	PUSH ES
+f000:f0af:	07	POP ES
+f000:f0b0:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0b2:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0b4:	71 50	JNO 0xf000:f106
+f000:f0b6:	5a	POP DX
+f000:f0b7:	0a 1f	OR BL,byte ptr [BX]
+f000:f0b9:	06	PUSH ES
+f000:f0ba:	19 1c	SBB word ptr [SI],BX
+f000:f0bc:	02 07	ADD AL,byte ptr [BX]
+f000:f0be:	06	PUSH ES
+f000:f0bf:	07	POP ES
+f000:f0c0:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0c2:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0c4:	38 28	CMP byte ptr [BX + SI],CH
+f000:f0c6:	2d 0a 7f	SUB AX,0x7f0a
+f000:f0c9:	06	PUSH ES
+f000:f0ca:	64 70 02	JO 0xf000:f0cf
+f000:f0cd:	01 06 07 00	ADD word ptr [0x7],AX
+f000:f0d1:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0d3:	00 61 50	ADD byte ptr [BX + DI + 0x50],AH
+f000:f0d6:	52	PUSH DX
+f000:f0d7:	0f 19 06 19 19	NOP word ptr [0x1919]
+f000:f0dc:	02 0d	ADD CL,byte ptr [DI]
+f000:f0de:	0b 0c	OR CX,word ptr [SI]
+f000:f0e0:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0e2:	00 00	ADD byte ptr [BX + SI],AL
+f000:f0e4:	00 08	ADD byte ptr [BX + SI],CL
+f000:f0e6:	00 10	ADD byte ptr [BX + SI],DL
+f000:f0e8:	00 40 00	ADD byte ptr [BX + SI + 0x0],AL
+f000:f0eb:	40	INC AX
+f000:f0ec:	28 28	SUB byte ptr [BX + SI],CH
+f000:f0ee:	50	PUSH AX
+f000:f0ef:	50	PUSH AX
+f000:f0f0:	28 28	SUB byte ptr [BX + SI],CH
+f000:f0f2:	50	PUSH AX
+f000:f0f3:	50	PUSH AX
+f000:f0f4:	2c 28	SUB AL,0x28
+f000:f0f6:	2d 29 2a	SUB AX,0x2a29
+f000:f0f9:	2e 1e	PUSH DS
+f000:f0fb:	29 00	SUB word ptr [BX + SI],AX
+f000:f0fd:	00 10	ADD byte ptr [BX + SI],DL
+f000:f0ff:	10 20	ADC byte ptr [BX + SI],AH
+f000:f101:	20 20	AND byte ptr [BX + SI],AH
+
+### FUNCTION FUN_f000_f104 @ f000:f104
+f000:f104:	80 fc 0f	CMP AH,0xf
+f000:f107:	76 01	JBE 0xf000:f10a
+f000:f109:	c3	RET
+f000:f10a:	d0 e4	SHL AH,0x1
+f000:f10c:	8a dc	MOV BL,AH
+f000:f10e:	b7 00	MOV BH,0x0
+f000:f110:	2e ff a7 45 f0	JMP word ptr CS:[BX + 0xf045]
+f000:f115:	a0 10 00	MOV AL,[0x10]
+f000:f118:	ba b4 03	MOV DX,0x3b4
+f000:f11b:	24 30	AND AL,0x30
+f000:f11d:	3c 30	CMP AL,0x30
+f000:f11f:	b0 01	MOV AL,0x1
+f000:f121:	b3 07	MOV BL,0x7
+f000:f123:	74 0c	JZ 0xf000:f131
+f000:f125:	8a 5e 02	MOV BL,byte ptr [BP + 0x2]
+f000:f128:	80 fb 07	CMP BL,0x7
+f000:f12b:	77 dc	JA 0xf000:f109
+f000:f12d:	b2 d4	MOV DL,0xd4
+f000:f12f:	fe c8	DEC AL
+f000:f131:	89 16 63 00	MOV word ptr [0x63],DX
+f000:f135:	80 c2 04	ADD DL,0x4
+f000:f138:	ee	OUT DX,AL
+f000:f139:	88 1e 49 00	MOV byte ptr [0x49],BL
+f000:f13d:	1e	PUSH DS
+f000:f13e:	33 c0	XOR AX,AX
+f000:f140:	8e d8	MOV DS,AX
+f000:f142:	c4 36 74 00	LES SI,[0x74]
+f000:f146:	1f	POP DS
+f000:f147:	b7 00	MOV BH,0x0
+f000:f149:	53	PUSH BX
+f000:f14a:	2e 8a 9f fc f0	MOV BL,byte ptr CS:[BX + 0xf0fc]
+f000:f14f:	03 f3	ADD SI,BX
+f000:f151:	b9 10 00	MOV CX,0x10
+f000:f154:	26 8a 04	MOV AL,byte ptr ES:[SI]
+f000:f157:	e8 2a 06	CALL 0xf000:f784
+f000:f15a:	fe c4	INC AH
+f000:f15c:	46	INC SI
+f000:f15d:	e2 f5	LOOP 0xf000:f154
+f000:f15f:	8b 5e 00	MOV BX,word ptr [BP + 0x0]
+f000:f162:	8e c3	MOV ES,BX
+f000:f164:	33 ff	XOR DI,DI
+f000:f166:	e8 7d 05	CALL 0xf000:f6e6
+f000:f169:	b5 20	MOV CH,0x20
+f000:f16b:	b8 00 00	MOV AX,0x0
+f000:f16e:	72 07	JC 0xf000:f177
+f000:f170:	75 02	JNZ 0xf000:f174
+f000:f172:	b5 08	MOV CH,0x8
+f000:f174:	b8 20 07	MOV AX,0x720
+f000:f177:	f3 ab	STOSW.REP ES:DI
+f000:f179:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f17d:	80 c2 04	ADD DL,0x4
+f000:f180:	5b	POP BX
+f000:f181:	2e 8a 87 f4 f0	MOV AL,byte ptr CS:[BX + 0xf0f4]
+f000:f186:	ee	OUT DX,AL
+f000:f187:	a2 65 00	MOV [0x65],AL
+f000:f18a:	42	INC DX
+f000:f18b:	b0 30	MOV AL,0x30
+f000:f18d:	80 fb 06	CMP BL,0x6
+f000:f190:	75 02	JNZ 0xf000:f194
+f000:f192:	b0 3f	MOV AL,0x3f
+f000:f194:	a2 66 00	MOV [0x66],AL
+f000:f197:	ee	OUT DX,AL
+f000:f198:	33 c0	XOR AX,AX
+f000:f19a:	a3 4e 00	MOV [0x4e],AX
+f000:f19d:	a2 62 00	MOV [0x62],AL
+f000:f1a0:	b1 08	MOV CL,0x8
+f000:f1a2:	bf 50 00	MOV DI,0x50
+f000:f1a5:	89 05	MOV word ptr [DI],AX
+f000:f1a7:	47	INC DI
+f000:f1a8:	e2 fb	LOOP 0xf000:f1a5
+f000:f1aa:	2e 8a 87 ec f0	MOV AL,byte ptr CS:[BX + 0xf0ec]
+f000:f1af:	a3 4a 00	MOV [0x4a],AX
+f000:f1b2:	80 e3 fe	AND BL,0xfe
+f000:f1b5:	2e 8b 87 e4 f0	MOV AX,word ptr CS:[BX + 0xf0e4]
+f000:f1ba:	a3 4c 00	MOV [0x4c],AX
+f000:f1bd:	c3	RET
+f000:f1be:	8b 4e 06	MOV CX,word ptr [BP + 0x6]
+f000:f1c1:	89 0e 60 00	MOV word ptr [0x60],CX
+f000:f1c5:	b4 0a	MOV AH,0xa
+f000:f1c7:	e8 b1 05	CALL 0xf000:f77b
+f000:f1ca:	c3	RET
+f000:f1cb:	8a 5e 05	MOV BL,byte ptr [BP + 0x5]
+f000:f1ce:	d0 e3	SHL BL,0x1
+f000:f1d0:	b7 00	MOV BH,0x0
+f000:f1d2:	8b 46 08	MOV AX,word ptr [BP + 0x8]
+f000:f1d5:	89 47 50	MOV word ptr [BX + 0x50],AX
+f000:f1d8:	e9 8b 05	JMP 0xf000:f766
+f000:f1db:	8a 5e 05	MOV BL,byte ptr [BP + 0x5]
+f000:f1de:	d0 e3	SHL BL,0x1
+f000:f1e0:	b7 00	MOV BH,0x0
+f000:f1e2:	8b 47 50	MOV AX,word ptr [BX + 0x50]
+f000:f1e5:	89 46 08	MOV word ptr [BP + 0x8],AX
+f000:f1e8:	a1 60 00	MOV AX,[0x60]
+f000:f1eb:	89 46 06	MOV word ptr [BP + 0x6],AX
+f000:f1ee:	c3	RET
+
+### NO FUNCTION
+f000:f1ef:	03 03	ADD AX,word ptr [BP + DI]
+f000:f1f1:	05 05 03	ADD AX,0x305
+f000:f1f4:	03 03	ADD AX,word ptr [BP + DI]
+
+### IN FUNCTION FUN_f000_f104
+f000:f1f6:	04 8b	ADD AL,0x8b
+f000:f1f8:	16	PUSH SS
+f000:f1f9:	63 00	ARPL word ptr [BX + SI],AX
+f000:f1fb:	80 c2 06	ADD DL,0x6
+f000:f1fe:	c6 46 03 00	MOV byte ptr [BP + 0x3],0x0
+f000:f202:	ec	IN AL,DX
+f000:f203:	a8 04	TEST AL,0x4
+f000:f205:	74 68	JZ 0xf000:f26f
+f000:f207:	a8 02	TEST AL,0x2
+f000:f209:	75 01	JNZ 0xf000:f20c
+f000:f20b:	c3	RET
+f000:f20c:	b4 10	MOV AH,0x10
+f000:f20e:	e8 10 05	CALL 0xf000:f721
+f000:f211:	8a 1e 49 00	MOV BL,byte ptr [0x49]
+f000:f215:	8a cb	MOV CL,BL
+f000:f217:	b7 00	MOV BH,0x0
+f000:f219:	2e 8a 9f ef f1	MOV BL,byte ptr CS:[BX + 0xf1ef]
+f000:f21e:	2b cb	SUB CX,BX
+f000:f220:	79 02	JNS 0xf000:f224
+f000:f222:	33 c0	XOR AX,AX
+f000:f224:	e8 bf 04	CALL 0xf000:f6e6
+f000:f227:	73 25	JNC 0xf000:f24e
+f000:f229:	b5 28	MOV CH,0x28
+f000:f22b:	f6 f2	DIV DL
+f000:f22d:	8a dc	MOV BL,AH
+f000:f22f:	b7 00	MOV BH,0x0
+f000:f231:	b1 03	MOV CL,0x3
+f000:f233:	d3 e3	SHL BX,CL
+f000:f235:	8a e8	MOV CH,AL
+f000:f237:	d0 e5	SHL CH,0x1
+f000:f239:	8a d4	MOV DL,AH
+f000:f23b:	8a f0	MOV DH,AL
+f000:f23d:	d0 ee	SHR DH,0x1
+f000:f23f:	d0 ee	SHR DH,0x1
+f000:f241:	80 3e 49 00 06	CMP byte ptr [0x49],0x6
+f000:f246:	75 1a	JNZ 0xf000:f262
+f000:f248:	d0 e2	SHL DL,0x1
+f000:f24a:	d1 e3	SHL BX,0x1
+f000:f24c:	eb 14	JMP 0xf000:f262
+f000:f24e:	f6 36 4a 00	DIV byte ptr [0x4a]
+f000:f252:	86 e0	XCHG AL,AH
+f000:f254:	8b d0	MOV DX,AX
+f000:f256:	b1 03	MOV CL,0x3
+f000:f258:	d2 e4	SHL AH,CL
+f000:f25a:	8a ec	MOV CH,AH
+f000:f25c:	8a d8	MOV BL,AL
+f000:f25e:	b7 00	MOV BH,0x0
+f000:f260:	d3 e3	SHL BX,CL
+f000:f262:	c6 46 03 01	MOV byte ptr [BP + 0x3],0x1
+f000:f266:	89 56 08	MOV word ptr [BP + 0x8],DX
+f000:f269:	89 5e 04	MOV word ptr [BP + 0x4],BX
+f000:f26c:	88 6e 07	MOV byte ptr [BP + 0x7],CH
+f000:f26f:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f273:	83 c2 07	ADD DX,0x7
+f000:f276:	ee	OUT DX,AL
+f000:f277:	c3	RET
+f000:f278:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f27b:	a2 62 00	MOV [0x62],AL
+f000:f27e:	b4 00	MOV AH,0x0
+f000:f280:	50	PUSH AX
+f000:f281:	8b 1e 4c 00	MOV BX,word ptr [0x4c]
+f000:f285:	f7 e3	MUL BX
+f000:f287:	a3 4e 00	MOV [0x4e],AX
+f000:f28a:	d1 e8	SHR AX,0x1
+f000:f28c:	8b c8	MOV CX,AX
+f000:f28e:	b4 0c	MOV AH,0xc
+f000:f290:	e8 e8 04	CALL 0xf000:f77b
+f000:f293:	5b	POP BX
+f000:f294:	e8 d7 04	CALL 0xf000:f76e
+f000:f297:	c3	RET
+f000:f298:	e8 4b 04	CALL 0xf000:f6e6
+f000:f29b:	73 03	JNC 0xf000:f2a0
+f000:f29d:	e9 9b 00	JMP 0xf000:f33b
+f000:f2a0:	fc	CLD
+f000:f2a1:	80 3e 49 00 02	CMP byte ptr [0x49],0x2
+f000:f2a6:	72 15	JC 0xf000:f2bd
+f000:f2a8:	80 3e 49 00 03	CMP byte ptr [0x49],0x3
+f000:f2ad:	77 0e	JA 0xf000:f2bd
+f000:f2af:	ba da 03	MOV DX,0x3da
+f000:f2b2:	ec	IN AL,DX
+f000:f2b3:	a8 08	TEST AL,0x8
+f000:f2b5:	74 fb	JZ 0xf000:f2b2
+f000:f2b7:	ba d8 03	MOV DX,0x3d8
+f000:f2ba:	b0 25	MOV AL,0x25
+f000:f2bc:	ee	OUT DX,AL
+f000:f2bd:	8b 46 08	MOV AX,word ptr [BP + 0x8]
+f000:f2c0:	50	PUSH AX
+f000:f2c1:	80 7e 03 07	CMP byte ptr [BP + 0x3],0x7
+f000:f2c5:	74 03	JZ 0xf000:f2ca
+f000:f2c7:	8b 46 06	MOV AX,word ptr [BP + 0x6]
+f000:f2ca:	e8 75 04	CALL 0xf000:f742
+f000:f2cd:	03 06 4e 00	ADD AX,word ptr [0x4e]
+f000:f2d1:	8b f0	MOV SI,AX
+f000:f2d3:	8b f8	MOV DI,AX
+f000:f2d5:	5a	POP DX
+f000:f2d6:	2b 56 06	SUB DX,word ptr [BP + 0x6]
+f000:f2d9:	81 c2 01 01	ADD DX,0x101
+f000:f2dd:	8b 1e 4a 00	MOV BX,word ptr [0x4a]
+f000:f2e1:	d1 e3	SHL BX,0x1
+f000:f2e3:	1e	PUSH DS
+f000:f2e4:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f2e7:	e8 ad fd	CALL 0xf000:f097
+f000:f2ea:	8e c1	MOV ES,CX
+f000:f2ec:	8e d9	MOV DS,CX
+f000:f2ee:	80 7e 03 06	CMP byte ptr [BP + 0x3],0x6
+f000:f2f2:	74 05	JZ 0xf000:f2f9
+f000:f2f4:	f7 d8	NEG AX
+f000:f2f6:	f7 db	NEG BX
+f000:f2f8:	fd	STD
+f000:f2f9:	8a 4e 02	MOV CL,byte ptr [BP + 0x2]
+f000:f2fc:	0a c9	OR CL,CL
+f000:f2fe:	74 1a	JZ 0xf000:f31a
+f000:f300:	03 f0	ADD SI,AX
+f000:f302:	2a 76 02	SUB DH,byte ptr [BP + 0x2]
+f000:f305:	b5 00	MOV CH,0x0
+f000:f307:	8a ca	MOV CL,DL
+f000:f309:	57	PUSH DI
+f000:f30a:	56	PUSH SI
+f000:f30b:	f3 a5	MOVSW.REP ES:DI,SI
+f000:f30d:	5e	POP SI
+f000:f30e:	5f	POP DI
+f000:f30f:	03 f3	ADD SI,BX
+f000:f311:	03 fb	ADD DI,BX
+f000:f313:	fe ce	DEC DH
+f000:f315:	75 ee	JNZ 0xf000:f305
+f000:f317:	8a 76 02	MOV DH,byte ptr [BP + 0x2]
+f000:f31a:	b5 00	MOV CH,0x0
+f000:f31c:	8a 66 05	MOV AH,byte ptr [BP + 0x5]
+f000:f31f:	b0 20	MOV AL,0x20
+f000:f321:	8a ca	MOV CL,DL
+f000:f323:	57	PUSH DI
+f000:f324:	f3 ab	STOSW.REP ES:DI
+f000:f326:	5f	POP DI
+f000:f327:	03 fb	ADD DI,BX
+f000:f329:	fe ce	DEC DH
+f000:f32b:	75 f4	JNZ 0xf000:f321
+f000:f32d:	1f	POP DS
+f000:f32e:	e8 b5 03	CALL 0xf000:f6e6
+f000:f331:	74 07	JZ 0xf000:f33a
+f000:f333:	a0 65 00	MOV AL,[0x65]
+f000:f336:	ba d8 03	MOV DX,0x3d8
+f000:f339:	ee	OUT DX,AL
+f000:f33a:	c3	RET
+f000:f33b:	fc	CLD
+f000:f33c:	8b 46 08	MOV AX,word ptr [BP + 0x8]
+f000:f33f:	50	PUSH AX
+f000:f340:	80 7e 03 07	CMP byte ptr [BP + 0x3],0x7
+f000:f344:	74 03	JZ 0xf000:f349
+f000:f346:	8b 46 06	MOV AX,word ptr [BP + 0x6]
+f000:f349:	e8 07 04	CALL 0xf000:f753
+f000:f34c:	8b f8	MOV DI,AX
+f000:f34e:	5a	POP DX
+f000:f34f:	2b 56 06	SUB DX,word ptr [BP + 0x6]
+f000:f352:	81 c2 01 01	ADD DX,0x101
+f000:f356:	d0 e6	SHL DH,0x1
+f000:f358:	d0 e6	SHL DH,0x1
+f000:f35a:	8a 46 03	MOV AL,byte ptr [BP + 0x3]
+f000:f35d:	80 3e 49 00 06	CMP byte ptr [0x49],0x6
+f000:f362:	74 09	JZ 0xf000:f36d
+f000:f364:	d0 e2	SHL DL,0x1
+f000:f366:	d1 e7	SHL DI,0x1
+f000:f368:	3c 07	CMP AL,0x7
+f000:f36a:	75 01	JNZ 0xf000:f36d
+f000:f36c:	47	INC DI
+f000:f36d:	3c 07	CMP AL,0x7
+f000:f36f:	75 04	JNZ 0xf000:f375
+f000:f371:	81 c7 f0 00	ADD DI,0xf0
+f000:f375:	8a 5e 02	MOV BL,byte ptr [BP + 0x2]
+f000:f378:	d0 e3	SHL BL,0x1
+f000:f37a:	d0 e3	SHL BL,0x1
+f000:f37c:	53	PUSH BX
+f000:f37d:	2a f3	SUB DH,BL
+f000:f37f:	b0 50	MOV AL,0x50
+f000:f381:	f6 e3	MUL BL
+f000:f383:	bb b0 1f	MOV BX,0x1fb0
+f000:f386:	80 7e 03 06	CMP byte ptr [BP + 0x3],0x6
+f000:f38a:	74 06	JZ 0xf000:f392
+f000:f38c:	f7 d8	NEG AX
+f000:f38e:	bb 50 20	MOV BX,0x2050
+f000:f391:	fd	STD
+f000:f392:	8b f7	MOV SI,DI
+f000:f394:	03 f0	ADD SI,AX
+f000:f396:	58	POP AX
+f000:f397:	0a c0	OR AL,AL
+f000:f399:	8b 4e 00	MOV CX,word ptr [BP + 0x0]
+f000:f39c:	8e d9	MOV DS,CX
+f000:f39e:	8e c1	MOV ES,CX
+f000:f3a0:	74 26	JZ 0xf000:f3c8
+f000:f3a2:	50	PUSH AX
+f000:f3a3:	b5 00	MOV CH,0x0
+f000:f3a5:	8a ca	MOV CL,DL
+f000:f3a7:	56	PUSH SI
+f000:f3a8:	57	PUSH DI
+f000:f3a9:	f3 a4	MOVSB.REP ES:DI,SI
+f000:f3ab:	5f	POP DI
+f000:f3ac:	5e	POP SI
+f000:f3ad:	81 c6 00 20	ADD SI,0x2000
+f000:f3b1:	81 c7 00 20	ADD DI,0x2000
+f000:f3b5:	8a ca	MOV CL,DL
+f000:f3b7:	56	PUSH SI
+f000:f3b8:	57	PUSH DI
+f000:f3b9:	f3 a4	MOVSB.REP ES:DI,SI
+f000:f3bb:	5f	POP DI
+f000:f3bc:	5e	POP SI
+f000:f3bd:	2b f3	SUB SI,BX
+f000:f3bf:	2b fb	SUB DI,BX
+f000:f3c1:	fe ce	DEC DH
+f000:f3c3:	75 de	JNZ 0xf000:f3a3
+f000:f3c5:	58	POP AX
+f000:f3c6:	8a f0	MOV DH,AL
+f000:f3c8:	8a 46 05	MOV AL,byte ptr [BP + 0x5]
+f000:f3cb:	b5 00	MOV CH,0x0
+f000:f3cd:	8a ca	MOV CL,DL
+f000:f3cf:	57	PUSH DI
+f000:f3d0:	f3 aa	STOSB.REP ES:DI
+f000:f3d2:	5f	POP DI
+f000:f3d3:	81 c7 00 20	ADD DI,0x2000
+f000:f3d7:	8a ca	MOV CL,DL
+f000:f3d9:	57	PUSH DI
+f000:f3da:	f3 aa	STOSB.REP ES:DI
+f000:f3dc:	5f	POP DI
+f000:f3dd:	2b fb	SUB DI,BX
+f000:f3df:	fe ce	DEC DH
+f000:f3e1:	75 ea	JNZ 0xf000:f3cd
+f000:f3e3:	c3	RET
+f000:f3e4:	e8 ff 02	CALL 0xf000:f6e6
+f000:f3e7:	72 70	JC 0xf000:f459
+f000:f3e9:	8a 5e 05	MOV BL,byte ptr [BP + 0x5]
+f000:f3ec:	b7 00	MOV BH,0x0
+f000:f3ee:	53	PUSH BX
+f000:f3ef:	e8 49 03	CALL 0xf000:f73b
+f000:f3f2:	8b f8	MOV DI,AX
+f000:f3f4:	58	POP AX
+f000:f3f5:	f7 26 4c 00	MUL word ptr [0x4c]
+f000:f3f9:	03 f8	ADD DI,AX
+f000:f3fb:	8b f7	MOV SI,DI
+f000:f3fd:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f401:	83 c2 06	ADD DX,0x6
+f000:f404:	1e	PUSH DS
+f000:f405:	8b 5e 00	MOV BX,word ptr [BP + 0x0]
+f000:f408:	8e db	MOV DS,BX
+f000:f40a:	8e c3	MOV ES,BX
+f000:f40c:	8a 46 03	MOV AL,byte ptr [BP + 0x3]
+f000:f40f:	3c 08	CMP AL,0x8
+f000:f411:	75 14	JNZ 0xf000:f427
+f000:f413:	ec	IN AL,DX
+f000:f414:	a8 01	TEST AL,0x1
+f000:f416:	75 fb	JNZ 0xf000:f413
+f000:f418:	fa	CLI
+f000:f419:	ec	IN AL,DX
+f000:f41a:	a8 01	TEST AL,0x1
+f000:f41c:	74 fb	JZ 0xf000:f419
+f000:f41e:	ad	LODSW SI
+f000:f41f:	1f	POP DS
+f000:f420:	88 46 02	MOV byte ptr [BP + 0x2],AL
+f000:f423:	88 66 03	MOV byte ptr [BP + 0x3],AH
+f000:f426:	c3	RET
+f000:f427:	8a 5e 02	MOV BL,byte ptr [BP + 0x2]
+f000:f42a:	8a 7e 04	MOV BH,byte ptr [BP + 0x4]
+f000:f42d:	8b 4e 06	MOV CX,word ptr [BP + 0x6]
+f000:f430:	3c 0a	CMP AL,0xa
+f000:f432:	74 12	JZ 0xf000:f446
+f000:f434:	ec	IN AL,DX
+f000:f435:	a8 01	TEST AL,0x1
+f000:f437:	75 fb	JNZ 0xf000:f434
+f000:f439:	fa	CLI
+f000:f43a:	ec	IN AL,DX
+f000:f43b:	a8 01	TEST AL,0x1
+f000:f43d:	74 fb	JZ 0xf000:f43a
+f000:f43f:	8b c3	MOV AX,BX
+f000:f441:	ab	STOSW ES:DI
+f000:f442:	e2 f0	LOOP 0xf000:f434
+f000:f444:	1f	POP DS
+f000:f445:	c3	RET
+f000:f446:	ec	IN AL,DX
+f000:f447:	a8 01	TEST AL,0x1
+f000:f449:	75 fb	JNZ 0xf000:f446
+f000:f44b:	fa	CLI
+f000:f44c:	ec	IN AL,DX
+f000:f44d:	a8 01	TEST AL,0x1
+f000:f44f:	74 fb	JZ 0xf000:f44c
+f000:f451:	8a c3	MOV AL,BL
+f000:f453:	aa	STOSB ES:DI
+f000:f454:	47	INC DI
+f000:f455:	e2 ef	LOOP 0xf000:f446
+f000:f457:	1f	POP DS
+f000:f458:	c3	RET
+f000:f459:	80 7e 03 08	CMP byte ptr [BP + 0x3],0x8
+f000:f45d:	75 03	JNZ 0xf000:f462
+f000:f45f:	e9 b8 00	JMP 0xf000:f51a
+f000:f462:	a1 50 00	MOV AX,[0x50]
+f000:f465:	e8 eb 02	CALL 0xf000:f753
+f000:f468:	8b f8	MOV DI,AX
+f000:f46a:	1e	PUSH DS
+f000:f46b:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f46e:	b4 00	MOV AH,0x0
+f000:f470:	0a c0	OR AL,AL
+f000:f472:	78 07	JS 0xf000:f47b
+f000:f474:	8c ca	MOV DX,CS
+f000:f476:	be 6e fa	MOV SI,0xfa6e
+f000:f479:	eb 0c	JMP 0xf000:f487
+f000:f47b:	24 7f	AND AL,0x7f
+f000:f47d:	33 db	XOR BX,BX
+f000:f47f:	8e db	MOV DS,BX
+f000:f481:	c5 36 7c 00	LDS SI,[0x7c]
+f000:f485:	8c da	MOV DX,DS
+f000:f487:	1f	POP DS
+f000:f488:	b1 03	MOV CL,0x3
+f000:f48a:	d3 e0	SHL AX,CL
+f000:f48c:	03 f0	ADD SI,AX
+f000:f48e:	8b 46 00	MOV AX,word ptr [BP + 0x0]
+f000:f491:	8e c0	MOV ES,AX
+f000:f493:	8b 4e 06	MOV CX,word ptr [BP + 0x6]
+f000:f496:	80 3e 49 00 06	CMP byte ptr [0x49],0x6
+f000:f49b:	1e	PUSH DS
+f000:f49c:	8e da	MOV DS,DX
+f000:f49e:	74 51	JZ 0xf000:f4f1
+f000:f4a0:	d1 e7	SHL DI,0x1
+f000:f4a2:	8a 46 04	MOV AL,byte ptr [BP + 0x4]
+f000:f4a5:	83 e0 03	AND AX,0x3
+f000:f4a8:	bb 55 55	MOV BX,0x5555
+f000:f4ab:	f7 e3	MUL BX
+f000:f4ad:	8b d0	MOV DX,AX
+f000:f4af:	8a 5e 04	MOV BL,byte ptr [BP + 0x4]
+f000:f4b2:	b7 08	MOV BH,0x8
+f000:f4b4:	57	PUSH DI
+f000:f4b5:	56	PUSH SI
+f000:f4b6:	ac	LODSB SI
+f000:f4b7:	51	PUSH CX
+f000:f4b8:	53	PUSH BX
+f000:f4b9:	33 db	XOR BX,BX
+f000:f4bb:	b9 08 00	MOV CX,0x8
+f000:f4be:	d0 e8	SHR AL,0x1
+f000:f4c0:	d1 db	RCR BX,0x1
+f000:f4c2:	d1 fb	SAR BX,0x1
+f000:f4c4:	e2 f8	LOOP 0xf000:f4be
+f000:f4c6:	8b c3	MOV AX,BX
+f000:f4c8:	5b	POP BX
+f000:f4c9:	59	POP CX
+f000:f4ca:	23 c2	AND AX,DX
+f000:f4cc:	86 c4	XCHG AH,AL
+f000:f4ce:	0a db	OR BL,BL
+f000:f4d0:	79 03	JNS 0xf000:f4d5
+f000:f4d2:	26 33 05	XOR AX,word ptr ES:[DI]
+f000:f4d5:	26 89 05	MOV word ptr ES:[DI],AX
+f000:f4d8:	81 f7 00 20	XOR DI,0x2000
+f000:f4dc:	f7 c7 00 20	TEST DI,0x2000
+f000:f4e0:	75 03	JNZ 0xf000:f4e5
+f000:f4e2:	83 c7 50	ADD DI,0x50
+f000:f4e5:	fe cf	DEC BH
+f000:f4e7:	75 cd	JNZ 0xf000:f4b6
+f000:f4e9:	5e	POP SI
+f000:f4ea:	5f	POP DI
+f000:f4eb:	47	INC DI
+f000:f4ec:	47	INC DI
+f000:f4ed:	e2 c3	LOOP 0xf000:f4b2
+f000:f4ef:	1f	POP DS
+f000:f4f0:	c3	RET
+f000:f4f1:	8a 5e 04	MOV BL,byte ptr [BP + 0x4]
+f000:f4f4:	ba 00 20	MOV DX,0x2000
+f000:f4f7:	b7 08	MOV BH,0x8
+f000:f4f9:	57	PUSH DI
+f000:f4fa:	56	PUSH SI
+f000:f4fb:	ac	LODSB SI
+f000:f4fc:	0a db	OR BL,BL
+f000:f4fe:	79 03	JNS 0xf000:f503
+f000:f500:	26 32 05	XOR AL,byte ptr ES:[DI]
+f000:f503:	26 88 05	MOV byte ptr ES:[DI],AL
+f000:f506:	33 fa	XOR DI,DX
+f000:f508:	85 fa	TEST DX,DI
+f000:f50a:	75 03	JNZ 0xf000:f50f
+f000:f50c:	83 c7 50	ADD DI,0x50
+f000:f50f:	fe cf	DEC BH
+f000:f511:	75 e8	JNZ 0xf000:f4fb
+f000:f513:	5e	POP SI
+f000:f514:	5f	POP DI
+f000:f515:	47	INC DI
+f000:f516:	e2 df	LOOP 0xf000:f4f7
+f000:f518:	1f	POP DS
+f000:f519:	c3	RET
+f000:f51a:	fc	CLD
+f000:f51b:	a1 50 00	MOV AX,[0x50]
+f000:f51e:	e8 32 02	CALL 0xf000:f753
+f000:f521:	8b f0	MOV SI,AX
+f000:f523:	83 ec 08	SUB SP,0x8
+f000:f526:	8b fc	MOV DI,SP
+f000:f528:	80 3e 49 00 06	CMP byte ptr [0x49],0x6
+f000:f52d:	8b 46 00	MOV AX,word ptr [BP + 0x0]
+f000:f530:	1e	PUSH DS
+f000:f531:	57	PUSH DI
+f000:f532:	8e d8	MOV DS,AX
+f000:f534:	74 31	JZ 0xf000:f567
+f000:f536:	b6 08	MOV DH,0x8
+f000:f538:	d1 e6	SHL SI,0x1
+f000:f53a:	bb 00 20	MOV BX,0x2000
+f000:f53d:	8b 04	MOV AX,word ptr [SI]
+f000:f53f:	86 c4	XCHG AH,AL
+f000:f541:	b9 00 c0	MOV CX,0xc000
+f000:f544:	b2 00	MOV DL,0x0
+f000:f546:	85 c1	TEST CX,AX
+f000:f548:	f8	CLC
+f000:f549:	74 01	JZ 0xf000:f54c
+f000:f54b:	f9	STC
+f000:f54c:	d0 d2	RCL DL,0x1
+f000:f54e:	d1 e9	SHR CX,0x1
+f000:f550:	d1 e9	SHR CX,0x1
+f000:f552:	73 f2	JNC 0xf000:f546
+f000:f554:	36 88 15	MOV byte ptr SS:[DI],DL
+f000:f557:	47	INC DI
+f000:f558:	33 f3	XOR SI,BX
+f000:f55a:	85 f3	TEST BX,SI
+f000:f55c:	75 03	JNZ 0xf000:f561
+f000:f55e:	83 c6 50	ADD SI,0x50
+f000:f561:	fe ce	DEC DH
+f000:f563:	75 d8	JNZ 0xf000:f53d
+f000:f565:	eb 17	JMP 0xf000:f57e
+f000:f567:	b6 04	MOV DH,0x4
+f000:f569:	8a 24	MOV AH,byte ptr [SI]
+f000:f56b:	36 88 25	MOV byte ptr SS:[DI],AH
+f000:f56e:	47	INC DI
+f000:f56f:	8a a4 00 20	MOV AH,byte ptr [SI + 0x2000]
+f000:f573:	36 88 25	MOV byte ptr SS:[DI],AH
+f000:f576:	47	INC DI
+f000:f577:	83 c6 50	ADD SI,0x50
+f000:f57a:	fe ce	DEC DH
+f000:f57c:	75 eb	JNZ 0xf000:f569
+f000:f57e:	8c ca	MOV DX,CS
+f000:f580:	bf 6e fa	MOV DI,0xfa6e
+f000:f583:	8e c2	MOV ES,DX
+f000:f585:	8c d2	MOV DX,SS
+f000:f587:	8e da	MOV DS,DX
+f000:f589:	5e	POP SI
+f000:f58a:	b0 00	MOV AL,0x0
+f000:f58c:	ba 80 00	MOV DX,0x80
+f000:f58f:	56	PUSH SI
+f000:f590:	57	PUSH DI
+f000:f591:	b9 08 00	MOV CX,0x8
+f000:f594:	f3 a6	CMPSB.REPE ES:DI,SI
+f000:f596:	5f	POP DI
+f000:f597:	5e	POP SI
+f000:f598:	74 1c	JZ 0xf000:f5b6
+f000:f59a:	fe c0	INC AL
+f000:f59c:	83 c7 08	ADD DI,0x8
+f000:f59f:	4a	DEC DX
+f000:f5a0:	75 ed	JNZ 0xf000:f58f
+f000:f5a2:	0a c0	OR AL,AL
+f000:f5a4:	74 10	JZ 0xf000:f5b6
+f000:f5a6:	33 db	XOR BX,BX
+f000:f5a8:	8e db	MOV DS,BX
+f000:f5aa:	c4 3e 7c 00	LES DI,[0x7c]
+f000:f5ae:	8c c3	MOV BX,ES
+f000:f5b0:	0b df	OR BX,DI
+f000:f5b2:	74 02	JZ 0xf000:f5b6
+f000:f5b4:	eb d6	JMP 0xf000:f58c
+f000:f5b6:	88 46 02	MOV byte ptr [BP + 0x2],AL
+f000:f5b9:	1f	POP DS
+f000:f5ba:	83 c4 08	ADD SP,0x8
+f000:f5bd:	c3	RET
+f000:f5be:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f5c2:	83 c2 05	ADD DX,0x5
+f000:f5c5:	a0 66 00	MOV AL,[0x66]
+f000:f5c8:	8a 66 05	MOV AH,byte ptr [BP + 0x5]
+f000:f5cb:	0a e4	OR AH,AH
+f000:f5cd:	8a 66 04	MOV AH,byte ptr [BP + 0x4]
+f000:f5d0:	75 09	JNZ 0xf000:f5db
+f000:f5d2:	24 e0	AND AL,0xe0
+f000:f5d4:	80 e4 1f	AND AH,0x1f
+f000:f5d7:	0a c4	OR AL,AH
+f000:f5d9:	eb 09	JMP 0xf000:f5e4
+f000:f5db:	24 df	AND AL,0xdf
+f000:f5dd:	f6 c4 01	TEST AH,0x1
+f000:f5e0:	74 02	JZ 0xf000:f5e4
+f000:f5e2:	0c 20	OR AL,0x20
+f000:f5e4:	a2 66 00	MOV [0x66],AL
+f000:f5e7:	ee	OUT DX,AL
+f000:f5e8:	c3	RET
+f000:f5e9:	8b 46 00	MOV AX,word ptr [BP + 0x0]
+f000:f5ec:	8e c0	MOV ES,AX
+f000:f5ee:	8b 56 08	MOV DX,word ptr [BP + 0x8]
+f000:f5f1:	8b 4e 06	MOV CX,word ptr [BP + 0x6]
+f000:f5f4:	e8 01 01	CALL 0xf000:f6f8
+f000:f5f7:	75 0d	JNZ 0xf000:f606
+f000:f5f9:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f5fc:	8a d8	MOV BL,AL
+f000:f5fe:	24 01	AND AL,0x1
+f000:f600:	d0 c8	ROR AL,0x1
+f000:f602:	b4 7f	MOV AH,0x7f
+f000:f604:	eb 0f	JMP 0xf000:f615
+f000:f606:	d0 e1	SHL CL,0x1
+f000:f608:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f60b:	8a d8	MOV BL,AL
+f000:f60d:	24 03	AND AL,0x3
+f000:f60f:	d0 c8	ROR AL,0x1
+f000:f611:	d0 c8	ROR AL,0x1
+f000:f613:	b4 3f	MOV AH,0x3f
+f000:f615:	d2 cc	ROR AH,CL
+f000:f617:	d2 e8	SHR AL,CL
+f000:f619:	26 8a 0c	MOV CL,byte ptr ES:[SI]
+f000:f61c:	0a db	OR BL,BL
+f000:f61e:	79 04	JNS 0xf000:f624
+f000:f620:	32 c8	XOR CL,AL
+f000:f622:	eb 04	JMP 0xf000:f628
+f000:f624:	22 cc	AND CL,AH
+f000:f626:	0a c8	OR CL,AL
+f000:f628:	26 88 0c	MOV byte ptr ES:[SI],CL
+f000:f62b:	c3	RET
+f000:f62c:	8b 46 00	MOV AX,word ptr [BP + 0x0]
+f000:f62f:	8e c0	MOV ES,AX
+f000:f631:	8b 56 08	MOV DX,word ptr [BP + 0x8]
+f000:f634:	8b 4e 06	MOV CX,word ptr [BP + 0x6]
+f000:f637:	e8 be 00	CALL 0xf000:f6f8
+f000:f63a:	26 8a 04	MOV AL,byte ptr ES:[SI]
+f000:f63d:	75 08	JNZ 0xf000:f647
+f000:f63f:	d2 e0	SHL AL,CL
+f000:f641:	d0 c0	ROL AL,0x1
+f000:f643:	24 01	AND AL,0x1
+f000:f645:	eb 0a	JMP 0xf000:f651
+f000:f647:	d0 e1	SHL CL,0x1
+f000:f649:	d2 e0	SHL AL,CL
+f000:f64b:	d0 c0	ROL AL,0x1
+f000:f64d:	d0 c0	ROL AL,0x1
+f000:f64f:	24 03	AND AL,0x3
+f000:f651:	88 46 02	MOV byte ptr [BP + 0x2],AL
+f000:f654:	c3	RET
+f000:f655:	8a 1e 62 00	MOV BL,byte ptr [0x62]
+f000:f659:	d0 e3	SHL BL,0x1
+f000:f65b:	b7 00	MOV BH,0x0
+f000:f65d:	8b 57 50	MOV DX,word ptr [BX + 0x50]
+f000:f660:	8a 46 02	MOV AL,byte ptr [BP + 0x2]
+f000:f663:	3c 08	CMP AL,0x8
+f000:f665:	74 22	JZ 0xf000:f689
+f000:f667:	3c 0a	CMP AL,0xa
+f000:f669:	74 3d	JZ 0xf000:f6a8
+f000:f66b:	3c 07	CMP AL,0x7
+f000:f66d:	74 23	JZ 0xf000:f692
+f000:f66f:	3c 0d	CMP AL,0xd
+f000:f671:	74 25	JZ 0xf000:f698
+f000:f673:	8a 5e 04	MOV BL,byte ptr [BP + 0x4]
+f000:f676:	b4 0a	MOV AH,0xa
+f000:f678:	b9 01 00	MOV CX,0x1
+f000:f67b:	cd 10	INT 0x10
+f000:f67d:	fe c2	INC DL
+f000:f67f:	3a 16 4a 00	CMP DL,byte ptr [0x4a]
+f000:f683:	75 15	JNZ 0xf000:f69a
+f000:f685:	b2 00	MOV DL,0x0
+f000:f687:	eb 1f	JMP 0xf000:f6a8
+f000:f689:	80 fa 00	CMP DL,0x0
+f000:f68c:	74 0c	JZ 0xf000:f69a
+f000:f68e:	fe ca	DEC DL
+f000:f690:	eb 08	JMP 0xf000:f69a
+f000:f692:	b3 01	MOV BL,0x1
+f000:f694:	e8 18 01	CALL 0xf000:f7af
+f000:f697:	c3	RET
+f000:f698:	b2 00	MOV DL,0x0
+f000:f69a:	8a 1e 62 00	MOV BL,byte ptr [0x62]
+f000:f69e:	d0 e3	SHL BL,0x1
+f000:f6a0:	b7 00	MOV BH,0x0
+f000:f6a2:	89 57 50	MOV word ptr [BX + 0x50],DX
+f000:f6a5:	e9 be 00	JMP 0xf000:f766
+f000:f6a8:	80 fe 18	CMP DH,0x18
+f000:f6ab:	74 04	JZ 0xf000:f6b1
+f000:f6ad:	fe c6	INC DH
+f000:f6af:	75 e9	JNZ 0xf000:f69a
+f000:f6b1:	b4 02	MOV AH,0x2
+f000:f6b3:	cd 10	INT 0x10
+f000:f6b5:	e8 2e 00	CALL 0xf000:f6e6
+f000:f6b8:	b7 00	MOV BH,0x0
+f000:f6ba:	72 06	JC 0xf000:f6c2
+f000:f6bc:	b4 08	MOV AH,0x8
+f000:f6be:	cd 10	INT 0x10
+f000:f6c0:	8a fc	MOV BH,AH
+f000:f6c2:	b4 06	MOV AH,0x6
+f000:f6c4:	b0 01	MOV AL,0x1
+f000:f6c6:	33 c9	XOR CX,CX
+f000:f6c8:	b6 18	MOV DH,0x18
+f000:f6ca:	8a 16 4a 00	MOV DL,byte ptr [0x4a]
+f000:f6ce:	fe ca	DEC DL
+f000:f6d0:	cd 10	INT 0x10
+f000:f6d2:	c3	RET
+f000:f6d3:	a0 4a 00	MOV AL,[0x4a]
+f000:f6d6:	88 46 03	MOV byte ptr [BP + 0x3],AL
+f000:f6d9:	a0 49 00	MOV AL,[0x49]
+f000:f6dc:	88 46 02	MOV byte ptr [BP + 0x2],AL
+f000:f6df:	a0 62 00	MOV AL,[0x62]
+f000:f6e2:	88 46 05	MOV byte ptr [BP + 0x5],AL
+f000:f6e5:	c3	RET
+
+### FUNCTION FUN_f000_f6e6 @ f000:f6e6
+f000:f6e6:	50	PUSH AX
+f000:f6e7:	a0 49 00	MOV AL,[0x49]
+f000:f6ea:	3c 07	CMP AL,0x7
+f000:f6ec:	74 08	JZ 0xf000:f6f6
+f000:f6ee:	3c 04	CMP AL,0x4
+f000:f6f0:	f5	CMC
+f000:f6f1:	73 03	JNC 0xf000:f6f6
+f000:f6f3:	18 c0	SBB AL,AL
+f000:f6f5:	f9	STC
+f000:f6f6:	58	POP AX
+f000:f6f7:	c3	RET
+
+### FUNCTION FUN_f000_f6f8 @ f000:f6f8
+f000:f6f8:	b0 50	MOV AL,0x50
+f000:f6fa:	33 f6	XOR SI,SI
+f000:f6fc:	d0 ea	SHR DL,0x1
+f000:f6fe:	73 03	JNC 0xf000:f703
+f000:f700:	be 00 20	MOV SI,0x2000
+f000:f703:	f6 e2	MUL DL
+f000:f705:	03 f0	ADD SI,AX
+f000:f707:	8b d1	MOV DX,CX
+f000:f709:	b9 02 03	MOV CX,0x302
+f000:f70c:	80 3e 49 00 06	CMP byte ptr [0x49],0x6
+f000:f711:	9c	PUSHF
+f000:f712:	75 03	JNZ 0xf000:f717
+f000:f714:	b9 03 07	MOV CX,0x703
+f000:f717:	22 ea	AND CH,DL
+f000:f719:	d3 ea	SHR DX,CL
+f000:f71b:	03 f2	ADD SI,DX
+f000:f71d:	86 e9	XCHG CL,CH
+f000:f71f:	9d	POPF
+f000:f720:	c3	RET
+
+### FUNCTION FUN_f000_f721 @ f000:f721
+f000:f721:	e8 0a 00	CALL 0xf000:f72e
+f000:f724:	8a e8	MOV CH,AL
+f000:f726:	fe c4	INC AH
+f000:f728:	e8 03 00	CALL 0xf000:f72e
+f000:f72b:	8a c8	MOV CL,AL
+f000:f72d:	c3	RET
+
+### FUNCTION FUN_f000_f72e @ f000:f72e
+f000:f72e:	52	PUSH DX
+f000:f72f:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f733:	86 e0	XCHG AL,AH
+f000:f735:	ee	OUT DX,AL
+f000:f736:	fe c2	INC DL
+f000:f738:	ec	IN AL,DX
+f000:f739:	5a	POP DX
+f000:f73a:	c3	RET
+
+### FUNCTION FUN_f000_f73b @ f000:f73b
+f000:f73b:	b7 00	MOV BH,0x0
+f000:f73d:	d1 e3	SHL BX,0x1
+f000:f73f:	8b 47 50	MOV AX,word ptr [BX + 0x50]
+
+### FUNCTION FUN_f000_f742 @ f000:f742
+f000:f742:	53	PUSH BX
+f000:f743:	8a d8	MOV BL,AL
+f000:f745:	8a c4	MOV AL,AH
+f000:f747:	f6 26 4a 00	MUL byte ptr [0x4a]
+f000:f74b:	b7 00	MOV BH,0x0
+f000:f74d:	03 c3	ADD AX,BX
+f000:f74f:	d1 e0	SHL AX,0x1
+f000:f751:	5b	POP BX
+f000:f752:	c3	RET
+
+### FUNCTION FUN_f000_f753 @ f000:f753
+f000:f753:	53	PUSH BX
+f000:f754:	8a d8	MOV BL,AL
+f000:f756:	8a c4	MOV AL,AH
+f000:f758:	f6 26 4a 00	MUL byte ptr [0x4a]
+f000:f75c:	d1 e0	SHL AX,0x1
+f000:f75e:	d1 e0	SHL AX,0x1
+f000:f760:	b7 00	MOV BH,0x0
+f000:f762:	03 c3	ADD AX,BX
+f000:f764:	5b	POP BX
+f000:f765:	c3	RET
+
+### FUNCTION FUN_f000_f766 @ f000:f766
+f000:f766:	d0 eb	SHR BL,0x1
+f000:f768:	38 1e 62 00	CMP byte ptr [0x62],BL
+f000:f76c:	75 24	JNZ 0xf000:f792
+
+### FUNCTION FUN_f000_f76e @ f000:f76e
+f000:f76e:	e8 ca ff	CALL 0xf000:f73b
+f000:f771:	03 06 4e 00	ADD AX,word ptr [0x4e]
+f000:f775:	d1 e8	SHR AX,0x1
+f000:f777:	8b c8	MOV CX,AX
+f000:f779:	b4 0e	MOV AH,0xe
+
+### FUNCTION FUN_f000_f77b @ f000:f77b
+f000:f77b:	8a c5	MOV AL,CH
+f000:f77d:	e8 04 00	CALL 0xf000:f784
+f000:f780:	fe c4	INC AH
+f000:f782:	8a c1	MOV AL,CL
+
+### FUNCTION FUN_f000_f784 @ f000:f784
+f000:f784:	52	PUSH DX
+f000:f785:	8b 16 63 00	MOV DX,word ptr [0x63]
+f000:f789:	86 e0	XCHG AL,AH
+f000:f78b:	ee	OUT DX,AL
+f000:f78c:	86 e0	XCHG AL,AH
+f000:f78e:	fe c2	INC DL
+f000:f790:	ee	OUT DX,AL
+f000:f791:	5a	POP DX
+f000:f792:	c3	RET
+
+### FUNCTION FUN_f000_f793 @ f000:f793
+f000:f793:	8a 26 10 00	MOV AH,byte ptr [0x10]
+f000:f797:	80 e4 30	AND AH,0x30
+f000:f79a:	b0 00	MOV AL,0x0
+f000:f79c:	80 fc 30	CMP AH,0x30
+f000:f79f:	74 09	JZ 0xf000:f7aa
+f000:f7a1:	b0 01	MOV AL,0x1
+f000:f7a3:	80 fc 10	CMP AH,0x10
+f000:f7a6:	74 02	JZ 0xf000:f7aa
+f000:f7a8:	b0 03	MOV AL,0x3
+f000:f7aa:	b4 00	MOV AH,0x0
+f000:f7ac:	cd 10	INT 0x10
+f000:f7ae:	c3	RET
+
+### FUNCTION FUN_f000_f7af @ f000:f7af
+f000:f7af:	50	PUSH AX
+f000:f7b0:	51	PUSH CX
+f000:f7b1:	b0 b6	MOV AL,0xb6
+f000:f7b3:	e6 43	OUT 0x43,AL
+f000:f7b5:	b8 28 05	MOV AX,0x528
+f000:f7b8:	e6 42	OUT 0x42,AL
+f000:f7ba:	8a c4	MOV AL,AH
+f000:f7bc:	e6 42	OUT 0x42,AL
+f000:f7be:	e4 61	IN AL,0x61
+f000:f7c0:	50	PUSH AX
+f000:f7c1:	0c 03	OR AL,0x3
+f000:f7c3:	e6 61	OUT 0x61,AL
+f000:f7c5:	33 c9	XOR CX,CX
+f000:f7c7:	e2 fe	LOOP 0xf000:f7c7
+f000:f7c9:	fe cb	DEC BL
+f000:f7cb:	75 fa	JNZ 0xf000:f7c7
+f000:f7cd:	58	POP AX
+f000:f7ce:	e6 61	OUT 0x61,AL
+f000:f7d0:	59	POP CX
+f000:f7d1:	58	POP AX
+f000:f7d2:	c3	RET
+
+### NO FUNCTION
+f000:f7d3:	c3	RET
+f000:f7ec:	c3	RET
+f000:f83c:	90	NOP
+f000:f83d:	90	NOP
+f000:f83e:	90	NOP
+f000:f83f:	90	NOP
+f000:f840:	90	NOP
+f000:f841:	fb	STI
+f000:f842:	1e	PUSH DS
+f000:f843:	33 c0	XOR AX,AX
+f000:f845:	8e d8	MOV DS,AX
+f000:f847:	a1 13 04	MOV AX,[0x413]
+f000:f84a:	1f	POP DS
+f000:f84b:	cf	IRET
+f000:f84c:	90	NOP
+f000:f84d:	fb	STI
+f000:f84e:	1e	PUSH DS
+f000:f84f:	33 c0	XOR AX,AX
+f000:f851:	8e d8	MOV DS,AX
+f000:f853:	a1 10 04	MOV AX,[0x410]
+f000:f856:	1f	POP DS
+f000:f857:	cf	IRET
+f000:f858:	90	NOP
+f000:f859:	f9	STC
+f000:f85a:	b4 86	MOV AH,0x86
+f000:f85c:	ca 02 00	RETF 0x2
+
+### FUNCTION FUN_f000_f85f @ f000:f85f
+f000:f85f:	50	PUSH AX
+f000:f860:	e4 62	IN AL,0x62
+f000:f862:	a8 c0	TEST AL,0xc0
+f000:f864:	75 03	JNZ 0xf000:f869
+f000:f866:	e9 a8 00	JMP 0xf000:f911
+f000:f869:	53	PUSH BX
+f000:f86a:	51	PUSH CX
+f000:f86b:	52	PUSH DX
+f000:f86c:	56	PUSH SI
+f000:f86d:	57	PUSH DI
+f000:f86e:	55	PUSH BP
+f000:f86f:	1e	PUSH DS
+f000:f870:	06	PUSH ES
+f000:f871:	b8 40 00	MOV AX,0x40
+f000:f874:	8e d8	MOV DS,AX
+f000:f876:	e8 1a ff	CALL 0xf000:f793
+f000:f879:	1e	PUSH DS
+f000:f87a:	0e	PUSH CS
+f000:f87b:	1f	POP DS
+f000:f87c:	be 18 f8	MOV SI,0xf818
+f000:f87f:	e8 60 ec	CALL 0xf000:e4e2
+f000:f882:	1f	POP DS
+f000:f883:	b8 11 00	MOV AX,0x11
+f000:f886:	e8 64 ec	CALL 0xf000:e4ed
+f000:f889:	b0 00	MOV AL,0x0
+f000:f88b:	e6 a0	OUT 0xa0,AL
+f000:f88d:	ba 61 00	MOV DX,0x61
+f000:f890:	ec	IN AL,DX
+f000:f891:	0c 30	OR AL,0x30
+f000:f893:	ee	OUT DX,AL
+f000:f894:	24 cf	AND AL,0xcf
+f000:f896:	ee	OUT DX,AL
+f000:f897:	b1 06	MOV CL,0x6
+f000:f899:	8b 1e 13 00	MOV BX,word ptr [0x13]
+f000:f89d:	d3 e3	SHL BX,CL
+f000:f89f:	42	INC DX
+f000:f8a0:	33 c0	XOR AX,AX
+f000:f8a2:	8e d8	MOV DS,AX
+f000:f8a4:	b9 10 00	MOV CX,0x10
+f000:f8a7:	33 f6	XOR SI,SI
+f000:f8a9:	8a 24	MOV AH,byte ptr [SI]
+f000:f8ab:	ec	IN AL,DX
+f000:f8ac:	a8 c0	TEST AL,0xc0
+f000:f8ae:	75 0e	JNZ 0xf000:f8be
+f000:f8b0:	46	INC SI
+f000:f8b1:	e2 f6	LOOP 0xf000:f8a9
+f000:f8b3:	8c d8	MOV AX,DS
+f000:f8b5:	40	INC AX
+f000:f8b6:	8e d8	MOV DS,AX
+f000:f8b8:	3b c3	CMP AX,BX
+f000:f8ba:	75 e8	JNZ 0xf000:f8a4
+f000:f8bc:	eb 0c	JMP 0xf000:f8ca
+f000:f8be:	88 24	MOV byte ptr [SI],AH
+f000:f8c0:	8c d8	MOV AX,DS
+f000:f8c2:	e8 4d ec	CALL 0xf000:e512
+f000:f8c5:	8b c6	MOV AX,SI
+f000:f8c7:	e8 18 ee	CALL 0xf000:e6e2
+f000:f8ca:	b8 16 00	MOV AX,0x16
+f000:f8cd:	e8 1d ec	CALL 0xf000:e4ed
+f000:f8d0:	1e	PUSH DS
+f000:f8d1:	0e	PUSH CS
+f000:f8d2:	1f	POP DS
+f000:f8d3:	be 2f f8	MOV SI,0xf82f
+f000:f8d6:	e8 09 ec	CALL 0xf000:e4e2
+f000:f8d9:	1f	POP DS
+f000:f8da:	e4 21	IN AL,0x21
+f000:f8dc:	50	PUSH AX
+f000:f8dd:	b0 fc	MOV AL,0xfc
+f000:f8df:	e6 21	OUT 0x21,AL
+f000:f8e1:	fb	STI
+f000:f8e2:	e8 09 06	CALL 0xf000:feee
+f000:f8e5:	50	PUSH AX
+f000:f8e6:	e8 ee eb	CALL 0xf000:e4d7
+f000:f8e9:	58	POP AX
+f000:f8ea:	3c 59	CMP AL,0x59
+f000:f8ec:	74 07	JZ 0xf000:f8f5
+f000:f8ee:	3c 79	CMP AL,0x79
+f000:f8f0:	74 03	JZ 0xf000:f8f5
+f000:f8f2:	e9 7c e9	JMP 0xf000:e271
+f000:f8f5:	e8 d8 00	CALL 0xf000:f9d0
+f000:f8f8:	58	POP AX
+f000:f8f9:	e6 21	OUT 0x21,AL
+f000:f8fb:	ba 61 00	MOV DX,0x61
+f000:f8fe:	ec	IN AL,DX
+f000:f8ff:	0c 30	OR AL,0x30
+f000:f901:	ee	OUT DX,AL
+f000:f902:	24 cf	AND AL,0xcf
+f000:f904:	ee	OUT DX,AL
+f000:f905:	b0 80	MOV AL,0x80
+f000:f907:	e6 a0	OUT 0xa0,AL
+f000:f909:	07	POP ES
+f000:f90a:	1f	POP DS
+f000:f90b:	5d	POP BP
+f000:f90c:	5f	POP DI
+f000:f90d:	5e	POP SI
+f000:f90e:	5a	POP DX
+f000:f90f:	59	POP CX
+f000:f910:	5b	POP BX
+f000:f911:	58	POP AX
+f000:f912:	cf	IRET
+
+### NO FUNCTION
+f000:f913:	4e	DEC SI
+f000:f914:	6f	OUTSW DX,SI
+f000:f915:	20 46 50	AND byte ptr [BP + 0x50],AL
+f000:f918:	55	PUSH BP
+f000:f919:	29 00	SUB word ptr [BX + SI],AX
+
+### FUNCTION FUN_f000_f91b @ f000:f91b
+f000:f91b:	32 c0	XOR AL,AL
+f000:f91d:	b0 40	MOV AL,0x40
+f000:f91f:	f6 e0	MUL AL
+f000:f921:	74 04	JZ 0xf000:f927
+f000:f923:	be 40 ec	MOV SI,0xec40
+f000:f926:	c3	RET
+f000:f927:	be dc ff	MOV SI,0xffdc
+f000:f92a:	c3	RET
+
+### FUNCTION FUN_f000_f92b @ f000:f92b
+f000:f92b:	bb 00 02	MOV BX,0x200
+f000:f92e:	b8 55 55	MOV AX,0x5555
+f000:f931:	33 ff	XOR DI,DI
+f000:f933:	8b cb	MOV CX,BX
+f000:f935:	f3 ab	STOSW.REP ES:DI
+f000:f937:	33 ff	XOR DI,DI
+f000:f939:	8b cb	MOV CX,BX
+f000:f93b:	f3 af	SCASW.REPE ES:DI
+f000:f93d:	e3 02	JCXZ 0xf000:f941
+f000:f93f:	f9	STC
+f000:f940:	c3	RET
+f000:f941:	33 ff	XOR DI,DI
+f000:f943:	8b cb	MOV CX,BX
+f000:f945:	f7 d0	NOT AX
+f000:f947:	f3 ab	STOSW.REP ES:DI
+f000:f949:	33 ff	XOR DI,DI
+f000:f94b:	8b cb	MOV CX,BX
+f000:f94d:	f3 af	SCASW.REPE ES:DI
+f000:f94f:	e3 02	JCXZ 0xf000:f953
+f000:f951:	f9	STC
+f000:f952:	c3	RET
+f000:f953:	33 ff	XOR DI,DI
+f000:f955:	8b cb	MOV CX,BX
+f000:f957:	33 c0	XOR AX,AX
+f000:f959:	f7 d0	NOT AX
+f000:f95b:	f3 ab	STOSW.REP ES:DI
+f000:f95d:	33 ff	XOR DI,DI
+f000:f95f:	8b cb	MOV CX,BX
+f000:f961:	f3 af	SCASW.REPE ES:DI
+f000:f963:	e3 02	JCXZ 0xf000:f967
+f000:f965:	f9	STC
+f000:f966:	c3	RET
+f000:f967:	33 ff	XOR DI,DI
+f000:f969:	8b cb	MOV CX,BX
+f000:f96b:	33 c0	XOR AX,AX
+f000:f96d:	f3 ab	STOSW.REP ES:DI
+f000:f96f:	33 ff	XOR DI,DI
+f000:f971:	8b cb	MOV CX,BX
+f000:f973:	f3 af	SCASW.REPE ES:DI
+f000:f975:	e3 02	JCXZ 0xf000:f979
+f000:f977:	f9	STC
+f000:f978:	c3	RET
+f000:f979:	8c c0	MOV AX,ES
+f000:f97b:	83 c0 40	ADD AX,0x40
+f000:f97e:	8e c0	MOV ES,AX
+f000:f980:	c3	RET
+
+### FUNCTION FUN_f000_f981 @ f000:f981
+f000:f981:	50	PUSH AX
+f000:f982:	53	PUSH BX
+f000:f983:	51	PUSH CX
+f000:f984:	e4 61	IN AL,0x61
+f000:f986:	34 0c	XOR AL,0xc
+f000:f988:	e6 61	OUT 0x61,AL
+f000:f98a:	bb 89 0f	MOV BX,0xf89
+f000:f98d:	24 04	AND AL,0x4
+f000:f98f:	74 03	JZ 0xf000:f994
+f000:f991:	bb 2e 05	MOV BX,0x52e
+f000:f994:	b0 b6	MOV AL,0xb6
+f000:f996:	e6 43	OUT 0x43,AL
+f000:f998:	8b c3	MOV AX,BX
+f000:f99a:	e6 42	OUT 0x42,AL
+f000:f99c:	8a c4	MOV AL,AH
+f000:f99e:	e6 42	OUT 0x42,AL
+f000:f9a0:	e4 61	IN AL,0x61
+f000:f9a2:	50	PUSH AX
+f000:f9a3:	0c 03	OR AL,0x3
+f000:f9a5:	e6 61	OUT 0x61,AL
+f000:f9a7:	b9 00 20	MOV CX,0x2000
+f000:f9aa:	e2 fe	LOOP 0xf000:f9aa
+f000:f9ac:	58	POP AX
+f000:f9ad:	e6 61	OUT 0x61,AL
+f000:f9af:	59	POP CX
+f000:f9b0:	5b	POP BX
+f000:f9b1:	58	POP AX
+f000:f9b2:	c3	RET
+
+### FUNCTION FUN_f000_f9b3 @ f000:f9b3
+f000:f9b3:	fb	STI
+f000:f9b4:	26 03 1e 6c 04	ADD BX,word ptr ES:[0x46c]
+f000:f9b9:	b4 01	MOV AH,0x1
+f000:f9bb:	cd 16	INT 0x16
+f000:f9bd:	75 0b	JNZ 0xf000:f9ca
+f000:f9bf:	26 8b 0e 6c 04	MOV CX,word ptr ES:[0x46c]
+f000:f9c4:	2b cb	SUB CX,BX
+f000:f9c6:	72 f1	JC 0xf000:f9b9
+f000:f9c8:	fa	CLI
+f000:f9c9:	c3	RET
+f000:f9ca:	32 e4	XOR AH,AH
+f000:f9cc:	cd 16	INT 0x16
+f000:f9ce:	eb f8	JMP 0xf000:f9c8
+
+### FUNCTION FUN_f000_f9d0 @ f000:f9d0
+f000:f9d0:	ba 4f 18	MOV DX,0x184f
+f000:f9d3:	33 c9	XOR CX,CX
+f000:f9d5:	b8 00 06	MOV AX,0x600
+f000:f9d8:	b7 07	MOV BH,0x7
+f000:f9da:	cd 10	INT 0x10
+f000:f9dc:	b4 02	MOV AH,0x2
+f000:f9de:	33 d2	XOR DX,DX
+f000:f9e0:	b7 00	MOV BH,0x0
+f000:f9e2:	cd 10	INT 0x10
+f000:f9e4:	b8 00 05	MOV AX,0x500
+f000:f9e7:	cd 10	INT 0x10
+f000:f9e9:	c3	RET
+
+### FUNCTION FUN_f000_f9ea @ f000:f9ea
+f000:f9ea:	33 d2	XOR DX,DX
+f000:f9ec:	b9 01 00	MOV CX,0x1
+f000:f9ef:	bb 70 00	MOV BX,0x70
+f000:f9f2:	26 80 3e 49 00 07	CMP byte ptr ES:[0x49],0x7
+f000:f9f8:	74 02	JZ 0xf000:f9fc
+f000:f9fa:	b3 e0	MOV BL,0xe0
+f000:f9fc:	ac	LODSB SI
+f000:f9fd:	0a c0	OR AL,AL
+f000:f9ff:	74 07	JZ 0xf000:fa08
+f000:fa01:	fe c2	INC DL
+f000:fa03:	e8 24 00	CALL 0xf000:fa2a
+f000:fa06:	eb f4	JMP 0xf000:f9fc
+f000:fa08:	b1 09	MOV CL,0x9
+f000:fa0a:	02 d1	ADD DL,CL
+f000:fa0c:	e8 1b 00	CALL 0xf000:fa2a
+f000:fa0f:	80 c1 04	ADD CL,0x4
+f000:fa12:	b3 e8	MOV BL,0xe8
+f000:fa14:	79 02	JNS 0xf000:fa18
+f000:fa16:	b3 01	MOV BL,0x1
+f000:fa18:	b0 b2	MOV AL,0xb2
+f000:fa1a:	02 d1	ADD DL,CL
+f000:fa1c:	e8 0b 00	CALL 0xf000:fa2a
+f000:fa1f:	b0 b1	MOV AL,0xb1
+f000:fa21:	02 d1	ADD DL,CL
+f000:fa23:	fe c1	INC CL
+f000:fa25:	e8 02 00	CALL 0xf000:fa2a
+f000:fa28:	b0 b0	MOV AL,0xb0
+
+### FUNCTION FUN_f000_fa2a @ f000:fa2a
+f000:fa2a:	b4 09	MOV AH,0x9
+f000:fa2c:	cd 10	INT 0x10
+f000:fa2e:	b4 02	MOV AH,0x2
+f000:fa30:	cd 10	INT 0x10
+f000:fa32:	c3	RET
+
+### NO FUNCTION
+f000:fa33:	90	NOP
+f000:fa34:	90	NOP
+f000:fa35:	90	NOP
+f000:fa36:	90	NOP
+f000:fa37:	90	NOP
+f000:fa38:	90	NOP
+f000:fa39:	90	NOP
+f000:fa3a:	90	NOP
+f000:fa3b:	90	NOP
+f000:fa3c:	90	NOP
+f000:fa3d:	90	NOP
+f000:fa3e:	90	NOP
+f000:fa3f:	90	NOP
+f000:fa40:	90	NOP
+f000:fa41:	90	NOP
+f000:fa42:	90	NOP
+f000:fa43:	90	NOP
+f000:fa44:	90	NOP
+f000:fa45:	90	NOP
+f000:fa46:	90	NOP
+f000:fa47:	90	NOP
+f000:fa48:	90	NOP
+f000:fa49:	90	NOP
+f000:fa4a:	90	NOP
+f000:fa4b:	90	NOP
+f000:fa4c:	90	NOP
+f000:fa4d:	90	NOP
+f000:fa4e:	90	NOP
+f000:fa4f:	90	NOP
+f000:fa50:	90	NOP
+f000:fa51:	90	NOP
+f000:fa52:	90	NOP
+f000:fa53:	90	NOP
+f000:fa54:	90	NOP
+f000:fa55:	90	NOP
+f000:fa56:	90	NOP
+f000:fa57:	90	NOP
+f000:fa58:	90	NOP
+f000:fa59:	90	NOP
+f000:fa5a:	90	NOP
+f000:fa5b:	90	NOP
+f000:fa5c:	90	NOP
+f000:fa5d:	90	NOP
+f000:fa5e:	90	NOP
+f000:fa5f:	90	NOP
+f000:fa60:	90	NOP
+f000:fa61:	90	NOP
+f000:fa62:	90	NOP
+f000:fa63:	90	NOP
+f000:fa64:	90	NOP
+f000:fa65:	90	NOP
+f000:fa66:	90	NOP
+f000:fa67:	90	NOP
+f000:fa68:	90	NOP
+f000:fa69:	90	NOP
+f000:fa6a:	90	NOP
+f000:fa6b:	90	NOP
+f000:fa6c:	90	NOP
+f000:fa6d:	90	NOP
+f000:fa6e:	00 00	ADD byte ptr [BX + SI],AL
+f000:fa70:	00 00	ADD byte ptr [BX + SI],AL
+f000:fa72:	00 00	ADD byte ptr [BX + SI],AL
+f000:fa74:	00 00	ADD byte ptr [BX + SI],AL
+f000:fa76:	7e 81	JLE 0xf000:f9f9
+f000:fa78:	a5	MOVSW ES:DI,SI
+f000:fa79:	81 bd 99 81 7e 7e	CMP word ptr [DI + 0x8199],0x7e7e
+f000:fa81:	ff c3	INC BX
+f000:fa83:	e7 ff	OUT 0xff,AX
+f000:fa85:	7e 6c	JLE 0xf000:faf3
+f000:fa89:	fe 7c 38	INC byte ptr [SI + 0x38]
+f000:fa8c:	10 00	ADC byte ptr [BX + SI],AL
+f000:fa8e:	10 38	ADC byte ptr [BX + SI],BH
+f000:fa90:	7c fe	JL 0xf000:fa90
+f000:fa92:	7c 38	JL 0xf000:facc
+f000:fa94:	10 00	ADC byte ptr [BX + SI],AL
+f000:fa96:	38 7c 38	CMP byte ptr [SI + 0x38],BH
+f000:fa9a:	fe 7c 38	INC byte ptr [SI + 0x38]
+f000:fa9d:	7c 10	JL 0xf000:faaf
+f000:fa9f:	10 38	ADC byte ptr [BX + SI],BH
+f000:faa1:	7c fe	JL 0xf000:faa1
+f000:faa3:	7c 38	JL 0xf000:fadd
+f000:faa5:	7c 00	JL 0xf000:faa7
+f000:faa7:	00 18	ADD byte ptr [BX + SI],BL
+f000:faa9:	3c 3c	CMP AL,0x3c
+f000:faab:	18 00	SBB byte ptr [BX + SI],AL
+f000:faad:	00 ff	ADD BH,BH
+f000:faaf:	ff e7	JMP DI
+f000:fab1:	c3	RET
+f000:fab2:	c3	RET
+f000:fab3:	e7 ff	OUT 0xff,AX
+f000:fab5:	ff 00	INC word ptr [BX + SI]
+f000:fab7:	3c 66	CMP AL,0x66
+f000:fab9:	42	INC DX
+f000:faba:	42	INC DX
+f000:fabb:	66 3c 00	CMP AL,0x0
+f000:fabe:	ff c3	INC BX
+f000:fac0:	99	CWD
+f000:fac1:	bd bd 99	MOV BP,0x99bd
+f000:fac4:	c3	RET
+f000:fac5:	ff 0f	DEC word ptr [BX]
+f000:fac7:	07	POP ES
+f000:fac9:	7d cc	JGE 0xf000:fa97
+f000:facb:	cc	INT3
+f000:facc:	cc	INT3
+f000:facd:	78 3c	JS 0xf000:fb0b
+f000:facf:	66 66 66 3c 18	CMP AL,0x18
+f000:fad4:	7e 18	JLE 0xf000:faee
+f000:fad6:	3f	AAS
+f000:fad7:	33 3f	XOR DI,word ptr [BX]
+f000:fad9:	30 30	XOR byte ptr [BX + SI],DH
+f000:fadb:	70 f0	JO 0xf000:facd
+f000:fadd:	e0 7f	LOOPNZ 0xf000:fb5e
+f000:fadf:	63 7f 63	ARPL word ptr [BX + 0x63],DI
+f000:fae2:	63 67 e6	ARPL word ptr [BX + -0x1a],SP
+f000:fae5:	c0 99 5a 3c e7	RCR byte ptr [BX + DI + 0x3c5a],0xe7
+f000:faeb:	3c 5a	CMP AL,0x5a
+f000:faed:	99	CWD
+f000:faee:	80 e0 f8	AND AL,0xf8
+f000:faf2:	f8	CLC
+f000:faf3:	e0 80	LOOPNZ 0xf000:fa75
+f000:faf5:	00 02	ADD byte ptr [BP + SI],AL
+f000:faf7:	0e	PUSH CS
+f000:faf8:	3e fe 3e 0e 02	INC byte ptr DS:[0x20e]
+f000:fafd:	00 18	ADD byte ptr [BX + SI],BL
+f000:faff:	3c 7e	CMP AL,0x7e
+f000:fb01:	18 18	SBB byte ptr [BX + SI],BL
+f000:fb03:	7e 3c	JLE 0xf000:fb41
+f000:fb05:	18 66 66	SBB byte ptr [BP + 0x66],AH
+f000:fb08:	66 66 66 00 66 00	ADD byte ptr [BP + 0x0],AH
+f000:fb0e:	7f db	JG 0xf000:faeb
+f000:fb10:	db 7b 1b	FSTP extended double ptr [BP + DI + 0x1b]
+f000:fb13:	1b 1b	SBB BX,word ptr [BP + DI]
+f000:fb15:	00 3e 63 38	ADD byte ptr [0x3863],BH
+f000:fb19:	6c	INSB ES:DI,DX
+f000:fb1a:	6c	INSB ES:DI,DX
+f000:fb1b:	38 cc	CMP AH,CL
+f000:fb1d:	78 00	JS 0xf000:fb1f
+f000:fb1f:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb21:	00 7e 7e	ADD byte ptr [BP + 0x7e],BH
+f000:fb24:	7e 00	JLE 0xf000:fb26
+f000:fb26:	18 3c	SBB byte ptr [SI],BH
+f000:fb28:	7e 18	JLE 0xf000:fb42
+f000:fb2a:	7e 3c	JLE 0xf000:fb68
+f000:fb2c:	18 ff	SBB BH,BH
+f000:fb2e:	18 3c	SBB byte ptr [SI],BH
+f000:fb30:	7e 18	JLE 0xf000:fb4a
+f000:fb32:	18 18	SBB byte ptr [BX + SI],BL
+f000:fb34:	18 00	SBB byte ptr [BX + SI],AL
+f000:fb36:	18 18	SBB byte ptr [BX + SI],BL
+f000:fb38:	18 18	SBB byte ptr [BX + SI],BL
+f000:fb3a:	7e 3c	JLE 0xf000:fb78
+f000:fb3c:	18 00	SBB byte ptr [BX + SI],AL
+f000:fb3e:	00 18	ADD byte ptr [BX + SI],BL
+f000:fb40:	0c fe	OR AL,0xfe
+f000:fb42:	0c 18	OR AL,0x18
+f000:fb44:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb46:	00 30	ADD byte ptr [BX + SI],DH
+f000:fb48:	60	PUSHA
+f000:fb49:	fe 60 30	INC byte ptr [BX + SI + 0x30]
+f000:fb4c:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb4e:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb50:	c0 c0 c0	ROL AL,0xc0
+f000:fb53:	fe 00	INC byte ptr [BX + SI]
+f000:fb55:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb57:	24 66	AND AL,0x66
+f000:fb59:	ff 66 24	JMP word ptr [BP + 0x24]
+f000:fb5c:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb5e:	00 18	ADD byte ptr [BX + SI],BL
+f000:fb60:	3c 7e	CMP AL,0x7e
+f000:fb63:	ff 00	INC word ptr [BX + SI]
+f000:fb65:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb68:	ff 7e 3c	INC word ptr [BP + 0x3c]
+f000:fb6b:	18 00	SBB byte ptr [BX + SI],AL
+f000:fb6d:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb6f:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb71:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb73:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb75:	00 30	ADD byte ptr [BX + SI],DH
+f000:fb77:	78 78	JS 0xf000:fbf1
+f000:fb79:	30 30	XOR byte ptr [BX + SI],DH
+f000:fb7b:	00 30	ADD byte ptr [BX + SI],DH
+f000:fb7d:	00 6c 6c	ADD byte ptr [SI + 0x6c],CH
+f000:fb80:	6c	INSB ES:DI,DX
+f000:fb81:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb83:	00 00	ADD byte ptr [BX + SI],AL
+f000:fb85:	00 6c 6c	ADD byte ptr [SI + 0x6c],CH
+f000:fb88:	fe 6c fe	INC byte ptr [SI + -0x2]
+f000:fb8b:	6c	INSB ES:DI,DX
+f000:fb8c:	6c	INSB ES:DI,DX
+f000:fb8d:	00 30	ADD byte ptr [BX + SI],DH
+f000:fb8f:	7c c0	JL 0xf000:fb51
+f000:fb91:	78 0c	JS 0xf000:fb9f
+f000:fb93:	f8	CLC
+f000:fb94:	30 00	XOR byte ptr [BX + SI],AL
+f000:fb96:	00 c6	ADD DH,AL
+f000:fb98:	cc	INT3
+f000:fb99:	18 30	SBB byte ptr [BX + SI],DH
+f000:fb9b:	66 c6 00 38	MOV byte ptr [BX + SI],0x38
+f000:fb9f:	6c	INSB ES:DI,DX
+f000:fba0:	38 76 dc	CMP byte ptr [BP + -0x24],DH
+f000:fba3:	cc	INT3
+f000:fba4:	76 00	JBE 0xf000:fba6
+f000:fba6:	60	PUSHA
+f000:fba7:	60	PUSHA
+f000:fba8:	c0 00 00	ROL byte ptr [BX + SI],0x0
+f000:fbab:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbad:	00 18	ADD byte ptr [BX + SI],BL
+f000:fbaf:	30 60 60	XOR byte ptr [BX + SI + 0x60],AH
+f000:fbb2:	60	PUSHA
+f000:fbb3:	30 18	XOR byte ptr [BX + SI],BL
+f000:fbb5:	00 60 30	ADD byte ptr [BX + SI + 0x30],AH
+f000:fbb8:	18 18	SBB byte ptr [BX + SI],BL
+f000:fbba:	18 30	SBB byte ptr [BX + SI],DH
+f000:fbbc:	60	PUSHA
+f000:fbbd:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbbf:	66 3c ff	CMP AL,0xff
+f000:fbc2:	3c 66	CMP AL,0x66
+f000:fbc4:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbc6:	00 30	ADD byte ptr [BX + SI],DH
+f000:fbc8:	30 fc	XOR AH,BH
+f000:fbca:	30 30	XOR byte ptr [BX + SI],DH
+f000:fbcc:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbce:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbd0:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbd2:	00 30	ADD byte ptr [BX + SI],DH
+f000:fbd4:	30 60 00	XOR byte ptr [BX + SI + 0x0],AH
+f000:fbd7:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbd9:	fc	CLD
+f000:fbda:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbdc:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbde:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbe0:	00 00	ADD byte ptr [BX + SI],AL
+f000:fbe2:	00 30	ADD byte ptr [BX + SI],DH
+f000:fbe4:	30 00	XOR byte ptr [BX + SI],AL
+f000:fbe6:	06	PUSH ES
+f000:fbe7:	0c 18	OR AL,0x18
+f000:fbe9:	30 60 c0	XOR byte ptr [BX + SI + -0x40],AH
+f000:fbec:	80 00 7c	ADD byte ptr [BX + SI],0x7c
+f000:fbf0:	ce	INTO
+f000:fbf1:	de f6	FDIVRP ST6,ST0
+f000:fbf3:	e6 7c	OUT 0x7c,AL
+f000:fbf5:	00 30	ADD byte ptr [BX + SI],DH
+f000:fbf7:	70 30	JO 0xf000:fc29
+f000:fbf9:	30 30	XOR byte ptr [BX + SI],DH
+f000:fbfb:	30 fc	XOR AH,BH
+f000:fbfd:	00 78 cc	ADD byte ptr [BX + SI + -0x34],BH
+f000:fc00:	0c 38	OR AL,0x38
+f000:fc02:	60	PUSHA
+f000:fc03:	cc	INT3
+f000:fc04:	fc	CLD
+f000:fc05:	00 78 cc	ADD byte ptr [BX + SI + -0x34],BH
+f000:fc08:	0c 38	OR AL,0x38
+f000:fc0a:	0c cc	OR AL,0xcc
+f000:fc0c:	78 00	JS 0xf000:fc0e
+f000:fc0e:	1c 3c	SBB AL,0x3c
+f000:fc10:	6c	INSB ES:DI,DX
+f000:fc11:	cc	INT3
+f000:fc12:	fe 0c	DEC byte ptr [SI]
+f000:fc14:	1e	PUSH DS
+f000:fc15:	00 fc	ADD AH,BH
+f000:fc17:	c0 f8 0c	SAR AL,0xc
+f000:fc1a:	0c cc	OR AL,0xcc
+f000:fc1c:	78 00	JS 0xf000:fc1e
+f000:fc1e:	38 60 c0	CMP byte ptr [BX + SI + -0x40],AH
+f000:fc21:	f8	CLC
+f000:fc22:	cc	INT3
+f000:fc23:	cc	INT3
+f000:fc24:	78 00	JS 0xf000:fc26
+f000:fc26:	fc	CLD
+f000:fc27:	cc	INT3
+f000:fc29:	18 30	SBB byte ptr [BX + SI],DH
+f000:fc2b:	30 30	XOR byte ptr [BX + SI],DH
+f000:fc2d:	00 78 cc	ADD byte ptr [BX + SI + -0x34],BH
+f000:fc30:	cc	INT3
+f000:fc31:	78 cc	JS 0xf000:fbff
+f000:fc33:	cc	INT3
+f000:fc34:	78 00	JS 0xf000:fc36
+f000:fc36:	78 cc	JS 0xf000:fc04
+f000:fc38:	cc	INT3
+f000:fc39:	7c 0c	JL 0xf000:fc47
+f000:fc3b:	18 70 00	SBB byte ptr [BX + SI + 0x0],DH
+f000:fc3e:	00 30	ADD byte ptr [BX + SI],DH
+f000:fc40:	30 00	XOR byte ptr [BX + SI],AL
+f000:fc42:	00 30	ADD byte ptr [BX + SI],DH
+f000:fc44:	30 00	XOR byte ptr [BX + SI],AL
+f000:fc46:	00 30	ADD byte ptr [BX + SI],DH
+f000:fc48:	30 00	XOR byte ptr [BX + SI],AL
+f000:fc4a:	00 30	ADD byte ptr [BX + SI],DH
+f000:fc4c:	30 60 18	XOR byte ptr [BX + SI + 0x18],AH
+f000:fc4f:	30 60 c0	XOR byte ptr [BX + SI + -0x40],AH
+f000:fc52:	60	PUSHA
+f000:fc53:	30 18	XOR byte ptr [BX + SI],BL
+f000:fc55:	00 00	ADD byte ptr [BX + SI],AL
+f000:fc57:	00 fc	ADD AH,BH
+f000:fc59:	00 00	ADD byte ptr [BX + SI],AL
+f000:fc5b:	fc	CLD
+f000:fc5c:	00 00	ADD byte ptr [BX + SI],AL
+f000:fc5e:	60	PUSHA
+f000:fc5f:	30 18	XOR byte ptr [BX + SI],BL
+f000:fc61:	0c 18	OR AL,0x18
+f000:fc63:	30 60 00	XOR byte ptr [BX + SI + 0x0],AH
+f000:fc66:	78 cc	JS 0xf000:fc34
+f000:fc68:	0c 18	OR AL,0x18
+f000:fc6a:	30 00	XOR byte ptr [BX + SI],AL
+f000:fc6c:	30 00	XOR byte ptr [BX + SI],AL
+f000:fc6e:	7c c6	JL 0xf000:fc36
+f000:fc72:	de c0	FADDP ST0,ST0
+f000:fc74:	78 00	JS 0xf000:fc76
+f000:fc76:	30 78 cc	XOR byte ptr [BX + SI + -0x34],BH
+f000:fc79:	cc	INT3
+f000:fc7a:	fc	CLD
+f000:fc7b:	cc	INT3
+f000:fc7c:	cc	INT3
+f000:fc7d:	00 fc	ADD AH,BH
+f000:fc7f:	66 66 7c 66	JL 0xf000:fce9
+f000:fc83:	66 fc	CLD
+f000:fc85:	00 3c	ADD byte ptr [SI],BH
+f000:fc87:	66 c0 c0 c0	ROL AL,0xc0
+f000:fc8b:	66 3c 00	CMP AL,0x0
+f000:fc8e:	f8	CLC
+f000:fc8f:	6c	INSB ES:DI,DX
+f000:fc90:	66 66 66 6c	INSB ES:DI,DX
+f000:fc94:	f8	CLC
+f000:fc95:	00 fe	ADD DH,BH
+f000:fc97:	62 68 78	BOUND BP,word ptr [BX + SI + 0x78]
+f000:fc9a:	68 62 fe	PUSH -0x19e
+f000:fc9d:	00 fe	ADD DH,BH
+f000:fc9f:	62 68 78	BOUND BP,word ptr [BX + SI + 0x78]
+f000:fca2:	68 60 f0	PUSH -0xfa0
+f000:fca5:	00 3c	ADD byte ptr [SI],BH
+f000:fca7:	66 c0 c0 ce	ROL AL,0xce
+f000:fcab:	66 3e 00 cc	ADD AH,CL
+f000:fcaf:	cc	INT3
+f000:fcb0:	cc	INT3
+f000:fcb1:	fc	CLD
+f000:fcb2:	cc	INT3
+f000:fcb3:	cc	INT3
+f000:fcb4:	cc	INT3
+f000:fcb5:	00 78 30	ADD byte ptr [BX + SI + 0x30],BH
+f000:fcb8:	30 30	XOR byte ptr [BX + SI],DH
+f000:fcba:	30 30	XOR byte ptr [BX + SI],DH
+f000:fcbc:	78 00	JS 0xf000:fcbe
+f000:fcbe:	1e	PUSH DS
+f000:fcbf:	0c 0c	OR AL,0xc
+f000:fcc1:	0c cc	OR AL,0xcc
+f000:fcc3:	cc	INT3
+f000:fcc4:	78 00	JS 0xf000:fcc6
+f000:fcc6:	e6 66	OUT 0x66,AL
+f000:fcc8:	6c	INSB ES:DI,DX
+f000:fcc9:	78 6c	JS 0xf000:fd37
+f000:fccb:	66 e6 00	OUT 0x0,AL
+f000:fccf:	60	PUSHA
+f000:fcd0:	60	PUSHA
+f000:fcd1:	60	PUSHA
+f000:fcd2:	62 66 fe	BOUND SP,word ptr [BP + -0x2]
+f000:fcd5:	00 c6	ADD DH,AL
+f000:fcd7:	ee	OUT DX,AL
+f000:fcda:	d6	SALC
+f000:fcdb:	c6 c6 00	MOV DH,0x0
+f000:fcdf:	e6 f6	OUT 0xf6,AL
+f000:fce1:	de ce	FMULP ST6
+f000:fce3:	c6 c6 00	MOV DH,0x0
+f000:fce6:	38 6c c6	CMP byte ptr [SI + -0x3a],CH
+f000:fce9:	c6 c6 6c	MOV DH,0x6c
+f000:fcec:	38 00	CMP byte ptr [BX + SI],AL
+f000:fcee:	fc	CLD
+f000:fcef:	66 66 7c 60	JL 0xf000:fd53
+f000:fcf3:	60	PUSHA
+f000:fcf4:	f0 00 78 cc	ADD.LOCK byte ptr [BX + SI + -0x34],BH
+f000:fcf8:	cc	INT3
+f000:fcf9:	cc	INT3
+f000:fcfa:	dc 78 1c	FDIVR double ptr [BX + SI + 0x1c]
+f000:fcfd:	00 fc	ADD AH,BH
+f000:fcff:	66 66 7c 6c	JL 0xf000:fd6f
+f000:fd03:	66 e6 00	OUT 0x0,AL
+f000:fd06:	78 cc	JS 0xf000:fcd4
+f000:fd08:	e0 70	LOOPNZ 0xf000:fd7a
+f000:fd0a:	1c cc	SBB AL,0xcc
+f000:fd0c:	78 00	JS 0xf000:fd0e
+f000:fd0e:	fc	CLD
+f000:fd0f:	b4 30	MOV AH,0x30
+f000:fd11:	30 30	XOR byte ptr [BX + SI],DH
+f000:fd13:	30 78 00	XOR byte ptr [BX + SI + 0x0],BH
+f000:fd16:	cc	INT3
+f000:fd17:	cc	INT3
+f000:fd18:	cc	INT3
+f000:fd19:	cc	INT3
+f000:fd1a:	cc	INT3
+f000:fd1b:	cc	INT3
+f000:fd1c:	fc	CLD
+f000:fd1d:	00 cc	ADD AH,CL
+f000:fd1f:	cc	INT3
+f000:fd20:	cc	INT3
+f000:fd21:	cc	INT3
+f000:fd22:	cc	INT3
+f000:fd23:	78 30	JS 0xf000:fd55
+f000:fd25:	00 c6	ADD DH,AL
+f000:fd27:	c6 c6 d6	MOV DH,0xd6
+f000:fd2b:	ee	OUT DX,AL
+f000:fd2c:	c6 00 c6	MOV byte ptr [BX + SI],0xc6
+f000:fd30:	6c	INSB ES:DI,DX
+f000:fd31:	38 38	CMP byte ptr [BX + SI],BH
+f000:fd33:	6c	INSB ES:DI,DX
+f000:fd34:	c6 00 cc	MOV byte ptr [BX + SI],0xcc
+f000:fd37:	cc	INT3
+f000:fd38:	cc	INT3
+f000:fd39:	78 30	JS 0xf000:fd6b
+f000:fd3b:	30 78 00	XOR byte ptr [BX + SI + 0x0],BH
+f000:fd3e:	fe c6	INC DH
+f000:fd40:	8c 18	MOV word ptr [BX + SI],DS
+f000:fd42:	32 66 fe	XOR AH,byte ptr [BP + -0x2]
+f000:fd45:	00 78 60	ADD byte ptr [BX + SI + 0x60],BH
+f000:fd48:	60	PUSHA
+f000:fd49:	60	PUSHA
+f000:fd4a:	60	PUSHA
+f000:fd4b:	60	PUSHA
+f000:fd4c:	78 00	JS 0xf000:fd4e
+f000:fd4e:	c0 60 30 18	SHL byte ptr [BX + SI + 0x30],0x18
+f000:fd53:	06	PUSH ES
+f000:fd54:	02 00	ADD AL,byte ptr [BX + SI]
+f000:fd56:	78 18	JS 0xf000:fd70
+f000:fd58:	18 18	SBB byte ptr [BX + SI],BL
+f000:fd5a:	18 18	SBB byte ptr [BX + SI],BL
+f000:fd5c:	78 00	JS 0xf000:fd5e
+f000:fd5e:	10 38	ADC byte ptr [BX + SI],BH
+f000:fd60:	6c	INSB ES:DI,DX
+f000:fd61:	c6 00 00	MOV byte ptr [BX + SI],0x0
+f000:fd64:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd66:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd68:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd6a:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd6c:	00 ff	ADD BH,BH
+f000:fd6e:	30 30	XOR byte ptr [BX + SI],DH
+f000:fd70:	18 00	SBB byte ptr [BX + SI],AL
+f000:fd72:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd74:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd76:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd78:	78 0c	JS 0xf000:fd86
+f000:fd7a:	7c cc	JL 0xf000:fd48
+f000:fd7c:	76 00	JBE 0xf000:fd7e
+f000:fd7e:	e0 60	LOOPNZ 0xf000:fde0
+f000:fd80:	60	PUSHA
+f000:fd81:	7c 66	JL 0xf000:fde9
+f000:fd83:	66 dc 00	FADD double ptr [BX + SI]
+f000:fd86:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd88:	78 cc	JS 0xf000:fd56
+f000:fd8a:	c0 cc 78	ROR AH,0x78
+f000:fd8d:	00 1c	ADD byte ptr [SI],BL
+f000:fd8f:	0c 0c	OR AL,0xc
+f000:fd91:	7c cc	JL 0xf000:fd5f
+f000:fd93:	cc	INT3
+f000:fd94:	76 00	JBE 0xf000:fd96
+f000:fd96:	00 00	ADD byte ptr [BX + SI],AL
+f000:fd98:	78 cc	JS 0xf000:fd66
+f000:fd9a:	fc	CLD
+f000:fd9b:	c0 78 00 38	SAR byte ptr [BX + SI + 0x0],0x38
+f000:fd9f:	6c	INSB ES:DI,DX
+f000:fda0:	60	PUSHA
+f000:fda2:	60	PUSHA
+f000:fda3:	60	PUSHA
+f000:fda4:	f0 00 00	ADD.LOCK byte ptr [BX + SI],AL
+f000:fda7:	00 76 cc	ADD byte ptr [BP + -0x34],DH
+f000:fdaa:	cc	INT3
+f000:fdab:	7c 0c	JL 0xf000:fdb9
+f000:fdad:	f8	CLC
+f000:fdae:	e0 60	LOOPNZ 0xf000:fe10
+f000:fdb0:	6c	INSB ES:DI,DX
+f000:fdb1:	76 66	JBE 0xf000:fe19
+f000:fdb3:	66 e6 00	OUT 0x0,AL
+f000:fdb6:	30 00	XOR byte ptr [BX + SI],AL
+f000:fdb8:	70 30	JO 0xf000:fdea
+f000:fdba:	30 30	XOR byte ptr [BX + SI],DH
+f000:fdbc:	78 00	JS 0xf000:fdbe
+f000:fdbe:	0c 00	OR AL,0x0
+f000:fdc0:	0c 0c	OR AL,0xc
+f000:fdc2:	0c cc	OR AL,0xcc
+f000:fdc4:	cc	INT3
+f000:fdc5:	78 e0	JS 0xf000:fda7
+f000:fdc7:	60	PUSHA
+f000:fdc8:	66 6c	INSB ES:DI,DX
+f000:fdca:	78 6c	JS 0xf000:fe38
+f000:fdcc:	e6 00	OUT 0x0,AL
+f000:fdce:	70 30	JO 0xf000:fe00
+f000:fdd0:	30 30	XOR byte ptr [BX + SI],DH
+f000:fdd2:	30 30	XOR byte ptr [BX + SI],DH
+f000:fdd4:	78 00	JS 0xf000:fdd6
+f000:fdd6:	00 00	ADD byte ptr [BX + SI],AL
+f000:fdd8:	cc	INT3
+f000:fddb:	d6	SALC
+f000:fddc:	c6 00 00	MOV byte ptr [BX + SI],0x0
+f000:fde0:	f8	CLC
+f000:fde1:	cc	INT3
+f000:fde2:	cc	INT3
+f000:fde3:	cc	INT3
+f000:fde4:	cc	INT3
+f000:fde5:	00 00	ADD byte ptr [BX + SI],AL
+f000:fde9:	cc	INT3
+f000:fdea:	cc	INT3
+f000:fdeb:	cc	INT3
+f000:fdec:	78 00	JS 0xf000:fdee
+f000:fdee:	00 00	ADD byte ptr [BX + SI],AL
+f000:fdf0:	dc 66 66	FSUB double ptr [BP + 0x66]
+f000:fdf3:	7c 60	JL 0xf000:fe55
+f000:fdf5:	f0 00 00	ADD.LOCK byte ptr [BX + SI],AL
+f000:fdf8:	76 cc	JBE 0xf000:fdc6
+f000:fdfa:	cc	INT3
+f000:fdfb:	7c 0c	JL 0xf000:fe09
+f000:fdfd:	1e	PUSH DS
+f000:fdfe:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe00:	dc 76 66	FDIV double ptr [BP + 0x66]
+f000:fe03:	60	PUSHA
+f000:fe04:	f0 00 00	ADD.LOCK byte ptr [BX + SI],AL
+f000:fe07:	00 7c c0	ADD byte ptr [SI + -0x40],BH
+f000:fe0a:	78 0c	JS 0xf000:fe18
+f000:fe0c:	f8	CLC
+f000:fe0d:	00 10	ADD byte ptr [BX + SI],DL
+f000:fe10:	7c 30	JL 0xf000:fe42
+f000:fe12:	30 34	XOR byte ptr [SI],DH
+f000:fe14:	18 00	SBB byte ptr [BX + SI],AL
+f000:fe16:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe18:	cc	INT3
+f000:fe19:	cc	INT3
+f000:fe1a:	cc	INT3
+f000:fe1b:	cc	INT3
+f000:fe1c:	76 00	JBE 0xf000:fe1e
+f000:fe1e:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe20:	cc	INT3
+f000:fe21:	cc	INT3
+f000:fe22:	cc	INT3
+f000:fe23:	78 30	JS 0xf000:fe55
+f000:fe25:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe27:	00 c6	ADD DH,AL
+f000:fe29:	d6	SALC
+f000:fe2b:	fe 6c 00	INC byte ptr [SI + 0x0]
+f000:fe2e:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe31:	6c	INSB ES:DI,DX
+f000:fe32:	38 6c c6	CMP byte ptr [SI + -0x3a],CH
+f000:fe35:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe38:	cc	INT3
+f000:fe39:	cc	INT3
+f000:fe3a:	cc	INT3
+f000:fe3b:	7c 0c	JL 0xf000:fe49
+f000:fe3d:	f8	CLC
+f000:fe3e:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe40:	fc	CLD
+f000:fe41:	98	CBW
+f000:fe42:	30 64 fc	XOR byte ptr [SI + -0x4],AH
+f000:fe45:	00 1c	ADD byte ptr [SI],BL
+f000:fe47:	30 30	XOR byte ptr [BX + SI],DH
+f000:fe49:	e0 30	LOOPNZ 0xf000:fe7b
+f000:fe4b:	30 1c	XOR byte ptr [SI],BL
+f000:fe4d:	00 18	ADD byte ptr [BX + SI],BL
+f000:fe4f:	18 18	SBB byte ptr [BX + SI],BL
+f000:fe51:	00 18	ADD byte ptr [BX + SI],BL
+f000:fe53:	18 18	SBB byte ptr [BX + SI],BL
+f000:fe55:	00 e0	ADD AL,AH
+f000:fe57:	30 30	XOR byte ptr [BX + SI],DH
+f000:fe59:	1c 30	SBB AL,0x30
+f000:fe5b:	30 e0	XOR AL,AH
+f000:fe5d:	00 76 dc	ADD byte ptr [BP + -0x24],DH
+f000:fe60:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe62:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe64:	00 00	ADD byte ptr [BX + SI],AL
+f000:fe66:	00 10	ADD byte ptr [BX + SI],DL
+f000:fe68:	38 6c c6	CMP byte ptr [SI + -0x3a],CH
+f000:fe6c:	fe 00	INC byte ptr [BX + SI]
+f000:fe6e:	fb	STI
+f000:fe6f:	1e	PUSH DS
+f000:fe70:	50	PUSH AX
+f000:fe71:	33 c0	XOR AX,AX
+f000:fe73:	8e d8	MOV DS,AX
+f000:fe75:	58	POP AX
+f000:fe76:	fa	CLI
+f000:fe77:	0a e4	OR AH,AH
+f000:fe79:	74 12	JZ 0xf000:fe8d
+f000:fe7b:	fe cc	DEC AH
+f000:fe7d:	75 19	JNZ 0xf000:fe98
+f000:fe7f:	89 16 6c 04	MOV word ptr [0x46c],DX
+f000:fe83:	89 0e 6e 04	MOV word ptr [0x46e],CX
+f000:fe87:	88 26 70 04	MOV byte ptr [0x470],AH
+f000:fe8b:	eb 0b	JMP 0xf000:fe98
+f000:fe8d:	8b 0e 6e 04	MOV CX,word ptr [0x46e]
+f000:fe91:	8b 16 6c 04	MOV DX,word ptr [0x46c]
+f000:fe95:	e8 03 00	CALL 0xf000:fe9b
+f000:fe98:	fb	STI
+f000:fe99:	1f	POP DS
+f000:fe9a:	cf	IRET
+
+### FUNCTION FUN_f000_fe9b @ f000:fe9b
+f000:fe9b:	a0 70 04	MOV AL,[0x470]
+f000:fe9e:	30 06 70 04	XOR byte ptr [0x470],AL
+f000:fea2:	c3	RET
+
+### NO FUNCTION
+f000:fea3:	68 00 fb	PUSH -0x500
+f000:fea6:	1e	PUSH DS
+f000:fea7:	52	PUSH DX
+f000:fea8:	50	PUSH AX
+f000:fea9:	33 c0	XOR AX,AX
+f000:feab:	8e d8	MOV DS,AX
+f000:fead:	fe 0e 40 04	DEC byte ptr [0x440]
+f000:feb1:	75 0b	JNZ 0xf000:febe
+f000:feb3:	80 26 3f 04 f0	AND byte ptr [0x43f],0xf0
+f000:feb8:	b0 0c	MOV AL,0xc
+f000:feba:	ba f2 03	MOV DX,0x3f2
+f000:febd:	ee	OUT DX,AL
+f000:febe:	ff 06 6c 04	INC word ptr [0x46c]
+f000:fec2:	75 04	JNZ 0xf000:fec8
+f000:fec4:	ff 06 6e 04	INC word ptr [0x46e]
+f000:fec8:	83 3e 6e 04 18	CMP word ptr [0x46e],0x18
+f000:fecd:	75 15	JNZ 0xf000:fee4
+f000:fecf:	81 3e 6c 04 b0 00	CMP word ptr [0x46c],0xb0
+f000:fed5:	75 0d	JNZ 0xf000:fee4
+f000:fed7:	33 c0	XOR AX,AX
+f000:fed9:	a3 6e 04	MOV [0x46e],AX
+f000:fedc:	a3 6c 04	MOV [0x46c],AX
+f000:fedf:	c6 06 70 04 01	MOV byte ptr [0x470],0x1
+f000:fee4:	cd 1c	INT 0x1c
+f000:fee6:	b0 20	MOV AL,0x20
+f000:fee8:	e6 20	OUT 0x20,AL
+f000:feea:	58	POP AX
+f000:feeb:	5a	POP DX
+f000:feec:	1f	POP DS
+f000:feed:	cf	IRET
+
+### FUNCTION FUN_f000_feee @ f000:feee
+f000:feee:	b4 00	MOV AH,0x0
+f000:fef0:	cd 16	INT 0x16
+f000:fef2:	c3	RET
+
+### NO FUNCTION
+f000:fef3:	a5	MOVSW ES:DI,SI
+f000:fef4:	fe 87 e9 23	INC byte ptr [BX + 0x23e9]
+f000:fef8:	ff 23	JMP word ptr [BP + DI]
+f000:fefa:	ff 23	JMP word ptr [BP + DI]
+f000:fefc:	ff 23	JMP word ptr [BP + DI]
+f000:fefe:	ff 57 ef	CALL word ptr [BX + -0x11]
+f000:ff01:	23 ff	AND DI,DI
+f000:ff05:	4d	DEC BP
+f000:ff06:	f8	CLC
+f000:ff07:	41	INC CX
+f000:ff08:	f8	CLC
+f000:ff09:	59	POP CX
+f000:ff0a:	ec	IN AL,DX
+f000:ff0b:	39 e7	CMP DI,SP
+f000:ff0d:	59	POP CX
+f000:ff0e:	f8	CLC
+f000:ff0f:	2e e8 d2 ef	CALL 0xf000:eee5
+f000:ff13:	23 ff	AND DI,DI
+f000:ff15:	f2 e6 6e	OUT 0x6e,AL
+f000:ff18:	fe 53 ff	INC byte ptr [BP + DI + -0x1]
+f000:ff1b:	53	PUSH BX
+f000:ff1c:	ff a4 f0 c7	JMP word ptr [SI + 0xc7f0]
+f000:ff20:	ef	OUT DX,AX
+f000:ff21:	00 00	ADD byte ptr [BX + SI],AL
+f000:ff23:	1e	PUSH DS
+f000:ff24:	52	PUSH DX
+f000:ff25:	50	PUSH AX
+f000:ff26:	33 c0	XOR AX,AX
+f000:ff28:	8e d8	MOV DS,AX
+f000:ff2a:	b0 0b	MOV AL,0xb
+f000:ff2c:	e6 20	OUT 0x20,AL
+f000:ff2e:	90	NOP
+f000:ff2f:	e4 20	IN AL,0x20
+f000:ff31:	8a e0	MOV AH,AL
+f000:ff33:	0a c0	OR AL,AL
+f000:ff35:	75 04	JNZ 0xf000:ff3b
+f000:ff37:	b0 ff	MOV AL,0xff
+f000:ff39:	eb 0a	JMP 0xf000:ff45
+f000:ff3b:	e4 21	IN AL,0x21
+f000:ff3d:	0a c4	OR AL,AH
+f000:ff3f:	e6 21	OUT 0x21,AL
+f000:ff41:	b0 20	MOV AL,0x20
+f000:ff43:	e6 20	OUT 0x20,AL
+f000:ff45:	88 26 6b 04	MOV byte ptr [0x46b],AH
+f000:ff49:	58	POP AX
+f000:ff4a:	5a	POP DX
+f000:ff4b:	1f	POP DS
+f000:ff4c:	cf	IRET
+f000:ff4d:	bc 03 78	MOV SP,0x7803
+f000:ff50:	03 78 02	ADD DI,word ptr [BX + SI + 0x2]
+f000:ff53:	cf	IRET
+f000:ff54:	fb	STI
+f000:ff55:	1e	PUSH DS
+f000:ff56:	50	PUSH AX
+f000:ff57:	53	PUSH BX
+f000:ff58:	51	PUSH CX
+f000:ff59:	52	PUSH DX
+f000:ff5a:	33 c0	XOR AX,AX
+f000:ff5c:	8e d8	MOV DS,AX
+f000:ff5e:	80 3e 00 05 01	CMP byte ptr [0x500],0x1
+f000:ff63:	74 56	JZ 0xf000:ffbb
+f000:ff65:	c6 06 00 05 01	MOV byte ptr [0x500],0x1
+f000:ff6a:	e8 5e 00	CALL 0xf000:ffcb
+f000:ff6d:	b4 0f	MOV AH,0xf
+f000:ff6f:	cd 10	INT 0x10
+f000:ff71:	50	PUSH AX
+f000:ff72:	b4 03	MOV AH,0x3
+f000:ff74:	cd 10	INT 0x10
+f000:ff76:	58	POP AX
+f000:ff77:	52	PUSH DX
+f000:ff78:	b5 19	MOV CH,0x19
+f000:ff7a:	8a cc	MOV CL,AH
+f000:ff7c:	33 d2	XOR DX,DX
+f000:ff7e:	b4 02	MOV AH,0x2
+f000:ff80:	cd 10	INT 0x10
+f000:ff82:	b4 08	MOV AH,0x8
+f000:ff84:	cd 10	INT 0x10
+f000:ff86:	0a c0	OR AL,AL
+f000:ff88:	75 02	JNZ 0xf000:ff8c
+f000:ff8a:	b0 20	MOV AL,0x20
+f000:ff8c:	52	PUSH DX
+f000:ff8d:	33 d2	XOR DX,DX
+f000:ff8f:	8a e2	MOV AH,DL
+f000:ff91:	cd 17	INT 0x17
+f000:ff93:	5a	POP DX
+f000:ff94:	f6 c4 25	TEST AH,0x25
+f000:ff97:	74 07	JZ 0xf000:ffa0
+f000:ff99:	c6 06 00 05 ff	MOV byte ptr [0x500],0xff
+f000:ff9e:	eb 16	JMP 0xf000:ffb6
+f000:ffa0:	fe c2	INC DL
+f000:ffa2:	3a ca	CMP CL,DL
+f000:ffa4:	75 d8	JNZ 0xf000:ff7e
+f000:ffa6:	b2 00	MOV DL,0x0
+f000:ffa8:	e8 20 00	CALL 0xf000:ffcb
+f000:ffab:	fe c6	INC DH
+f000:ffad:	3a f5	CMP DH,CH
+f000:ffaf:	75 cd	JNZ 0xf000:ff7e
+f000:ffb1:	c6 06 00 05 00	MOV byte ptr [0x500],0x0
+f000:ffb6:	5a	POP DX
+f000:ffb7:	b4 02	MOV AH,0x2
+f000:ffb9:	cd 10	INT 0x10
+f000:ffbb:	5a	POP DX
+f000:ffbc:	59	POP CX
+f000:ffbd:	5b	POP BX
+f000:ffbe:	58	POP AX
+f000:ffbf:	1f	POP DS
+f000:ffc0:	cf	IRET
+f000:ffc1:	53	PUSH BX
+f000:ffc2:	79 73	JNS 0xffff:0047
+f000:ffc4:	74 65	JZ 0xffff:003b
+f000:ffc6:	6d	INSW ES:DI,DX
+f000:ffc7:	20 c2	AND DL,AL
+f000:ffc9:	20 00	AND byte ptr [BX + SI],AL
+
+### FUNCTION FUN_f000_ffcb @ f000:ffcb
+f000:ffcb:	52	PUSH DX
+f000:ffcc:	33 d2	XOR DX,DX
+f000:ffce:	8a e2	MOV AH,DL
+f000:ffd0:	b0 0a	MOV AL,0xa
+f000:ffd2:	cd 17	INT 0x17
+f000:ffd4:	b4 00	MOV AH,0x0
+f000:ffd6:	b0 0d	MOV AL,0xd
+f000:ffd8:	cd 17	INT 0x17
+f000:ffda:	5a	POP DX
+f000:ffdb:	c3	RET
+
+### NO FUNCTION
+f000:ffdc:	32 38	XOR BH,byte ptr [BX + SI]
+f000:ffde:	36 20 43 50	AND byte ptr SS:[BP + DI + 0x50],AL
+f000:ffe2:	55	PUSH BP
+f000:ffe3:	20 28	AND byte ptr [BX + SI],CH
+f000:ffe5:	00 38	ADD byte ptr [BX + SI],BH
+f000:ffe7:	30 38	XOR byte ptr [BX + SI],BH
+f000:ffe9:	37	AAA
+f000:ffea:	20 46 50	AND byte ptr [BP + 0x50],AL
+f000:ffed:	55	PUSH BP
+f000:ffee:	29 00	SUB word ptr [BX + SI],AX
+f000:fff0:	ea 5b e0 00 f0	JMPF 0xf000:e05b
+f000:fff5:	31 32	XOR word ptr [BP + SI],SI
+f000:fff7:	2f	DAS
+f000:fff8:	31 32	XOR word ptr [BP + SI],SI
+f000:fffa:	2f	DAS
+f000:fffb:	32 33	XOR DH,byte ptr [BP + DI]
+f000:fffd:	00 ff	ADD BH,BH
