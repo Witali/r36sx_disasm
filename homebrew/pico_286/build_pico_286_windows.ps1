@@ -4,6 +4,7 @@ param(
     [switch]$DisableComputedGoto,
     [switch]$DisableFastMemory,
     [switch]$DisableProtectedMode,
+    [switch]$DisableProtectedModeDebug,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og")]
     [string]$OptLevel = "O2",
     [string]$Out,
@@ -44,6 +45,7 @@ $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
 $ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
 $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 $ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
+$ProtectedModeDebugValue = if ($DisableProtectedModeDebug) { "0" } else { "1" }
 $RootPath = $Root.Path
 
 function ConvertTo-CMacroString {
@@ -151,6 +153,7 @@ $CommonArgs = @(
     "-DR36SX_CPU_COMPUTED_GOTO=$ComputedGotoValue",
     "-DR36SX_NATIVE_FAST_MEMORY=$FastMemoryValue",
     "-DR36SX_ENABLE_PROTECTED_MODE=$ProtectedModeValue",
+    "-DR36SX_DEBUG_386_PROTECTED_MODE=$ProtectedModeDebugValue",
     "-DR36SX_SEGMENT_BASE_CACHE=1",
     "-DCPU_386_EXTENDED_OPS=1",
     "-DR36SX_RUNTIME_SOUND_FREQUENCY=1",

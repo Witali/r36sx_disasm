@@ -179,6 +179,12 @@ int r36sx_pico286_app_stats_enabled(void);
 // Return non-zero when Pico-286 should provide built-in INT 2Fh services.
 int r36sx_pico286_int2f_enabled(void);
 
+// Return non-zero when pico_286.log should be truncated at process start.
+int r36sx_pico286_log_truncate_on_start(void);
+
+// Return the maximum pico_286.log size in bytes; 0 means no size cap.
+uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes);
+
 // Return non-zero when AdLib/OPL2 audio is mixed into the output stream.
 int r36sx_pico286_audio_adlib_enabled(void);
 

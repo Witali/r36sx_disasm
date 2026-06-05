@@ -95,8 +95,11 @@ cd patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286
 .\pico_286_win.exe
 ```
 
-Debug logs are appended to `pico_286.log` beside the Windows executable and stop
-growing after 2 MB, matching the bounded device-log behavior.
+Debug logs are written to `pico_286.log` beside the Windows executable and stop
+growing at the `[debug] log_max_bytes` cap, matching the bounded device-log
+behavior.  By default logs are appended across runs; set
+`log_truncate_on_start=1` in `[debug]` to clear the log at process start.
+Set `log_max_bytes=0` to disable the size cap.
 
 The Windows host has its own menu entry and shortcuts for debug-only actions
 that would normally be opened through handheld Fn combinations:
@@ -576,6 +579,12 @@ diagnostics, pass `-DebugLog`:
 ```powershell
 .\homebrew\pico_286\build_pico_286.ps1 -DebugLog
 ```
+
+Protected-mode CPU diagnostics are controlled by the compile-time
+`R36SX_DEBUG_386_PROTECTED_MODE` switch.  In debug builds, pass
+`-DisableProtectedModeDebug` (or `--disable-protected-mode-debug` in the WSL
+shell script) to compile out the noisy protected-mode diagnostic logs while
+leaving protected-mode execution enabled.
 
 The normal build enables the computed-goto opcode dispatch table.  To compare
 against the old switch-based decoder, pass `-DisableComputedGoto`:

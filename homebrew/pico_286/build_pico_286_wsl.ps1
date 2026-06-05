@@ -4,6 +4,7 @@ param(
     [switch]$DisableComputedGoto,
     [switch]$DisableFastMemory,
     [switch]$DisableProtectedMode,
+    [switch]$DisableProtectedModeDebug,
     [ValidateSet("O0", "O1", "O2", "O3", "Os", "Og", "Ofast")]
     [string]$OptLevel = "O2",
     [switch]$EnableMipsDsp,
@@ -35,6 +36,7 @@ if ($DisableProfiling) { $ArgsList += "--disable-profiling" }
 if ($DisableComputedGoto) { $ArgsList += "--disable-computed-goto" }
 if ($DisableFastMemory) { $ArgsList += "--disable-fast-memory" }
 if ($DisableProtectedMode) { $ArgsList += "--disable-protected-mode" }
+if ($DisableProtectedModeDebug) { $ArgsList += "--disable-protected-mode-debug" }
 if ($EffectiveOptLevel) {
     $ArgsList += "--opt-level"
     $ArgsList += $EffectiveOptLevel

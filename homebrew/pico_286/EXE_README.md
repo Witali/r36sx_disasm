@@ -278,6 +278,9 @@ A20.
 Set `profiling_enabled=1` to write periodic performance summaries to
 `pico_286.log`.  `profiling_log_ms` controls the interval.  Profiling can be
 compiled out with `build_pico_286.ps1 -DisableProfiling`.
+Set `log_truncate_on_start=1` in `[debug]` to clear `pico_286.log` at process
+start; the default `0` keeps append-only logs.  `log_max_bytes` sets the log
+file cap in bytes, with `2097152` as the default and `0` meaning no cap.
 
 Set `screenshot_format=png` for compressed screenshots or
 `screenshot_format=bmp` for uncompressed 24-bit BMP output.  Both formats are

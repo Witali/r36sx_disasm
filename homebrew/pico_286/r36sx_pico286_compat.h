@@ -28,6 +28,7 @@
 #endif
 
 #include "r36sx_debug_config.h"
+#include "r36sx_disk_config.h"
 
 #define R36SX_PICO286_LOG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log"
 #define R36SX_PICO286_FALLBACK_LOG_PATH "/mnt/sdcard/pico_286.log"
@@ -37,6 +38,8 @@
 /* Keep append-only logs bounded: once the file reaches the cap, stop writing. */
 static inline FILE *r36sx_pico286_open_log_for_append(void)
 {
+    uint32_t max_log_bytes =
+        r36sx_pico286_log_max_bytes(R36SX_PICO286_MAX_LOG_BYTES);
     const char *paths[] = {
         R36SX_PICO286_LOG_PATH,
         R36SX_PICO286_FALLBACK_LOG_PATH,
@@ -45,8 +48,9 @@ static inline FILE *r36sx_pico286_open_log_for_append(void)
     for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
         struct stat st;
 
-        if (stat(paths[i], &st) == 0 &&
-            st.st_size >= (off_t)R36SX_PICO286_MAX_LOG_BYTES) {
+        if (max_log_bytes > 0 &&
+            stat(paths[i], &st) == 0 &&
+            st.st_size >= (off_t)max_log_bytes) {
             return NULL;
         }
 
@@ -57,6 +61,14 @@ static inline FILE *r36sx_pico286_open_log_for_append(void)
     }
 
     return NULL;
+}
+
+static inline void r36sx_pico286_truncate_log_file(const char *path)
+{
+    FILE *fp = fopen(path, "w");
+    if (fp) {
+        fclose(fp);
+    }
 }
 
 static inline void r36sx_pico286_debug_log(const char *format, ...)
@@ -82,9 +94,13 @@ static inline void r36sx_pico286_debug_log(const char *format, ...)
 static inline void r36sx_pico286_debug_reset(void)
 {
 #if DEBUG
+    if (r36sx_pico286_log_truncate_on_start()) {
+        r36sx_pico286_truncate_log_file(R36SX_PICO286_LOG_PATH);
+        r36sx_pico286_truncate_log_file(R36SX_PICO286_FALLBACK_LOG_PATH);
+    }
     /*
-     * Keep previous runs in the same file.  Each debug run appends this marker
-     * before the build/configuration lines so device logs preserve history.
+     * Each debug run writes this marker before the build/configuration lines.
+     * Config can keep previous runs appended or truncate the log at startup.
      */
     r36sx_pico286_debug_log("log start");
 #endif

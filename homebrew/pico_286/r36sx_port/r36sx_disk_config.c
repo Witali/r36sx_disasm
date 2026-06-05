@@ -28,6 +28,8 @@
 #define R36SX_PICO286_MAX_CACHE_FLUSH_MS 60000UL
 #define R36SX_PICO286_MIN_PROFILE_LOG_MS 500UL
 #define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
+#define R36SX_PICO286_DEFAULT_LOG_MAX_BYTES (2UL * 1024UL * 1024UL)
+#define R36SX_PICO286_MAX_LOG_MAX_BYTES (64UL * 1024UL * 1024UL)
 #define R36SX_PICO286_MIN_TARGET_FPS 1UL
 #define R36SX_PICO286_MAX_TARGET_FPS 240UL
 #define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
@@ -93,6 +95,8 @@ static char disk_cache_flush_sectors_text[16] = "4";
 static char disk_cache_flush_ms_text[16] = "2000";
 static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
+static char log_truncate_on_start_text[8] = "0";
+static char log_max_bytes_text[16] = "2097152";
 static char app_stats_enabled_text[8] = "1";
 static char int2f_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
@@ -129,6 +133,8 @@ static uint32_t disk_cache_flush_sectors = 4u;
 static uint32_t disk_cache_flush_ms = 2000u;
 static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
+static int log_truncate_on_start = 0;
+static uint32_t log_max_bytes = (uint32_t)R36SX_PICO286_DEFAULT_LOG_MAX_BYTES;
 static int app_stats_enabled = 1;
 static int int2f_enabled = 1;
 static uint32_t target_fps = 60u;
@@ -773,6 +779,77 @@ static int set_profiling_value(const char *key, const char *value,
             sizeof(profiling_log_ms_text),
             1UL,
             line_no);
+    }
+
+    return 0;
+}
+
+static int set_debug_value(const char *key, const char *value, int line_no)
+{
+    int enabled;
+
+    if (!key_equals(key, "log_truncate_on_start")) {
+        return 0;
+    }
+
+    if (!parse_bool_value(value, &enabled)) {
+        r36sx_pico286_debug_log(
+            "diskcfg: ignoring invalid %s '%s' at line %d",
+            key, value, line_no);
+        return 1;
+    }
+
+    log_truncate_on_start = enabled;
+    snprintf(log_truncate_on_start_text, sizeof(log_truncate_on_start_text),
+             "%d", enabled ? 1 : 0);
+    r36sx_pico286_debug_log("diskcfg: log_truncate_on_start=%d",
+                            log_truncate_on_start);
+    return 1;
+}
+
+static int set_debug_uint_value(const char *key, const char *value,
+                                int line_no)
+{
+    if (key_equals(key, "log_max_bytes") ||
+        key_equals(key, "log_file_limit_bytes") ||
+        key_equals(key, "log_limit_bytes") ||
+        key_equals(key, "max_log_bytes")) {
+        return set_disk_cache_uint(
+            key, value,
+            0UL,
+            R36SX_PICO286_MAX_LOG_MAX_BYTES,
+            &log_max_bytes,
+            log_max_bytes_text,
+            sizeof(log_max_bytes_text),
+            1UL,
+            line_no);
+    }
+
+    if (key_equals(key, "log_max_kb") ||
+        key_equals(key, "log_file_limit_kb") ||
+        key_equals(key, "log_limit_kb") ||
+        key_equals(key, "max_log_kb")) {
+        char *end = NULL;
+        unsigned long parsed = strtoul(value, &end, 10);
+        unsigned long bytes;
+
+        if (end) {
+            end = trim_space(end);
+        }
+        if (value[0] == '\0' || (end && end[0] != '\0') ||
+            parsed > R36SX_PICO286_MAX_LOG_MAX_BYTES / 1024UL) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        bytes = parsed * 1024UL;
+        log_max_bytes = (uint32_t)bytes;
+        snprintf(log_max_bytes_text, sizeof(log_max_bytes_text),
+                 "%lu", bytes);
+        r36sx_pico286_debug_log("diskcfg: log_max_bytes=%lu", bytes);
+        return 1;
     }
 
     return 0;
@@ -1649,6 +1726,12 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_profiling_value(key, value, line_no)) {
         return 1;
     }
+    if (set_debug_value(key, value, line_no)) {
+        return 1;
+    }
+    if (set_debug_uint_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
@@ -1983,6 +2066,15 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[profiling]\n");
     fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
     fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
+
+    fprintf(fp, "# Runtime debug log behavior.\n");
+    fprintf(fp, "# log_truncate_on_start=1 clears pico_286.log before writing\n");
+    fprintf(fp, "# the new run's log start marker. 0 keeps append-only logs.\n");
+    fprintf(fp, "# log_max_bytes limits pico_286.log growth; 0 disables the cap.\n");
+    fprintf(fp, "[debug]\n");
+    fprintf(fp, "log_truncate_on_start=%s\n",
+            log_truncate_on_start_text);
+    fprintf(fp, "log_max_bytes=%s\n\n", log_max_bytes_text);
 
     fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
     fprintf(fp, "[stats]\n");
@@ -2320,6 +2412,21 @@ int r36sx_pico286_int2f_enabled(void)
     load_disk_config();
 
     return int2f_enabled;
+}
+
+int r36sx_pico286_log_truncate_on_start(void)
+{
+    load_disk_config();
+
+    return log_truncate_on_start;
+}
+
+uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes)
+{
+    (void)fallback_bytes;
+    load_disk_config();
+
+    return log_max_bytes;
 }
 
 int r36sx_pico286_audio_adlib_enabled(void)
