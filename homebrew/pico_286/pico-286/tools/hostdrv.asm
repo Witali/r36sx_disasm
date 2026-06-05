@@ -323,6 +323,7 @@ redir_disk_info:
     jmp redir_success
 
 redir_find_first:
+    call close_active_find
     call clear_request
     mov word [request + REQ_COMMAND], CMD_FIND_FIRST
     mov ax, FIRST_FILENAME_OFF
@@ -337,9 +338,16 @@ redir_find_first:
     mov word [request + REQ_DATA_LEN], 20
     call execute_request
     jc redir_from_rpc
+    cmp word [request + REQ_RESULT], 0
+    jne .not_found
     mov ax, [request + REQ_HANDLE]
     mov [active_find], ax
     call write_dta_find_result
+    jmp redir_from_rpc
+.not_found:
+    ; Do not touch the DOS DTA on failed search.  Some shells inspect stale
+    ; search data even after CF=1 and may report a phantom "file exists".
+    mov word [active_find], 0FFFFh
     jmp redir_from_rpc
 
 redir_find_next:
@@ -353,7 +361,13 @@ redir_find_next:
     mov word [request + REQ_DATA_LEN], 20
     call execute_request
     jc redir_from_rpc
+    cmp word [request + REQ_RESULT], 0
+    jne .not_found
     call write_dta_find_result
+    jmp redir_from_rpc
+.not_found:
+    ; HOSTRPC closes the host find handle when enumeration is exhausted.
+    mov word [active_find], 0FFFFh
     jmp redir_from_rpc
 
 redir_seek_end:
@@ -464,6 +478,20 @@ rpc_io_common:
     mov [es:di + SFT_FILE_SIZE + 2], ax
     mov cx, [request + REQ_BYTES_DONE]
 .done:
+    ret
+
+close_active_find:
+    push ax
+    mov ax, [active_find]
+    cmp ax, 0FFFFh
+    je .done
+    call clear_request
+    mov word [request + REQ_COMMAND], CMD_FIND_CLOSE
+    mov [request + REQ_HANDLE], ax
+    call execute_request
+    mov word [active_find], 0FFFFh
+.done:
+    pop ax
     ret
 
 fill_sft_from_request:
