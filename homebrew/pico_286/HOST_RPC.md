@@ -103,6 +103,12 @@ directory.
 It checks the port signature, sends a Ping request, creates `HOSTRPC.TXT`,
 writes one line, and closes it.
 
+Build it with the shared HOSTRPC include directory:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostrpc_test.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostrpc.com
+```
+
 This is only a diagnostic program.  The next step is a resident DOS
 redirector/driver that owns `INT 2Fh AH=11h` and translates DOS redirector
 callbacks into these host RPC requests.

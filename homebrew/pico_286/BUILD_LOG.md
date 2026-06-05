@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTRPC shared NASM include
+
+Moved the guest-side HOSTRPC port ABI constants out of `hostdrv.asm` into
+`homebrew/pico_286/pico-286/tools/hostrpc.inc`.  `hostdrv.asm` and
+`hostrpc_test.asm` now include the same file for port numbers, request layout,
+command ids, magic/version fields, and request flags.
+
+Rebuild commands:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostrpc_test.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostrpc.com
+```
+
+Updated both COM files inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostrpc.com ::/HOSTRPC.COM
+```
+
+Verified SHA256:
+
+```text
+a4c4131fb995365001846d90ed2ea3933c84e651ac60e70d6f59fb4f81519124  HOSTDRV.COM
+884792e0a6405bee9d4f4939a32183e68ad5186f0da10db6f59999db5de748a5  HOSTRPC.COM
+```
+
 ## 2026-06-05 HOSTDRV process cleanup
 
 Closed the HOSTDRV TODO item for safe DOS process cleanup.  `HOSTDRV.COM` now

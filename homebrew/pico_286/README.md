@@ -702,7 +702,7 @@ handler inside DOS and talks to the emulator only through the private HOSTRPC
 ports `E360h..E36Fh`.  Build the patch copy with:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
 ```
 
 Run it inside DOS as `HOSTDRV H:`.  The long-term high-memory target is a

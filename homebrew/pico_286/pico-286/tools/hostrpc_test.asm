@@ -4,49 +4,13 @@
 ; to the emulator-side host RPC device without using INT 2Fh.
 ;
 ; Build:
-;   nasm -f bin hostrpc_test.asm -o hostrpc.com
+;   nasm -i. -f bin hostrpc_test.asm -o hostrpc.com
 
     org 100h
     bits 16
     cpu 8086
 
-PORT_BASE       equ 0E360h
-PORT_ID0        equ PORT_BASE + 0
-PORT_ID1        equ PORT_BASE + 1
-PORT_COMMAND    equ PORT_BASE + 2
-PORT_STATUS     equ PORT_BASE + 3
-PORT_ADDR0      equ PORT_BASE + 4
-PORT_ADDR1      equ PORT_BASE + 5
-PORT_ADDR2      equ PORT_BASE + 6
-PORT_ADDR3      equ PORT_BASE + 7
-
-RPC_MAGIC       equ 05248h       ; "HR" little-endian
-RPC_VERSION     equ 1
-RPC_EXECUTE     equ 1
-
-CMD_PING        equ 0
-CMD_CREATE      equ 3
-CMD_CLOSE       equ 4
-CMD_WRITE       equ 6
-
-REQ_MAGIC       equ 0
-REQ_VERSION     equ 2
-REQ_COMMAND     equ 4
-REQ_FLAGS       equ 6
-REQ_PATH_PHYS   equ 8
-REQ_PATH2_PHYS  equ 12
-REQ_DATA_PHYS   equ 16
-REQ_DATA_LEN    equ 20
-REQ_FILE_POS    equ 24
-REQ_FILE_SIZE   equ 28
-REQ_HANDLE      equ 32
-REQ_MODE        equ 34
-REQ_ATTR        equ 36
-REQ_DOS_ERROR   equ 38
-REQ_RESULT      equ 40
-REQ_RESERVED    equ 42
-REQ_BYTES_DONE  equ 44
-REQ_SIZE        equ 48
+%include "hostrpc.inc"
 
 start:
     mov dx, PORT_ID0
