@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-05 HOSTDRV SHSUCDX-style find state marker
+
+Compared HOSTDRV's find-first/find-next DTA/SDB state with SHSUCDX.  SHSUCDX
+stores the first search-data byte as zero-based drive number with the high
+network-state bits set (`drive_number | C0h`), not as an ASCII drive letter.
+HOSTDRV now writes and checks the same marker shape through `dta_drive_marker`.
+
+Rebuild command:
+
+```powershell
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+```
+
+Updated `HOSTDRV.COM` inside `hdd.hdd` with WSL `mtools`:
+
+```bash
+MTOOLS_SKIP_CHECK=1 mcopy -o -i patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/hostdrv.com ::/HOSTDRV.COM
+```
+
+Verified SHA256:
+
+```text
+cdc6c0e3b47ab1932380adcec4fd4cde10307a4870fcbd370b3b22fda32af39b  HOSTDRV.COM
+```
+
 ## 2026-06-05 HOSTDRV chained INT 2Fh register restore
 
 Compared HOSTDRV's `INT 2Fh/AH=11h` path with SHSUCDX's `New2F`/`Main2F`

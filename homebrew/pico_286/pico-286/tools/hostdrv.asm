@@ -928,8 +928,7 @@ dta_find_state_is_ours:
     push es
     call load_dta_esdi
     jc .not_ours
-    mov al, [drive_letter]
-    or al, 80h
+    call dta_drive_marker
     cmp [es:di + DTA_DRIVE], al
     jne .not_ours
     cmp word [es:di + DTA_FIND_MAGIC], DTA_FIND_MAGIC_VALUE
@@ -1055,15 +1054,14 @@ clear_host_tracking:
 
 load_dta_find_handle:
     ; Return AX = HOSTRPC find handle if the current DTA belongs to HOSTDRV.
-    ; The first byte keeps the ASCII drive letter with bit 7 set, matching the
-    ; old redirector and RBIL note that bit 7 marks network search state.
+    ; The first byte keeps the zero-based DOS drive number with the network
+    ; search-state bits set, matching SHSUCDX's SDB.DriveLet format.
     push bx
     push di
     push es
     call load_dta_esdi
     jc .fail
-    mov al, [drive_letter]
-    or al, 80h
+    call dta_drive_marker
     cmp [es:di + DTA_DRIVE], al
     jne .fail
     cmp word [es:di + DTA_FIND_MAGIC], DTA_FIND_MAGIC_VALUE
@@ -1175,8 +1173,7 @@ write_dta_find_result:
     call load_dta_esdi
     jc .done
     mov bx, di
-    mov al, [drive_letter]
-    or al, 80h
+    call dta_drive_marker
     mov [es:bx + DTA_DRIVE], al
     mov ax, [request + REQ_HANDLE]
     mov [es:bx + DTA_FIND_HANDLE], ax
@@ -1203,6 +1200,13 @@ write_dta_find_result:
     pop cx
     pop bx
     pop ax
+    ret
+
+dta_drive_marker:
+    ; SHSUCDX writes SDB.DriveLet as drive_number | C0h.  Keep the same shape:
+    ; bit 7 marks a redirector search state and the low bits remain A=0..Z=25.
+    mov al, [drive_number]
+    or al, 0C0h
     ret
 
 path_to_dos_name_esdi:
