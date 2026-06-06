@@ -235,6 +235,10 @@ $CFiles += Get-Item (Join-Path $PortRoot "r36sx_host_disk_io.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_disk_config.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_profile.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu.c")
+$CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu_dispatch.c")
+$CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu_8086.c")
+$CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu_80286.c")
+$CFiles += Get-Item (Join-Path $PortRoot "r36sx_cpu_80386.c")
 $CFiles += Get-Item (Join-Path $PortRoot "r36sx_ports.c")
 
 foreach ($File in $CFiles) {

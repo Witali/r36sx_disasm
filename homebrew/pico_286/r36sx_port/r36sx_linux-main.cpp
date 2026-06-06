@@ -12,6 +12,7 @@
 #include "emu8950.h"
 #include "linux-audio.h"
 #include "r36sx_app_stats.h"
+#include "r36sx_cpu.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
@@ -1581,7 +1582,7 @@ void *ticks_thread(void *arg) {
             elapsed_frame_tics = elapsedTime;
         }
 
-        // Generate missed ticks in batches, then yield the CPU to exec86().
+        // Generate missed ticks in batches, then yield the CPU executor.
         usleep(R36SX_TICKS_THREAD_SLEEP_US);
     }
     r36sx_pico286_debug_log("ticks_thread: exit loops=%u", ticks_loop_count);
@@ -1682,9 +1683,11 @@ int main() {
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms,
                                        main_loop_frame_us);
     uint32_t cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
+    r36sx_cpu_exec_fn cpu_exec = r36sx_cpu_select_exec();
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
+        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
                             r36sx_pico286_cpu_model_name(),
+                            r36sx_cpu_selected_exec_name(),
                             r36sx_pico286_cpu_mode_name(),
                             r36sx_pico286_x87_enabled() ? "on" : "off",
                             r36sx_pico286_bios_mode_name(),
@@ -1706,6 +1709,9 @@ int main() {
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
+            cpu_exec = r36sx_cpu_select_exec();
+            r36sx_pico286_debug_log("main: cpu_exec=%s after reset",
+                                    r36sx_cpu_selected_exec_name());
             R36SX_PROFILE_END(R36SX_PROFILE_SOFT_RESET, profile_soft_reset);
         }
         {
@@ -1742,7 +1748,7 @@ int main() {
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
         uint64_t exec_start_us = r36sx_pico286_now_us();
-        exec86(cpu_exec_loops_per_frame);
+        cpu_exec(cpu_exec_loops_per_frame);
         exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
                                 cpu_exec_loops_per_frame);
