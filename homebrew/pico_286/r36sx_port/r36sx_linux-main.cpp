@@ -43,6 +43,7 @@ extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
+extern "C" void r36sx_pico286_post_reset(void);
 
 #define R36SX_AUDIO_DRIVER_RATE 44100u
 #define R36SX_AUDIO_CHANNELS 2u
@@ -1322,6 +1323,7 @@ static void r36sx_pico286_soft_reset(void) {
     port61 = 0;
     port64 = 0;
     r36sx_pico286_reset_pic();
+    r36sx_pico286_post_reset();
     memset(&i8253_controller, 0, sizeof(i8253_controller));
     timer_period = 54925;
     speakerenabled = 0;
@@ -1654,6 +1656,7 @@ int main() {
     sn76489_reset();
     r36sx_pico286_debug_log("main: sn76489_reset done");
     r36sx_pico286_reset_pic();
+    r36sx_pico286_post_reset();
     reset86();
     r36sx_pico286_debug_log("main: reset86 done");
 
