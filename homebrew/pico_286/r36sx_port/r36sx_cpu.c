@@ -5719,15 +5719,35 @@ static void r36sx_pm_diag_log_software_interrupt_result(
     static uint32_t last_request_ecx;
     static uint32_t last_request_edx;
     static uint32_t repeat_count;
+    static uint16_t sample_count_by_vector[256];
     uint8_t repeated;
+    uint8_t int10_mode_set = intnum == 0x10u &&
+                              ((request_eax >> 8) & 0xffu) == 0x00u;
+    uint8_t interesting_vector = intnum == 0x10u || intnum == 0x21u ||
+                                 intnum == 0x31u ||
+                                 intnum == R36SX_EXCEPTION_GP;
 
     /*
      * Doom/DOS4GW sets VGA mode through a protected-mode INT 10h stub before
-     * touching VGA registers directly.  Always log INT 10h and unhandled
-     * software interrupts; verbose PM builds can opt into the full stream.
+     * touching VGA registers directly.  Log those mode-set requests and a
+     * small sample of the bridge vectors; keep the full stream behind a
+     * separate switch because normal DOS4GW execution can generate thousands
+     * of INT 10h/21h/31h reflections per second.
      */
-    if (intnum != 0x10u && handled && !R36SX_DEBUG_PM_VERBOSE) {
-        return;
+    if (handled && !int10_mode_set && !R36SX_DEBUG_PM_SOFTINT_VERBOSE) {
+        if (!interesting_vector) {
+            return;
+        }
+        if (sample_count_by_vector[intnum] >= 8u) {
+            if (sample_count_by_vector[intnum] == 8u) {
+                r36sx_pico286_debug_log(
+                    "[PM] software INT %02X further handled calls suppressed",
+                    intnum);
+                sample_count_by_vector[intnum] = 9u;
+            }
+            return;
+        }
+        sample_count_by_vector[intnum]++;
     }
 
     repeated = repeat_count &&

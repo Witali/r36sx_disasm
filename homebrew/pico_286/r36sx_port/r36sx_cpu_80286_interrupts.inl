@@ -4,6 +4,124 @@
  * compiler can still inline hot interpreter paths.
  */
 
+#if R36SX_DEBUG_PM_DIAG
+static uint8_t r36sx_pm_diag_idt_vector_is_interesting(uint8_t intnum)
+{
+    return intnum == 0x10u || intnum == 0x21u ||
+           intnum == 0x31u || intnum == R36SX_EXCEPTION_GP;
+}
+
+static void r36sx_pm_diag_log_idt_gate_if_interesting(uint8_t intnum,
+                                                      uint8_t software_int,
+                                                      uint32_t fault_ip)
+{
+    enum { R36SX_PM_DIAG_IDT_SLOT_COUNT = 4 };
+    typedef struct {
+        uint8_t valid;
+        uint8_t intnum;
+        uint32_t idtr_base;
+        uint16_t idtr_limit;
+        uint32_t lo;
+        uint32_t hi;
+    } r36sx_pm_diag_idt_slot_t;
+
+    static r36sx_pm_diag_idt_slot_t slots[R36SX_PM_DIAG_IDT_SLOT_COUNT];
+
+    if (!r36sx_pm_diag_idt_vector_is_interesting(intnum)) {
+        return;
+    }
+
+    uint32_t gate_offset = (uint32_t)intnum * 8u;
+    if (gate_offset + 7u > r36sx_idtr_limit) {
+        r36sx_pico286_debug_log(
+            "[PM] IDT[%02X] unavailable reason=%s idtr=%08lX:%04X "
+            "gate_offset=%04lX fault=%04X:%08lX",
+            intnum, software_int ? "soft" : "cpu",
+            (unsigned long)r36sx_idtr_base, r36sx_idtr_limit,
+            (unsigned long)gate_offset, CPU_CS, (unsigned long)fault_ip);
+        return;
+    }
+
+    uint32_t addr = r36sx_idtr_base + gate_offset;
+    uint32_t lo = readdw86(addr);
+    uint32_t hi = readdw86(addr + 4u);
+    uint32_t slot_index = intnum == 0x10u ? 0u :
+                          intnum == 0x21u ? 1u :
+                          intnum == 0x31u ? 2u : 3u;
+    r36sx_pm_diag_idt_slot_t *slot = &slots[slot_index];
+
+    /*
+     * Log only when the effective gate changes.  DOS extenders call BIOS and
+     * DOS services thousands of times, but the IDT gate itself usually changes
+     * only during real/protected-mode bridge setup.
+     */
+    if (slot->valid &&
+        slot->intnum == intnum &&
+        slot->idtr_base == r36sx_idtr_base &&
+        slot->idtr_limit == r36sx_idtr_limit &&
+        slot->lo == lo &&
+        slot->hi == hi) {
+        return;
+    }
+
+    slot->valid = 1u;
+    slot->intnum = intnum;
+    slot->idtr_base = r36sx_idtr_base;
+    slot->idtr_limit = r36sx_idtr_limit;
+    slot->lo = lo;
+    slot->hi = hi;
+
+    uint8_t access = (uint8_t)((hi >> 8) & 0xffu);
+    uint8_t type = access & 0x0fu;
+    uint8_t dpl = (access >> 5) & 3u;
+    uint8_t present = (access & R36SX_DESCRIPTOR_PRESENT) != 0u;
+    uint16_t selector = (uint16_t)(lo >> 16);
+    uint32_t offset = (lo & 0xffffu) |
+                      ((type == 0x0eu || type == 0x0fu)
+                           ? (hi & 0xffff0000u)
+                           : 0u);
+
+    r36sx_pico286_debug_log(
+        "[PM] IDT[%02X] reason=%s idtr=%08lX:%04X gate=%08lX:%08lX "
+        "type=%02X dpl=%u p=%u sel=%04X off=%08lX fault=%04X:%08lX",
+        intnum, software_int ? "soft" : "cpu",
+        (unsigned long)r36sx_idtr_base, r36sx_idtr_limit,
+        (unsigned long)hi, (unsigned long)lo,
+        type, dpl, present, selector, (unsigned long)offset,
+        CPU_CS, (unsigned long)fault_ip);
+
+    if ((selector & 0xfffcu) != 0u) {
+        r36sx_segment_cache_t target;
+        memset(&target, 0, sizeof(target));
+        if (r36sx_cpu_decode_descriptor_any(selector, &target)) {
+            r36sx_pico286_debug_log(
+                "[PM] IDT[%02X] target sel=%04X base=%08lX limit=%08lX "
+                "access=%02X flags=%02X valid=%u dpl=%u",
+                intnum, selector, (unsigned long)target.base,
+                (unsigned long)target.limit, target.access, target.flags,
+                target.valid, r36sx_descriptor_dpl(&target));
+        } else {
+            r36sx_pico286_debug_log(
+                "[PM] IDT[%02X] target sel=%04X unavailable "
+                "gdtr=%08lX:%04X ldtr=%04X base=%08lX limit=%08lX valid=%u",
+                intnum, selector, (unsigned long)r36sx_gdtr_base,
+                r36sx_gdtr_limit, r36sx_ldtr_selector,
+                (unsigned long)r36sx_ldtr_cache.base,
+                (unsigned long)r36sx_ldtr_cache.limit,
+                r36sx_ldtr_cache.valid);
+        }
+    }
+}
+#else
+static inline void r36sx_pm_diag_log_idt_gate_if_interesting(
+    uint8_t intnum, uint8_t software_int, uint32_t fault_ip)
+{
+    (void)intnum;
+    (void)software_int;
+    (void)fault_ip;
+}
+#endif
+
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
@@ -14,6 +132,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint32_t gate_offset = (uint32_t)intnum * 8u;
     /* IDT selector-style error code: vector index plus the IDT source bit. */
     uint32_t gate_error = ((uint32_t)intnum << 3) | 0x02u;
+    r36sx_pm_diag_log_idt_gate_if_interesting(
+        intnum, software_int, fault_ip);
 
     if (gate_offset + 7u > r36sx_idtr_limit) {
 #if R36SX_DEBUG_PM_VERBOSE
