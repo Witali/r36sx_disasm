@@ -264,6 +264,7 @@ void vga_set_dac_color(uint8_t index, uint8_t red6, uint8_t green6, uint8_t blue
 void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *blue6);
 void vga_set_dac_color8(uint8_t index, uint8_t red8, uint8_t green8, uint8_t blue8);
 void vga_get_dac_color8(uint8_t index, uint8_t *red8, uint8_t *green8, uint8_t *blue8);
+uint8_t vga_mode13_unchained_planar_active(void);
 
 /*
  * Shadow Palette hooks for the Linux/R36SX renderer.

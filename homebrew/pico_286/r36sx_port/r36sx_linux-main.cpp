@@ -468,6 +468,12 @@ static inline void vga_render_planar_4bpp(uint16_t **out_pixels,
     *out_pixels = pixels;
 }
 
+static inline uint8_t vga_chain4_pixel(uint32_t byte_offset)
+{
+    uint32_t cell = vga_vram_cell(byte_offset >> 2);
+    return (uint8_t)(cell >> ((byte_offset & 3u) << 3));
+}
+
 static inline uint16_t svga_read_rgb565(uint32_t offset)
 {
     if (offset + 1u >= SVGA_VRAM_SIZE) {
@@ -889,8 +895,14 @@ static inline void renderer() {
                     break;
                 }
                 case 0x13: {
-                    if (vga_planar_mode) {
+                    if (vga_mode13_unchained_planar_active()) {
                         const uint32_t visible_cells = 320u / 4u;
+                        /*
+                         * Mode X/Y: 256-color mode 13h with chain4 disabled.
+                         * One addressable cell contains four adjacent pixels,
+                         * one byte per VGA plane.  CRTC offset 28h therefore
+                         * means 80 cells per 320-pixel scanline.
+                         */
                         uint32_t stride = vga_crtc_planar_stride(visible_cells, 0);
                         uint32_t vram_base = vram_offset +
                                              ((uint32_t)y >> 1) * stride;
@@ -914,7 +926,8 @@ static inline void renderer() {
                         uint32_t vram_base = vram_offset +
                                              ((uint32_t)y >> 1) * stride;
                         for (int x = 0; x < 320; x++) {
-                            uint16_t color = vga_palette565[vga_vram_cell(vram_base + x) & 0xFFu];
+                            uint16_t color =
+                                vga_palette565[vga_chain4_pixel(vram_base + (uint32_t)x)];
                             put_pixel_repeat(&pixels, color, 2u);
                         }
                     }

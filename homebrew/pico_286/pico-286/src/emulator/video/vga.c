@@ -653,6 +653,39 @@ static inline int vga_svga_vram_contains(uint32_t offset, uint32_t bytes)
            bytes <= SVGA_VRAM_SIZE - offset;
 }
 
+uint8_t vga_mode13_unchained_planar_active(void)
+{
+    return videomode == 0x13 && !vga.chain4 && !vga_svga_mode_active();
+}
+
+static inline int vga_mode13_chain4_active(void)
+{
+    return videomode == 0x13 && vga.chain4 && !vga_svga_mode_active();
+}
+
+static inline uint32_t vga_chain4_cell_index(uint32_t address)
+{
+    /*
+     * VGA chain-4 uses address bits A0..A1 as the plane selector and the
+     * remaining bits as the byte index inside each plane.  Keeping mode 13h
+     * in this native planar layout makes later chain4-off Mode X/Y switches
+     * see the same VRAM contents real hardware would expose.
+     */
+    return (address >> 2) & 0xFFFFu;
+}
+
+static inline uint32_t vga_chain4_plane_shift(uint32_t address)
+{
+    return (address & 3u) << 3;
+}
+
+static inline uint8_t vga_chain4_read_byte(uint32_t address)
+{
+    uint32_t cell = VIDEORAM[vga_chain4_cell_index(address)];
+    vga_latch32 = cell;
+    return (uint8_t)(cell >> vga_chain4_plane_shift(address));
+}
+
 // ---------------------- Read path ----------------------
 
 // Read a byte from VGA memory (emulates CPU byte read from VGA window).
@@ -662,6 +695,10 @@ uint8_t __not_in_flash() vga_mem_read(const uint32_t address) {
         uint32_t offset = vga_svga_vram_offset(address);
         return vga_svga_vram_contains(offset, 1u) ?
                SVGA_VRAM[offset] : 0xFFu;
+    }
+
+    if (vga_mode13_chain4_active()) {
+        return vga_chain4_read_byte(address);
     }
 
     vga_latch32 = VIDEORAM[address & 0xFFFF];
@@ -702,6 +739,13 @@ uint16_t __not_in_flash() vga_mem_read16(uint32_t address) {
     }
 
     address &= 0xFFFF;
+
+    if (vga_mode13_chain4_active()) {
+        const uint16_t byte_low = vga_chain4_read_byte(address);
+        const uint16_t byte_high =
+            vga_chain4_read_byte((address + 1u) & 0xFFFFu);
+        return byte_low | byte_high << 8;
+    }
 
     if (videomode == 0x13 && !vga_planar_mode) {
         const uint16_t byte_low = (uint8_t)(VIDEORAM[address] & 0xFFu);
@@ -749,6 +793,21 @@ static inline void vga_store_dirty(uint32_t *cell, uint32_t value)
         *cell = value;
         r36sx_pico286_video_mark_dirty();
     }
+}
+
+static inline void vga_chain4_write_byte(uint32_t address, uint8_t value)
+{
+    uint32_t plane = address & 3u;
+    uint32_t plane_bit = 1u << plane;
+
+    if ((vga.sequencer[2] & plane_bit) == 0) {
+        return;
+    }
+
+    uint32_t *cell = &VIDEORAM[vga_chain4_cell_index(address)];
+    uint32_t shift = plane << 3;
+    uint32_t mask = 0xFFu << shift;
+    vga_store_dirty(cell, (*cell & ~mask) | ((uint32_t)value << shift));
 }
 
 #if VGA_DEBUGGING
@@ -848,6 +907,11 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
         return;
     }
 
+    if (vga_mode13_chain4_active()) {
+        vga_chain4_write_byte(address, cpu_data);
+        return;
+    }
+
     uint32_t new_data;
 
     const uint32_t map_mask32 = vga.map_mask32;
@@ -933,6 +997,12 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
         if (changed) {
             r36sx_pico286_video_mark_dirty();
         }
+        return;
+    }
+
+    if (vga_mode13_chain4_active()) {
+        vga_chain4_write_byte(address, (uint8_t)(cpu_data_x2 & 0xFFu));
+        vga_chain4_write_byte(address + 1u, (uint8_t)(cpu_data_x2 >> 8));
         return;
     }
 
