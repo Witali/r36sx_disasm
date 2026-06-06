@@ -4391,6 +4391,43 @@ static void r36sx_bios_teletype(uint8_t page, uint8_t ch, uint8_t attr)
     r36sx_bios_set_cursor(page, col, row);
 }
 
+static void r36sx_bios_set_video_mode(uint8_t requested_mode,
+                                      const char *source)
+{
+    uint8_t base_mode = requested_mode & 0x7Fu;
+    uint8_t clear_display = (requested_mode & 0x80u) == 0;
+
+#if R36SX_DEBUG_PM_DIAG
+    r36sx_pico286_debug_log(
+        "[BIOS] INT10 set mode source=%s requested=0x%02X base=0x%02X "
+        "clear=%u old=0x%X",
+        source ? source : "unknown",
+        requested_mode,
+        base_mode,
+        clear_display,
+        (unsigned)videomode);
+#else
+    (void)source;
+#endif
+
+    videomode = base_mode;
+    vga_set_standard_mode(base_mode);
+    r36sx_bios_update_video_bda_for_mode(requested_mode, base_mode);
+    vram_offset = 0;
+    tga_offset = 0x8000;
+
+    if (clear_display) {
+        memset(VIDEORAM, 0x0, sizeof(VIDEORAM));
+        if (r36sx_bios_is_text_mode(base_mode)) {
+            r36sx_bios_clear_text_window(0, 0, 0,
+                r36sx_bios_text_rows() - 1u,
+                r36sx_bios_text_cols() - 1u, 0x07u);
+        }
+    }
+    r36sx_bios_set_cursor(0, 0, 0);
+    r36sx_pico286_video_mark_dirty();
+}
+
 #define R36SX_VBE_STATUS_OK 0x004Fu
 #define R36SX_VBE_STATUS_FAIL 0x014Fu
 #define R36SX_VBE_WINDOW_KB 64u
@@ -5333,31 +5370,8 @@ void intcall86(uint8_t intnum) {
                 case 0x00:
                     // http://www.techhelpmanual.com/114-video_modes.html
                     // http://www.techhelpmanual.com/89-video_memory_layouts.html
-
-                    {
-                        uint8_t requested_mode = CPU_AL;
-                        uint8_t base_mode = requested_mode & 0x7Fu;
-                        uint8_t clear_display = (requested_mode & 0x80u) == 0;
-
-                        videomode = base_mode;
-                        vga_set_standard_mode(base_mode);
-                        r36sx_bios_update_video_bda_for_mode(requested_mode,
-                                                             base_mode);
-                        vram_offset = 0;
-                        tga_offset = 0x8000;
-
-                        if (clear_display) {
-                            memset(VIDEORAM, 0x0, sizeof(VIDEORAM));
-                            if (r36sx_bios_is_text_mode(base_mode)) {
-                                r36sx_bios_clear_text_window(0, 0, 0,
-                                    r36sx_bios_text_rows() - 1u,
-                                    r36sx_bios_text_cols() - 1u, 0x07u);
-                            }
-                        }
-                        r36sx_bios_set_cursor(0, 0, 0);
-                        r36sx_pico286_video_mark_dirty();
-                    }
-                    break;
+                    r36sx_bios_set_video_mode(CPU_AL, "real");
+                    return;
                 case 0x05: /* Select Active Page */ {
                     if (CPU_AL >= 0x80) {
                         uint8_t CRTCPU = FIRST_RAM_PAGE[BIOS_CRTCPU_PAGE];
@@ -5755,6 +5769,8 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
 {
     if (r36sx_cpu_protected_enabled()) {
         uint8_t handled;
+        uint8_t pm_int10_set_mode = 0;
+        uint8_t pm_int10_mode = 0;
 #if R36SX_DEBUG_PM_DIAG
         uint16_t request_cs = CPU_CS;
         uint32_t request_ip = fault_ip;
@@ -5763,6 +5779,10 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
         uint32_t request_ecx = CPU_ECX;
         uint32_t request_edx = CPU_EDX;
 #endif
+        if (intnum == 0x10u && CPU_AH == 0x00u) {
+            pm_int10_set_mode = 1;
+            pm_int10_mode = CPU_AL;
+        }
         r36sx_pm_diag_log_interrupt(intnum);
         handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip);
 #if R36SX_DEBUG_PM_DIAG
@@ -5770,6 +5790,18 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
             intnum, fault_ip, handled, request_cs, request_ip,
             request_eax, request_ebx, request_ecx, request_edx);
 #endif
+        /*
+         * DOS extenders such as DOS/4GW often issue BIOS video calls through a
+         * protected-mode INT 10h stub while entering VGA graphics.  If that
+         * bridge returns without reaching our real-mode BIOS handler, the guest
+         * stays in text mode and later direct VGA programming cannot render
+         * correctly.  Keep this fallback intentionally narrow: only AH=00h
+         * video-mode changes are reflected here.
+         */
+        if (handled && pm_int10_set_mode &&
+            videomode != (uint8_t)(pm_int10_mode & 0x7Fu)) {
+            r36sx_bios_set_video_mode(pm_int10_mode, "pm-fallback");
+        }
         return;
     }
 
