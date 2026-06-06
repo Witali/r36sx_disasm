@@ -5,6 +5,9 @@ disk_image/
 ghidra_12.0.4_PUBLIC/
 ghidra_projects/
 ghidra_exports/
+analysis/doom_video/ghidra_doom/
+analysis/doom_video/ndisasm/
+analysis/doom_video/doom_video_patterns.txt
 
 # Downloaded third-party repositories and source mirrors
 internet_sources/

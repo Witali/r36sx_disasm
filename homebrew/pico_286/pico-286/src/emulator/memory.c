@@ -187,10 +187,15 @@ static inline uint16_t videoram_read16(const uint32_t address)
 static inline void videoram_write32(const uint32_t address, const uint32_t value)
 {
     if (videoram_uses_vga_path()) {
-        vga_mem_write(address, (uint8_t)value);
-        vga_mem_write(address + 1u, (uint8_t)(value >> 8));
-        vga_mem_write(address + 2u, (uint8_t)(value >> 16));
-        vga_mem_write(address + 3u, (uint8_t)(value >> 24));
+        /*
+         * Keep dword accesses on the same VGA path as byte/word accesses.
+         * Tweaked VGA modes such as Doom's unchained 13h rely on the graphics
+         * controller aperture mapping and latch side effects for each byte.
+         */
+        videoram_write8(address, (uint8_t)value);
+        videoram_write8(address + 1u, (uint8_t)(value >> 8));
+        videoram_write8(address + 2u, (uint8_t)(value >> 16));
+        videoram_write8(address + 3u, (uint8_t)(value >> 24));
         return;
     }
     videoram_write8_raw(address, (uint8_t)value);
@@ -202,10 +207,14 @@ static inline void videoram_write32(const uint32_t address, const uint32_t value
 static inline uint32_t videoram_read32(const uint32_t address)
 {
     if (videoram_uses_vga_path()) {
-        return (uint32_t)vga_mem_read(address) |
-               ((uint32_t)vga_mem_read(address + 1u) << 8) |
-               ((uint32_t)vga_mem_read(address + 2u) << 16) |
-               ((uint32_t)vga_mem_read(address + 3u) << 24);
+        /*
+         * Read through videoram_read8() so each byte observes the active VGA
+         * memory map and updates latches in the same order as real hardware.
+         */
+        return (uint32_t)videoram_read8(address) |
+               ((uint32_t)videoram_read8(address + 1u) << 8) |
+               ((uint32_t)videoram_read8(address + 2u) << 16) |
+               ((uint32_t)videoram_read8(address + 3u) << 24);
     }
     return (uint32_t)videoram_read8_raw(address) |
            ((uint32_t)videoram_read8_raw(address + 1u) << 8) |
