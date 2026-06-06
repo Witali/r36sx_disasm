@@ -493,7 +493,8 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
                                              uint8_t software_int,
-                                             uint32_t fault_ip);
+                                             uint32_t fault_ip,
+                                             uint8_t raise_delivery_faults);
 static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint32_t error_code,
                                       uint8_t has_error_code,
@@ -5256,8 +5257,14 @@ static void r36sx_bios_int15_cpu_type(void)
 void intcall86(uint8_t intnum) {
     r36sx_pm_diag_log_interrupt(intnum);
 
-    if (r36sx_cpu_protected_enabled() &&
-        r36sx_cpu_protected_interrupt(intnum, 0, 0, 0, CPU_IP)) {
+    if (r36sx_cpu_protected_enabled()) {
+        /*
+         * In protected mode every interrupt, including BIOS-looking vectors,
+         * is delivered through the IDT.  If delivery faults, protected_interrupt
+         * raises the architected #GP/#NP/#TS path; silently falling through to
+         * the real-mode BIOS switch would hide broken IDT/gate state.
+         */
+        (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 0, CPU_IP, 1);
         return;
     }
 
@@ -5784,7 +5791,7 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
             pm_int10_mode = CPU_AL;
         }
         r36sx_pm_diag_log_interrupt(intnum);
-        handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip);
+        handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip, 1);
 #if R36SX_DEBUG_PM_DIAG
         r36sx_pm_diag_log_software_interrupt_result(
             intnum, fault_ip, handled, request_cs, request_ip,
