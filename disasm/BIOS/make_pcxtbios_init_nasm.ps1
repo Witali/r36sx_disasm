@@ -1,6 +1,6 @@
 param(
-    [string]$InputPath = ".\BIOS\pcxtbios_init_annotated.asm",
-    [string]$OutputPath = ".\homebrew\pico_286\bios\pcxtbios_init_annotated_nasm.asm"
+    [string]$InputPath = ".\disasm\BIOS\pcxtbios_init_annotated.asm",
+    [string]$OutputPath = ".\disasm\BIOS\nasm_attempt\pcxtbios_init_annotated_nasm.asm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,12 +92,12 @@ foreach ($Line in $InputLines) {
 }
 
 $Output = New-Object System.Collections.Generic.List[string]
-$Output.Add("; NASM rebuild source generated from BIOS/pcxtbios_init_annotated.asm.") | Out-Null
+$Output.Add("; NASM rebuild source generated from disasm/BIOS/pcxtbios_init_annotated.asm.") | Out-Null
 $Output.Add("; Address prefixes are converted to loc_XXXX labels; unlisted gaps are") | Out-Null
-$Output.Add("; byte-preserved from BIOS/pcxtbios.bin so the output can still rebuild") | Out-Null
+$Output.Add("; byte-preserved from disasm/BIOS/pcxtbios.bin so the output can still rebuild") | Out-Null
 $Output.Add("; the complete 8 KiB ROM while selected init code is assembled as text.") | Out-Null
 $Output.Add(";") | Out-Null
-$Output.Add("; Build: nasm -f bin homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin") | Out-Null
+$Output.Add("; Build: nasm -f bin disasm/BIOS/nasm_attempt/pcxtbios_init_annotated_nasm.asm -o disasm/BIOS/nasm_attempt/pcxtbios_init_annotated.bin") | Out-Null
 $Output.Add("bits 16") | Out-Null
 $Output.Add("org 0xe000") | Out-Null
 $Output.Add("") | Out-Null
@@ -108,7 +108,7 @@ $Output.Add("    %assign __here (`$ - `$$)") | Out-Null
 $Output.Add("    %if __target < __here") | Out-Null
 $Output.Add("        %error `"assembled past annotated BIOS address`"") | Out-Null
 $Output.Add("    %elif __target > __here") | Out-Null
-$Output.Add("        incbin `"BIOS/pcxtbios.bin`", __here, __target - __here") | Out-Null
+$Output.Add("        incbin `"disasm/BIOS/pcxtbios.bin`", __here, __target - __here") | Out-Null
 $Output.Add("    %endif") | Out-Null
 $Output.Add("%endmacro") | Out-Null
 $Output.Add("") | Out-Null

@@ -1,9 +1,9 @@
-; NASM rebuild source generated from BIOS/pcxtbios_init_annotated.asm.
+; NASM rebuild source generated from disasm/BIOS/pcxtbios_init_annotated.asm.
 ; Address prefixes are converted to loc_XXXX labels; unlisted gaps are
-; byte-preserved from BIOS/pcxtbios.bin so the output can still rebuild
+; byte-preserved from disasm/BIOS/pcxtbios.bin so the output can still rebuild
 ; the complete 8 KiB ROM while selected init code is assembled as text.
 ;
-; Build: nasm -f bin homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin
+; Build: nasm -f bin disasm/BIOS/nasm_attempt/pcxtbios_init_annotated_nasm.asm -o disasm/BIOS/nasm_attempt/pcxtbios_init_annotated.bin
 bits 16
 org 0xe000
 
@@ -14,7 +14,7 @@ org 0xe000
     %if __target < __here
         %error "assembled past annotated BIOS address"
     %elif __target > __here
-        incbin "BIOS/pcxtbios.bin", __here, __target - __here
+        incbin "disasm/BIOS/pcxtbios.bin", __here, __target - __here
     %endif
 %endmacro
 

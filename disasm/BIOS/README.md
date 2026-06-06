@@ -15,10 +15,10 @@ This directory contains the 8 KiB BIOS ROM extracted from the embedded
 - `ghidra_pcxtbios/` - Ghidra summary, symbols, function list, disassembly,
   and decompiler output exported by the existing project script.
 
-The generated NASM source is kept with the Pico-286 homebrew sources:
+The generated NASM source is kept with the BIOS disassembly notes:
 
 ```text
-homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm
+disasm/BIOS/nasm_attempt/pcxtbios_init_annotated_nasm.asm
 ```
 
 It converts leading `F000:XXXX` listing addresses into `loc_XXXX` labels and
@@ -109,20 +109,20 @@ During reset the ROM fills vectors `00h..07h` with a default stub at
 ## Reproduction Commands
 
 The raw ROM was generated from `bios.h` by parsing every `0xNN` byte literal
-and writing them in order to `BIOS/pcxtbios.bin`.
+and writing them in order to `disasm/BIOS/pcxtbios.bin`.
 
 Ghidra was run as:
 
 ```powershell
 .\ghidra_12.0.4_PUBLIC\support\analyzeHeadless.bat `
   .\ghidra_projects pico286_pcxtbios_export `
-  -import .\BIOS\pcxtbios.bin `
+  -import .\disasm\BIOS\pcxtbios.bin `
   -loader BinaryLoader `
   -loader-baseAddr 0xfe000 `
   -processor "x86:LE:16:Real Mode" `
   -scriptPath .\ghidra_scripts `
-  -postScript DumpDisasmRanges.java .\BIOS\pcxtbios_ghidra_full.s 0xFE000 0x2000 `
-  -postScript ExportDisasmAndDecompile.java .\BIOS\ghidra_pcxtbios `
+  -postScript DumpDisasmRanges.java .\disasm\BIOS\pcxtbios_ghidra_full.s 0xFE000 0x2000 `
+  -postScript ExportDisasmAndDecompile.java .\disasm\BIOS\ghidra_pcxtbios `
   -deleteProject
 ```
 
@@ -130,7 +130,7 @@ The annotated init notes can be converted into a compilable NASM source and
 rebuilt as a byte-identical ROM:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\BIOS\make_pcxtbios_init_nasm.ps1
-wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && nasm -f bin homebrew/pico_286/bios/pcxtbios_init_annotated_nasm.asm -o BIOS/pcxtbios_init_annotated.bin'
-wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && cmp -s BIOS/pcxtbios.bin BIOS/pcxtbios_init_annotated.bin && echo cmp_identical'
+powershell -ExecutionPolicy Bypass -File .\disasm\BIOS\make_pcxtbios_init_nasm.ps1
+wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && nasm -f bin disasm/BIOS/nasm_attempt/pcxtbios_init_annotated_nasm.asm -o disasm/BIOS/nasm_attempt/pcxtbios_init_annotated.bin'
+wsl sh -lc 'cd /mnt/c/Work/r36sx_disasm && cmp -s disasm/BIOS/pcxtbios.bin disasm/BIOS/nasm_attempt/pcxtbios_init_annotated.bin && echo cmp_identical'
 ```
