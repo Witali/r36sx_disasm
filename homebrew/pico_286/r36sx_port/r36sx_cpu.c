@@ -5677,11 +5677,99 @@ void intcall86(uint8_t intnum) {
     tf = 0;
 }
 
+#if R36SX_DEBUG_PM_DIAG
+static void r36sx_pm_diag_log_software_interrupt_result(
+    uint8_t intnum,
+    uint32_t fault_ip,
+    uint8_t handled,
+    uint16_t request_cs,
+    uint32_t request_ip,
+    uint32_t request_eax,
+    uint32_t request_ebx,
+    uint32_t request_ecx,
+    uint32_t request_edx)
+{
+    static uint8_t last_intnum;
+    static uint8_t last_handled;
+    static uint16_t last_request_cs;
+    static uint32_t last_request_ip;
+    static uint32_t last_request_eax;
+    static uint32_t last_request_ebx;
+    static uint32_t last_request_ecx;
+    static uint32_t last_request_edx;
+    static uint32_t repeat_count;
+    uint8_t repeated;
+
+    /*
+     * Doom/DOS4GW sets VGA mode through a protected-mode INT 10h stub before
+     * touching VGA registers directly.  Always log INT 10h and unhandled
+     * software interrupts; verbose PM builds can opt into the full stream.
+     */
+    if (intnum != 0x10u && handled && !R36SX_DEBUG_PM_VERBOSE) {
+        return;
+    }
+
+    repeated = repeat_count &&
+               last_intnum == intnum &&
+               last_handled == handled &&
+               last_request_cs == request_cs &&
+               last_request_ip == request_ip &&
+               last_request_eax == request_eax &&
+               last_request_ebx == request_ebx &&
+               last_request_ecx == request_ecx &&
+               last_request_edx == request_edx;
+    if (repeated) {
+        repeat_count++;
+    } else {
+        if (repeat_count > 8u) {
+            r36sx_pico286_debug_log(
+                "[PM] software INT repeat suppressed count=%lu",
+                (unsigned long)(repeat_count - 8u));
+        }
+        last_intnum = intnum;
+        last_handled = handled;
+        last_request_cs = request_cs;
+        last_request_ip = request_ip;
+        last_request_eax = request_eax;
+        last_request_ebx = request_ebx;
+        last_request_ecx = request_ecx;
+        last_request_edx = request_edx;
+        repeat_count = 1u;
+    }
+
+    if (repeat_count <= 8u) {
+        r36sx_pico286_debug_log(
+            "[PM] software INT %02X handled=%u from=%04X:%08lX "
+            "eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX "
+            "now=%04X:%08lX",
+            intnum, handled,
+            request_cs, (unsigned long)request_ip,
+            (unsigned long)request_eax, (unsigned long)request_ebx,
+            (unsigned long)request_ecx, (unsigned long)request_edx,
+            CPU_CS, (unsigned long)CPU_IP);
+    }
+}
+#endif
+
 static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
 {
     if (r36sx_cpu_protected_enabled()) {
+        uint8_t handled;
+#if R36SX_DEBUG_PM_DIAG
+        uint16_t request_cs = CPU_CS;
+        uint32_t request_ip = fault_ip;
+        uint32_t request_eax = CPU_EAX;
+        uint32_t request_ebx = CPU_EBX;
+        uint32_t request_ecx = CPU_ECX;
+        uint32_t request_edx = CPU_EDX;
+#endif
         r36sx_pm_diag_log_interrupt(intnum);
-        (void)r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip);
+        handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip);
+#if R36SX_DEBUG_PM_DIAG
+        r36sx_pm_diag_log_software_interrupt_result(
+            intnum, fault_ip, handled, request_cs, request_ip,
+            request_eax, request_ebx, request_ecx, request_edx);
+#endif
         return;
     }
 
