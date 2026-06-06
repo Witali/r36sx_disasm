@@ -146,3 +146,35 @@ emulator, a realistic timed `3DAh` is more important than adding a VGA IRQ.
   3. Correct planar memory write/read modes.
   4. Better CRTC-derived rendering for tweaked modes.
   5. Optional VGA IRQ behavior only if a real program requires it.
+
+## References
+
+- Michael Abrash, *Graphics Programming Black Book*, Chapter 47,
+  "Mode X: 256-Color VGA Magic":
+  https://www.phatcode.net/res/224/files/html/ch47/47-02.html
+  - Use for the canonical BIOS `13h` -> Mode X register setup sequence:
+    Sequencer Memory Mode `0604h`, synchronous reset, Misc Output clock
+    selection, CRTC unlock/reprogramming, map mask `0F02h`, and full VRAM
+    clear.
+- Michael Abrash, *Graphics Programming Black Book*, Chapter 47 pixel layout:
+  https://www.phatcode.net/res/224/files/html/ch47/47-03.html
+  - Use for Mode X address math: byte offset `x / 4`, plane `x mod 4`, map
+    mask register `3C4h:02h`, and read-map register `3CEh:04h`.
+- Michael Abrash, *Graphics Programming Black Book*, Chapter 48,
+  "Mode X Marks the Latch":
+  https://www.phatcode.net/res/224/files/html/ch48/48-01.html
+  - Use for VGA latch behavior: a display-memory read loads one byte from each
+    of the four planes into the latches, and later writes can use those latches
+    for four-pixel copies/fills.
+- OSDev Wiki, "VGA Hardware":
+  https://wiki.osdev.org/VGA_Hardware
+  - Use as a compact register/memory map reference for VGA ports, indexed
+    register access, DAC behavior, memory windows, chain-4, latches, and sample
+    register settings.
+- FreeVGA, "VGA Sequencer Registers":
+  https://www.osdever.net/FreeVGA/vga/seqreg.htm
+  - Use for Sequencer register definitions, especially Map Mask register `02h`
+    and Memory Mode register `04h`.
+- FreeVGA, "VGA Sequencer Operation":
+  https://www.osdever.net/FreeVGA/vga/vgaseq.htm
+  - Use for display-side Sequencer behavior and 256-color shift-mode details.
