@@ -340,7 +340,15 @@ inline int16_t blaster_sample() { //for DMA mode
         if (sound_blaster.recording_mode_active == 0) {
             generated_sample = (i8237_read(SB_DMA_CHANNEL) - 128) << 6;
         } else {
-            i8237_write(SB_DMA_CHANNEL, 128); //silence
+            /*
+             * ADC DMA would normally write microphone input into guest memory.
+             * We do not emulate a recording source, so keep this path inert:
+             * some SB drivers probe ADC commands while FX is enabled, and
+             * writing generated silence from the audio callback can corrupt
+             * guest video/DOS memory if the DMA setup is not a real recording
+             * transfer.
+             */
+            generated_sample = 0;
         }
     }
 

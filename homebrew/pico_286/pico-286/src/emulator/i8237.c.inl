@@ -231,9 +231,14 @@ INLINE uint8_t i8237_read(const uint8_t channel) {
 }
 
 INLINE void i8237_write(const uint8_t channel, const uint8_t value) {
-    printf("Write to %06X %x value %x\r\n", dma_channels[channel].page + dma_channels[channel].address,
-           dma_channels[channel].count, value);
-    register uint32_t memory_address = dma_channels[channel].page + dma_channels[channel].address;
+    if (dma_channels[channel].masked || dma_channels[channel].transfer_type != 1) {
+        return;
+    }
+
+    const uint32_t memory_address = dma_channels[channel].page + dma_channels[channel].address;
+#ifdef DEBUG_DMA
+    printf("[DMA] Write to %06X %x value %x\r\n", memory_address, dma_channels[channel].count, value);
+#endif
     update_count(channel);
     write86(memory_address, value);
 }
