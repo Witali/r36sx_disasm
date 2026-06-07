@@ -434,8 +434,13 @@ static inline char redirector_effective_drive_letter(void)
 
 static inline uint16_t redirector_device_info_for_drive(char drive)
 {
+    const char upper = redirector_upper_drive(drive);
+
+    if (upper < 'A' || upper > 'Z') {
+        return REDIRECTOR_DEVICE_INFO_BASE;
+    }
     return (uint16_t)(REDIRECTOR_DEVICE_INFO_BASE |
-                      (uint8_t)redirector_upper_drive(drive));
+                      (uint8_t)(upper - 'A'));
 }
 
 static inline bool redirector_read_far_ptr(uint32_t address,

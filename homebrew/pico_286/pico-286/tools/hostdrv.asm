@@ -1758,6 +1758,7 @@ parse_drive_arg:
     mov al, [drive_letter]
     mov [msg_ok_drive], al
     mov [err_lastdrive_drive], al
+    mov al, [drive_number]
     mov ah, 80h
     or al, 40h
     mov [device_info], ax
@@ -1798,7 +1799,7 @@ trace_ds_si_string:
 old_2f       dd 0
 sda_seg      dw 0
 sda_off      dw 0
-device_info  dw 8048h
+device_info  dw 8047h
 sft_open_mode dw 0FF02h
 sft_file_attr dw 0020h
 ext_open_action dw 0
