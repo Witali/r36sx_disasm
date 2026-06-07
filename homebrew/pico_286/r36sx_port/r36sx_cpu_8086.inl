@@ -267,7 +267,7 @@ static inline void flag_sub32(uint32_t v1, uint32_t v2) {
 #define op_sbb32() { res32 = sbb32(oper1, oper2, cf); }
 
 static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
-    uint16_t s = oper1b;
+    register uint16_t s = oper1b;
 #ifdef CPU_LIMIT_SHIFT_COUNT
     cnt &= 0x1F;
 #endif
