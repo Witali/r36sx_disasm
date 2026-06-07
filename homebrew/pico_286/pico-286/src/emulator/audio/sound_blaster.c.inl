@@ -80,6 +80,7 @@ typedef  struct sound_blaster_s {
     uint8_t recording_mode_active;
     uint8_t dma_transfer_enabled;
     uint8_t reset_latch;
+    uint8_t irq_pending;
     uint8_t dsp_read_buffer[SB_READ_BUFFER];
 } sound_blaster_s;
 
@@ -114,6 +115,11 @@ static INLINE uint8_t blaster_read_buffer() {
     return first_byte;
 }
 
+static INLINE void blaster_raise_irq() {
+    sound_blaster.irq_pending = 1;
+    doirq(SB_IRQ);
+}
+
 INLINE void blaster_reset() {
     memset(&sound_blaster, 0, sizeof(sound_blaster_s));
     sound_blaster.current_audio_sample = 0;
@@ -127,6 +133,7 @@ static INLINE void blaster_reset_port_write(const uint8_t value) {
         sound_blaster.current_dsp_command = 0;
         sound_blaster.parameter_byte_index = 0;
         sound_blaster.dma_transfer_enabled = 0;
+        sound_blaster.irq_pending = 0;
         return;
     }
 
@@ -267,6 +274,9 @@ static INLINE void blaster_command(const uint8_t command_byte) {
         case DSP_DMA_RESUME: //continue DMA operation, 8-bit
             sound_blaster.dma_transfer_enabled = 1;
             break;
+        case DSP_SPEAKER_STATUS: //get speaker status
+            blaster_write_buffer(sound_blaster.speaker_enabled ? 0xFF : 0x00);
+            break;
         case 0xDA: //exit auto-initialize DMA operation, 8-bit
             sound_blaster.dma_transfer_enabled = 0;
             sound_blaster.auto_init_mode_enabled = 0;
@@ -286,7 +296,7 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             blaster_write_buffer(sound_blaster.dsp_test_register);
             break;
         case DSP_IRQ: //trigger 8-bit IRQ
-            doirq(SB_IRQ);
+            blaster_raise_irq();
             break;
         case 0xF8: //Undocumented
             sound_blaster.read_buffer_length = 0;
@@ -325,8 +335,12 @@ static INLINE uint8_t blaster_read(const uint16_t port) {
             return blaster_read_buffer();
         case DSP_WRITE_STATUS:
             return 0x00;
-        case DSP_READ_STATUS:
-            return sound_blaster.read_buffer_length ? 0x80 : 0x00;
+        case DSP_READ_STATUS: {
+            const uint8_t status = (sound_blaster.read_buffer_length ||
+                                    sound_blaster.irq_pending) ? 0x80 : 0x00;
+            sound_blaster.irq_pending = 0;
+            return status;
+        }
     }
 
     return 0xff;
@@ -354,7 +368,7 @@ inline int16_t blaster_sample() { //for DMA mode
 
     if (++sound_blaster.dma_bytes_processed == sound_blaster.dma_transfer_length) {
         sound_blaster.dma_bytes_processed = 0;
-        doirq(SB_IRQ);
+        blaster_raise_irq();
         sound_blaster.dma_transfer_enabled = sound_blaster.auto_init_mode_enabled;
     }
 
