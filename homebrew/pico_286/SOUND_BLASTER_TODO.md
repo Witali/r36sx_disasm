@@ -87,7 +87,7 @@ References:
     direction decisions behind a debug define.
   - Keep tracing off by default to avoid audio-thread stalls.
 
-- Add a small SB probe test.
+- [x] Add a small SB probe test.
   - Reset DSP and verify `AAh`.
   - Query `E1h` and verify version `2.01`.
   - Exercise `E0h`, `E2h`, `D1h`, `D3h`, `D8h`, `14h`, and IRQ ack behavior.

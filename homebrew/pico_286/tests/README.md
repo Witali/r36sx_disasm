@@ -124,3 +124,15 @@ Build it with the same NASM 3.01 executable:
 
 The generated file is mirrored to
 `disk_image/MIPS_NATIVE/pico_286/mapdrive.com` for the local working image.
+
+## SBPROBE.COM
+
+`sound_blaster/sb_probe.asm` is a DOS `.COM` probe for the Sound Blaster DSP
+emulation.  It checks reset/version/identity commands, speaker status, DMA
+identification, and a single-cycle DMA playback IRQ acknowledge path.
+
+Build it with:
+
+```powershell
+.\homebrew\pico_286\tests\sound_blaster\build_sb_probe.ps1
+```
