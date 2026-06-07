@@ -39,7 +39,7 @@ References:
     and configured for device-to-memory recording or DMA identification writes.
   - Confirm the local `transfer_type` values against the 8237 mode register bits.
 
-- Model DSP recording commands safely.
+- [x] Model DSP recording commands safely.
   - `20h` direct ADC currently returns silence, which is acceptable as a stub.
   - `24h` single-cycle DMA input and `2Ch` auto-init DMA input should either
     write silence only through a valid device-to-memory DMA setup or stay inert.

@@ -42,6 +42,8 @@
 #define DSP_DMA_ADPCM           0x7F    //creative ADPCM 8bit to 3bit
 #define DSP_DMA_SINGLE          0x14    //follosed by length
 #define DSP_DMA_SINGLE_ALT      0x15
+#define DSP_DMA_SINGLE_IN       0x24
+#define DSP_DMA_AUTO_IN         0x2C
 #define DSP_DMA_AUTO            0X1C    //length based on 48h
 #define DSP_DMA_BLOCK_SIZE      0x48    //block size for highspeed/dma
 //#define DSP_DMA_DAC 0x14
@@ -120,6 +122,12 @@ static INLINE void blaster_raise_irq() {
     doirq(SB_IRQ);
 }
 
+static INLINE void blaster_recording_sample() {
+    if (i8237_can_write(SB_DMA_CHANNEL)) {
+        i8237_write(SB_DMA_CHANNEL, 128);
+    }
+}
+
 INLINE void blaster_reset() {
     memset(&sound_blaster, 0, sizeof(sound_blaster_s));
     sound_blaster.current_audio_sample = 0;
@@ -152,7 +160,7 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             return;
         case DSP_DMA_SINGLE: //DMA DAC, 8-bit
         case DSP_DMA_SINGLE_ALT:
-        case 0x24:
+        case DSP_DMA_SINGLE_IN:
         case DSP_DMA_HS_SINGLE:
             if (sound_blaster.parameter_byte_index == 0) {
                 sound_blaster.dma_transfer_length = command_byte;
@@ -166,7 +174,7 @@ static INLINE void blaster_command(const uint8_t command_byte) {
                 sound_blaster.dma_bytes_processed = 0;
                 sound_blaster.silence_mode_active = 0;
                 sound_blaster.auto_init_mode_enabled = 0;
-                sound_blaster.recording_mode_active = (active_dsp_command == 0x24) ? 1 : 0;
+                sound_blaster.recording_mode_active = (active_dsp_command == DSP_DMA_SINGLE_IN) ? 1 : 0;
                 sound_blaster.dma_transfer_enabled = 1;
 #ifdef DEBUG_BLASTER
                 printf("[BLASTER] Begin DMA transfer mode with 0x%04X  byte blocks\r\n", sb.dmalen);
@@ -235,16 +243,16 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             break;
         case 0x14: //DMA DAC, 8-bit
         case DSP_DMA_SINGLE_ALT:
-        case 0x24:
+        case DSP_DMA_SINGLE_IN:
             sound_blaster.parameter_byte_index = 0;
             break;
         case DSP_DMA_HS_AUTO:
         case DSP_DMA_AUTO: //auto-initialize DMA DAC, 8-bit
-        case 0x2C:
+        case DSP_DMA_AUTO_IN:
             sound_blaster.dma_bytes_processed = 0;
             sound_blaster.silence_mode_active = 0;
             sound_blaster.auto_init_mode_enabled = 1;
-            sound_blaster.recording_mode_active = (command_byte == 0x2C) ? 1 : 0;
+            sound_blaster.recording_mode_active = (command_byte == DSP_DMA_AUTO_IN) ? 1 : 0;
             sound_blaster.dma_transfer_enabled = 1;
 #ifdef DEBUG_BLASTER
             printf("[BLASTER] Begin auto-init DMA transfer mode with %d byte blocks\r\n", sb.dmacount);
@@ -355,14 +363,9 @@ inline int16_t blaster_sample() { //for DMA mode
             generated_sample = i8237_can_read(SB_DMA_CHANNEL) ?
                 (i8237_read(SB_DMA_CHANNEL) - 128) << 6 : 0;
         } else {
-            /*
-             * ADC DMA would normally write microphone input into guest memory.
-             * We do not emulate a recording source, so keep this path inert:
-             * some SB drivers probe ADC commands while FX is enabled, and
-             * writing generated silence from the audio callback can corrupt
-             * guest video/DOS memory if the DMA setup is not a real recording
-             * transfer.
-             */
+            /* No recording source is emulated; write midpoint silence only
+             * through a valid device-to-memory DMA transfer. */
+            blaster_recording_sample();
             generated_sample = 0;
         }
     }
