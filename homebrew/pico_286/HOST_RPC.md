@@ -108,8 +108,9 @@ directory.
 ## Diagnostic COM
 
 `homebrew/pico_286/pico-286/tools/hostrpc_test.asm` builds to `hostrpc.com`.
-It checks the stream protocol with RESET/PING, creates `HOSTRPC.TXT`,
-writes one line, and closes it.
+Without arguments it checks the stream protocol with RESET/PING, creates
+`HOSTRPC.TXT`, writes one line, and closes it.  With one filename argument it
+opens that DOS file and copies it to the mapped host drive through HOSTRPC.
 
 Build it with the shared HOSTRPC include directory:
 

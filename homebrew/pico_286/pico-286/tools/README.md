@@ -5,7 +5,8 @@ This directory contains small DOS-side helpers used by the R36SX Pico-286 port.
 - `hostdrv.asm` is the experimental resident DOS network redirector. It owns
   `INT 2Fh/AH=11h` and translates DOS redirector callbacks into the private
   HOSTRPC stream protocol exposed by the emulator on port `E360h`.
-- `hostrpc_test.asm` is a non-resident HOSTRPC stream probe.
+- `hostrpc_test.asm` is a non-resident HOSTRPC stream probe.  With one
+  filename argument, it copies that DOS file to the mapped host drive.
 - `hostrpc.inc` is the shared HOSTRPC guest ABI include used by both programs:
   stream constants, stream command ids, request layout, magic/version, and
   request flags.
