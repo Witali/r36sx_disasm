@@ -77,12 +77,14 @@ typedef  struct sound_blaster_s {
     uint8_t parameter_byte_index;    // tracks whether we're reading low or high byte
     uint32_t dma_bytes_processed;
     uint8_t auto_init_mode_enabled;
+    uint8_t auto_init_exit_pending;
     uint8_t dsp_test_register;
     uint8_t silence_mode_active;
     uint8_t recording_mode_active;
     uint8_t dma_transfer_enabled;
     uint8_t reset_latch;
     uint8_t irq_pending;
+    uint8_t write_buffer_busy;
     uint8_t dsp_read_buffer[SB_READ_BUFFER];
 } sound_blaster_s;
 
@@ -128,6 +130,24 @@ static INLINE void blaster_recording_sample() {
     }
 }
 
+static INLINE void blaster_dma_identification_write(const uint8_t command_byte) {
+    int16_t calculated_value = 0xAA;
+    for (uint8_t bit_index = 0; bit_index < 8; bit_index++) {
+        if ((command_byte >> bit_index) & 0x01) {
+            calculated_value += dma_identification_lookup_table[bit_index];
+        }
+    }
+
+    calculated_value += dma_identification_lookup_table[8];
+    i8237_write(SB_DMA_CHANNEL, (uint8_t)calculated_value);
+}
+
+static INLINE uint8_t blaster_write_status() {
+    const uint8_t status = sound_blaster.write_buffer_busy ? 0x80 : 0x00;
+    sound_blaster.write_buffer_busy = 0;
+    return status;
+}
+
 INLINE void blaster_reset() {
     memset(&sound_blaster, 0, sizeof(sound_blaster_s));
     sound_blaster.current_audio_sample = 0;
@@ -142,6 +162,7 @@ static INLINE void blaster_reset_port_write(const uint8_t value) {
         sound_blaster.parameter_byte_index = 0;
         sound_blaster.dma_transfer_enabled = 0;
         sound_blaster.irq_pending = 0;
+        sound_blaster.write_buffer_busy = 0;
         return;
     }
 
@@ -174,6 +195,7 @@ static INLINE void blaster_command(const uint8_t command_byte) {
                 sound_blaster.dma_bytes_processed = 0;
                 sound_blaster.silence_mode_active = 0;
                 sound_blaster.auto_init_mode_enabled = 0;
+                sound_blaster.auto_init_exit_pending = 0;
                 sound_blaster.recording_mode_active = (active_dsp_command == DSP_DMA_SINGLE_IN) ? 1 : 0;
                 sound_blaster.dma_transfer_enabled = 1;
 #ifdef DEBUG_BLASTER
@@ -213,6 +235,9 @@ static INLINE void blaster_command(const uint8_t command_byte) {
                 sound_blaster.dma_bytes_processed = 0;
                 sound_blaster.silence_mode_active = 1;
                 sound_blaster.auto_init_mode_enabled = 0;
+                sound_blaster.auto_init_exit_pending = 0;
+                sound_blaster.recording_mode_active = 0;
+                sound_blaster.dma_transfer_enabled = 1;
             }
             return;
         case DSP_IDENTIFICATION: //DSP identification (returns bitwise NOT of data byte)
@@ -220,18 +245,9 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             sound_blaster.current_dsp_command = 0;
             return;
         case 0xE2: //DMA identification write
-        {
-            int16_t calculated_value = 0xAA;
-            for (uint8_t bit_index = 0; bit_index < 8; bit_index++) {
-                if (command_byte >> bit_index & 0x01) {
-                    calculated_value += dma_identification_lookup_table[bit_index];
-                }
-            }
-            calculated_value += dma_identification_lookup_table[8];
-            i8237_write(SB_DMA_CHANNEL, calculated_value);
+            blaster_dma_identification_write(command_byte);
             sound_blaster.current_dsp_command = 0;
             return;
-        }
         case DSP_WRITETEST: //write test register
             sound_blaster.dsp_test_register = command_byte;
             sound_blaster.current_dsp_command = 0;
@@ -252,6 +268,7 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             sound_blaster.dma_bytes_processed = 0;
             sound_blaster.silence_mode_active = 0;
             sound_blaster.auto_init_mode_enabled = 1;
+            sound_blaster.auto_init_exit_pending = 0;
             sound_blaster.recording_mode_active = (command_byte == DSP_DMA_AUTO_IN) ? 1 : 0;
             sound_blaster.dma_transfer_enabled = 1;
 #ifdef DEBUG_BLASTER
@@ -286,8 +303,11 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             blaster_write_buffer(sound_blaster.speaker_enabled ? 0xFF : 0x00);
             break;
         case 0xDA: //exit auto-initialize DMA operation, 8-bit
-            sound_blaster.dma_transfer_enabled = 0;
-            sound_blaster.auto_init_mode_enabled = 0;
+            if (sound_blaster.auto_init_mode_enabled) {
+                sound_blaster.auto_init_exit_pending = 1;
+            } else {
+                sound_blaster.dma_transfer_enabled = 0;
+            }
             break;
         case 0xE0: //DSP identification (returns bitwise NOT of data byte)
             break;
@@ -327,6 +347,7 @@ static INLINE void blaster_write(const uint16_t port, const uint8_t value) {
             blaster_reset_port_write(value);
             break;
         case DSP_WRITE: //DSP write (command/data)
+            sound_blaster.write_buffer_busy = 1;
             blaster_command(value);
             break;
     }
@@ -342,7 +363,7 @@ static INLINE uint8_t blaster_read(const uint16_t port) {
         case DSP_READ:
             return blaster_read_buffer();
         case DSP_WRITE_STATUS:
-            return 0x00;
+            return blaster_write_status();
         case DSP_READ_STATUS: {
             const uint8_t status = (sound_blaster.read_buffer_length ||
                                     sound_blaster.irq_pending) ? 0x80 : 0x00;
@@ -371,9 +392,15 @@ inline int16_t blaster_sample() { //for DMA mode
     }
 
     if (++sound_blaster.dma_bytes_processed == sound_blaster.dma_transfer_length) {
+        const uint8_t keep_auto_init = sound_blaster.auto_init_mode_enabled &&
+                                       !sound_blaster.auto_init_exit_pending;
         sound_blaster.dma_bytes_processed = 0;
         blaster_raise_irq();
-        sound_blaster.dma_transfer_enabled = sound_blaster.auto_init_mode_enabled;
+        sound_blaster.dma_transfer_enabled = keep_auto_init;
+        if (!keep_auto_init) {
+            sound_blaster.auto_init_mode_enabled = 0;
+            sound_blaster.auto_init_exit_pending = 0;
+        }
     }
 
     return sound_blaster.speaker_enabled ? generated_sample : 0;

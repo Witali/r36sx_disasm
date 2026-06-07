@@ -52,18 +52,18 @@ References:
   - After command `D8h`, the DSP should return `FFh` when speaker output is on
     and `00h` when it is off.
 
-- Improve `base + 0Ch` Write-Buffer Status.
+- [x] Improve `base + 0Ch` Write-Buffer Status.
   - Bit 7 should indicate DSP write-buffer busy status.
   - Returning always-ready is usually tolerated, but it is not hardware-accurate
     and can hide timing bugs.
 
-- Review auto-init exit/pause timing.
+- [x] Review auto-init exit/pause timing.
   - `D0h` pauses 8-bit DMA requests.
   - `D4h` resumes 8-bit DMA.
   - `DAh` should exit 8-bit auto-init at the end of the current block, not
     necessarily stop immediately.
 
-- Verify `E2h` DMA identification behavior.
+- [x] Verify `E2h` DMA identification behavior.
   - The command should produce the expected byte through the selected 8-bit DMA
     channel when the guest has programmed a valid DMA write transfer.
   - It should not cause side effects when DMA is masked or configured for the
