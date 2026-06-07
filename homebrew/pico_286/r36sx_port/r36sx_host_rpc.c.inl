@@ -1400,6 +1400,9 @@ static void r36sx_host_rpc_stream_command_frame(uint8_t command)
 {
     if (r36sx_host_rpc_is_request_command(command) ||
         command == R36SX_HOST_RPC_PROTO_CALL) {
+        R36SX_HOSTRPC_LOG("hostrpc: stream command %s(%u) expects request address",
+                          r36sx_host_rpc_command_name(command),
+                          (unsigned)command);
         r36sx_host_rpc_stream_command = command;
         r36sx_host_rpc_stream_addr = 0;
         r36sx_host_rpc_stream_addr_bits = 0;
@@ -1410,24 +1413,31 @@ static void r36sx_host_rpc_stream_command_frame(uint8_t command)
 
     switch (command) {
         case R36SX_HOST_RPC_PROTO_RESET:
+            R36SX_HOSTRPC_LOG("hostrpc: stream reset");
             r36sx_host_rpc_stream_reset_session();
             r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_VERSION);
             break;
         case R36SX_HOST_RPC_PROTO_PING:
+            R36SX_HOSTRPC_LOG("hostrpc: stream ping");
             r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_VERSION);
             break;
         case R36SX_HOST_RPC_PROTO_ABORT:
+            R36SX_HOSTRPC_LOG("hostrpc: stream abort");
             r36sx_host_rpc_stream_abort_transfer();
             r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
             break;
         case R36SX_HOST_RPC_PROTO_END:
+            R36SX_HOSTRPC_LOG("hostrpc: stream end");
             r36sx_host_rpc_stream_abort_transfer();
             r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
             break;
         case R36SX_HOST_RPC_PROTO_CONTINUE:
+            R36SX_HOSTRPC_LOG("hostrpc: stream continue");
             r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
             break;
         default:
+            R36SX_HOSTRPC_LOG("hostrpc: stream bad command %u",
+                              (unsigned)command);
             r36sx_host_rpc_stream_abort_transfer();
             r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
             r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
@@ -1440,6 +1450,8 @@ static void r36sx_host_rpc_stream_data_frame(uint8_t payload)
 {
     if (!r36sx_host_rpc_is_request_command(r36sx_host_rpc_stream_command) &&
         r36sx_host_rpc_stream_command != R36SX_HOST_RPC_PROTO_CALL) {
+        R36SX_HOSTRPC_LOG("hostrpc: stream data without request command payload=%u",
+                          (unsigned)(payload & R36SX_HOST_RPC_PROTO_DATA_MASK));
         r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
         r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
         r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
@@ -1459,6 +1471,9 @@ static void r36sx_host_rpc_stream_data_frame(uint8_t payload)
     }
 
     r36sx_host_rpc_request_addr = r36sx_host_rpc_stream_addr;
+    R36SX_HOSTRPC_LOG("hostrpc: stream request addr=%05lx command=%u",
+                      (unsigned long)r36sx_host_rpc_request_addr,
+                      (unsigned)r36sx_host_rpc_stream_command);
     r36sx_host_rpc_execute_request(
         r36sx_host_rpc_stream_command == R36SX_HOST_RPC_PROTO_CALL ?
             R36SX_HOST_RPC_REQUEST_COMMAND_FROM_BLOCK :

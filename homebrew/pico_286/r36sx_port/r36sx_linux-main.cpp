@@ -1249,6 +1249,9 @@ extern "C" int HanldeMenu(int menu_id, int checked) {
 
 static volatile int running = 1;
 
+extern "C" int r36sx_emergency_dump_pending(void);
+extern "C" void r36sx_emergency_dump_write_and_clear(void);
+
 void signal_handler(int sig) {
     r36sx_pico286_debug_log("main: signal %d, stopping", sig);
     running = 0;
@@ -1760,6 +1763,11 @@ int main() {
         exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
                                 cpu_exec_loops_per_frame);
+        if (r36sx_emergency_dump_pending()) {
+            r36sx_emergency_dump_write_and_clear();
+            running = 0;
+            break;
+        }
         R36SX_PROFILE_BEGIN(profile_disk_flush);
         r36sx_pico286_disk_flush_pending();
         R36SX_PROFILE_END(R36SX_PROFILE_DISK_FLUSH, profile_disk_flush);

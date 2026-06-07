@@ -1,4 +1,12 @@
 #pragma GCC optimize("Ofast")
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 #include <time.h>
 #include "emulator.h"
 #include "r36sx_debug_config.h"
@@ -20,6 +28,9 @@ OPL *emu8950_opl;
 #include "i8237.c.inl"
 #include "r36sx_host_rpc.c.inl"
 
+#define R36SX_HOSTDRV_TRACE_PORT (R36SX_HOST_RPC_PORT_LAST + 1u)
+#define R36SX_EMERGENCY_DUMP_PORT (R36SX_HOST_RPC_PORT_LAST + 2u)
+
 uint8_t crt_controller_idx, crt_controller[32];
 uint8_t port60, port61, port64;
 uint8_t cursor_start = 12, cursor_end = 13;
@@ -34,6 +45,188 @@ static int audio_cms_enabled = 1;
 static int audio_sn76489_enabled = 1;
 static int audio_mpu401_enabled = 1;
 static int audio_covox_enabled = 1;
+
+static volatile int r36sx_emergency_dump_requested;
+static volatile int r36sx_emergency_stop_requested;
+static uint8_t r36sx_emergency_dump_code;
+static char r36sx_emergency_dump_reason[64];
+static unsigned r36sx_emergency_dump_sequence;
+
+extern uint8_t r36sx_cpu_is_protected_enabled(void);
+
+static int r36sx_emergency_mkdir(const char *path)
+{
+#if defined(_WIN32)
+    if (_mkdir(path) == 0 || errno == EEXIST) {
+        return 1;
+    }
+#else
+    if (mkdir(path, 0777) == 0 || errno == EEXIST) {
+        return 1;
+    }
+#endif
+    return 0;
+}
+
+static int r36sx_emergency_write_file(const char *path,
+                                      const void *data,
+                                      size_t bytes)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        r36sx_pico286_debug_log("emergency_dump: open failed path='%s' errno=%d",
+                                path, errno);
+        return 0;
+    }
+    if (bytes != 0 && fwrite(data, 1, bytes, fp) != bytes) {
+        r36sx_pico286_debug_log("emergency_dump: write failed path='%s' errno=%d",
+                                path, errno);
+        fclose(fp);
+        return 0;
+    }
+    fclose(fp);
+    return 1;
+}
+
+static uint8_t r36sx_videoram_byte(uint32_t address)
+{
+    return (uint8_t)(VIDEORAM[(address - VIDEORAM_START) & 0xFFFFu] & 0xFFu);
+}
+
+static void r36sx_emergency_dump_text_screen(const char *path)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        r36sx_pico286_debug_log("emergency_dump: open failed path='%s' errno=%d",
+                                path, errno);
+        return;
+    }
+    for (unsigned row = 0; row < 25u; row++) {
+        for (unsigned col = 0; col < 80u; col++) {
+            uint32_t addr = 0xB8000u + ((row * 80u + col) * 2u);
+            uint8_t ch = r36sx_videoram_byte(addr);
+            if (ch < 0x20u || ch > 0x7Eu) {
+                ch = ' ';
+            }
+            fputc((int)ch, fp);
+        }
+        fputc('\n', fp);
+    }
+    fclose(fp);
+}
+
+static void r36sx_emergency_dump_registers(const char *path)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        r36sx_pico286_debug_log("emergency_dump: open failed path='%s' errno=%d",
+                                path, errno);
+        return;
+    }
+    fprintf(fp, "reason=%s\n", r36sx_emergency_dump_reason);
+    fprintf(fp, "code=%u\n", (unsigned)r36sx_emergency_dump_code);
+    fprintf(fp, "cpu_protected=%u\n",
+            (unsigned)r36sx_cpu_is_protected_enabled());
+    fprintf(fp, "videomode=0x%02x\n", (unsigned)videomode);
+    fprintf(fp, "ip=%04x ip32=%08lx\n",
+            (unsigned)CPU_IP,
+            (unsigned long)ip32);
+    fprintf(fp, "flags=%08lx CF=%u PF=%u AF=%u ZF=%u SF=%u TF=%u IF=%u DF=%u OF=%u\n",
+            (unsigned long)x86_flags.value,
+            (unsigned)CPU_FL_CF,
+            (unsigned)CPU_FL_PF,
+            (unsigned)CPU_FL_AF,
+            (unsigned)CPU_FL_ZF,
+            (unsigned)CPU_FL_SF,
+            (unsigned)CPU_FL_TF,
+            (unsigned)CPU_FL_IFL,
+            (unsigned)CPU_FL_DF,
+            (unsigned)CPU_FL_OF);
+    fprintf(fp, "eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx\n",
+            (unsigned long)CPU_EAX,
+            (unsigned long)CPU_EBX,
+            (unsigned long)CPU_ECX,
+            (unsigned long)CPU_EDX);
+    fprintf(fp, "esi=%08lx edi=%08lx ebp=%08lx esp=%08lx\n",
+            (unsigned long)CPU_ESI,
+            (unsigned long)CPU_EDI,
+            (unsigned long)CPU_EBP,
+            (unsigned long)CPU_ESP);
+    fprintf(fp, "ax=%04x bx=%04x cx=%04x dx=%04x si=%04x di=%04x bp=%04x sp=%04x\n",
+            (unsigned)CPU_AX,
+            (unsigned)CPU_BX,
+            (unsigned)CPU_CX,
+            (unsigned)CPU_DX,
+            (unsigned)CPU_SI,
+            (unsigned)CPU_DI,
+            (unsigned)CPU_BP,
+            (unsigned)CPU_SP);
+    fprintf(fp, "cs=%04x ds=%04x es=%04x ss=%04x fs=%04x gs=%04x\n",
+            (unsigned)CPU_CS,
+            (unsigned)CPU_DS,
+            (unsigned)CPU_ES,
+            (unsigned)CPU_SS,
+            (unsigned)CPU_FS,
+            (unsigned)CPU_GS);
+    fprintf(fp, "linear_cs_ip=%05lx linear_ss_sp=%05lx\n",
+            (unsigned long)(((uint32_t)CPU_CS << 4) + (uint16_t)CPU_IP),
+            (unsigned long)(((uint32_t)CPU_SS << 4) + CPU_SP));
+    fclose(fp);
+}
+
+void r36sx_emergency_dump_request(uint8_t code, const char *reason)
+{
+    r36sx_emergency_dump_code = code;
+    if (!reason || !reason[0]) {
+        reason = "guest";
+    }
+    snprintf(r36sx_emergency_dump_reason,
+             sizeof(r36sx_emergency_dump_reason),
+             "%s", reason);
+    r36sx_emergency_dump_requested = 1;
+    r36sx_emergency_stop_requested = 1;
+    r36sx_pico286_debug_log("emergency_dump: requested code=%u reason='%s'",
+                            (unsigned)code,
+                            r36sx_emergency_dump_reason);
+}
+
+int r36sx_emergency_dump_pending(void)
+{
+    return r36sx_emergency_stop_requested != 0;
+}
+
+void r36sx_emergency_dump_write_and_clear(void)
+{
+    char dir[96];
+    char path[160];
+
+    if (!r36sx_emergency_dump_requested) {
+        return;
+    }
+    r36sx_emergency_dump_requested = 0;
+    r36sx_emergency_dump_sequence++;
+    snprintf(dir, sizeof(dir), "emergency_dump_%03u",
+             r36sx_emergency_dump_sequence);
+    if (!r36sx_emergency_mkdir(dir)) {
+        r36sx_pico286_debug_log("emergency_dump: mkdir failed path='%s' errno=%d",
+                                dir, errno);
+        return;
+    }
+
+    snprintf(path, sizeof(path), "%s/registers.txt", dir);
+    r36sx_emergency_dump_registers(path);
+    snprintf(path, sizeof(path), "%s/ram.bin", dir);
+    r36sx_emergency_write_file(path, RAM, RAM_SIZE);
+    snprintf(path, sizeof(path), "%s/videoram.bin", dir);
+    r36sx_emergency_write_file(path, VIDEORAM,
+                               sizeof(VIDEORAM[0]) * (size_t)VIDEORAM_SIZE);
+    snprintf(path, sizeof(path), "%s/svga_vram.bin", dir);
+    r36sx_emergency_write_file(path, SVGA_VRAM, SVGA_VRAM_SIZE);
+    snprintf(path, sizeof(path), "%s/text_b800.txt", dir);
+    r36sx_emergency_dump_text_screen(path);
+
+    r36sx_pico286_debug_log("emergency_dump: wrote %s", dir);
+}
 
 #define R36SX_KEYBOARD_QUEUE_CAPACITY 8u
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
@@ -757,9 +950,66 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 }
 
 void portout(uint16_t portnum, uint16_t value) {
+    static char hostdrv_trace_text[128];
+    static uint8_t hostdrv_trace_text_len;
+    static uint8_t hostdrv_trace_collecting;
+
     if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
         portnum <= R36SX_HOST_RPC_PORT_LAST) {
         r36sx_host_rpc_portout(portnum, (uint8_t)value);
+        return;
+    }
+    if (portnum == R36SX_HOSTDRV_TRACE_PORT) {
+#if R36SX_DEBUG_HOSTRPC_TRACE
+        uint8_t code = (uint8_t)value;
+        if (code == 0xD0u) {
+            hostdrv_trace_collecting = 1u;
+            hostdrv_trace_text_len = 0u;
+            hostdrv_trace_text[0] = '\0';
+            return;
+        }
+        if (code == 0xD1u) {
+            hostdrv_trace_text[hostdrv_trace_text_len] = '\0';
+            r36sx_pico286_debug_log("hostdrv: 1123 source='%s'",
+                                    hostdrv_trace_text);
+            hostdrv_trace_collecting = 0u;
+            return;
+        }
+        if (hostdrv_trace_collecting) {
+            if (hostdrv_trace_text_len < sizeof(hostdrv_trace_text) - 1u) {
+                hostdrv_trace_text[hostdrv_trace_text_len++] =
+                    (code >= 0x20u && code <= 0x7Eu) ? (char)code : '.';
+            }
+            return;
+        }
+        switch (code) {
+            case 0xF0u:
+                r36sx_pico286_debug_log("hostdrv: success");
+                break;
+            case 0xF1u:
+                r36sx_pico286_debug_log("hostdrv: fail");
+                break;
+            case 0xF2u:
+                r36sx_pico286_debug_log("hostdrv: chain");
+                break;
+            case 0xF3u:
+                r36sx_pico286_debug_log("hostdrv: sft ours");
+                break;
+            case 0xF4u:
+                r36sx_pico286_debug_log("hostdrv: sft not ours");
+                break;
+            default:
+                r36sx_pico286_debug_log("hostdrv: int2f ax=11%02x", code);
+                break;
+        }
+#endif
+        return;
+    }
+    if (portnum == R36SX_EMERGENCY_DUMP_PORT) {
+#if R36SX_DEBUG_HOSTRPC_TRACE || DEBUG
+        r36sx_emergency_dump_request((uint8_t)value, "guest-port");
+        r36sx_emergency_dump_write_and_clear();
+#endif
         return;
     }
 

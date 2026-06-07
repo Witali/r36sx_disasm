@@ -10,6 +10,8 @@
 ; same 8-bit port and waits for the host to toggle bit 7 in the readable latch.
 PORT_BASE       equ 0E360h
 PORT_DATA       equ PORT_BASE + 0
+HOSTDRV_TRACE_PORT equ PORT_BASE + 0Ah
+EMERGENCY_DUMP_PORT equ PORT_BASE + 0Bh
 
 PROTO_CMD_FLAG  equ 080h
 PROTO_DATA_MASK equ 07Fh

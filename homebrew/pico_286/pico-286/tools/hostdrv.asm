@@ -34,6 +34,33 @@
 ; from another redirector's SFT even if DOS rewrites the device-info word.
 HOSTDRV_MAX_HANDLES equ HOSTRPC_MAX_HANDLES
 
+%macro trace_al 0
+    push dx
+    mov dx, HOSTDRV_TRACE_PORT
+    out dx, al
+    pop dx
+%endmacro
+
+%macro trace_byte 1
+    push ax
+    push dx
+    mov al, %1
+    mov dx, HOSTDRV_TRACE_PORT
+    out dx, al
+    pop dx
+    pop ax
+%endmacro
+
+%macro emergency_dump 1
+    push ax
+    push dx
+    mov al, %1
+    mov dx, EMERGENCY_DUMP_PORT
+    out dx, al
+    pop dx
+    pop ax
+%endmacro
+
 ; DOS error codes returned through redirected INT 2Fh callbacks.
 DOS_ERR_INVALID_FUNCTION equ 1
 DOS_ERR_FILE_NOT_FOUND   equ 2
@@ -211,6 +238,7 @@ int2f_handler:
     push di
     push cs
     pop ds
+    trace_al
 
     ; INT 2Fh/AH=11h redirector subfunctions used by DOS.  Unsupported calls
     ; are chained so another redirector may handle them.
@@ -257,6 +285,8 @@ int2f_handler:
     je redir_process_cleanup
     cmp ax, 1122h
     je redir_process_cleanup
+    cmp ax, 1123h
+    je redir_qualify_filename
     cmp ax, 1120h
     je redir_success
     cmp ax, 1121h
@@ -622,6 +652,7 @@ redir_find_first:
     jne .not_found
     call write_dta_find_result
     call track_find_open
+    xor cx, cx
     jmp redir_from_rpc
 .not_found:
     ; Leave the user-visible found-file area untouched, but invalidate our
@@ -649,6 +680,7 @@ redir_find_next:
     cmp word [request + REQ_RESULT], 0
     jne .not_found
     call write_dta_find_result
+    xor cx, cx
     jmp redir_from_rpc
 .not_found:
     ; HOSTRPC closes the host find handle when enumeration is exhausted.
@@ -681,6 +713,42 @@ redir_seek_end:
     mov dx, bx
     jmp redir_success
 
+redir_qualify_filename:
+    ; AX=1123h asks the redirector to canonicalize a remote filename.
+    ; DOS calls it while resolving names; if HOSTDRV fails H: paths here, DOS
+    ; can fall back into local resolution and never reach later read/write
+    ; callbacks for the remote SFT.
+    push ds
+    push si
+    push di
+    push ax
+    mov ax, [bp - 2]
+    mov ds, ax
+    call trace_ds_si_string
+    mov al, [si]
+    call upper_al
+    cmp al, [cs:drive_letter]
+    jne .not_ours
+    cmp byte [si + 1], ':'
+    jne .not_ours
+    cld
+.copy:
+    lodsb
+    stosb
+    cmp al, 0
+    jne .copy
+    pop ax
+    pop di
+    pop si
+    pop ds
+    jmp redir_success
+.not_ours:
+    pop ax
+    pop di
+    pop si
+    pop ds
+    jmp redir_chain
+
 redir_from_rpc:
     ; Translate HOSTRPC completion into the DOS redirector convention.  A
     ; transport error (CF from execute_request) and a host-side DOS error in the
@@ -700,11 +768,13 @@ redir_from_rpc:
 redir_success:
     ; Clear carry in the saved FLAGS image.  We cannot simply CLC before IRET
     ; because IRET restores FLAGS from the interrupt frame.
+    trace_byte 0F0h
     and word [bp + 6], 0FFFEh
     jmp redir_done
 
 redir_fail:
     ; Set carry in the saved FLAGS image and return AX as DOS error code.
+    trace_byte 0F1h
     or word [bp + 6], 0001h
     jmp redir_done
 
@@ -719,6 +789,7 @@ redir_done:
 redir_chain:
     ; This AH=11h callback is not for our mapped drive or SFT.  Restore the
     ; caller's saved registers and continue through the redirector chain.
+    trace_byte 0F2h
     pop di
     pop dx
     pop cx
@@ -773,6 +844,7 @@ rpc_open_common:
     pop ax
     push bx
     push dx
+    push di
     xor ah, ah
     mov [request + REQ_COMMAND], ax
     mov [request + REQ_MODE], bx
@@ -782,7 +854,7 @@ rpc_open_common:
     ; DOS-facing marker stable, while passing the caller's real access/share
     ; or create-mode word to HOSTRPC through REQ_MODE/REQ_FLAGS.
     mov word [sft_open_mode], 0002h
-    mov word [sft_file_attr], 0020h
+    mov word [sft_file_attr], 0008h
     cmp word [request + REQ_COMMAND], CMD_CREATE
     jne .params_ready
     ; Create/truncate: low byte is DOS file attributes, high byte selects
@@ -790,7 +862,6 @@ rpc_open_common:
     mov dx, bx
     xor bh, bh
     mov [request + REQ_ATTR], bx
-    mov [sft_file_attr], bx
     cmp dh, 01h
     jne .params_ready
     mov word [request + REQ_FLAGS], REQ_FLAG_CREATE_NEW
@@ -805,10 +876,13 @@ rpc_open_common:
     jc .done
     cmp word [request + REQ_RESULT], 0
     jne .done
+    pop di
+    push di
     call fill_sft_from_request
     call track_open_sft
     clc
 .done:
+    pop di
     pop dx
     pop bx
     ret
@@ -904,6 +978,7 @@ sft_is_ours:
     cmp ax, di
     jne .check_device_word
     clc
+    trace_byte 0F3h
     jmp .done
 .check_device_word:
     ; Keep the device-info word as a compatibility fallback for older SFTs
@@ -912,9 +987,11 @@ sft_is_ours:
     cmp ax, [device_info]
     jne .not_ours
     clc
+    trace_byte 0F3h
     jmp .done
 .not_ours:
     stc
+    trace_byte 0F4h
 .done:
     pop cx
     pop bx
@@ -1108,11 +1185,12 @@ fill_sft_from_request:
     push di
     ; INT 2Fh/1116h and 1117h require the redirector to fill the SFT except
     ; for the handle count; DOS owns SFT_TOTAL_HANDLES until close.
-    mov ax, [sft_open_mode]
+    mov ax, [es:di + SFT_OPEN_MODE]
+    and ax, 0FF00h
+    mov bx, [sft_open_mode]
+    and bx, 00FFh
+    or ax, bx
     mov [es:di + SFT_OPEN_MODE], ax
-    mov ax, [request + REQ_ATTR]
-    cmp al, 0
-    jne .attr_ready
     mov ax, [sft_file_attr]
     cmp al, 0
     jne .attr_ready
@@ -1696,6 +1774,25 @@ upper_al:
     ja .done
     sub al, 20h
 .done:
+    ret
+
+trace_ds_si_string:
+    push ax
+    push cx
+    push si
+    trace_byte 0D0h
+    mov cx, 64
+.loop:
+    lodsb
+    cmp al, 0
+    je .done
+    trace_al
+    loop .loop
+.done:
+    trace_byte 0D1h
+    pop si
+    pop cx
+    pop ax
     ret
 
 old_2f       dd 0
