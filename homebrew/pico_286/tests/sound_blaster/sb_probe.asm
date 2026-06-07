@@ -55,6 +55,11 @@ start:
     mov dx, msg_e2
     call pass
 
+    call test_adc_dma_inert
+    jc fail_adc
+    mov dx, msg_adc
+    call pass
+
     call test_playback_irq
     jc fail_irq
     mov dx, msg_irq
@@ -80,6 +85,9 @@ fail_speaker:
     jmp fail
 fail_e2:
     mov dx, msg_e2
+    jmp fail
+fail_adc:
+    mov dx, msg_adc
     jmp fail
 fail_irq:
     mov dx, msg_irq
@@ -347,6 +355,40 @@ test_e2_dma:
     stc
     ret
 
+test_adc_dma_inert:
+    call setup_irq7
+    mov byte [irq_seen], 0
+    mov byte [dma_byte], 05Ah
+    mov bx, dma_byte
+    mov al, DMA_CH1_WRITE_MODE
+    call setup_dma_channel1
+
+    mov al, 024h
+    call write_dsp
+    jc .fail
+    xor al, al
+    call write_dsp
+    jc .fail
+    xor al, al
+    call write_dsp
+    jc .fail
+
+    mov cx, 0FFFFh
+.wait_irq:
+    cmp byte [irq_seen], 1
+    je .check_buffer
+    call short_delay
+    loop .wait_irq
+.fail:
+    stc
+    ret
+.check_buffer:
+    cmp byte [dma_byte], 05Ah
+    jne .fail
+    call restore_irq7
+    clc
+    ret
+
 setup_irq7:
     mov ax, 3500h + IRQ7_VECTOR
     int 21h
@@ -444,6 +486,7 @@ msg_version db 'DSP version E1h', '$'
 msg_ident   db 'DSP identification E0h', '$'
 msg_speaker db 'speaker status D8h', '$'
 msg_e2      db 'DMA identification E2h', '$'
+msg_adc     db 'ADC DMA input inert', '$'
 msg_irq     db 'DMA playback IRQ ack', '$'
 
 old_irq7_off    dw 0

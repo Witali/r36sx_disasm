@@ -10,6 +10,8 @@ The probe currently checks:
 - DSP identification command `E0h`;
 - speaker enable/disable plus `D8h` speaker status;
 - `E2h` DMA identification through DMA channel 1 write mode;
+- `24h` DMA input completion without writing guest memory while ADC input is
+  not emulated;
 - `14h` single-cycle DMA playback completion, IRQ7 delivery, and IRQ acknowledge
   through `base + 0Eh`.
 

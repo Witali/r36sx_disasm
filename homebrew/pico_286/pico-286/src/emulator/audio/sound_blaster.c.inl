@@ -130,12 +130,6 @@ static INLINE void blaster_raise_irq() {
     doirq(SB_IRQ);
 }
 
-static INLINE void blaster_recording_sample() {
-    if (i8237_can_write(SB_DMA_CHANNEL)) {
-        i8237_write(SB_DMA_CHANNEL, 128);
-    }
-}
-
 static INLINE void blaster_dma_identification_write(const uint8_t command_byte) {
     int16_t calculated_value = 0xAA;
     for (uint8_t bit_index = 0; bit_index < 8; bit_index++) {
@@ -391,9 +385,12 @@ inline int16_t blaster_sample() { //for DMA mode
             generated_sample = i8237_can_read(SB_DMA_CHANNEL) ?
                 (i8237_read(SB_DMA_CHANNEL) - 128) << 6 : 0;
         } else {
-            /* No recording source is emulated; write midpoint silence only
-             * through a valid device-to-memory DMA transfer. */
-            blaster_recording_sample();
+            /*
+             * ADC DMA would normally write microphone input into guest memory.
+             * We do not emulate a recording source, and Supaplex reaches ADC
+             * commands while FX is enabled, so keep this path memory-inert.
+             * The block still advances below and raises IRQ at completion.
+             */
             generated_sample = 0;
         }
     }
