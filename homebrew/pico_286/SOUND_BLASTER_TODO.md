@@ -71,12 +71,12 @@ References:
 
 ## Compatibility Cleanup
 
-- Support Sound Blaster base `240h` or make the conflict explicit.
+- [x] Support Sound Blaster base `240h` or make the conflict explicit.
   - The Creative documentation lists `220h` and `240h` for SB2.0.
   - The current port map uses `240h..24Fh` for XT RTC, so SB is effectively
     only available at `220h`.
 
-- Separate CMS/GameBlaster and DSP behavior more clearly.
+- [x] Separate CMS/GameBlaster and DSP behavior more clearly.
   - SB 1.x/2.0 maps CMS ports at `base + 0h..3h` when CMS chips exist.
   - The current write path intentionally falls through from CMS ports to the SB
     handler, which is mostly harmless because the DSP ignores those offsets, but

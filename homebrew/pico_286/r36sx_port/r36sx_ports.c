@@ -946,6 +946,7 @@ if (sound_chips_clock) {
 #else
         cms_out(portnum, value);
 #endif
+        return;
         case 0x224:
         case 0x225:
         case 0x226:
@@ -979,6 +980,14 @@ if (sound_chips_clock) {
         case 0x24D:
         case 0x24E:
         case 0x24F:
+            if (r36sx_pico286_rtc_xt_enabled()) {
+                r36sx_xt_rtc_write(portnum, (uint8_t)value);
+                return;
+            }
+#if !PICO_RP2040
+            blaster_write(portnum, value);
+#endif
+            return;
         case 0x250:
         case 0x251:
         case 0x252:
@@ -1221,6 +1230,12 @@ uint16_t portin(uint16_t portnum) {
         case 0x221:
         case 0x222:
         case 0x223:
+// Creative Music System / GameBlaster
+#if !PICO_RP2040
+            return audio_cms_enabled ? cms_in(portnum) : 0xFF;
+#else
+            return cms_in(portnum);
+#endif
         case 0x224:
         case 0x225:
         case 0x226:
@@ -1233,7 +1248,7 @@ uint16_t portin(uint16_t portnum) {
         case 0x22d:
         case 0x22e:
         case 0x22f:
-// Sound Blaster / GameBlaster
+// Sound Blaster DSP
 #if !PICO_RP2040
             return blaster_read(portnum);
 #else
@@ -1256,6 +1271,14 @@ uint16_t portin(uint16_t portnum) {
         case 0x24D:
         case 0x24E:
         case 0x24F:
+            if (r36sx_pico286_rtc_xt_enabled()) {
+                return rtc_read(portnum);
+            }
+#if !PICO_RP2040
+            return blaster_read(portnum);
+#else
+            return 0xFF;
+#endif
         case 0x250:
         case 0x251:
         case 0x252:
