@@ -44,8 +44,8 @@ void out8259(uint16_t port_number, uint8_t register_value) {
 //                i8259_controller.ocw[2] = register_value;
                 switch (register_value & 0xE0) {
                     case 0x60: //specific EOI
-                        i8259_controller.interrupt_request_register &= ~(1 << (register_value & 0x03));
-                        i8259_controller.in_service_register &= ~(1 << (register_value & 0x03));
+                        i8259_controller.interrupt_request_register &= ~(1 << (register_value & 0x07));
+                        i8259_controller.in_service_register &= ~(1 << (register_value & 0x07));
                         break;
                     case 0x40: //no operation
                         break;

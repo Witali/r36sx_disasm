@@ -41,6 +41,7 @@
 #define DSP_DMA_HS_AUTO         0x90
 #define DSP_DMA_ADPCM           0x7F    //creative ADPCM 8bit to 3bit
 #define DSP_DMA_SINGLE          0x14    //follosed by length
+#define DSP_DMA_SINGLE_ALT      0x15
 #define DSP_DMA_AUTO            0X1C    //length based on 48h
 #define DSP_DMA_BLOCK_SIZE      0x48    //block size for highspeed/dma
 //#define DSP_DMA_DAC 0x14
@@ -78,6 +79,7 @@ typedef  struct sound_blaster_s {
     uint8_t silence_mode_active;
     uint8_t recording_mode_active;
     uint8_t dma_transfer_enabled;
+    uint8_t reset_latch;
     uint8_t dsp_read_buffer[SB_READ_BUFFER];
 } sound_blaster_s;
 
@@ -87,7 +89,7 @@ static sound_blaster_s sound_blaster = { 0 };
 uint16_t timeconst = 22;
 uint64_t sb_samplerate = 22050;
 
-#define SB_IRQ 3
+#define SB_IRQ 7
 #define SB_DMA_CHANNEL 1
 
 static const int16_t dma_identification_lookup_table[9] = { 0x01, -0x02, -0x04, 0x08, -0x10, 0x20, 0x40, -0x80, -106 };
@@ -118,6 +120,21 @@ INLINE void blaster_reset() {
     blaster_write_buffer(0xAA);
 }
 
+static INLINE void blaster_reset_port_write(const uint8_t value) {
+    if (value & 1u) {
+        sound_blaster.reset_latch = 1;
+        sound_blaster.read_buffer_length = 0;
+        sound_blaster.current_dsp_command = 0;
+        sound_blaster.parameter_byte_index = 0;
+        sound_blaster.dma_transfer_enabled = 0;
+        return;
+    }
+
+    if (sound_blaster.reset_latch) {
+        blaster_reset();
+    }
+}
+
 // TODO: Consider renaming to process_dsp_command for clarity
 static INLINE void blaster_command(const uint8_t command_byte) {
     //    printf("SB command %x : %x        %d\r\n", sb.lastcmd, value, i++);
@@ -127,19 +144,22 @@ static INLINE void blaster_command(const uint8_t command_byte) {
             sound_blaster.current_dsp_command = 0;
             return;
         case DSP_DMA_SINGLE: //DMA DAC, 8-bit
+        case DSP_DMA_SINGLE_ALT:
         case 0x24:
         case DSP_DMA_HS_SINGLE:
             if (sound_blaster.parameter_byte_index == 0) {
                 sound_blaster.dma_transfer_length = command_byte;
                 sound_blaster.parameter_byte_index = 1;
             } else {
+                const uint8_t active_dsp_command =
+                    sound_blaster.current_dsp_command;
                 sound_blaster.dma_transfer_length |= (uint32_t) command_byte << 8;
                 sound_blaster.dma_transfer_length++;
                 sound_blaster.current_dsp_command = 0;
                 sound_blaster.dma_bytes_processed = 0;
                 sound_blaster.silence_mode_active = 0;
                 sound_blaster.auto_init_mode_enabled = 0;
-                sound_blaster.recording_mode_active = (sound_blaster.current_dsp_command == 0x24) ? 1 : 0;
+                sound_blaster.recording_mode_active = (active_dsp_command == 0x24) ? 1 : 0;
                 sound_blaster.dma_transfer_enabled = 1;
 #ifdef DEBUG_BLASTER
                 printf("[BLASTER] Begin DMA transfer mode with 0x%04X  byte blocks\r\n", sb.dmalen);
@@ -207,9 +227,11 @@ static INLINE void blaster_command(const uint8_t command_byte) {
         case 0x10: //direct DAC, 8-bit
             break;
         case 0x14: //DMA DAC, 8-bit
+        case DSP_DMA_SINGLE_ALT:
         case 0x24:
             sound_blaster.parameter_byte_index = 0;
             break;
+        case DSP_DMA_HS_AUTO:
         case DSP_DMA_AUTO: //auto-initialize DMA DAC, 8-bit
         case 0x2C:
             sound_blaster.dma_bytes_processed = 0;
@@ -284,7 +306,7 @@ static INLINE void blaster_write(const uint16_t port, const uint8_t value) {
 #endif
     switch (port & 0xF) {
         case DSP_RESET:
-            blaster_reset();
+            blaster_reset_port_write(value);
             break;
         case DSP_WRITE: //DSP write (command/data)
             blaster_command(value);

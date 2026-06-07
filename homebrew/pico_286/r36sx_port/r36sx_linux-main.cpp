@@ -44,6 +44,7 @@ extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
 extern "C" void r36sx_pico286_post_reset(void);
+extern "C" uint64_t sb_samplerate;
 
 #define R36SX_AUDIO_DRIVER_RATE 44100u
 #define R36SX_AUDIO_CHANNELS 2u
@@ -1426,7 +1427,6 @@ void *ticks_thread(void *arg) {
 
     const uint64_t hostfreq = 1000000000; // nanoseconds
     const uint64_t dss_period = hostfreq / 7000;
-    const uint64_t sb_period = hostfreq / 22050;
     const uint32_t audio_sample_rate = r36sx_sound_frequency ?
         r36sx_sound_frequency : R36SX_AUDIO_DRIVER_RATE;
     const uint64_t sound_period = hostfreq / audio_sample_rate;
@@ -1497,6 +1497,11 @@ void *ticks_thread(void *arg) {
 
         // Sound Blaster
         unsigned int sb_catchup_count = 0;
+        const uint64_t sb_rate = sb_samplerate ? sb_samplerate : 22050ull;
+        uint64_t sb_period = hostfreq / sb_rate;
+        if (sb_period == 0) {
+            sb_period = 1;
+        }
         R36SX_PROFILE_BEGIN(profile_sb_sample);
         for (;
              elapsedTime - last_sb_tick >= sb_period;
