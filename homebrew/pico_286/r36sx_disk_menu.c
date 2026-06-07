@@ -702,8 +702,10 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
     menu->cpu_changed = 0;
     menu->cpu_frequency_changed = 0;
     menu->x87_changed = 0;
-    return (bios_changed || cpu_model_changed || x87_changed) ?
-        R36SX_DISK_MENU_RESULT_RESET_PC : 0;
+    r36sx_disk_menu_set_visible(menu, 0);
+    return R36SX_DISK_MENU_RESULT_CLOSED |
+        ((bios_changed || cpu_model_changed || x87_changed) ?
+         R36SX_DISK_MENU_RESULT_RESET_PC : 0);
 }
 
 void r36sx_disk_menu_init(struct r36sx_disk_menu *menu)
