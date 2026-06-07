@@ -562,9 +562,9 @@ redir_close:
     jc redir_chain
     mov ax, [es:di + SFT_TOTAL_HANDLES]
     cmp ax, SFT_REFCOUNT_FREE
-    je .invalid_sft
+    je .last_reference
     cmp ax, 0
-    je .invalid_sft
+    je .last_reference
     cmp ax, 1
     je .last_reference
     dec ax
@@ -968,10 +968,10 @@ sda_path_is_ours:
     ret
 
 sft_is_ours:
-    ; HOSTDRV stamps SFT_DEVICE_INFO when opening a host-backed file, but DOS
-    ; redirector fields are partly undocumented and can be rewritten by DOS.
-    ; The sidecar table is authoritative: it maps the HOSTRPC handle stored in
-    ; the SFT back to the exact ES:DI SFT address that HOSTDRV opened.
+    ; HOSTDRV stores a HOSTRPC slot in the SFT's cluster field.  If that slot is
+    ; still active, accept the callback even if DOS has copied or rewritten the
+    ; SFT around it.  The device marker remains a compatibility fallback for old
+    ; in-flight entries.
     push ax
     push bx
     push cx
@@ -983,12 +983,6 @@ sft_is_ours:
     mov ax, [host_sft_seg + bx]
     cmp ax, 0
     je .check_device_word
-    mov cx, es
-    cmp ax, cx
-    jne .check_device_word
-    mov ax, [host_sft_off + bx]
-    cmp ax, di
-    jne .check_device_word
     clc
     trace_byte 0F3h
     jmp .done

@@ -588,10 +588,9 @@ static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
     /*
      * The SFT handle number is a slot in this redirector's FILE* table, while
      * DOS still owns the SFT structure around it.  Some DOS versions/tools can
-     * rewrite parts of the SFT after open/create, so accept either the exact
-     * device marker we wrote or the same SFT address that originally received
-     * the slot.  The address sidecar keeps local image-backed files from being
-     * mistaken for host files just because their cluster number is small.
+     * rewrite parts of the SFT after open/create.  Once the SFT carries an
+     * active HOSTRPC slot, accept it even if the exact SFT address or device
+     * marker no longer matches what we recorded at open time.
      */
     if (!sftptr || sftptr->file_handle >= MAX_FILES ||
         !open_files[sftptr->file_handle]) {
@@ -608,14 +607,14 @@ static inline bool redirector_sft_is_mine(const sftstruct *sftptr)
         sftptr->device_info == open_file_device_info[sftptr->file_handle];
 
     if (!same_sft && !same_device) {
-        redirector_error_log(
-            "redir: rejecting non-host SFT handle=%u device=%04x expected=%04x sft=%05lx expected_sft=%05lx",
+        redirector_trace_log(
+            "redir: accepting active host handle with rewritten SFT handle=%u device=%04x expected=%04x sft=%05lx expected_sft=%05lx",
             sftptr->file_handle, sftptr->device_info,
             open_file_device_info[sftptr->file_handle],
             (unsigned long)sft_addr,
             (unsigned long)open_file_sft_addr[sftptr->file_handle]);
     }
-    return same_sft || same_device;
+    return true;
 }
 
 static inline void redirector_clear_file_slot(uint16_t file_handle)
