@@ -12,6 +12,7 @@
 #include "emu8950.h"
 #include "linux-audio.h"
 #include "r36sx_app_stats.h"
+#include "r36sx_cpu.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
@@ -42,6 +43,7 @@ extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
+extern "C" void r36sx_pico286_post_reset(void);
 
 #define R36SX_AUDIO_DRIVER_RATE 44100u
 #define R36SX_AUDIO_CHANNELS 2u
@@ -1321,6 +1323,7 @@ static void r36sx_pico286_soft_reset(void) {
     port61 = 0;
     port64 = 0;
     r36sx_pico286_reset_pic();
+    r36sx_pico286_post_reset();
     memset(&i8253_controller, 0, sizeof(i8253_controller));
     timer_period = 54925;
     speakerenabled = 0;
@@ -1581,7 +1584,7 @@ void *ticks_thread(void *arg) {
             elapsed_frame_tics = elapsedTime;
         }
 
-        // Generate missed ticks in batches, then yield the CPU to exec86().
+        // Generate missed ticks in batches, then yield the CPU executor.
         usleep(R36SX_TICKS_THREAD_SLEEP_US);
     }
     r36sx_pico286_debug_log("ticks_thread: exit loops=%u", ticks_loop_count);
@@ -1653,6 +1656,7 @@ int main() {
     sn76489_reset();
     r36sx_pico286_debug_log("main: sn76489_reset done");
     r36sx_pico286_reset_pic();
+    r36sx_pico286_post_reset();
     reset86();
     r36sx_pico286_debug_log("main: reset86 done");
 
@@ -1682,9 +1686,11 @@ int main() {
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms,
                                        main_loop_frame_us);
     uint32_t cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
+    r36sx_cpu_exec_fn cpu_exec = r36sx_cpu_select_exec();
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
+        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
                             r36sx_pico286_cpu_model_name(),
+                            r36sx_cpu_selected_exec_name(),
                             r36sx_pico286_cpu_mode_name(),
                             r36sx_pico286_x87_enabled() ? "on" : "off",
                             r36sx_pico286_bios_mode_name(),
@@ -1706,6 +1712,9 @@ int main() {
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
+            cpu_exec = r36sx_cpu_select_exec();
+            r36sx_pico286_debug_log("main: cpu_exec=%s after reset",
+                                    r36sx_cpu_selected_exec_name());
             R36SX_PROFILE_END(R36SX_PROFILE_SOFT_RESET, profile_soft_reset);
         }
         {
@@ -1742,7 +1751,7 @@ int main() {
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
         uint64_t exec_start_us = r36sx_pico286_now_us();
-        exec86(cpu_exec_loops_per_frame);
+        cpu_exec(cpu_exec_loops_per_frame);
         exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
                                 cpu_exec_loops_per_frame);

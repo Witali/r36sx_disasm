@@ -53,6 +53,7 @@ static int audio_covox_enabled = 1;
 #define R36SX_TEST386_ASCII_IMM8_PORT 0x91u
 
 extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
+extern void r36sx_pico286_post_code_reset(void);
 extern void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value);
 
 #if R36SX_DEBUG_TEST_BIOS_TRACE
@@ -76,6 +77,12 @@ static uint8_t keyboard_controller_response_ready;
 static uint8_t keyboard_controller_write_output_port;
 static uint8_t keyboard_controller_output_port;
 static uint8_t r36sx_test386_current_post;
+
+void r36sx_pico286_post_reset(void)
+{
+    r36sx_test386_current_post = 0;
+    r36sx_pico286_post_code_reset();
+}
 
 #if R36SX_DEBUG_TEST_BIOS_TRACE
 static FILE *r36sx_test386_ee_output_fp;

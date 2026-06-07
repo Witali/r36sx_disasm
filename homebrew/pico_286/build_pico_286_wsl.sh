@@ -349,6 +349,10 @@ for src in \
     "$PORT_ROOT/r36sx_disk_config.c" \
     "$PORT_ROOT/r36sx_profile.c" \
     "$PORT_ROOT/r36sx_cpu.c" \
+    "$PORT_ROOT/r36sx_cpu_dispatch.c" \
+    "$PORT_ROOT/r36sx_cpu_8086.c" \
+    "$PORT_ROOT/r36sx_cpu_80286.c" \
+    "$PORT_ROOT/r36sx_cpu_80386.c" \
     "$PORT_ROOT/r36sx_ports.c"; do
     case "$src" in
         *.S) compile_asm "$src" ;;

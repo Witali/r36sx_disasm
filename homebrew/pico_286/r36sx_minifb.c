@@ -238,6 +238,19 @@ void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
                             (unsigned int)portnum, (unsigned int)value);
 }
 
+void r36sx_pico286_post_code_reset(void)
+{
+    g_post_code_port = 0;
+    g_post_code_value = 0;
+    g_post_code_valid = 0;
+    g_post_subcode_port = 0;
+    g_post_subcode_value = 0;
+    g_post_subcode_valid = 0;
+    g_post_code_generation++;
+    g_mfb.force_present = 1;
+    r36sx_pico286_debug_log("post: reset");
+}
+
 static uint16_t r36sx_mfb_rgb888_to_rgb565(uint32_t color)
 {
     uint32_t r = (color >> 16) & 0xffu;

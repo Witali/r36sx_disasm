@@ -463,6 +463,18 @@ void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
                             portnum, value);
 }
 
+void r36sx_pico286_post_code_reset(void)
+{
+    InterlockedExchange(&g_post_code_port, 0);
+    InterlockedExchange(&g_post_code_value, 0);
+    InterlockedExchange(&g_post_code_valid, 0);
+    InterlockedExchange(&g_post_subcode_port, 0);
+    InterlockedExchange(&g_post_subcode_value, 0);
+    InterlockedExchange(&g_post_subcode_valid, 0);
+    InterlockedIncrement(&g_post_code_generation);
+    r36sx_pico286_debug_log("post: reset");
+}
+
 static int r36sx_win_menu_visible(void)
 {
     return r36sx_disk_menu_is_visible(&g_disk_menu) ||

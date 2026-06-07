@@ -5,6 +5,7 @@
 #include <unistd.h>
 #endif
 #include "emulator.h"
+#include "r36sx_cpu_internal.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 
@@ -61,6 +62,8 @@ static uint8_t r36sx_cpu_maskable_interrupt_shadow;
 static uint8_t r36sx_cpu_interpreter_protected;
 static uint8_t r36sx_cpu_current_cpl;
 static uint8_t r36sx_cpu_strict_8086_mode;
+static uint8_t r36sx_cpu_model_at_least_80286 = 1;
+static uint8_t r36sx_cpu_model_at_least_80386 = 1;
 
 static inline uint8_t r36sx_cpu_x87_present(void)
 {
@@ -69,6 +72,16 @@ static inline uint8_t r36sx_cpu_x87_present(void)
 #else
     return r36sx_pico286_x87_enabled() ? 1u : 0u;
 #endif
+}
+
+static inline uint8_t r36sx_cpu_has_80286_features(void)
+{
+    return r36sx_cpu_model_at_least_80286;
+}
+
+static inline uint8_t r36sx_cpu_has_80386_features(void)
+{
+    return r36sx_cpu_model_at_least_80386;
 }
 
 #if R36SX_DEBUG_PM_DIAG
@@ -468,7 +481,7 @@ typedef struct {
 static inline uint8_t r36sx_cpu_v86_enabled(void)
 {
 #if R36SX_ENABLE_PROTECTED_MODE
-    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+    return r36sx_cpu_has_80386_features() &&
            (r36sx_cr0 & R36SX_CR0_PE) != 0 &&
            (x86_flags.value & R36SX_EFLAGS_VM_MASK) != 0;
 #else
@@ -502,7 +515,6 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
 static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
 void intcall86(uint8_t intnum);
 static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip);
-static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops);
 
 static inline uint8_t r36sx_cpu_exception_is_pending(void)
 {
@@ -784,7 +796,7 @@ static inline uint8_t r36sx_cpu_debug_ranges_overlap(uint32_t a_start,
 
 static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
 {
-    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    if (!r36sx_cpu_has_80386_features()) {
         return 0;
     }
 
@@ -842,7 +854,7 @@ static inline void r36sx_cpu_debug_note_data_write(uint32_t linear,
 {
     if (r36sx_debug_suppress_watchpoints ||
         bytes == 0u ||
-        !r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        !r36sx_cpu_has_80386_features()) {
         return;
     }
 
@@ -3143,7 +3155,7 @@ static void r36sx_cpu_load_task_flags(uint32_t flags, uint8_t is_32)
      * A hardware task switch loads FLAGS/EFLAGS from the TSS image; unlike
      * POPF/IRET within the same task, it is not constrained by current CPL.
      */
-    if (is_32 && r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    if (is_32 && r36sx_cpu_has_80386_features()) {
         x86_flags.value = R36SX_FLAGS_ALWAYS_ONE |
                           (flags & R36SX_EFLAGS_386_MASK);
     } else {
@@ -3213,7 +3225,7 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
     }
 
     if (is_32 &&
-        r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) &&
+        r36sx_cpu_has_80386_features() &&
         (new_flags & R36SX_EFLAGS_VM_MASK)) {
         /*
          * VM86 task state is loaded by a protected-mode task switch, but the
@@ -3749,7 +3761,7 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
 
     if (wide && (target_flags & R36SX_EFLAGS_VM_MASK)) {
         if (old_cpl != 0u ||
-            !r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+            !r36sx_cpu_has_80386_features()) {
             r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
             return 0;
         }
@@ -3899,11 +3911,11 @@ static INLINE uint16_t r36sx_cpu_flags_word_variable_mask(void) {
      * 8086/80186 expose bits 12..15 as fixed ones.  80286 real mode exposes
      * them as fixed zeros; protected mode and 80386 keep IOPL/NT in FLAGS.
      */
-    if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+    if (r36sx_cpu_strict_8086_mode) {
         return mask;
     }
     if (r36sx_cpu_protected_enabled() ||
-        r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+        r36sx_cpu_has_80386_features()) {
         mask |= R36SX_FLAGS_286_CONTROL_MASK;
     }
     return mask;
@@ -3911,7 +3923,7 @@ static INLINE uint16_t r36sx_cpu_flags_word_variable_mask(void) {
 
 static INLINE uint16_t r36sx_cpu_flags_word_fixed_bits(void) {
     uint16_t fixed = R36SX_FLAGS_ALWAYS_ONE;
-    if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+    if (r36sx_cpu_strict_8086_mode) {
         fixed |= R36SX_FLAGS_8086_FIXED_MASK;
     }
     return fixed;
@@ -3924,7 +3936,7 @@ static INLINE uint16_t makeflagsword(void) {
 
 static INLINE void decodeflagsword(uint16_t x) {
     uint32_t preserved = 0;
-    if (r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    if (r36sx_cpu_has_80386_features()) {
         /* 16-bit POPF/IRET updates FLAGS, not the high EFLAGS-only bits. */
         preserved = x86_flags.value & (R36SX_EFLAGS_386_MASK & 0xffff0000u);
     }
@@ -3951,7 +3963,7 @@ static INLINE void decodeflagsword(uint16_t x) {
 }
 
 static INLINE uint32_t makeflagsdword(void) {
-    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    if (!r36sx_cpu_has_80386_features()) {
         return makeflagsword();
     }
     /* 80386 EFLAGS: expose 386-era bits, but not 486+ AC or CPUID ID. */
@@ -3959,7 +3971,7 @@ static INLINE uint32_t makeflagsdword(void) {
 }
 
 static INLINE void decodeflagsdword(uint32_t x) {
-    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+    if (!r36sx_cpu_has_80386_features()) {
         decodeflagsword((uint16_t)x);
         return;
     }
@@ -4868,7 +4880,7 @@ static inline uint8_t r36sx_cpu_at_class_memory_available(void)
      * are AT/286-class facilities.  Hide them when the user selects the
      * documented 8086 compatibility model.
      */
-    return r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80286);
+    return r36sx_cpu_has_80286_features();
 }
 
 #define R36SX_BIOS_INT15_STATUS_OK 0x00u
@@ -5207,7 +5219,7 @@ static void r36sx_bios_int15_system_config(void)
     uint32_t table =
         r36sx_bios_real_ptr(R36SX_BIOS_SYSTEM_CONFIG_SEG,
                             R36SX_BIOS_SYSTEM_CONFIG_OFF);
-    uint8_t model = r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)
+    uint8_t model = r36sx_cpu_has_80386_features()
                         ? R36SX_BIOS_MODEL_386_OR_NEWER
                         : R36SX_BIOS_MODEL_AT_286;
     uint8_t features =
@@ -5242,7 +5254,7 @@ static void r36sx_bios_int15_ebda_segment(void)
 
 static void r36sx_bios_int15_cpu_type(void)
 {
-    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) ||
+    if (!r36sx_cpu_has_80386_features() ||
         CPU_AL != 0x10u) {
         r36sx_bios_int15_fail(R36SX_BIOS_INT15_STATUS_UNSUPPORTED);
         return;
@@ -5932,10 +5944,17 @@ static inline uint8_t r36sx_cpu_lock_prefix_allowed(uint8_t opcode)
 
 void reset86() {
 #if !PICO_ON_DEVICE
+    r36sx_pico286_cpu_model_t cpu_model = r36sx_pico286_cpu_model();
     r36sx_cpu_strict_8086_mode =
-        r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086;
+        cpu_model == R36SX_PICO286_CPU_8086;
+    r36sx_cpu_model_at_least_80286 =
+        cpu_model >= R36SX_PICO286_CPU_80286;
+    r36sx_cpu_model_at_least_80386 =
+        cpu_model >= R36SX_PICO286_CPU_80386;
 #else
     r36sx_cpu_strict_8086_mode = 0;
+    r36sx_cpu_model_at_least_80286 = 1;
+    r36sx_cpu_model_at_least_80386 = 1;
 #endif
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
@@ -6074,7 +6093,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 
 #if CPU_386_EXTENDED_OPS
                 case 0x64: /* segment CPU_FS */
-                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    if (!r36sx_cpu_has_80386_features()) {
                         r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
@@ -6086,7 +6105,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
 
                 case 0x65: /* segment CPU_GS */
-                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    if (!r36sx_cpu_has_80386_features()) {
                         r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
@@ -6108,7 +6127,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 
 #if CPU_386_EXTENDED_OPS
                 case 0x66: /* operand-size override */
-                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    if (!r36sx_cpu_has_80386_features()) {
                         r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
@@ -6119,7 +6138,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                     break;
 
                 case 0x67: /* address-size override */
-                    if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                    if (!r36sx_cpu_has_80386_features()) {
                         r36sx_cpu_set_ip(firstip);
                         intcall86(6);
                         prefix_exception = 1;
@@ -6406,7 +6425,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #if R36SX_CPU_COMPUTED_GOTO
             r36sx_opcode_0F: ;
 #endif
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     /* 8086/8088 only: 0F POP CS. */
                     r36sx_cpu_load_segment(regcs,
                                            r36sx_cpu_pop_segment_selector());
@@ -7265,7 +7284,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_54: ;
 #endif
                 /* 54 PUSH eSP */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     push(CPU_SP - 2);
                 } else {
                     push(CPU_SP);
@@ -7366,7 +7385,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_60: ;
 #endif
                 /* 60 PUSHA (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7398,7 +7417,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_61: ;
 #endif
                 /* 61 POPA (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7428,7 +7447,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_62: ;
 #endif
                 /* 62 BOUND Gv, Ev (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7472,7 +7491,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 63 ARPL Ew,Gw (80286+ protected mode) */
                 if (!r36sx_cpu_native_protected_enabled() ||
-                    r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                    r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7495,7 +7514,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_66: ;
 #endif
                 /* Operand-Size Override (???????? ?????? ?????????: 16 ? 32 ???) */
-                if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                if (!r36sx_cpu_has_80386_features()) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7506,7 +7525,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_67: ;
 #endif
                 /* Address-Size Override (???????? ?????? ??????: 16 ? 32 ???) */
-                if (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386)) {
+                if (!r36sx_cpu_has_80386_features()) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7518,7 +7537,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_68: ;
 #endif
                 /* 68 PUSH Iv (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7533,7 +7552,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 {
                 /* 69 IMUL Gv Ev Iv (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7555,7 +7574,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_6A: ;
 #endif
                 /* 6A PUSH Ib (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7569,7 +7588,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 {
                 /* 6B IMUL Gv Eb Ib (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7591,7 +7610,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_6C: ;
 #endif
                 /* 6C INSB */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7626,7 +7645,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_6D: ;
 #endif
                 /* 6D INSW */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7661,7 +7680,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_6E: ;
 #endif
                 /* 6E OUTSB */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -7696,7 +7715,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_6F: ;
 #endif
                 /* 6F OUTSW */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -8132,7 +8151,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
 #endif
                 /* 8C MOV Ew Sw */
                 modregrm();
-                if ((!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) && reg > regds) ||
+                if ((!r36sx_cpu_has_80386_features() && reg > regds) ||
                     reg > reggs) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
@@ -8168,7 +8187,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
                 /* 8E MOV Sw Ew */
                 modregrm();
                 if (reg == regcs ||
-                    (!r36sx_pico286_cpu_model_at_least(R36SX_PICO286_CPU_80386) && reg > regds) ||
+                    (!r36sx_cpu_has_80386_features() && reg > regds) ||
                     reg > reggs) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
@@ -8907,7 +8926,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_C0: ;
 #endif
                 /* C0 GRP2 byte imm8 (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -8924,7 +8943,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_C1: ;
 #endif
                 /* C1 GRP2 word imm8 (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -9060,7 +9079,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_C8: ;
 #endif
                 /* C8 ENTER (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -9081,7 +9100,7 @@ static void __not_in_flash() r36sx_cpu_exec86_core(uint32_t execloops) {
             r36sx_opcode_C9: ;
 #endif
                 /* C9 LEAVE (80186+) */
-                if (r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086) {
+                if (r36sx_cpu_strict_8086_mode) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
@@ -9814,23 +9833,19 @@ r36sx_opcode_done:
     r36sx_app_stats_record_x86(loopcount);
 }
 
-static void __not_in_flash() r36sx_cpu_exec86_real(uint32_t execloops)
+uint8_t r36sx_cpu_is_protected_enabled(void)
+{
+    return r36sx_cpu_protected_enabled();
+}
+
+void __not_in_flash() r36sx_cpu_exec_real(uint32_t execloops)
 {
     r36sx_cpu_interpreter_protected = 0;
     r36sx_cpu_exec86_core(execloops);
 }
 
-static void __not_in_flash() r36sx_cpu_exec86_protected(uint32_t execloops)
+void __not_in_flash() r36sx_cpu_exec_protected(uint32_t execloops)
 {
     r36sx_cpu_interpreter_protected = 1;
     r36sx_cpu_exec86_core(execloops);
-}
-
-void __not_in_flash() exec86(uint32_t execloops)
-{
-    if (unlikely(r36sx_cpu_protected_enabled())) {
-        r36sx_cpu_exec86_protected(execloops);
-        return;
-    }
-    r36sx_cpu_exec86_real(execloops);
 }
