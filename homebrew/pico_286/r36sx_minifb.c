@@ -149,6 +149,8 @@ static uint16_t g_palette[256];
 static volatile uint32_t g_frame_generation;
 static volatile uint32_t g_disk_activity_until_ms;
 static volatile uint32_t g_disk_activity_depth;
+static volatile uint32_t g_disk_activity_generation;
+static uint32_t g_disk_led_presented_generation;
 static volatile uint32_t g_post_code_generation;
 static volatile uint16_t g_post_code_port;
 static volatile uint8_t g_post_code_value;
@@ -184,14 +186,22 @@ static uint32_t r36sx_mfb_frame_generation(void)
     return __sync_add_and_fetch(&g_frame_generation, 0u);
 }
 
+static void r36sx_mfb_extend_disk_activity(void)
+{
+    __sync_lock_test_and_set(
+        &g_disk_activity_until_ms,
+        r36sx_mfb_now_ms32() + R36SX_PICO286_DISK_LED_HOLD_MS);
+    __sync_add_and_fetch(&g_disk_activity_generation, 1u);
+}
+
 void r36sx_pico286_disk_activity(void)
 {
-    g_disk_activity_until_ms =
-        r36sx_mfb_now_ms32() + R36SX_PICO286_DISK_LED_HOLD_MS;
+    r36sx_mfb_extend_disk_activity();
 }
 
 void r36sx_pico286_disk_activity_begin(void)
 {
+    r36sx_mfb_extend_disk_activity();
     __sync_add_and_fetch(&g_disk_activity_depth, 1u);
 }
 
@@ -201,7 +211,9 @@ void r36sx_pico286_disk_activity_end(void)
 
     if ((int32_t)depth < 0) {
         __sync_lock_test_and_set(&g_disk_activity_depth, 0u);
+        return;
     }
+    r36sx_mfb_extend_disk_activity();
 }
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
@@ -1340,7 +1352,8 @@ static void r36sx_mfb_disk_led_center(int *cx, int *cy)
            r36sx_osk_panel_y() : g_mfb.height) - radius - 12;
 }
 
-static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms)
+static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms,
+                                       int force_visible)
 {
     int cx;
     int cy;
@@ -1350,7 +1363,8 @@ static void r36sx_mfb_draw_disk_led_on(uint16_t *target, uint32_t now_ms)
     const uint16_t dark_red = 0x6000u;
     const uint16_t outline = 0x0000u;
 
-    if (!target || !r36sx_mfb_disk_led_visible(now_ms)) {
+    if (!target ||
+        (!force_visible && !r36sx_mfb_disk_led_visible(now_ms))) {
         return;
     }
 
@@ -1443,7 +1457,8 @@ static void r36sx_mfb_restore_saved_rect(
 }
 
 static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
-                                         struct r36sx_mfb_saved_rect *saved)
+                                         struct r36sx_mfb_saved_rect *saved,
+                                         int force_visible)
 {
     int cx;
     int cy;
@@ -1453,7 +1468,8 @@ static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
     int y1;
     const int outer_radius = R36SX_PICO286_DISK_LED_OUTER_RADIUS;
 
-    if (!target || !saved || !r36sx_mfb_disk_led_visible(now_ms)) {
+    if (!target || !saved ||
+        (!force_visible && !r36sx_mfb_disk_led_visible(now_ms))) {
         return 0;
     }
 
@@ -1466,7 +1482,7 @@ static int r36sx_mfb_draw_disk_led_saved(uint16_t *target, uint32_t now_ms,
         return 0;
     }
 
-    r36sx_mfb_draw_disk_led_on(target, now_ms);
+    r36sx_mfb_draw_disk_led_on(target, now_ms, force_visible);
     return 1;
 }
 
@@ -2111,6 +2127,10 @@ int mfb_open(const char *name, int width, int height, int scale)
 
     memset(&g_mfb, 0, sizeof(g_mfb));
     g_frame_generation = 0;
+    g_disk_activity_until_ms = 0;
+    g_disk_activity_depth = 0;
+    g_disk_activity_generation = 0;
+    g_disk_led_presented_generation = 0;
     r36sx_app_stats_init();
     r36sx_screen_keyboard_init(&g_mfb.osk);
     r36sx_screen_keyboard_set_cursor_block(&g_mfb.osk, 1);
@@ -2220,6 +2240,8 @@ int mfb_update(void *buffer, int fps_limit)
     int post_codes_refresh_due;
     int screenshot_toast_visible;
     int need_present;
+    uint32_t disk_activity_generation;
+    int disk_led_pending;
     uint32_t post_code_generation;
     r36sx_pico286_scaling_filter_t scaling_filter;
     (void)fps_limit;
@@ -2262,6 +2284,10 @@ int mfb_update(void *buffer, int fps_limit)
         osk_overlay_active && r36sx_mfb_osk_overlay_cache_due();
     fullscreen_menu_active = r36sx_mfb_fullscreen_menu_active();
     large_overlay_active = r36sx_mfb_large_overlay_active(now_ms);
+    disk_activity_generation =
+        __sync_add_and_fetch(&g_disk_activity_generation, 0u);
+    disk_led_pending =
+        disk_activity_generation != g_disk_led_presented_generation;
     disk_led_active = r36sx_mfb_disk_led_active(now_ms);
     stats_overlay_visible = r36sx_app_stats_is_visible();
     stats_refresh_due =
@@ -2276,6 +2302,7 @@ int mfb_update(void *buffer, int fps_limit)
         source_changed ||
         osk_overlay_refresh_due ||
         large_overlay_active ||
+        disk_led_pending ||
         disk_led_active ||
         g_mfb.disk_led_was_active ||
         stats_refresh_due ||
@@ -2304,7 +2331,8 @@ int mfb_update(void *buffer, int fps_limit)
                 g_mfb.frame,
                 g_mfb.base_frame,
                 (size_t)g_mfb.width * (size_t)g_mfb.height);
-            r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms);
+            r36sx_mfb_draw_disk_led_on(g_mfb.frame, now_ms,
+                                       disk_led_pending);
         }
         if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
             r36sx_disk_menu_draw_overlay();
@@ -2330,6 +2358,7 @@ int mfb_update(void *buffer, int fps_limit)
     } else {
         int direct_overlay_active =
             osk_overlay_active ||
+            disk_led_pending ||
             r36sx_mfb_disk_led_visible(now_ms) ||
             stats_overlay_visible ||
             post_codes_visible;
@@ -2345,7 +2374,8 @@ int mfb_update(void *buffer, int fps_limit)
                 r36sx_mfb_draw_post_codes_saved(src, &g_mfb.post_restore);
             restore_pending |=
                 r36sx_mfb_draw_disk_led_saved(src, now_ms,
-                                              &g_mfb.led_restore);
+                                              &g_mfb.led_restore,
+                                              disk_led_pending);
             g_mfb.direct_restore_pending = restore_pending != 0;
         }
 
@@ -2356,7 +2386,10 @@ int mfb_update(void *buffer, int fps_limit)
         r36sx_app_stats_record_frame();
     }
 
-    g_mfb.disk_led_was_active = disk_led_active;
+    if (disk_led_pending) {
+        g_disk_led_presented_generation = disk_activity_generation;
+    }
+    g_mfb.disk_led_was_active = disk_led_active || disk_led_pending;
     g_mfb.screenshot_toast_was_visible =
         r36sx_mfb_screenshot_toast_visible(r36sx_mfb_now_ms32());
     g_mfb.force_present = 0;

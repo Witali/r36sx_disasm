@@ -72,6 +72,8 @@ static volatile LONG g_post_subcode_value;
 static volatile LONG g_post_subcode_valid;
 static volatile LONG g_disk_activity_until_ms;
 static volatile LONG g_disk_activity_depth;
+static volatile LONG g_disk_activity_generation;
+static LONG g_disk_led_presented_generation;
 
 static uint32_t r36sx_win_rgb565_to_rgb888(uint16_t color)
 {
@@ -149,7 +151,8 @@ static int r36sx_win_disk_led_visible(uint32_t now_ms)
     return ((now_ms / R36SX_WIN_DISK_LED_BLINK_MS) & 1u) != 0u;
 }
 
-static void r36sx_win_draw_disk_led(uint16_t *target, uint32_t now_ms)
+static void r36sx_win_draw_disk_led(uint16_t *target, uint32_t now_ms,
+                                    int force_visible)
 {
     const int radius = R36SX_WIN_DISK_LED_RADIUS;
     const int outer_radius = R36SX_WIN_DISK_LED_OUTER_RADIUS;
@@ -159,7 +162,8 @@ static void r36sx_win_draw_disk_led(uint16_t *target, uint32_t now_ms)
     const uint16_t dark_red = 0x6000u;
     const uint16_t outline = 0x0000u;
 
-    if (!target || !r36sx_win_disk_led_visible(now_ms)) {
+    if (!target ||
+        (!force_visible && !r36sx_win_disk_led_visible(now_ms))) {
         return;
     }
 
@@ -409,15 +413,22 @@ void r36sx_mfb_mark_frame_ready(void)
     InterlockedIncrement((volatile LONG *)&g_frame_generation);
 }
 
-void r36sx_pico286_disk_activity(void)
+static void r36sx_win_extend_disk_activity(void)
 {
     InterlockedExchange(&g_disk_activity_until_ms,
                         (LONG)(GetTickCount() +
                                R36SX_WIN_DISK_LED_HOLD_MS));
+    InterlockedIncrement(&g_disk_activity_generation);
+}
+
+void r36sx_pico286_disk_activity(void)
+{
+    r36sx_win_extend_disk_activity();
 }
 
 void r36sx_pico286_disk_activity_begin(void)
 {
+    r36sx_win_extend_disk_activity();
     InterlockedIncrement(&g_disk_activity_depth);
 }
 
@@ -427,7 +438,9 @@ void r36sx_pico286_disk_activity_end(void)
 
     if (depth < 0) {
         InterlockedExchange(&g_disk_activity_depth, 0);
+        return;
     }
+    r36sx_win_extend_disk_activity();
 }
 
 void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
@@ -803,6 +816,10 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_post_subcode_port = 0;
     g_post_subcode_value = 0;
     g_post_subcode_valid = 0;
+    g_disk_activity_until_ms = 0;
+    g_disk_activity_depth = 0;
+    g_disk_activity_generation = 0;
+    g_disk_led_presented_generation = 0;
     r36sx_app_stats_init();
     r36sx_disk_menu_init(&g_disk_menu);
     r36sx_key_presets_load(&g_key_presets);
@@ -887,6 +904,8 @@ int mfb_update(void *buffer, int fps_limit)
     const uint16_t *present_src;
     size_t pixels;
     uint32_t now_ms;
+    LONG disk_activity_generation;
+    int disk_led_pending;
     int disk_led_visible;
     (void)fps_limit;
 
@@ -897,7 +916,11 @@ int mfb_update(void *buffer, int fps_limit)
 
     pixels = (size_t)g_width * (size_t)g_height;
     now_ms = GetTickCount();
-    disk_led_visible = r36sx_win_disk_led_visible(now_ms);
+    disk_activity_generation =
+        InterlockedCompareExchange(&g_disk_activity_generation, 0, 0);
+    disk_led_pending =
+        disk_activity_generation != g_disk_led_presented_generation;
+    disk_led_visible = disk_led_pending || r36sx_win_disk_led_visible(now_ms);
     present_src = src;
     if (r36sx_win_menu_visible() || r36sx_app_stats_is_visible() ||
         g_post_codes_visible || disk_led_visible) {
@@ -919,7 +942,7 @@ int mfb_update(void *buffer, int fps_limit)
             r36sx_win_draw_stats_overlay(g_overlay_frame);
             r36sx_win_draw_post_codes_overlay(g_overlay_frame);
         }
-        r36sx_win_draw_disk_led(g_overlay_frame, now_ms);
+        r36sx_win_draw_disk_led(g_overlay_frame, now_ms, disk_led_pending);
         present_src = g_overlay_frame;
     }
     if (g_screenshot_requested) {
@@ -932,6 +955,9 @@ int mfb_update(void *buffer, int fps_limit)
     StretchDIBits(g_hdc, 0, 0, g_width * g_scale, g_height * g_scale,
                   0, 0, g_width, g_height,
                   g_frame32, &g_bmi, DIB_RGB_COLORS, SRCCOPY);
+    if (disk_led_pending) {
+        g_disk_led_presented_generation = disk_activity_generation;
+    }
     r36sx_app_stats_record_frame();
 
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
