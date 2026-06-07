@@ -3,5 +3,5 @@
 
 void exec86(uint32_t execloops)
 {
-    r36sx_cpu_exec_real(execloops);
+    r36sx_cpu_exec_8086(execloops);
 }
