@@ -243,10 +243,11 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
             &&r36sx_opcode_48, &&r36sx_opcode_49, &&r36sx_opcode_4A, &&r36sx_opcode_4B, &&r36sx_opcode_4C, &&r36sx_opcode_4D, &&r36sx_opcode_4E, &&r36sx_opcode_4F,
             &&r36sx_opcode_50, &&r36sx_opcode_51, &&r36sx_opcode_52, &&r36sx_opcode_53, &&r36sx_opcode_54, &&r36sx_opcode_55, &&r36sx_opcode_56, &&r36sx_opcode_57,
             &&r36sx_opcode_58, &&r36sx_opcode_59, &&r36sx_opcode_5A, &&r36sx_opcode_5B, &&r36sx_opcode_5C, &&r36sx_opcode_5D, &&r36sx_opcode_5E, &&r36sx_opcode_5F,
+            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_63, &&r36sx_opcode_default, &&r36sx_opcode_default,
 #if R36SX_CPU_CORE_HAS_386_EXTENDED_OPS
-            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_63, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_66, &&r36sx_opcode_67,
+            &&r36sx_opcode_66, &&r36sx_opcode_67,
 #else
-            &&r36sx_opcode_60, &&r36sx_opcode_61, &&r36sx_opcode_62, &&r36sx_opcode_63, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default, &&r36sx_opcode_default,
+            &&r36sx_opcode_default, &&r36sx_opcode_default,
 #endif
             &&r36sx_opcode_68, &&r36sx_opcode_69, &&r36sx_opcode_6A, &&r36sx_opcode_6B, &&r36sx_opcode_6C, &&r36sx_opcode_6D, &&r36sx_opcode_6E, &&r36sx_opcode_6F,
             &&r36sx_opcode_70, &&r36sx_opcode_71, &&r36sx_opcode_72, &&r36sx_opcode_73, &&r36sx_opcode_74, &&r36sx_opcode_75, &&r36sx_opcode_76, &&r36sx_opcode_77,
