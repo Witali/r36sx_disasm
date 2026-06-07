@@ -341,6 +341,7 @@ for src in \
     "$ROOT/homebrew/common/inih/ini.c" \
     "$SCRIPT_DIR/r36sx_disk_menu.c" \
     "$SCRIPT_DIR/r36sx_key_presets.c" \
+    "$SCRIPT_DIR/r36sx_post_overlay.c" \
     "$SCRIPT_DIR/r36sx_minifb.c" \
     "$SCRIPT_DIR/r36sx_linux_audio.c" \
     "$PORT_ROOT/r36sx_app_stats.c" \

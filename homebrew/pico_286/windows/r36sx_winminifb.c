@@ -17,6 +17,7 @@
 #include "r36sx_disk_config.h"
 #include "r36sx_disk_menu.h"
 #include "r36sx_key_presets.h"
+#include "r36sx_post_overlay.h"
 #include "r36sx_screenshot.h"
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
@@ -38,9 +39,6 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_STATS_CHAR_ADVANCE \
     ((R36SX_WIN_STATS_FONT_W + 1) * R36SX_WIN_STATS_FONT_SCALE)
 #define R36SX_WIN_STATS_ROWS 5
-#define R36SX_WIN_POST_PAD 5
-#define R36SX_WIN_POST_MARGIN 8
-#define R36SX_WIN_POST_SUBCODE_PORT 0x190u
 #define R36SX_WIN_DISK_LED_HOLD_MS 350u
 #define R36SX_WIN_DISK_LED_BLINK_MS 120u
 #define R36SX_WIN_DISK_LED_RADIUS 8
@@ -284,61 +282,21 @@ static void r36sx_win_draw_stats_text(uint16_t *target, int x, int y,
 
 static void r36sx_win_draw_post_codes_overlay(uint16_t *target)
 {
-    char line0[24];
-    char line1[24];
     LONG generation = g_post_code_generation;
-    LONG port = g_post_code_port;
     LONG value = g_post_code_value;
     LONG code_valid = g_post_code_valid;
-    LONG sub_port = g_post_subcode_port;
     LONG sub_value = g_post_subcode_value;
     LONG sub_valid = g_post_subcode_valid;
-    int text_w;
-    int box_w;
-    int box_h;
-    int line_h = R36SX_WIN_STATS_FONT_H * R36SX_WIN_STATS_FONT_SCALE + 2;
-    int x = R36SX_WIN_POST_MARGIN;
-    int y;
 
     if (!target || !g_post_codes_visible) {
         return;
     }
 
-    if (generation == 0 || !code_valid) {
-        snprintf(line0, sizeof(line0), "POST --");
-    } else {
-        snprintf(line0, sizeof(line0), "POST %03lX:%02lX",
-                 (unsigned long)(port & 0xffff),
-                 (unsigned long)(value & 0xff));
-    }
-    if (sub_valid) {
-        snprintf(line1, sizeof(line1), "%03lX:%02lX",
-                 (unsigned long)(sub_port & 0xffff),
-                 (unsigned long)(sub_value & 0xff));
-    } else {
-        snprintf(line1, sizeof(line1), "%03X:--",
-                 (unsigned int)R36SX_WIN_POST_SUBCODE_PORT);
-    }
-
-    text_w = r36sx_win_stats_text_width(line0);
-    box_w = text_w + R36SX_WIN_POST_PAD * 2;
-    box_h = line_h * 2 - 2 +
-            R36SX_WIN_POST_PAD * 2;
-    y = g_height - box_h - R36SX_WIN_POST_MARGIN;
-    if (y < 0) {
-        y = 0;
-    }
-
-    r36sx_win_fill_rect(target, x, y, box_w, box_h,
-                        r36sx_win_rgb565(5, 8, 12));
-    r36sx_win_stroke_rect(target, x, y, box_w, box_h,
-                          r36sx_win_rgb565(70, 96, 112));
-    r36sx_win_draw_stats_text(target, x + R36SX_WIN_POST_PAD,
-                              y + R36SX_WIN_POST_PAD, line0,
-                              r36sx_win_rgb565(236, 242, 220));
-    r36sx_win_draw_stats_text(target, x + R36SX_WIN_POST_PAD,
-                              y + R36SX_WIN_POST_PAD + line_h, line1,
-                              r36sx_win_rgb565(236, 242, 220));
+    r36sx_post_overlay_draw(target, g_width, g_height, g_width,
+                            (uint8_t)(generation != 0 && code_valid),
+                            (uint8_t)(value & 0xff),
+                            (uint8_t)sub_valid,
+                            (uint8_t)(sub_value & 0xff));
 }
 
 static void r36sx_win_draw_stats_overlay(uint16_t *target)
@@ -449,7 +407,7 @@ void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value)
      * Keep the standard POST stage and R36SX test386 sub-step separately, so
      * a 190h breadcrumb does not hide the major 80h stage on the overlay.
      */
-    if (portnum == R36SX_WIN_POST_SUBCODE_PORT) {
+    if (portnum == R36SX_POST_OVERLAY_SUBCODE_PORT) {
         g_post_subcode_port = (LONG)portnum;
         g_post_subcode_value = (LONG)value;
         g_post_subcode_valid = 1;
