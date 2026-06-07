@@ -19,6 +19,7 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #ifndef mkdir
 #define mkdir(path, mode) _mkdir(path)
 #endif
@@ -26,6 +27,7 @@
 #define rmdir(path) _rmdir(path)
 #endif
 #else
+#include <sys/types.h>
 #include <unistd.h>
 #endif
 
@@ -176,6 +178,22 @@ static inline int r36sx_host_rpc_ram_range_ok(uint32_t address, size_t bytes)
 {
     return bytes == 0 ? address <= RAM_SIZE :
            address < RAM_SIZE && bytes <= (size_t)(RAM_SIZE - address);
+}
+
+static int r36sx_host_rpc_resize_file(FILE *fp, uint32_t size)
+{
+    if (!fp) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (fflush(fp) != 0) {
+        return -1;
+    }
+#ifdef _WIN32
+    return _chsize_s(_fileno(fp), size) == 0 ? 0 : -1;
+#else
+    return ftruncate(fileno(fp), (off_t)size);
+#endif
 }
 
 static inline uint16_t r36sx_host_rpc_read_u16(uint32_t address)
@@ -1101,11 +1119,12 @@ static void r36sx_host_rpc_execute_request(uint16_t command_override)
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_HANDLE, 6);
                 break;
             }
-            if (!r36sx_host_rpc_ram_range_ok(req.data_phys, req.data_len)) {
+            if (req.data_len != 0 &&
+                !r36sx_host_rpc_ram_range_ok(req.data_phys, req.data_len)) {
                 r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_BAD_ADDRESS, 8);
                 break;
             }
-            if (writing) {
+            if (writing && req.data_len != 0) {
                 r36sx_host_rpc_trace_buffer("write-in", req.data_phys,
                                             req.data_len);
             }
@@ -1119,13 +1138,23 @@ static void r36sx_host_rpc_execute_request(uint16_t command_override)
                                                                           writing));
                 break;
             }
-            if (writing) {
+            if (writing && req.data_len == 0) {
+                if (r36sx_host_rpc_resize_file(fp, req.file_pos) != 0) {
+                    err = errno ? errno : EIO;
+                    r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_ERR_HOST_IO,
+                                          r36sx_host_rpc_dos_error_from_errno(
+                                              err, 1));
+                    break;
+                }
+                done = 0;
+                req.file_size = req.file_pos;
+            } else if (writing) {
                 done = fwrite(&RAM[req.data_phys], 1, req.data_len, fp);
                 fflush(fp);
             } else {
                 done = fread(&RAM[req.data_phys], 1, req.data_len, fp);
             }
-            if (!writing) {
+            if (!writing && req.data_len != 0) {
                 r36sx_host_rpc_trace_buffer("read-out", req.data_phys,
                                             (uint32_t)done);
             }

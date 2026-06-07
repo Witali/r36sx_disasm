@@ -974,10 +974,9 @@ sda_path_is_ours:
     ret
 
 sft_is_ours:
-    ; HOSTDRV stores a HOSTRPC slot in the SFT's cluster field.  If that slot is
-    ; still active, accept the callback even if DOS has copied or rewritten the
-    ; SFT around it.  The device marker remains a compatibility fallback for old
-    ; in-flight entries.
+    ; HOSTDRV stores a HOSTRPC slot in the SFT's cluster field.  The slot is
+    ; authoritative only for the SFT pointer that opened it; local DOS files may
+    ; reuse the same small handle value while a host file is open.
     push ax
     push bx
     push cx
@@ -989,6 +988,12 @@ sft_is_ours:
     mov ax, [host_sft_seg + bx]
     cmp ax, 0
     je .check_device_word
+    mov cx, es
+    cmp ax, cx
+    jne .check_device_word
+    mov ax, [host_sft_off + bx]
+    cmp ax, di
+    jne .check_device_word
     clc
     trace_byte 0F3h
     jmp .done
@@ -1387,6 +1392,7 @@ store_dta_phys:
     ; request block as DATA_PHYS.
     push ax
     push bx
+    push di
     push si
     push es
     call load_dta_esdi
@@ -1398,6 +1404,7 @@ store_dta_phys:
 .done:
     pop es
     pop si
+    pop di
     pop bx
     pop ax
     ret
