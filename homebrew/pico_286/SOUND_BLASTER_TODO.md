@@ -82,7 +82,7 @@ References:
     handler, which is mostly harmless because the DSP ignores those offsets, but
     it is easy to misunderstand and should be made explicit.
 
-- Add optional debug tracing for DSP commands.
+- [x] Add optional debug tracing for DSP commands.
   - Trace reset, command bytes, DMA command start/end, IRQ latch changes, and DMA
     direction decisions behind a debug define.
   - Keep tracing off by default to avoid audio-thread stalls.
