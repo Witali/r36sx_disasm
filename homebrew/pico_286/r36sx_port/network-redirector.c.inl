@@ -668,6 +668,12 @@ static inline void guest_memory_error(void) {
     CPU_FL_CF = 1;
 }
 
+static inline void redirector_success_zero_cx(void) {
+    CPU_AX = 0;
+    CPU_CX = 0;
+    CPU_FL_CF = 0;
+}
+
 static inline uint16_t redirector_dos_error_from_errno(int err,
                                                        int writing) {
     // DOS redirector callbacks report failures as DOS error codes in AX.
@@ -805,8 +811,7 @@ static inline bool redirector_handler() {
 
             const int result = rmdir(path); // TODO recursive remove
             if (result == 0) {
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 CPU_AX = 5; // Access denied (typical for rmdir failure)
                 CPU_FL_CF = 1;
@@ -826,8 +831,7 @@ static inline bool redirector_handler() {
             debug_log("Creating directory %s\n", path);
             const int result = mkdir(path, 0777);
             if (result == 0) {
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 CPU_AX = 3; // Path isn't found (typical for mkdir failure)
                 CPU_FL_CF = 1;
@@ -859,8 +863,7 @@ static inline bool redirector_handler() {
             current_remote_dir[sizeof(current_remote_dir) - 1] = '\0';
 
             debug_log("Current remote dir set to: '%s'\n", current_remote_dir);
-            CPU_AX = 0;
-            CPU_FL_CF = 0;
+            redirector_success_zero_cx();
         }
         break;
 
@@ -891,8 +894,7 @@ static inline bool redirector_handler() {
                 sftptr->total_handles = 0xffff;
                 redirector_clear_file_slot(file_handle);
                 redirector_trace_sft("close ok", sftptr);
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: close invalid handle=%u",
                                      file_handle);
@@ -929,8 +931,7 @@ static inline bool redirector_handler() {
                     break;
                 }
                 redirector_trace_sft("commit ok", sftptr);
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: commit invalid handle=%u",
                                      file_handle);
@@ -1158,8 +1159,7 @@ static inline bool redirector_handler() {
 
             int result = rename(old_path, new_path);
             if (result == 0) {
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 const int err = errno ? errno : EIO;
                 redirector_error_log(
@@ -1186,8 +1186,7 @@ static inline bool redirector_handler() {
             int result = unlink(path);
             if (result == 0) {
                 redirector_trace_log("redir: delete ok host='%s'", path);
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 const int err = errno ? errno : EIO;
                 redirector_error_log(
@@ -1278,8 +1277,7 @@ static inline bool redirector_handler() {
                     sftptr->unk4 = 0xff;
 
                     redirector_trace_sft("open ok", sftptr);
-                    CPU_AX = 0;
-                    CPU_FL_CF = 0;
+                    redirector_success_zero_cx();
                 } else {
                     redirector_trace_log("redir: open not found host='%s'", path);
                     CPU_AX = 2; // File not found
@@ -1348,8 +1346,7 @@ static inline bool redirector_handler() {
                     sftptr->unk4 = 0xff;
 
                     redirector_trace_sft("create ok", sftptr);
-                    CPU_AX = 0;
-                    CPU_FL_CF = 0;
+                    redirector_success_zero_cx();
                 } else {
                     const int err = errno ? errno : EIO;
                     redirector_error_log(
@@ -1375,8 +1372,7 @@ static inline bool redirector_handler() {
             if (!redirector_sft_is_mine(sftptr)) {
                 return false;
             }
-            CPU_AX = 0;
-            CPU_FL_CF = 0;
+            redirector_success_zero_cx();
             break;
         }
 
@@ -1402,8 +1398,7 @@ static inline bool redirector_handler() {
             if (!redirector_update_mapped_drive_from_context(dos_path)) {
                 return false;
             }
-            CPU_AX = 0;
-            CPU_FL_CF = 0;
+            redirector_success_zero_cx();
             break;
         }
 
@@ -1493,8 +1488,7 @@ static inline bool redirector_handler() {
                     dta_ptr->foundfile.fname,
                     (unsigned long)dta_ptr->foundfile.fsize,
                     dta_ptr->foundfile.fattr);
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: find_first no_match host='%s'", path);
                 dta_ptr = NULL;
@@ -1529,8 +1523,7 @@ static inline bool redirector_handler() {
                     dta_ptr->foundfile.fname,
                     (unsigned long)dta_ptr->foundfile.fsize,
                     dta_ptr->foundfile.fattr);
-                CPU_AX = 0;
-                CPU_FL_CF = 0;
+                redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: find_next done handle=%ld dta=%p",
                                      (long)handle, (void *)dta_ptr);
@@ -1555,8 +1548,7 @@ static inline bool redirector_handler() {
                     }
                 }
             }
-            CPU_AX = 0;
-            CPU_FL_CF = 0;
+            redirector_success_zero_cx();
             break;
 
         // Seek from File End

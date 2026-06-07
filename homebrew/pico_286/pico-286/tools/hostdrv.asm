@@ -475,7 +475,7 @@ redir_ext_open_create:
     mov word [ext_open_status], EXT_STATUS_OPENED
     call rpc_open_common
     mov cx, [ext_open_status]
-    jmp redir_from_rpc
+    jmp redir_from_rpc_keep_cx
 
 .exists_replace:
     mov bx, [ext_open_attr]
@@ -483,7 +483,7 @@ redir_ext_open_create:
     mov word [ext_open_status], EXT_STATUS_REPLACED
     call rpc_open_common
     mov cx, [ext_open_status]
-    jmp redir_from_rpc
+    jmp redir_from_rpc_keep_cx
 
 .exists_fail:
     mov ax, DOS_ERR_FILE_EXISTS
@@ -510,7 +510,7 @@ redir_ext_open_create:
     mov word [ext_open_status], EXT_STATUS_CREATED
     call rpc_open_common
     mov cx, [ext_open_status]
-    jmp redir_from_rpc
+    jmp redir_from_rpc_keep_cx
 
 .missing_fail:
     mov ax, [ext_open_missing_error]
@@ -606,14 +606,14 @@ redir_read:
     jc redir_chain
     mov al, CMD_READ
     call rpc_io_common
-    jmp redir_from_rpc
+    jmp redir_from_rpc_keep_cx
 
 redir_write:
     call sft_is_ours
     jc redir_chain
     mov al, CMD_WRITE
     call rpc_io_common
-    jmp redir_from_rpc
+    jmp redir_from_rpc_keep_cx
 
 redir_disk_info:
     ; Return conservative fake free-space geometry.  DOS only needs plausible
@@ -755,10 +755,22 @@ redir_from_rpc:
     ; request block both become CF=1 for the original INT 2Fh caller.
     jc redir_fail
     cmp word [request + REQ_RESULT], 0
-    jne .rpc_error
+    jne redir_rpc_error
+    xor ax, ax
+    xor cx, cx
+    jmp redir_success
+
+redir_from_rpc_keep_cx:
+    ; FreeDOS' redirector wrapper returns AX := CX on successful callbacks.
+    ; Only read/write byte counts and extended-open action status are carried in
+    ; CX; ordinary successful RPC commands must leave it zero.
+    jc redir_fail
+    cmp word [request + REQ_RESULT], 0
+    jne redir_rpc_error
     xor ax, ax
     jmp redir_success
-.rpc_error:
+
+redir_rpc_error:
     mov ax, [request + REQ_DOS_ERROR]
     cmp ax, 0
     jne redir_fail
