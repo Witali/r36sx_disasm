@@ -262,7 +262,7 @@ and `TEST386`; the test ROM file is `test386.bin` next to `pico_286`.
 from `homebrew/pico_286/pico-286/tools/mapdrive.asm` with the same NASM
 executable and copied to the Pico-286 patch directory.  `hostdrv.com` is the
 experimental DOS-side redirector that owns `INT 2Fh/AH=11h` and talks to the
-emulator through HOSTRPC ports `E360h..E36Fh`; it is built from
+emulator through the HOSTRPC stream port `E360h`; it is built from
 `homebrew/pico_286/pico-286/tools/hostdrv.asm`, sharing the HOSTRPC ABI
 constants from `homebrew/pico_286/pico-286/tools/hostrpc.inc`.  See
 `homebrew/pico_286/README.md` for the exact commands.

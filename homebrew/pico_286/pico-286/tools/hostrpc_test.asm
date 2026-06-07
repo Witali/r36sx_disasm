@@ -13,18 +13,13 @@
 %include "hostrpc.inc"
 
 start:
-    mov dx, PORT_ID0
-    in al, dx
-    cmp al, 'R'
-    jne rpc_missing
-    mov dx, PORT_ID1
-    in al, dx
-    cmp al, 'H'
-    jne rpc_missing
+    call rpc_init_session
+    jc rpc_missing
 
     call clear_request
     mov word [request + REQ_COMMAND], CMD_PING
     call execute_request
+    jc rpc_missing
     call require_ok
 
     call clear_request
@@ -33,6 +28,7 @@ start:
     mov di, request + REQ_PATH_PHYS
     call store_phys
     call execute_request
+    jc rpc_failed
     call require_ok
     mov ax, [request + REQ_HANDLE]
     mov [open_handle], ax
@@ -47,6 +43,7 @@ start:
     mov di, request + REQ_DATA_PHYS
     call store_phys
     call execute_request
+    jc rpc_failed
     call require_ok
 
     call clear_request
@@ -54,6 +51,7 @@ start:
     mov ax, [open_handle]
     mov [request + REQ_HANDLE], ax
     call execute_request
+    jc rpc_failed
     call require_ok
 
     mov dx, msg_ok
@@ -117,37 +115,144 @@ store_phys:
     ret
 
 execute_request:
-    ; Set request physical address ports.
+    ; Submit the request block through the HOSTRPC stream protocol.  The stream
+    ; command carries a 32-bit physical pointer encoded as five 7-bit frames;
+    ; the host still writes the fixed response fields back into this block.
     mov si, request
     mov di, phys_tmp
     call store_phys
 
-    mov dx, PORT_ADDR0
-    mov al, [phys_tmp]
-    out dx, al
-    mov dx, PORT_ADDR1
-    mov al, [phys_tmp + 1]
-    out dx, al
-    mov dx, PORT_ADDR2
-    mov al, [phys_tmp + 2]
-    out dx, al
-    mov dx, PORT_ADDR3
-    mov al, [phys_tmp + 3]
-    out dx, al
+    mov al, PROTO_CALL
+    call rpc_send_command
+    jc .done
+    call rpc_send_phys_tmp
+    jc .done
+    and al, PROTO_DATA_MASK
+    cmp al, PROTO_DATA_MASK
+    jne .ok
+    stc
+    ret
+.ok:
+    clc
+.done:
+    ret
 
-    mov dx, PORT_COMMAND
-    mov al, RPC_EXECUTE
-    out dx, al
-
-    mov dx, PORT_STATUS
+rpc_init_session:
+    mov dx, PORT_DATA
     in al, dx
+    and al, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], al
+    mov al, PROTO_RESET
+    call rpc_send_command
+    jc .fail
+    mov al, PROTO_PING
+    call rpc_send_command
+    jc .fail
+    and al, PROTO_DATA_MASK
+    cmp al, RPC_VERSION
+    jne .fail
+    clc
+    ret
+.fail:
+    stc
+    ret
+
+rpc_send_command:
+    or al, PROTO_CMD_FLAG
+    jmp rpc_send_frame
+
+rpc_send_data:
+    and al, PROTO_DATA_MASK
+
+rpc_send_frame:
+    push dx
+    mov dx, PORT_DATA
+    out dx, al
+    call rpc_wait_toggle
+    pop dx
+    ret
+
+rpc_wait_toggle:
+    push bx
+    push cx
+    push dx
+    mov bx, 0400h
+.outer:
+    mov cx, 0FFFFh
+.poll:
+    mov dx, PORT_DATA
+    in al, dx
+    mov ah, al
+    xor ah, [rpc_sync_bit]
+    test ah, PROTO_CMD_FLAG
+    jnz .changed
+    loop .poll
+    dec bx
+    jnz .outer
+    stc
+    jmp .done
+.changed:
+    mov ah, al
+    and ah, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], ah
+    clc
+.done:
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+rpc_send_phys_tmp:
+    mov al, [phys_tmp]
+    and al, 07Fh
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp]
+    mov cl, 7
+    shr al, cl
+    mov ah, [phys_tmp + 1]
+    and ah, 03Fh
+    shl ah, 1
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 1]
+    mov cl, 6
+    shr al, cl
+    mov ah, [phys_tmp + 2]
+    and ah, 01Fh
+    mov cl, 2
+    shl ah, cl
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 2]
+    mov cl, 5
+    shr al, cl
+    mov ah, [phys_tmp + 3]
+    and ah, 00Fh
+    mov cl, 3
+    shl ah, cl
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 3]
+    mov cl, 4
+    shr al, cl
+    call rpc_send_data
+.done:
     ret
 
 open_handle dw 0
 phys_tmp dd 0
+rpc_sync_bit db 0
 
 msg_ok      db 'HOSTRPC OK: wrote HOSTRPC.TXT in the host drive.',13,10,'$'
-msg_missing db 'HOSTRPC device not found on ports E360h..E36Fh.',13,10,'$'
+msg_missing db 'HOSTRPC stream device not found on port E360h.',13,10,'$'
 msg_failed  db 'HOSTRPC request failed.',13,10,'$'
 test_path   db 'HOSTRPC.TXT',0
 test_text   db 'Hello from DOS through R36SX HOSTRPC.',13,10

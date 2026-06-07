@@ -39,6 +39,7 @@
 
 #define R36SX_HOST_RPC_PORT_BASE 0xE360u
 #define R36SX_HOST_RPC_PORT_LAST (R36SX_HOST_RPC_PORT_BASE + 9u)
+#define R36SX_HOST_RPC_STREAM_PORT R36SX_HOST_RPC_PORT_BASE
 
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
 #define R36SX_HOST_RPC_VERSION 1u
@@ -48,6 +49,11 @@
 #define R36SX_HOST_RPC_MAX_HOST_PATH 512u
 #define R36SX_HOST_RPC_FIND_RESULT_SIZE 20u
 #define R36SX_HOST_RPC_FLAG_CREATE_NEW 0x0001u
+
+#define R36SX_HOST_RPC_PROTO_CMD_FLAG 0x80u
+#define R36SX_HOST_RPC_PROTO_DATA_MASK 0x7fu
+#define R36SX_HOST_RPC_PROTO_ERR 0x7fu
+#define R36SX_HOST_RPC_PROTO_CALL_ADDR_CHUNKS 5u
 
 #if R36SX_DEBUG_HOSTRPC_TRACE
 extern void r36sx_pico286_debug_log(const char *format, ...);
@@ -80,6 +86,15 @@ typedef enum {
     R36SX_HOST_RPC_CMD_CLOSE_ALL = 16,
     R36SX_HOST_RPC_CMD_CHDIR = 17,
 } r36sx_host_rpc_command_t;
+
+typedef enum {
+    R36SX_HOST_RPC_PROTO_RESET = 0,
+    R36SX_HOST_RPC_PROTO_PING = 1,
+    R36SX_HOST_RPC_PROTO_CONTINUE = 2,
+    R36SX_HOST_RPC_PROTO_ABORT = 3,
+    R36SX_HOST_RPC_PROTO_END = 4,
+    R36SX_HOST_RPC_PROTO_CALL = 5,
+} r36sx_host_rpc_proto_command_t;
 
 static const char *r36sx_host_rpc_command_name(uint16_t command)
 {
@@ -139,6 +154,12 @@ typedef struct {
 static uint32_t r36sx_host_rpc_request_addr;
 static uint8_t r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_IDLE;
 static uint16_t r36sx_host_rpc_last_result = R36SX_HOST_RPC_OK;
+static uint8_t r36sx_host_rpc_stream_sync_bit;
+static uint8_t r36sx_host_rpc_stream_value = 'R';
+static uint8_t r36sx_host_rpc_stream_command;
+static uint8_t r36sx_host_rpc_stream_addr_chunks;
+static uint8_t r36sx_host_rpc_stream_addr_bits;
+static uint32_t r36sx_host_rpc_stream_addr;
 static FILE *r36sx_host_rpc_files[R36SX_HOST_RPC_MAX_FILES];
 static intptr_t r36sx_host_rpc_finds[R36SX_HOST_RPC_MAX_FINDS];
 static uint8_t r36sx_host_rpc_find_active[R36SX_HOST_RPC_MAX_FINDS];
@@ -1339,9 +1360,115 @@ static void r36sx_host_rpc_execute_request(void)
     r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_DONE;
 }
 
+static void r36sx_host_rpc_stream_reply(uint8_t payload)
+{
+    r36sx_host_rpc_stream_sync_bit ^= R36SX_HOST_RPC_PROTO_CMD_FLAG;
+    r36sx_host_rpc_stream_value =
+        r36sx_host_rpc_stream_sync_bit |
+        (uint8_t)(payload & R36SX_HOST_RPC_PROTO_DATA_MASK);
+}
+
+static void r36sx_host_rpc_stream_abort_transfer(void)
+{
+    r36sx_host_rpc_stream_command = 0;
+    r36sx_host_rpc_stream_addr = 0;
+    r36sx_host_rpc_stream_addr_bits = 0;
+    r36sx_host_rpc_stream_addr_chunks = 0;
+}
+
+static void r36sx_host_rpc_stream_reset_session(void)
+{
+    r36sx_host_rpc_stream_abort_transfer();
+    r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_IDLE;
+    r36sx_host_rpc_last_result = R36SX_HOST_RPC_OK;
+    r36sx_host_rpc_request_addr = 0;
+    r36sx_host_rpc_cwd[0] = '\0';
+    (void)r36sx_host_rpc_close_all_handles();
+}
+
+static void r36sx_host_rpc_stream_command_frame(uint8_t command)
+{
+    switch (command) {
+        case R36SX_HOST_RPC_PROTO_RESET:
+            r36sx_host_rpc_stream_reset_session();
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_VERSION);
+            break;
+        case R36SX_HOST_RPC_PROTO_PING:
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_VERSION);
+            break;
+        case R36SX_HOST_RPC_PROTO_ABORT:
+            r36sx_host_rpc_stream_abort_transfer();
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+            break;
+        case R36SX_HOST_RPC_PROTO_END:
+            r36sx_host_rpc_stream_abort_transfer();
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+            break;
+        case R36SX_HOST_RPC_PROTO_CONTINUE:
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+            break;
+        case R36SX_HOST_RPC_PROTO_CALL:
+            r36sx_host_rpc_stream_command = command;
+            r36sx_host_rpc_stream_addr = 0;
+            r36sx_host_rpc_stream_addr_bits = 0;
+            r36sx_host_rpc_stream_addr_chunks = 0;
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+            break;
+        default:
+            r36sx_host_rpc_stream_abort_transfer();
+            r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
+            r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
+            break;
+    }
+}
+
+static void r36sx_host_rpc_stream_data_frame(uint8_t payload)
+{
+    if (r36sx_host_rpc_stream_command != R36SX_HOST_RPC_PROTO_CALL) {
+        r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
+        r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
+        r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
+        return;
+    }
+
+    r36sx_host_rpc_stream_addr |=
+        ((uint32_t)(payload & R36SX_HOST_RPC_PROTO_DATA_MASK)
+         << r36sx_host_rpc_stream_addr_bits);
+    r36sx_host_rpc_stream_addr_bits =
+        (uint8_t)(r36sx_host_rpc_stream_addr_bits + 7u);
+    r36sx_host_rpc_stream_addr_chunks++;
+    if (r36sx_host_rpc_stream_addr_chunks <
+        R36SX_HOST_RPC_PROTO_CALL_ADDR_CHUNKS) {
+        r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+        return;
+    }
+
+    r36sx_host_rpc_request_addr = r36sx_host_rpc_stream_addr;
+    r36sx_host_rpc_execute_request();
+    r36sx_host_rpc_stream_abort_transfer();
+    r36sx_host_rpc_stream_reply(
+        r36sx_host_rpc_status == R36SX_HOST_RPC_STATUS_DONE ?
+            (uint8_t)r36sx_host_rpc_last_result :
+            R36SX_HOST_RPC_PROTO_ERR);
+}
+
+static void r36sx_host_rpc_stream_portout(uint8_t value)
+{
+    if (value & R36SX_HOST_RPC_PROTO_CMD_FLAG) {
+        r36sx_host_rpc_stream_command_frame(
+            (uint8_t)(value & R36SX_HOST_RPC_PROTO_DATA_MASK));
+    } else {
+        r36sx_host_rpc_stream_data_frame(value);
+    }
+}
+
 static void r36sx_host_rpc_portout(uint16_t portnum, uint8_t value)
 {
     switch (portnum - R36SX_HOST_RPC_PORT_BASE) {
+        case 0x00:
+            r36sx_host_rpc_stream_portout(value);
+            break;
         case 0x02:
             if (value == 1u) {
                 r36sx_host_rpc_execute_request();
@@ -1378,7 +1505,7 @@ static uint8_t r36sx_host_rpc_portin(uint16_t portnum)
 {
     switch (portnum - R36SX_HOST_RPC_PORT_BASE) {
         case 0x00:
-            return 'R';
+            return r36sx_host_rpc_stream_value;
         case 0x01:
             return 'H';
         case 0x02:

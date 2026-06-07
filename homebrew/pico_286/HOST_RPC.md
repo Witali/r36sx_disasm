@@ -4,30 +4,35 @@ Pico-286 is moving host-folder access away from emulator-owned `INT 2Fh`
 hooks.  DOS drivers and TSRs should own `INT 2Fh`; the emulator should expose
 only a small private hardware-like RPC device.
 
-## Port Range
+## Stream Port
 
-The R36SX host RPC device uses I/O ports `E360h..E36Fh`.
+The R36SX host RPC device uses one bidirectional 8-bit stream port, `E360h`.
 
-These ports are intentionally outside the common IBM PC/AT legacy range used by
+This port is intentionally outside the common IBM PC/AT legacy range used by
 DMA, PIC, PIT, keyboard, CMOS, VGA, serial, parallel, Sound Blaster, AdLib, and
-NE2000-style cards.  They also avoid `80h`/`190h` POST logging and `E9h`
+NE2000-style cards.  It also avoids `80h`/`190h` POST logging and `E9h`
 debug-console conventions.
 
-## Port Layout
+## Stream Protocol
 
-| Port | Direction | Meaning |
+Guest code reads `E360h` before starting a session and stores bit 7 as the
+current sync bit.  Command frames are written with bit 7 set; data frames are
+written with bit 7 clear and carry 7 payload bits.  Every host reply toggles
+bit 7 in the readable latch, so the guest waits until that bit changes before
+using the low 7 payload bits.
+
+| Command | Value | Notes |
 | --- | --- | --- |
-| `E360h` | read | Signature byte `R` |
-| `E361h` | read | Signature byte `H` |
-| `E362h` | write/read | Command port; write `1` to execute request block. Reads return RPC version `1`. |
-| `E363h` | read | Status |
-| `E364h..E367h` | read/write | 32-bit physical request-block address, little-endian |
-| `E368h..E369h` | read | Last RPC result, little-endian |
+| `RESET` | `0` | Resets HOSTRPC stream state and closes stale host handles. |
+| `PING` | `1` | Returns RPC version `1` in the low 7 bits. |
+| `CONTINUE` | `2` | Reserved for multi-frame host responses. |
+| `ABORT` | `3` | Cancels the current stream transfer. |
+| `END` | `4` | Ends the current stream transfer. |
+| `CALL` | `5` | Receives a 32-bit physical request-block address as five 7-bit data frames, executes it, and writes response fields back to guest RAM. |
 
-This layout keeps the useful 16-bit pairs aligned: `IN E360h` returns the
-`HR` signature word, `OUT E362h` can submit a command byte without disturbing
-the address registers, and `OUT E364h`/`OUT E366h` can write the 32-bit request
-address as two words.
+The first implementation keeps the existing request block as the call payload:
+`CALL` replaces the old `E364h..E367h` address ports and `E362h` execute port,
+but the filesystem command and response fields still live in guest RAM.
 
 ## Request Block
 
@@ -100,13 +105,13 @@ directory.
 ## Diagnostic COM
 
 `homebrew/pico_286/pico-286/tools/hostrpc_test.asm` builds to `hostrpc.com`.
-It checks the port signature, sends a Ping request, creates `HOSTRPC.TXT`,
+It checks the stream protocol with RESET/PING, creates `HOSTRPC.TXT`,
 writes one line, and closes it.
 
 Build it with the shared HOSTRPC include directory:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostrpc_test.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostrpc.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostrpc_test.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools\HOSTRPC.COM
 ```
 
 This is only a diagnostic program.  The next step is a resident DOS

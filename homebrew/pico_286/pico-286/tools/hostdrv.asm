@@ -1,7 +1,7 @@
 ; HOSTDRV - early DOS-side network redirector for R36SX Pico-286.
 ;
 ; This resident .COM owns INT 2Fh/AH=11h and translates DOS redirector
-; callbacks into the private HOSTRPC I/O-port protocol at E360h..E36Fh.
+; callbacks into the private HOSTRPC stream protocol at E360h.
 ; It is intentionally separate from MAPDRIVE.COM while the port-backed
 ; redirector is still being brought up.
 ;
@@ -13,8 +13,9 @@
 ;
 ; Emulator side:
 ;   - The resident driver never touches host files directly.  It fills the
-;     request block below, writes its physical address to HOSTRPC ports, then
-;     waits for the emulator to execute the command and update the block.
+;     request block below, sends its physical address through the HOSTRPC
+;     stream port, then waits for the emulator to execute the command and
+;     update the block.
 ;
 ; Keep this file 8086-compatible.  It is meant to run inside plain DOS before
 ; any 286/386 extender or protected-mode helper is available.
@@ -1423,9 +1424,9 @@ store_far_phys:
     ret
 
 execute_request:
-    ; Submit the current request block to the emulator.  The protocol is
-    ; synchronous: after OUT PORT_COMMAND the emulator has already updated the
-    ; request block and status port by the time we read PORT_STATUS.
+    ; Submit the current request block to the emulator.  The stream protocol is
+    ; synchronous: PROTO_CALL receives this block's physical address as five
+    ; 7-bit data frames and the host toggles the sync bit after each frame.
     push ax
     push dx
     push si
@@ -1433,27 +1434,18 @@ execute_request:
     mov si, request
     mov di, phys_tmp
     call store_near_phys
-    mov dx, PORT_ADDR0
-    mov al, [phys_tmp]
-    out dx, al
-    mov dx, PORT_ADDR1
-    mov al, [phys_tmp + 1]
-    out dx, al
-    mov dx, PORT_ADDR2
-    mov al, [phys_tmp + 2]
-    out dx, al
-    mov dx, PORT_ADDR3
-    mov al, [phys_tmp + 3]
-    out dx, al
-    mov dx, PORT_COMMAND
-    mov al, RPC_EXECUTE
-    out dx, al
-    mov dx, PORT_STATUS
-    in al, dx
-    cmp al, 01h
-    clc
-    je .done
+    mov al, PROTO_CALL
+    call rpc_send_command
+    jc .done
+    call rpc_send_phys_tmp
+    jc .done
+    and al, PROTO_DATA_MASK
+    cmp al, PROTO_DATA_MASK
+    jne .ok
     stc
+    jmp .done
+.ok:
+    clc
 .done:
     pop di
     pop si
@@ -1461,17 +1453,121 @@ execute_request:
     pop ax
     ret
 
+rpc_init_session:
+    mov dx, PORT_DATA
+    in al, dx
+    and al, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], al
+    mov al, PROTO_RESET
+    call rpc_send_command
+    jc .fail
+    mov al, PROTO_PING
+    call rpc_send_command
+    jc .fail
+    and al, PROTO_DATA_MASK
+    cmp al, RPC_VERSION
+    jne .fail
+    clc
+    ret
+.fail:
+    stc
+    ret
+
+rpc_send_command:
+    or al, PROTO_CMD_FLAG
+    jmp rpc_send_frame
+
+rpc_send_data:
+    and al, PROTO_DATA_MASK
+
+rpc_send_frame:
+    push dx
+    mov dx, PORT_DATA
+    out dx, al
+    call rpc_wait_toggle
+    pop dx
+    ret
+
+rpc_wait_toggle:
+    push bx
+    push cx
+    push dx
+    mov bx, 0400h
+.outer:
+    mov cx, 0FFFFh
+.poll:
+    mov dx, PORT_DATA
+    in al, dx
+    mov ah, al
+    xor ah, [rpc_sync_bit]
+    test ah, PROTO_CMD_FLAG
+    jnz .changed
+    loop .poll
+    dec bx
+    jnz .outer
+    stc
+    jmp .done
+.changed:
+    mov ah, al
+    and ah, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], ah
+    clc
+.done:
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+rpc_send_phys_tmp:
+    mov al, [phys_tmp]
+    and al, 07Fh
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp]
+    mov cl, 7
+    shr al, cl
+    mov ah, [phys_tmp + 1]
+    and ah, 03Fh
+    shl ah, 1
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 1]
+    mov cl, 6
+    shr al, cl
+    mov ah, [phys_tmp + 2]
+    and ah, 01Fh
+    mov cl, 2
+    shl ah, cl
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 2]
+    mov cl, 5
+    shr al, cl
+    mov ah, [phys_tmp + 3]
+    and ah, 00Fh
+    mov cl, 3
+    shl ah, cl
+    or al, ah
+    call rpc_send_data
+    jc .done
+
+    mov al, [phys_tmp + 3]
+    mov cl, 4
+    shr al, cl
+    call rpc_send_data
+.done:
+    ret
+
 probe_rpc:
     ; Verify that the emulator exposes HOSTRPC and that the request/response
     ; path is usable before installing a resident redirector.
-    mov dx, PORT_ID0
-    in al, dx
-    cmp al, 'R'
-    jne .fail
-    mov dx, PORT_ID1
-    in al, dx
-    cmp al, 'H'
-    jne .fail
+    call rpc_init_session
+    jc .fail
     call clear_request
     mov word [request + REQ_COMMAND], CMD_PING
     call execute_request
@@ -1614,6 +1710,7 @@ ext_open_attr dw 0
 ext_open_status dw 0
 ext_open_missing_error dw DOS_ERR_FILE_NOT_FOUND
 phys_tmp     dd 0
+rpc_sync_bit db 0
 host_file_count dw 0
 host_find_count dw 0
 host_sft_seg times HOSTDRV_MAX_HANDLES dw 0
@@ -1628,10 +1725,10 @@ err_cds_fail  db 'HOSTDRV: could not get CDS.',13,10,'$'
 err_lastdrive db 'CONFIG.SYS must contain LASTDRIVE='
 err_lastdrive_drive db DEFAULT_DRIVE_LETTER
               db ' or higher.',13,10,'$'
-msg_missing   db 'HOSTDRV: HOSTRPC ports E360h..E36Fh not found.',13,10,'$'
+msg_missing   db 'HOSTDRV: HOSTRPC stream port E360h not found.',13,10,'$'
 msg_ok        db 'HOSTDRV: drive '
 msg_ok_drive  db DEFAULT_DRIVE_LETTER
-              db ': mapped through HOSTRPC ports.',13,10,'$'
+              db ': mapped through HOSTRPC stream port.',13,10,'$'
 
 path_buf      times 128 db 0
 path2_buf     times 128 db 0

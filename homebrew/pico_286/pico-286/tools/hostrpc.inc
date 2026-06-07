@@ -6,20 +6,19 @@
 %ifndef R36SX_HOSTRPC_INC
 %define R36SX_HOSTRPC_INC
 
-; HOSTRPC I/O ports.  The emulator exposes a tiny device here:
-;   E360/E361 return signature bytes 'R'/'H' and can be read as one word.
-;   E362 executes the command currently stored in the request block.
-;   E363 returns status, so command/status sit on one 16-bit I/O pair.
-;   E364..E367 receive the physical request-block address, little-endian.
+; HOSTRPC stream protocol port.  Guest code writes command/data frames to the
+; same 8-bit port and waits for the host to toggle bit 7 in the readable latch.
 PORT_BASE       equ 0E360h
-PORT_ID0        equ PORT_BASE + 0
-PORT_ID1        equ PORT_BASE + 1
-PORT_COMMAND    equ PORT_BASE + 2
-PORT_STATUS     equ PORT_BASE + 3
-PORT_ADDR0      equ PORT_BASE + 4
-PORT_ADDR1      equ PORT_BASE + 5
-PORT_ADDR2      equ PORT_BASE + 6
-PORT_ADDR3      equ PORT_BASE + 7
+PORT_DATA       equ PORT_BASE + 0
+
+PROTO_CMD_FLAG  equ 080h
+PROTO_DATA_MASK equ 07Fh
+PROTO_RESET     equ 0
+PROTO_PING      equ 1
+PROTO_CONTINUE  equ 2
+PROTO_ABORT     equ 3
+PROTO_END       equ 4
+PROTO_CALL      equ 5
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
