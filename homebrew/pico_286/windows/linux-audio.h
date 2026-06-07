@@ -10,7 +10,8 @@ extern "C" {
 
 typedef enum {
     LINUX_AUDIO_NONE = 0,
-    LINUX_AUDIO_WIN32_STUB = 100
+    LINUX_AUDIO_WIN32_STUB = 100,
+    LINUX_AUDIO_WINMM = 101
 } linux_audio_backend_t;
 
 int linux_audio_init(int sample_rate, int channels, int buffer_size);
