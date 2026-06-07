@@ -798,7 +798,7 @@ int mfb_open(const char *name, int width, int height, int scale)
     host_menu = CreatePopupMenu();
     if (menu && host_menu) {
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_DISK,
-                   "Disk menu\tF11");
+                   "Settings\tF11");
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_PRESETS,
                    "Key presets");
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_SCREENSHOT,

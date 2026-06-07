@@ -29,7 +29,7 @@
 #define R36SX_DISK_CPU_80286 1u
 #define R36SX_DISK_CPU_80386 2u
 #define R36SX_DISK_CPU_MIN_MHZ 1u
-#define R36SX_DISK_CPU_MAX_MHZ 30u
+#define R36SX_DISK_CPU_MAX_MHZ 50u
 
 #define R36SX_DISK_X87_OFF 0u
 #define R36SX_DISK_X87_ON 1u
@@ -884,7 +884,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
               rgb565(10, 13, 18));
     stroke_rect(frame, width, height, stride_pixels, 12, 12, width - 24,
                 height - 24, rgb565(94, 118, 134));
-    draw_text(frame, width, height, stride_pixels, 28, 28, "DISK MENU",
+    draw_text(frame, width, height, stride_pixels, 28, 28, "SETTINGS",
               rgb565(238, 236, 196), 3);
     draw_text(frame, width, height, stride_pixels, 28, 60,
               "LEFT/RIGHT CHANGE  A/Y SELECT/OK  X/B CANCEL",
@@ -938,7 +938,7 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
                   menu->message, rgb565(238, 236, 196), 1);
     } else {
         draw_text(frame, width, height, stride_pixels, 32, height - 42,
-                  "FN+SELECT OPENS THIS MENU  FN+START OPENS KEY PRESETS",
+                  "FN+SELECT OPENS SETTINGS  FN+START OPENS KEY PRESETS",
                   rgb565(180, 202, 208), 1);
     }
 }

@@ -104,7 +104,7 @@ Set `log_max_bytes=0` to disable the size cap.
 The Windows host has its own menu entry and shortcuts for debug-only actions
 that would normally be opened through handheld Fn combinations:
 
-- `Host -> Disk menu` or `F11` opens the disk/CPU/device-settings menu.
+- `Host -> Settings` or `F11` opens the disk/CPU/device-settings menu.
 - `Host -> Key presets` opens the key preset editor.
 - `Host -> Screenshot` or `F12` saves a screenshot.
 - `Host -> Show statistics` toggles the statistics overlay.
@@ -226,13 +226,13 @@ or `SHIFT+A`.  B always enters Backspace and X always enters Escape while the
 picker keyboard is visible; in name editing this means B deletes a character
 and X closes the picker.
 
-Holding Fn and pressing Select opens the disk image binding menu.  The menu
+Holding Fn and pressing Select opens the settings menu.  The menu
 lists the four emulated drives `FDD0`, `FDD1`, `HDD0`, and `HDD1`; Left/Right
 or A/Y on a drive row cycles through matching files found in the configured
 `image_dir`.  Floppy rows accept `.img`, `.ima`, `.flp`, `.fdd`, `.vfd`, and
 `.dsk`; hard-disk rows accept `.hdd`, `.hd`, `.hdi`, and `.raw`.
 The host drive is connected from inside DOS by running `MAPDRIVE.COM`; the
-emulator does not inject or launch the mapper from the disk menu.  With no
+emulator does not inject or launch the mapper from the settings menu.  With no
 argument it maps `H:`.  A different letter can be selected with
 `MAPDRIVE G:` or `MAPDRIVE G`; `CONFIG.SYS` must contain `LASTDRIVE=` set to
 that letter or higher.

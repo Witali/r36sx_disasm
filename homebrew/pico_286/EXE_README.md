@@ -87,7 +87,7 @@ without resizing it; `keyboard_mode=normal` keeps the compressed layout.
 Overlay mode caches the keyboard panel and refreshes it only when the visible
 keyboard state changes.
 
-## Disk Image Menu
+## Settings
 
 Open it with Fn+Select.
 
@@ -96,7 +96,7 @@ Open it with Fn+Select.
 - A or Y on a drive row: select the next disk image.
 - A or Y on `BOOT ORDER`: switch between `A,C` and `C,A`.
 - A or Y on `CPU`: switch between `8086`, `80286`, and `80386`.
-- Left/Right on `FREQUENCY`: decrease/increase by 1 MHz from 1 to 30 MHz.
+- Left/Right on `FREQUENCY`: decrease/increase by 1 MHz from 1 to 50 MHz.
 - A or Y on `FREQUENCY`: increase by 1 MHz.
 - A or Y on `X87`: enable or disable the emulated math coprocessor.
 - A or Y on `BIOS`: switch between the normal embedded BIOS and `TEST386`.
@@ -317,7 +317,7 @@ chosen command, such as `MAPDRIVE` or `MAPDRIVE G:`, to the end of
 image.
 
 Normal DOS frames are now presented directly from the emulator `SCREEN` buffer.
-Full-screen menus such as the disk menu and key preset editor draw directly into
+Full-screen menus such as the settings menu and key preset editor draw directly into
 the output frame and skip DOS-frame composition underneath them.
 `keyboard_mode=normal` resizes the DOS image above the on-screen keyboard;
 `keyboard_mode=overlay` keeps the DOS image unscaled and draws the keyboard over

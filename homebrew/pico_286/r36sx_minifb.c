@@ -741,7 +741,7 @@ static void r36sx_mfb_draw_fn_help_overlay(uint16_t *target)
         "FN+UP: SCREENSHOT + PREVIEW",
         "FN+DOWN: APP STATISTICS",
         "FN+RIGHT: POST CODES",
-        "FN+SELECT: DISK MENU",
+        "FN+SELECT: SETTINGS",
         "FN+START: KEY PRESETS",
         "FN+B: SOFT RESET PC",
         "FN+X: EXIT TO TINYMC",

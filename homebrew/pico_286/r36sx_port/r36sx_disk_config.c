@@ -15,7 +15,7 @@
 #define R36SX_PICO286_MAX_DISK_PATH 192
 #define R36SX_PICO286_DEFAULT_RTC_START_TIME "2026-06-03 00:00:00"
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
-#define R36SX_PICO286_MAX_CPU_MHZ 250.000
+#define R36SX_PICO286_MAX_CPU_MHZ 50.000
 /* Round historical throughput estimates used to turn MHz into exec86 IPS. */
 #define R36SX_PICO286_8086_IPS_PER_MHZ 75000u
 #define R36SX_PICO286_80286_IPS_PER_MHZ 150000u
@@ -1961,7 +1961,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# CPU speed knob is converted to exec86 instructions/sec using\n");
     fprintf(fp, "# round historical throughput: 8086=75k, 80286=150k,\n");
     fprintf(fp, "# 80386=300k instructions/sec per MHz.\n");
-    fprintf(fp, "# The disk menu edits cpu_mhz from 1 to 30 MHz in 1 MHz steps.\n");
+    fprintf(fp, "# The settings menu edits cpu_mhz from 1 to 50 MHz in 1 MHz steps.\n");
     fprintf(fp, "# x87_enabled=0 hides the math coprocessor from DOS probes.\n");
     fprintf(fp, "[cpu]\n");
     fprintf(fp, "cpu_model=%s\n", cpu_model_text);
@@ -2213,8 +2213,8 @@ uint32_t r36sx_pico286_cpu_frequency_mhz(void)
     mhz = (uint32_t)(cpu_mhz_value + 0.5);
     if (mhz < 1u) {
         mhz = 1u;
-    } else if (mhz > 30u) {
-        mhz = 30u;
+    } else if (mhz > 50u) {
+        mhz = 50u;
     }
     return mhz;
 }
@@ -2225,7 +2225,7 @@ int r36sx_pico286_set_cpu_frequency_mhz(uint32_t mhz)
 
     load_disk_config();
 
-    if (mhz < 1u || mhz > 30u) {
+    if (mhz < 1u || mhz > 50u) {
         return 0;
     }
 
