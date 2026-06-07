@@ -693,7 +693,7 @@ by your image.
 Build the patch copy with:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools\MAPDRIVE.COM
 ```
 
 `hostdrv.com` is the experimental DOS-side redirector that replaces the old
@@ -702,11 +702,11 @@ handler inside DOS and talks to the emulator only through the private HOSTRPC
 stream port `E360h`.  Build the patch copy with:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\hostdrv.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -i.\homebrew\pico_286\pico-286\tools\ -f bin .\homebrew\pico_286\pico-286\tools\hostdrv.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools\HOSTDRV.COM
 ```
 
-The diagnostic `HOSTRPC.COM` and resident `HOSTDRV.COM` builds are also kept
-under `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/`.
+Generated DOS `.COM` files are kept under
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/`.
 
 Run it inside DOS as `HOSTDRV H:`.  The long-term high-memory target is a
 `HOSTDRV.SYS` variant loaded with `DEVICEHIGH=` when UMBs are available, so the
@@ -715,11 +715,11 @@ redirector does not permanently consume conventional memory.
 Then mirror it into the local disk-image working copy if needed:
 
 ```powershell
-Copy-Item -LiteralPath .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com -Destination .\disk_image\MIPS_NATIVE\pico_286\mapdrive.com -Force
+Copy-Item -LiteralPath .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools\MAPDRIVE.COM -Destination .\disk_image\MIPS_NATIVE\pico_286\MAPDRIVE.COM -Force
 ```
 
 Scan generated binaries before distributing or copying them to the SD card.
-For `mapdrive.com`, the current checked-in patch file was scanned with
+For `MAPDRIVE.COM`, the current checked-in patch file was scanned with
 Microsoft Defender and found clean.
 
 Before replacing the vendored `homebrew/pico_286/pico-286` source snapshot,

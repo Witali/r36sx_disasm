@@ -119,11 +119,11 @@ the patch folder keeps a real `.COM` copy for DOS-side mapping and testing.
 Build it with the same NASM 3.01 executable:
 
 ```powershell
-.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\mapdrive.com
+.\tools\nasm-3.01-win64\nasm-3.01\nasm.exe -f bin .\homebrew\pico_286\pico-286\tools\mapdrive.asm -o .\patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools\MAPDRIVE.COM
 ```
 
-The generated file is mirrored to
-`disk_image/MIPS_NATIVE/pico_286/mapdrive.com` for the local working image.
+Generated DOS `.COM` files for the patch are kept under
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/`.
 
 ## SBPROBE.COM
 
