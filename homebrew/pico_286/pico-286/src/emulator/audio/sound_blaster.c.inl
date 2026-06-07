@@ -352,7 +352,8 @@ inline int16_t blaster_sample() { //for DMA mode
     if (!sound_blaster.dma_transfer_enabled) return sound_blaster.speaker_enabled ? sound_blaster.current_audio_sample : 0;
     if (sound_blaster.silence_mode_active == 0) {
         if (sound_blaster.recording_mode_active == 0) {
-            generated_sample = (i8237_read(SB_DMA_CHANNEL) - 128) << 6;
+            generated_sample = i8237_can_read(SB_DMA_CHANNEL) ?
+                (i8237_read(SB_DMA_CHANNEL) - 128) << 6 : 0;
         } else {
             /*
              * ADC DMA would normally write microphone input into guest memory.

@@ -564,6 +564,8 @@ extern uint8_t xms_handler();
 
 //uint8_t i8237_readport( uint16_t portnum);
 //uint8_t i8237_readpage( uint16_t portnum);
+uint8_t i8237_can_read(uint8_t channel);
+uint8_t i8237_can_write(uint8_t channel);
 uint8_t i8237_read(uint8_t channel);
 
 void i8237_write(uint8_t channel, uint8_t value);

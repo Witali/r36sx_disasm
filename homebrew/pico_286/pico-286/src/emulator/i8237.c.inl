@@ -15,6 +15,9 @@
 
 
 #define DMA_CHANNELS 4
+#define DMA_TRANSFER_VERIFY 0
+#define DMA_TRANSFER_WRITE 1
+#define DMA_TRANSFER_READ 2
 
 typedef struct dma_channel_t {
     uint32_t page;
@@ -79,7 +82,11 @@ static INLINE void i8237_writeport(const uint16_t portnum, const uint8_t value) 
             dma_channels[value & 3].dreq = (value >> 2) & 1;
             break;
         case DMA_CHANNEL_MASK_REGISTER: //DMA channel 0-3 mask register
-            dma_channels[value & 3].masked = (value >> 2) & 1;
+        {
+            const uint8_t channel = value & 3;
+            dma_channels[channel].masked = (value >> 2) & 1;
+            dma_channels[channel].enable = dma_channels[channel].masked ? 0 : 1;
+        }
         // printf("channel %i masked %i\n", value & 3, (value >> 2) & 1);
             break;
         case DMA_MODE_REGISTER: //DMA channel 0-3 mode register
@@ -101,6 +108,10 @@ static INLINE void i8237_writeport(const uint16_t portnum, const uint8_t value) 
             dma_channels[1].masked = (value >> 1) & 1;
             dma_channels[2].masked = (value >> 2) & 1;
             dma_channels[3].masked = (value >> 3) & 1;
+            dma_channels[0].enable = dma_channels[0].masked ? 0 : 1;
+            dma_channels[1].enable = dma_channels[1].masked ? 0 : 1;
+            dma_channels[2].enable = dma_channels[2].masked ? 0 : 1;
+            dma_channels[3].enable = dma_channels[3].masked ? 0 : 1;
             break;
     }
 }
@@ -112,6 +123,20 @@ inline void i8237_reset() {
     dma_channels[1].masked = 1;
     dma_channels[2].masked = 1;
     dma_channels[3].masked = 1;
+}
+
+INLINE uint8_t i8237_can_read(const uint8_t channel) {
+    return channel < DMA_CHANNELS &&
+           dma_channels[channel].enable &&
+           !dma_channels[channel].masked &&
+           dma_channels[channel].transfer_type == DMA_TRANSFER_READ;
+}
+
+INLINE uint8_t i8237_can_write(const uint8_t channel) {
+    return channel < DMA_CHANNELS &&
+           dma_channels[channel].enable &&
+           !dma_channels[channel].masked &&
+           dma_channels[channel].transfer_type == DMA_TRANSFER_WRITE;
 }
 
 static INLINE void i8237_writepage(const uint16_t portnum, const uint8_t value) {
@@ -221,7 +246,7 @@ static INLINE void update_count(const uint8_t channel) {
 }
 
 INLINE uint8_t i8237_read(const uint8_t channel) {
-    if (dma_channels[channel].masked) return 0;
+    if (!i8237_can_read(channel)) return 0;
 
     const uint32_t memory_address = dma_channels[channel].page + dma_channels[channel].address;
     const uint8_t read_data = read86(memory_address);
@@ -231,7 +256,7 @@ INLINE uint8_t i8237_read(const uint8_t channel) {
 }
 
 INLINE void i8237_write(const uint8_t channel, const uint8_t value) {
-    if (dma_channels[channel].masked || dma_channels[channel].transfer_type != 1) {
+    if (!i8237_can_write(channel)) {
         return;
     }
 

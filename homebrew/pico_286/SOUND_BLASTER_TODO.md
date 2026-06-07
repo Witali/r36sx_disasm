@@ -32,7 +32,7 @@ References:
   - Keep PIC EOI handling separate; DOS interrupt handlers normally read the SB
     ack port first, then send EOI to the PIC.
 
-- Fix DMA direction checks for both directions.
+- [x] Fix DMA direction checks for both directions.
   - `i8237_read()` should only transfer when the DMA channel is enabled,
     unmasked, and configured for memory-to-device playback.
   - `i8237_write()` should only transfer when the channel is enabled, unmasked,
