@@ -17,6 +17,14 @@
 #define R36SX_CPU_CORE_8086_ONLY 0
 #endif
 
+#ifndef R36SX_CPU_CORE_FIXED_16BIT
+#define R36SX_CPU_CORE_FIXED_16BIT R36SX_CPU_CORE_8086_ONLY
+#endif
+
+#ifndef R36SX_CPU_CORE_HAS_386_DEBUG_REGS
+#define R36SX_CPU_CORE_HAS_386_DEBUG_REGS (!R36SX_CPU_CORE_FIXED_16BIT)
+#endif
+
 #ifndef R36SX_CPU_CORE_COMPUTED_GOTO
 #define R36SX_CPU_CORE_COMPUTED_GOTO \
     (R36SX_CPU_COMPUTED_GOTO && !R36SX_CPU_CORE_8086_ONLY)
@@ -61,7 +69,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         reptype = 0;
         segoverride = 0;
         lockPrefix = 0;
-#if R36SX_CPU_CORE_8086_ONLY
+#if R36SX_CPU_CORE_FIXED_16BIT
         operandSizeOverride = false;
         addressSizeOverride = false;
 #else
@@ -76,9 +84,11 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         r36sx_cpu_exception_pending = 0u;
         register uint8_t opcode;
 
+#if R36SX_CPU_CORE_HAS_386_DEBUG_REGS
         if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {
             continue;
         }
+#endif
 
         while (!docontinue) {
             ///         CPU_CS &= 0xFFFF;
@@ -3846,7 +3856,7 @@ r36sx_opcode_done:
         if (unlikely(r36sx_cpu_maskable_interrupt_shadow != 0u)) {
             r36sx_cpu_maskable_interrupt_shadow--;
         }
-#if R36SX_CPU_CORE_8086_ONLY
+#if !R36SX_CPU_CORE_HAS_386_DEBUG_REGS
         if (unlikely(was_TF)) {
             was_TF = false;
             intcall86(1);
