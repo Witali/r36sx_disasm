@@ -1673,7 +1673,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     CPU_CX = CPU_CX - 1;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -1708,7 +1707,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     CPU_CX = CPU_CX - 1;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -1743,7 +1741,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     CPU_CX = CPU_CX - 1;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -1778,7 +1775,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     CPU_CX = CPU_CX - 1;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2489,7 +2485,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                                                     loopcount, execloops);
                     r36sx_rep_movsb(batch);
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                    loopcount += batch;
+                    loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
@@ -2497,7 +2493,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 
                 r36sx_rep_movsb(1);
-                loopcount++;
                 break;
 
             case 0xA5:
@@ -2517,7 +2512,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                                                     loopcount, execloops);
                     r36sx_rep_movsw(batch);
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                    loopcount += batch;
+                    loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
@@ -2525,7 +2520,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 
                 r36sx_rep_movsw(1);
-                loopcount++;
                 break;
 
             case 0xA6:
@@ -2558,7 +2552,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2598,7 +2591,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2647,7 +2639,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                                                     loopcount, execloops);
                     r36sx_rep_stosb(batch);
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                    loopcount += batch;
+                    loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
@@ -2655,7 +2647,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 
                 r36sx_rep_stosb(1);
-                loopcount++;
                 break;
 
             case 0xAB:
@@ -2675,7 +2666,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                                                     loopcount, execloops);
                     r36sx_rep_stosw(batch);
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                    loopcount += batch;
+                    loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
                     }
@@ -2683,7 +2674,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 
                 r36sx_rep_stosw(1);
-                loopcount++;
                 break;
 
             case 0xAC:
@@ -2705,7 +2695,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2733,7 +2722,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2769,7 +2757,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }
@@ -2806,7 +2793,6 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                loopcount++;
                 if (!reptype) {
                     break;
                 }

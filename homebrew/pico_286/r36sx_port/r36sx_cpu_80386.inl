@@ -350,7 +350,6 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
             }
-            (*loopcount)++;
             if (reptype) {
                 r36sx_cpu_set_ip(fault_ip);
             }
@@ -375,7 +374,6 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
             }
-            (*loopcount)++;
             if (reptype) {
                 r36sx_cpu_set_ip(fault_ip);
             }
@@ -607,14 +605,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                                             *loopcount, execloops);
                 r36sx_rep_movsd(batch);
                 r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                *loopcount += batch;
+                *loopcount += batch - 1u;
                 if (r36sx_rep_get_count() != 0) {
                     r36sx_cpu_set_ip(fault_ip);
                 }
                 return true;
             }
             r36sx_rep_movsd(1);
-            (*loopcount)++;
             return true;
 
         /* CMPSD */
@@ -636,7 +633,6 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if ((reptype == 2) && zf) {
                 return true;
             }
-            (*loopcount)++;
             if (reptype) {
                 r36sx_cpu_set_ip(fault_ip);
             }
@@ -661,14 +657,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                                             *loopcount, execloops);
                 r36sx_rep_stosd(batch);
                 r36sx_rep_set_count(r36sx_rep_get_count() - batch);
-                *loopcount += batch;
+                *loopcount += batch - 1u;
                 if (r36sx_rep_get_count() != 0) {
                     r36sx_cpu_set_ip(fault_ip);
                 }
                 return true;
             }
             r36sx_rep_stosd(1);
-            (*loopcount)++;
             return true;
 
         /* LODSD */
@@ -682,7 +677,6 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
             }
-            (*loopcount)++;
             if (reptype) {
                 r36sx_cpu_set_ip(fault_ip);
             }
@@ -706,7 +700,6 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if ((reptype == 2) && zf) {
                 return true;
             }
-            (*loopcount)++;
             if (reptype) {
                 r36sx_cpu_set_ip(fault_ip);
             }
