@@ -297,8 +297,14 @@ int2f_handler:
     jmp redir_chain
 
 redir_install_check:
-    ; Installation check.  Some DOS versions also pass a refreshed SDA pointer
-    ; in BX:DX, so keep it if it is non-zero.
+    ; Installation check.  MAPDRIVE-style probes pass BX:DX = SDA, but ordinary
+    ; DOS/app probes are not required to preserve that convention.  HOSTDRV
+    ; already cached the SDA through INT 21h/5D06h at install time, so only use
+    ; BX:DX as a bootstrap fallback if the cached pointer is still empty.
+    cmp word [sda_seg], 0
+    jne .done
+    cmp word [sda_off], 0
+    jne .done
     cmp bx, 0
     jne .store_sda
     cmp dx, 0
