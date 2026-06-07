@@ -157,6 +157,7 @@ static volatile uint8_t g_post_subcode_valid;
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern int r36sx_pico286_video_active_height(void);
 extern void r36sx_pico286_request_soft_reset(void);
+extern void r36sx_memory_dump_request(uint8_t code, const char *reason);
 extern void r36sx_pico286_audio_play_shutter(void);
 
 static uint64_t r36sx_mfb_now_us(void)
@@ -1175,6 +1176,11 @@ static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
         r36sx_pico286_debug_log("minifb: disk menu requested reset");
         r36sx_mfb_disk_menu_set_visible(0);
         r36sx_pico286_request_soft_reset();
+    }
+    if ((result & R36SX_DISK_MENU_RESULT_MEMORY_DUMP) != 0) {
+        r36sx_pico286_debug_log("minifb: disk menu requested memory dump");
+        r36sx_memory_dump_request(0, "settings-menu");
+        g_mfb.force_present = 1;
     }
     if ((result & (R36SX_DISK_MENU_RESULT_CLOSED |
                    R36SX_DISK_MENU_RESULT_EXIT_APP |

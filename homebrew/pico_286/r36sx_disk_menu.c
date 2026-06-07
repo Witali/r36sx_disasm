@@ -17,9 +17,10 @@
 #define R36SX_DISK_MENU_ROW_X87 7
 #define R36SX_DISK_MENU_ROW_BIOS 8
 #define R36SX_DISK_MENU_ROW_EXIT 9
-#define R36SX_DISK_MENU_ROW_OK 10
-#define R36SX_DISK_MENU_ROW_CANCEL 11
-#define R36SX_DISK_MENU_ROW_COUNT 12
+#define R36SX_DISK_MENU_ROW_DUMP_MEMORY 10
+#define R36SX_DISK_MENU_ROW_OK 11
+#define R36SX_DISK_MENU_ROW_CANCEL 12
+#define R36SX_DISK_MENU_ROW_COUNT 13
 
 #define R36SX_DISK_BOOT_ORDER_AC 0u
 #define R36SX_DISK_BOOT_ORDER_CA 1u
@@ -708,6 +709,13 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
          R36SX_DISK_MENU_RESULT_RESET_PC : 0);
 }
 
+static int is_action_row(uint8_t row)
+{
+    return row == R36SX_DISK_MENU_ROW_DUMP_MEMORY ||
+           row == R36SX_DISK_MENU_ROW_OK ||
+           row == R36SX_DISK_MENU_ROW_CANCEL;
+}
+
 void r36sx_disk_menu_init(struct r36sx_disk_menu *menu)
 {
     if (!menu) {
@@ -749,8 +757,7 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
         if (menu->selected_row == 0) {
             menu->selected_row = R36SX_DISK_MENU_ROW_CANCEL;
-        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK ||
-                   menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+        } else if (is_action_row(menu->selected_row)) {
             menu->selected_row = R36SX_DISK_MENU_ROW_EXIT;
         } else {
             menu->selected_row--;
@@ -758,9 +765,8 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     }
     if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
         if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
-            menu->selected_row = R36SX_DISK_MENU_ROW_OK;
-        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK ||
-                   menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+            menu->selected_row = R36SX_DISK_MENU_ROW_DUMP_MEMORY;
+        } else if (is_action_row(menu->selected_row)) {
             menu->selected_row = 0;
         } else {
             menu->selected_row++;
@@ -768,6 +774,12 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
     }
     if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0 &&
         menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
+        menu->selected_row = R36SX_DISK_MENU_ROW_OK;
+    } else if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0 &&
+               menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
+        menu->selected_row = R36SX_DISK_MENU_ROW_DUMP_MEMORY;
+    } else if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0 &&
+               menu->selected_row == R36SX_DISK_MENU_ROW_DUMP_MEMORY) {
         menu->selected_row = R36SX_DISK_MENU_ROW_OK;
     } else if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0 &&
                menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
@@ -826,6 +838,10 @@ uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
             cycle_bios(menu);
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
             return apply_disk_bindings(menu);
+        } else if (menu->selected_row == R36SX_DISK_MENU_ROW_DUMP_MEMORY) {
+            snprintf(menu->message, sizeof(menu->message),
+                     "MEMORY DUMP REQUESTED");
+            return R36SX_DISK_MENU_RESULT_MEMORY_DUMP;
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
             return R36SX_DISK_MENU_RESULT_EXIT_APP;
         } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
@@ -868,9 +884,12 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     int x = 28;
     int y = 86;
     int full_w = width - x * 2;
-    int ok_w = 128;
-    int ok_gap = 24;
-    int ok_x = (width - ok_w * 2 - ok_gap) / 2;
+    int dump_w = 176;
+    int ok_w = 96;
+    int cancel_w = 128;
+    int ok_gap = 18;
+    int dump_x = (width - dump_w - ok_w - cancel_w - ok_gap * 2) / 2;
+    int ok_x = dump_x + dump_w + ok_gap;
     int cancel_x = ok_x + ok_w + ok_gap;
     const int row_h = 24;
     const int gap = 4;
@@ -927,9 +946,13 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
 
     y += row_h + action_gap;
     draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_DUMP_MEMORY, dump_x, y, dump_w, 28,
+             "DUMP MEMORY");
+    draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_OK, ok_x, y, ok_w, 28, "OK");
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_CANCEL, cancel_x, y, ok_w, 28, "CANCEL");
+             R36SX_DISK_MENU_ROW_CANCEL, cancel_x, y, cancel_w, 28,
+             "CANCEL");
 
     if (menu->message[0]) {
         int msg_w = text_width(menu->message, 1);

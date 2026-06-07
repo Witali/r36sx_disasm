@@ -174,7 +174,9 @@ static void r36sx_emergency_dump_registers(const char *path)
     fclose(fp);
 }
 
-void r36sx_emergency_dump_request(uint8_t code, const char *reason)
+static void r36sx_emergency_dump_request_common(uint8_t code,
+                                                const char *reason,
+                                                int stop)
 {
     r36sx_emergency_dump_code = code;
     if (!reason || !reason[0]) {
@@ -184,10 +186,23 @@ void r36sx_emergency_dump_request(uint8_t code, const char *reason)
              sizeof(r36sx_emergency_dump_reason),
              "%s", reason);
     r36sx_emergency_dump_requested = 1;
-    r36sx_emergency_stop_requested = 1;
-    r36sx_pico286_debug_log("emergency_dump: requested code=%u reason='%s'",
+    if (stop) {
+        r36sx_emergency_stop_requested = 1;
+    }
+    r36sx_pico286_debug_log("memory_dump: requested code=%u stop=%d reason='%s'",
                             (unsigned)code,
+                            stop,
                             r36sx_emergency_dump_reason);
+}
+
+void r36sx_emergency_dump_request(uint8_t code, const char *reason)
+{
+    r36sx_emergency_dump_request_common(code, reason, 1);
+}
+
+void r36sx_memory_dump_request(uint8_t code, const char *reason)
+{
+    r36sx_emergency_dump_request_common(code, reason, 0);
 }
 
 int r36sx_emergency_dump_pending(void)
@@ -195,20 +210,27 @@ int r36sx_emergency_dump_pending(void)
     return r36sx_emergency_stop_requested != 0;
 }
 
+int r36sx_memory_dump_pending(void)
+{
+    return r36sx_emergency_dump_requested != 0;
+}
+
 void r36sx_emergency_dump_write_and_clear(void)
 {
     char dir[96];
     char path[160];
+    int stop = r36sx_emergency_stop_requested != 0;
+    const char *prefix = stop ? "emergency_dump" : "memory_dump";
 
     if (!r36sx_emergency_dump_requested) {
         return;
     }
     r36sx_emergency_dump_requested = 0;
     r36sx_emergency_dump_sequence++;
-    snprintf(dir, sizeof(dir), "emergency_dump_%03u",
+    snprintf(dir, sizeof(dir), "%s_%03u", prefix,
              r36sx_emergency_dump_sequence);
     if (!r36sx_emergency_mkdir(dir)) {
-        r36sx_pico286_debug_log("emergency_dump: mkdir failed path='%s' errno=%d",
+        r36sx_pico286_debug_log("memory_dump: mkdir failed path='%s' errno=%d",
                                 dir, errno);
         return;
     }
@@ -225,7 +247,7 @@ void r36sx_emergency_dump_write_and_clear(void)
     snprintf(path, sizeof(path), "%s/text_b800.txt", dir);
     r36sx_emergency_dump_text_screen(path);
 
-    r36sx_pico286_debug_log("emergency_dump: wrote %s", dir);
+    r36sx_pico286_debug_log("memory_dump: wrote %s", dir);
 }
 
 #define R36SX_KEYBOARD_QUEUE_CAPACITY 8u

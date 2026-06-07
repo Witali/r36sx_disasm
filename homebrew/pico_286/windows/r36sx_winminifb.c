@@ -23,6 +23,7 @@
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern void HandleMouse(int x, int y, int buttons);
 extern void r36sx_pico286_request_soft_reset(void);
+extern void r36sx_memory_dump_request(uint8_t code, const char *reason);
 
 #define R36SX_WIN_MENU_DISK 40001
 #define R36SX_WIN_MENU_PRESETS 40002
@@ -31,6 +32,7 @@ extern void r36sx_pico286_request_soft_reset(void);
 #define R36SX_WIN_MENU_POST_CODES 40005
 #define R36SX_WIN_MENU_RESET 40006
 #define R36SX_WIN_MENU_EXIT 40007
+#define R36SX_WIN_MENU_MEMORY_DUMP 40008
 
 #define R36SX_WIN_SCREENSHOT_DIR "screenshots"
 #define R36SX_WIN_STATS_FONT_W 3
@@ -487,6 +489,12 @@ static void r36sx_win_request_screenshot(void)
     r36sx_pico286_debug_log("winminifb: F12 screenshot requested");
 }
 
+static void r36sx_win_request_memory_dump(void)
+{
+    r36sx_memory_dump_request(0, "windows-ui");
+    r36sx_pico286_debug_log("winminifb: memory dump requested");
+}
+
 static void r36sx_win_toggle_post_codes(void)
 {
     g_post_codes_visible = !g_post_codes_visible;
@@ -577,6 +585,9 @@ static void r36sx_win_handle_disk_menu_buttons(uint32_t pressed)
     if ((result & R36SX_DISK_MENU_RESULT_RESET_PC) != 0) {
         r36sx_pico286_request_soft_reset();
     }
+    if ((result & R36SX_DISK_MENU_RESULT_MEMORY_DUMP) != 0) {
+        r36sx_win_request_memory_dump();
+    }
 }
 
 static void r36sx_win_handle_key_preset_buttons(uint32_t pressed,
@@ -634,6 +645,9 @@ static void r36sx_win_handle_command(WORD command)
             break;
         case R36SX_WIN_MENU_SCREENSHOT:
             r36sx_win_request_screenshot();
+            break;
+        case R36SX_WIN_MENU_MEMORY_DUMP:
+            r36sx_win_request_memory_dump();
             break;
         case R36SX_WIN_MENU_STATS:
             r36sx_app_stats_toggle_visible();
@@ -803,6 +817,8 @@ int mfb_open(const char *name, int width, int height, int scale)
                    "Key presets");
         AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_SCREENSHOT,
                    "Screenshot\tF12");
+        AppendMenu(host_menu, MF_STRING, R36SX_WIN_MENU_MEMORY_DUMP,
+                   "Dump memory");
         AppendMenu(host_menu, MF_STRING | MF_UNCHECKED,
                    R36SX_WIN_MENU_STATS, "Show statistics");
         AppendMenu(host_menu, MF_STRING | MF_UNCHECKED,
