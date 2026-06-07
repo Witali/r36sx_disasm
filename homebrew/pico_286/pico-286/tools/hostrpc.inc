@@ -18,32 +18,32 @@ PROTO_PING      equ 1
 PROTO_CONTINUE  equ 2
 PROTO_ABORT     equ 3
 PROTO_END       equ 4
-PROTO_CALL      equ 5
+PROTO_CALL      equ 5       ; reserved legacy generic request-block call
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
 RPC_VERSION     equ 1
-RPC_EXECUTE     equ 1
 
-; HOSTRPC command identifiers understood by r36sx_host_rpc.c.inl.
-CMD_PING        equ 0
-CMD_OPEN_RO     equ 1
-CMD_OPEN_RW     equ 2
-CMD_CREATE      equ 3
-CMD_CLOSE       equ 4
-CMD_READ        equ 5
-CMD_WRITE       equ 6
-CMD_DELETE      equ 7
-CMD_MKDIR       equ 8
-CMD_RMDIR       equ 9
-CMD_GETATTR     equ 10
-CMD_RENAME      equ 11
-CMD_COMMIT      equ 12
-CMD_FIND_FIRST  equ 13
-CMD_FIND_NEXT   equ 14
-CMD_FIND_CLOSE  equ 15
-CMD_CLOSE_ALL   equ 16
-CMD_CHDIR       equ 17
+; HOSTRPC filesystem commands are stream command-frame payloads.  Commands
+; carry a request-block physical address as five 7-bit data frames.
+CMD_PING        equ 6
+CMD_OPEN_RO     equ 7
+CMD_OPEN_RW     equ 8
+CMD_CREATE      equ 9
+CMD_CLOSE       equ 10
+CMD_READ        equ 11
+CMD_WRITE       equ 12
+CMD_DELETE      equ 13
+CMD_MKDIR       equ 14
+CMD_RMDIR       equ 15
+CMD_GETATTR     equ 16
+CMD_RENAME      equ 17
+CMD_COMMIT      equ 18
+CMD_FIND_FIRST  equ 19
+CMD_FIND_NEXT   equ 20
+CMD_FIND_CLOSE  equ 21
+CMD_CLOSE_ALL   equ 22
+CMD_CHDIR       equ 23
 
 ; HOSTRPC currently exposes 16 file handles.  Guest drivers may mirror handle
 ; ownership with sidecar tables, but the handle namespace itself belongs to

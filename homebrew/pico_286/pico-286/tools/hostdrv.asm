@@ -1424,9 +1424,9 @@ store_far_phys:
     ret
 
 execute_request:
-    ; Submit the current request block to the emulator.  The stream protocol is
-    ; synchronous: PROTO_CALL receives this block's physical address as five
-    ; 7-bit data frames and the host toggles the sync bit after each frame.
+    ; Submit the current request block to the emulator.  The stream command is
+    ; the RPC operation; its payload is this block's physical address as five
+    ; 7-bit data frames.  The host toggles the sync bit after each frame.
     push ax
     push dx
     push si
@@ -1434,7 +1434,7 @@ execute_request:
     mov si, request
     mov di, phys_tmp
     call store_near_phys
-    mov al, PROTO_CALL
+    mov al, [request + REQ_COMMAND]
     call rpc_send_command
     jc .done
     call rpc_send_phys_tmp

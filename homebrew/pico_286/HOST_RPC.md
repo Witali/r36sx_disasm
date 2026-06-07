@@ -28,11 +28,14 @@ using the low 7 payload bits.
 | `CONTINUE` | `2` | Reserved for multi-frame host responses. |
 | `ABORT` | `3` | Cancels the current stream transfer. |
 | `END` | `4` | Ends the current stream transfer. |
-| `CALL` | `5` | Receives a 32-bit physical request-block address as five 7-bit data frames, executes it, and writes response fields back to guest RAM. |
+| `CALL` | `5` | Reserved legacy generic request-block call. New clients send the filesystem command value directly. |
 
-The first implementation keeps the existing request block as the call payload:
-`CALL` replaces the old `E364h..E367h` address ports and `E362h` execute port,
-but the filesystem command and response fields still live in guest RAM.
+Filesystem commands use the same command-frame namespace starting at `6`.
+After a filesystem command frame, the guest sends a 32-bit physical
+request-block address as five 7-bit data frames.  The command frame selects
+the operation; the request block carries arguments and response fields.  The
+`command` field remains in the block for staging and legacy generic calls, but
+new stream clients should send the operation as the command frame.
 
 ## Request Block
 
@@ -64,24 +67,24 @@ struct host_rpc_request {
 
 | Command | Name | Notes |
 | --- | --- | --- |
-| `0` | Ping | Verifies the device and writes version info. |
-| `1` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
-| `2` | Open read/write | Opens or creates `path_phys`. |
-| `3` | Create | Creates/truncates `path_phys`. |
-| `4` | Close | Closes `handle`. |
-| `5` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
-| `6` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
-| `7` | Delete | Deletes `path_phys`. |
-| `8` | Mkdir | Creates directory `path_phys`. |
-| `9` | Rmdir | Removes directory `path_phys`. |
-| `10` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
-| `11` | Rename | Renames `path_phys` to `path2_phys`. |
-| `12` | Commit | Flushes the open file in `handle`. |
-| `13` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
-| `14` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
-| `15` | Find close | Closes a search handle from find first. |
-| `16` | Close all | Closes all host handles owned by the redirector instance. |
-| `17` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
+| `6` | Ping | Verifies the device and writes version info. |
+| `7` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
+| `8` | Open read/write | Opens or creates `path_phys`. |
+| `9` | Create | Creates/truncates `path_phys`. |
+| `10` | Close | Closes `handle`. |
+| `11` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
+| `12` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
+| `13` | Delete | Deletes `path_phys`. |
+| `14` | Mkdir | Creates directory `path_phys`. |
+| `15` | Rmdir | Removes directory `path_phys`. |
+| `16` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
+| `17` | Rename | Renames `path_phys` to `path2_phys`. |
+| `18` | Commit | Flushes the open file in `handle`. |
+| `19` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
+| `20` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
+| `21` | Find close | Closes a search handle from find first. |
+| `22` | Close all | Closes all host handles owned by the redirector instance. |
+| `23` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
 
 Find commands write this fixed 20-byte result into `data_phys`, provided
 `data_len >= 20`:

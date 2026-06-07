@@ -7,7 +7,7 @@ This directory contains small DOS-side helpers used by the R36SX Pico-286 port.
   HOSTRPC stream protocol exposed by the emulator on port `E360h`.
 - `hostrpc_test.asm` is a non-resident HOSTRPC stream probe.
 - `hostrpc.inc` is the shared HOSTRPC guest ABI include used by both programs:
-  stream constants, request command ids, request layout, magic/version, and
+  stream constants, stream command ids, request layout, magic/version, and
   request flags.
 - `mapdrive.asm` is the older helper for marking a DOS drive letter as a
   redirected host drive.

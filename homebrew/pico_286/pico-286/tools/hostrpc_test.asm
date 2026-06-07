@@ -116,13 +116,14 @@ store_phys:
 
 execute_request:
     ; Submit the request block through the HOSTRPC stream protocol.  The stream
-    ; command carries a 32-bit physical pointer encoded as five 7-bit frames;
-    ; the host still writes the fixed response fields back into this block.
+    ; command is the RPC operation; the payload is this block's physical
+    ; address encoded as five 7-bit frames.  The host writes fixed response
+    ; fields back into this block.
     mov si, request
     mov di, phys_tmp
     call store_phys
 
-    mov al, PROTO_CALL
+    mov al, [request + REQ_COMMAND]
     call rpc_send_command
     jc .done
     call rpc_send_phys_tmp
