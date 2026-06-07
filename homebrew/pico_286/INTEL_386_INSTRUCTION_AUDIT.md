@@ -104,8 +104,8 @@ mode is strict and many edge cases still need tests:
   conformance tests around every privileged path.
 - TSS and gate code is substantial, but still needs selector/error-code tests
   against Intel's exact `#TS`, `#NP`, `#SS`, and `#GP` rules.
-- `R36SX_CPU_COMPUTED_GOTO` is present but disabled by default.  This is a
-  performance choice rather than a 386 correctness gap.
+- `R36SX_CPU_COMPUTED_GOTO` is enabled by default on GCC/Clang builds.  This
+  is a performance option rather than a 386 correctness gap.
 
 ## Suggested Order
 

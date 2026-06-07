@@ -15,7 +15,11 @@
 #define CPU_286_STYLE_PUSH_SP
 #define R36SX_REP_BATCH_MAX 1024u
 #ifndef R36SX_CPU_COMPUTED_GOTO
+#if defined(__GNUC__) || defined(__clang__)
+#define R36SX_CPU_COMPUTED_GOTO 1
+#else
 #define R36SX_CPU_COMPUTED_GOTO 0
+#endif
 #endif
 #if R36SX_CPU_COMPUTED_GOTO && !defined(__GNUC__) && !defined(__clang__)
 #error R36SX_CPU_COMPUTED_GOTO requires GNU labels-as-values support.
@@ -6819,7 +6823,6 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
 #define R36SX_CPU_CORE_FIXED_16BIT 1
 #define R36SX_CPU_CORE_HAS_386_EXTENDED_OPS 0
 #define R36SX_CPU_CORE_HAS_386_DEBUG_REGS 0
-#define R36SX_CPU_CORE_COMPUTED_GOTO 0
 #define R36SX_CPU_CORE_OPERAND_SIZE_OVERRIDE 0
 #define R36SX_CPU_CORE_ADDRESS_SIZE_OVERRIDE 0
 #define r36sx_cpu_strict_8086_mode 0
