@@ -8,6 +8,8 @@ $BuildDir = Join-Path $ScriptDir "build"
 $Source = Join-Path $ScriptDir "sb_probe.asm"
 $Output = Join-Path $BuildDir "SBPROBE.COM"
 $Listing = Join-Path $BuildDir "sb_probe.lst"
+$PatchToolsDir = Join-Path $RepoRoot "patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286\tools"
+$PatchOutput = Join-Path $PatchToolsDir "SBPROBE.COM"
 
 if (!(Test-Path -LiteralPath $Nasm)) {
     throw "NASM not found: $Nasm"
@@ -19,4 +21,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "NASM failed with exit code $LASTEXITCODE"
 }
 
+New-Item -ItemType Directory -Force -Path $PatchToolsDir | Out-Null
+Copy-Item -LiteralPath $Output -Destination $PatchOutput -Force
+
 Write-Host "Built $Output"
+Write-Host "Copied $PatchOutput"

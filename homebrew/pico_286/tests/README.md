@@ -136,3 +136,6 @@ Build it with:
 ```powershell
 .\homebrew\pico_286\tests\sound_blaster\build_sb_probe.ps1
 ```
+
+The script also mirrors the generated DOS test to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/SBPROBE.COM`.

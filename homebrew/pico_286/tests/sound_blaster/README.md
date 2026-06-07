@@ -21,4 +21,5 @@ Build it with:
 .\homebrew\pico_286\tests\sound_blaster\build_sb_probe.ps1
 ```
 
-The generated `SBPROBE.COM` is written to `tests/sound_blaster/build/`.
+The generated `SBPROBE.COM` is written to `tests/sound_blaster/build/` and
+mirrored to `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/`.
