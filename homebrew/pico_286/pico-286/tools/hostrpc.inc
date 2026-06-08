@@ -20,7 +20,6 @@ PROTO_PING      equ 1
 PROTO_CONTINUE  equ 2
 PROTO_ABORT     equ 3
 PROTO_END       equ 4
-PROTO_CALL      equ 5       ; reserved legacy generic request-block call
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h

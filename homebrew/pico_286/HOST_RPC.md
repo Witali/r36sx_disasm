@@ -28,14 +28,13 @@ using the low 7 payload bits.
 | `CONTINUE` | `2` | Reserved for multi-frame host responses. |
 | `ABORT` | `3` | Cancels the current stream transfer. |
 | `END` | `4` | Ends the current stream transfer. |
-| `CALL` | `5` | Reserved legacy generic request-block call. New clients send the filesystem command value directly. |
 
 Filesystem commands use the same command-frame namespace starting at `6`.
 After a filesystem command frame, the guest sends a 32-bit physical
 request-block address as five 7-bit data frames.  The command frame selects
 the operation; the request block carries arguments and response fields.  The
-`command` field remains in the block for staging and legacy generic calls, but
-new stream clients should send the operation as the command frame.
+`command` field remains in the block as a staging/debug mirror, but the host
+uses the command-frame value as the operation selector.
 
 ## Request Block
 
