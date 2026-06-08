@@ -1,10 +1,14 @@
 #include <pthread.h>
 #include <unistd.h>
+#include <cerrno>
 #include <cstring>
+#include <fcntl.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <time.h>
 #include <cstdio>
+#include <linux/input.h>
 #include "MiniFB.h"
 #include "emulator/emulator.h"
 #include "emulator/includes/font8x16.h"
@@ -56,6 +60,21 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_HLT_SLEEP_US 1000u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
 #define R36SX_EXEC86_MIN_LOOPS 1000u
+#define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
+
+enum {
+    R36SX_EVDEV_MAX_FDS = 16,
+    R36SX_EVDEV_RESCAN_USEC = 2000000
+};
+
+struct r36sx_physical_keyboard_state {
+    int fds[R36SX_EVDEV_MAX_FDS];
+    char paths[R36SX_EVDEV_MAX_FDS][32];
+    uint64_t next_scan_us;
+};
+
+static struct r36sx_physical_keyboard_state g_physical_keyboard;
+
 static int16_t audio_buffers[R36SX_AUDIO_BUFFER_COUNT]
                             [R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
 static int16_t audio_playback_buffer[R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
@@ -1124,13 +1143,13 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // Backspace
         case 9: scancode = 0x0F;
             break; // Tab
-        case 37: scancode = 0x4B;
+        case 37: scancode = 0x4B; extended = 1;
             break; // Left
-        case 38: scancode = 0x48;
+        case 38: scancode = 0x48; extended = 1;
             break; // Up
-        case 39: scancode = 0x4D;
+        case 39: scancode = 0x4D; extended = 1;
             break; // Right
-        case 40: scancode = 0x50;
+        case 40: scancode = 0x50; extended = 1;
             break; // Down
         case 112: scancode = 0x3B;
             break; // F1
@@ -1175,8 +1194,43 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // Caps Lock
         case R36SX_SCREEN_KEY_LWIN: scancode = 0x5B; extended = 1;
             break; // Left Windows
+        case R36SX_SCREEN_KEY_RWIN: scancode = 0x5C; extended = 1;
+            break; // Right Windows
         case R36SX_SCREEN_KEY_APPS: scancode = 0x5D; extended = 1;
             break; // Context menu
+        case R36SX_SCREEN_KEY_NUMPAD0: scancode = 0x52;
+            break; // Numpad 0
+        case R36SX_SCREEN_KEY_NUMPAD1: scancode = 0x4F;
+            break; // Numpad 1
+        case R36SX_SCREEN_KEY_NUMPAD2: scancode = 0x50;
+            break; // Numpad 2
+        case R36SX_SCREEN_KEY_NUMPAD3: scancode = 0x51;
+            break; // Numpad 3
+        case R36SX_SCREEN_KEY_NUMPAD4: scancode = 0x4B;
+            break; // Numpad 4
+        case R36SX_SCREEN_KEY_NUMPAD5: scancode = 0x4C;
+            break; // Numpad 5
+        case R36SX_SCREEN_KEY_NUMPAD6: scancode = 0x4D;
+            break; // Numpad 6
+        case R36SX_SCREEN_KEY_NUMPAD7: scancode = 0x47;
+            break; // Numpad 7
+        case R36SX_SCREEN_KEY_NUMPAD8: scancode = 0x48;
+            break; // Numpad 8
+        case R36SX_SCREEN_KEY_NUMPAD9: scancode = 0x49;
+            break; // Numpad 9
+        case R36SX_SCREEN_KEY_MULTIPLY: scancode = 0x37;
+            break; // Numpad *
+        case R36SX_SCREEN_KEY_ADD:
+        case R36SX_SCREEN_KEY_SEPARATOR: scancode = 0x4E;
+            break; // Numpad +
+        case R36SX_SCREEN_KEY_SUBTRACT: scancode = 0x4A;
+            break; // Numpad -
+        case R36SX_SCREEN_KEY_DECIMAL: scancode = 0x53;
+            break; // Numpad .
+        case R36SX_SCREEN_KEY_DIVIDE: scancode = 0x35; extended = 1;
+            break; // Numpad /
+        case R36SX_SCREEN_KEY_NUMLOCK: scancode = 0x45;
+            break; // Num Lock
         case 33: scancode = 0x49; extended = 1;
             break; // Page Up
         case 34: scancode = 0x51; extended = 1;
@@ -1187,7 +1241,7 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             break; // Home
         case 45: scancode = 0x52; extended = 1;
             break; // Insert
-        case 46: scancode = 0x53;
+        case 46: scancode = 0x53; extended = 1;
             break; // Delete
         case 145: scancode = 0x46;
             break; // Scroll Lock
@@ -1226,6 +1280,280 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
             r36sx_keyboard_enqueue_scancode(0xE0);
         }
         r36sx_keyboard_enqueue_scancode((uint8_t)scancode);
+    }
+}
+
+#define R36SX_EVDEV_BITS_PER_LONG ((int)(sizeof(unsigned long) * 8))
+#define R36SX_EVDEV_BIT_WORD(nr) ((nr) / R36SX_EVDEV_BITS_PER_LONG)
+#define R36SX_EVDEV_BIT_MASK(nr) (1ul << ((nr) % R36SX_EVDEV_BITS_PER_LONG))
+
+static int r36sx_evdev_test_bit(int bit, const unsigned long *bits,
+                                int word_count)
+{
+    int word = R36SX_EVDEV_BIT_WORD(bit);
+    if (word < 0 || word >= word_count) {
+        return 0;
+    }
+    return (bits[word] & R36SX_EVDEV_BIT_MASK(bit)) != 0;
+}
+
+static void r36sx_physical_keyboard_init(void)
+{
+    memset(&g_physical_keyboard, 0, sizeof(g_physical_keyboard));
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        g_physical_keyboard.fds[i] = -1;
+    }
+}
+
+static void r36sx_physical_keyboard_close_index(int index)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS) {
+        return;
+    }
+    if (g_physical_keyboard.fds[index] >= 0) {
+        close(g_physical_keyboard.fds[index]);
+    }
+    g_physical_keyboard.fds[index] = -1;
+    g_physical_keyboard.paths[index][0] = '\0';
+}
+
+static void r36sx_physical_keyboard_close_all(void)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        r36sx_physical_keyboard_close_index(i);
+    }
+}
+
+static int r36sx_physical_keyboard_path_is_open(const char *path)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_keyboard.fds[i] >= 0 &&
+            strcmp(g_physical_keyboard.paths[i], path) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int r36sx_physical_keyboard_is_keyboard_fd(int fd)
+{
+    unsigned long ev_bits[R36SX_EVDEV_BIT_WORD(EV_MAX) + 1];
+    unsigned long key_bits[R36SX_EVDEV_BIT_WORD(KEY_MAX) + 1];
+
+    memset(ev_bits, 0, sizeof(ev_bits));
+    memset(key_bits, 0, sizeof(key_bits));
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(EV_KEY, ev_bits,
+                              (int)R36SX_ARRAY_COUNT(ev_bits))) {
+        return 0;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) < 0) {
+        return 0;
+    }
+    return r36sx_evdev_test_bit(KEY_A, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits)) &&
+           r36sx_evdev_test_bit(KEY_ENTER, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits));
+}
+
+static void r36sx_physical_keyboard_try_open(const char *path)
+{
+    if (r36sx_physical_keyboard_path_is_open(path)) {
+        return;
+    }
+
+    int slot = -1;
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_keyboard.fds[i] < 0) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        return;
+    }
+
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    if (fd < 0) {
+        return;
+    }
+    if (!r36sx_physical_keyboard_is_keyboard_fd(fd)) {
+        close(fd);
+        return;
+    }
+
+    g_physical_keyboard.fds[slot] = fd;
+    snprintf(g_physical_keyboard.paths[slot],
+             sizeof(g_physical_keyboard.paths[slot]), "%s", path);
+    r36sx_pico286_debug_log("keyboard: opened physical input %s", path);
+}
+
+static void r36sx_physical_keyboard_scan(void)
+{
+    uint64_t now = r36sx_pico286_now_us();
+    if (now < g_physical_keyboard.next_scan_us) {
+        return;
+    }
+    g_physical_keyboard.next_scan_us = now + R36SX_EVDEV_RESCAN_USEC;
+
+    for (int i = 0; i < 32; i++) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        r36sx_physical_keyboard_try_open(path);
+    }
+}
+
+static unsigned int r36sx_evdev_key_to_screen_key(unsigned int code)
+{
+    if (code >= KEY_1 && code <= KEY_9) {
+        return '1' + (code - KEY_1);
+    }
+    if (code >= KEY_F1 && code <= KEY_F10) {
+        return R36SX_SCREEN_KEY_F1 + (code - KEY_F1);
+    }
+
+    switch (code) {
+        case KEY_0: return '0';
+        case KEY_A: return 'A';
+        case KEY_B: return 'B';
+        case KEY_C: return 'C';
+        case KEY_D: return 'D';
+        case KEY_E: return 'E';
+        case KEY_F: return 'F';
+        case KEY_G: return 'G';
+        case KEY_H: return 'H';
+        case KEY_I: return 'I';
+        case KEY_J: return 'J';
+        case KEY_K: return 'K';
+        case KEY_L: return 'L';
+        case KEY_M: return 'M';
+        case KEY_N: return 'N';
+        case KEY_O: return 'O';
+        case KEY_P: return 'P';
+        case KEY_Q: return 'Q';
+        case KEY_R: return 'R';
+        case KEY_S: return 'S';
+        case KEY_T: return 'T';
+        case KEY_U: return 'U';
+        case KEY_V: return 'V';
+        case KEY_W: return 'W';
+        case KEY_X: return 'X';
+        case KEY_Y: return 'Y';
+        case KEY_Z: return 'Z';
+        case KEY_ESC: return R36SX_SCREEN_KEY_ESCAPE;
+        case KEY_BACKSPACE: return R36SX_SCREEN_KEY_BACK;
+        case KEY_TAB: return R36SX_SCREEN_KEY_TAB;
+        case KEY_ENTER:
+        case KEY_KPENTER: return R36SX_SCREEN_KEY_RETURN;
+        case KEY_SPACE: return R36SX_SCREEN_KEY_SPACE;
+        case KEY_LEFTSHIFT: return R36SX_SCREEN_KEY_LSHIFT;
+        case KEY_RIGHTSHIFT: return R36SX_SCREEN_KEY_RSHIFT;
+        case KEY_LEFTCTRL: return R36SX_SCREEN_KEY_LCONTROL;
+        case KEY_RIGHTCTRL: return R36SX_SCREEN_KEY_RCONTROL;
+        case KEY_LEFTALT: return R36SX_SCREEN_KEY_LMENU;
+        case KEY_RIGHTALT: return R36SX_SCREEN_KEY_RMENU;
+        case KEY_CAPSLOCK: return R36SX_SCREEN_KEY_CAPITAL;
+        case KEY_HOME: return R36SX_SCREEN_KEY_HOME;
+        case KEY_UP: return R36SX_SCREEN_KEY_UP;
+        case KEY_PAGEUP: return R36SX_SCREEN_KEY_PRIOR;
+        case KEY_LEFT: return R36SX_SCREEN_KEY_LEFT;
+        case KEY_RIGHT: return R36SX_SCREEN_KEY_RIGHT;
+        case KEY_END: return R36SX_SCREEN_KEY_END;
+        case KEY_DOWN: return R36SX_SCREEN_KEY_DOWN;
+        case KEY_PAGEDOWN: return R36SX_SCREEN_KEY_NEXT;
+        case KEY_INSERT: return R36SX_SCREEN_KEY_INSERT;
+        case KEY_DELETE: return R36SX_SCREEN_KEY_DELETE;
+        case KEY_SYSRQ: return R36SX_SCREEN_KEY_PRINT;
+        case KEY_PAUSE: return R36SX_SCREEN_KEY_PAUSE;
+        case KEY_LEFTMETA: return R36SX_SCREEN_KEY_LWIN;
+        case KEY_RIGHTMETA: return R36SX_SCREEN_KEY_RWIN;
+        case KEY_MENU:
+        case KEY_COMPOSE: return R36SX_SCREEN_KEY_APPS;
+        case KEY_NUMLOCK: return R36SX_SCREEN_KEY_NUMLOCK;
+        case KEY_F11: return R36SX_SCREEN_KEY_F1 + 10;
+        case KEY_F12: return R36SX_SCREEN_KEY_F1 + 11;
+        case KEY_SCROLLLOCK: return R36SX_SCREEN_KEY_SCROLL;
+        case KEY_SEMICOLON: return R36SX_SCREEN_KEY_OEM_1;
+        case KEY_EQUAL: return R36SX_SCREEN_KEY_OEM_PLUS;
+        case KEY_COMMA: return R36SX_SCREEN_KEY_OEM_COMMA;
+        case KEY_MINUS: return R36SX_SCREEN_KEY_OEM_MINUS;
+        case KEY_DOT: return R36SX_SCREEN_KEY_OEM_PERIOD;
+        case KEY_SLASH: return R36SX_SCREEN_KEY_OEM_2;
+        case KEY_GRAVE: return R36SX_SCREEN_KEY_OEM_3;
+        case KEY_LEFTBRACE: return R36SX_SCREEN_KEY_OEM_4;
+        case KEY_BACKSLASH: return R36SX_SCREEN_KEY_OEM_5;
+        case KEY_RIGHTBRACE: return R36SX_SCREEN_KEY_OEM_6;
+        case KEY_APOSTROPHE: return R36SX_SCREEN_KEY_OEM_7;
+        case KEY_KP0: return R36SX_SCREEN_KEY_NUMPAD0;
+        case KEY_KP1: return R36SX_SCREEN_KEY_NUMPAD1;
+        case KEY_KP2: return R36SX_SCREEN_KEY_NUMPAD2;
+        case KEY_KP3: return R36SX_SCREEN_KEY_NUMPAD3;
+        case KEY_KP4: return R36SX_SCREEN_KEY_NUMPAD4;
+        case KEY_KP5: return R36SX_SCREEN_KEY_NUMPAD5;
+        case KEY_KP6: return R36SX_SCREEN_KEY_NUMPAD6;
+        case KEY_KP7: return R36SX_SCREEN_KEY_NUMPAD7;
+        case KEY_KP8: return R36SX_SCREEN_KEY_NUMPAD8;
+        case KEY_KP9: return R36SX_SCREEN_KEY_NUMPAD9;
+        case KEY_KPASTERISK: return R36SX_SCREEN_KEY_MULTIPLY;
+        case KEY_KPPLUS: return R36SX_SCREEN_KEY_ADD;
+        case KEY_KPMINUS: return R36SX_SCREEN_KEY_SUBTRACT;
+        case KEY_KPDOT: return R36SX_SCREEN_KEY_DECIMAL;
+        case KEY_KPSLASH: return R36SX_SCREEN_KEY_DIVIDE;
+        default: return 0;
+    }
+}
+
+static void r36sx_physical_keyboard_handle_key(unsigned int code, int value)
+{
+    unsigned int keycode = r36sx_evdev_key_to_screen_key(code);
+    if (keycode == 0) {
+        return;
+    }
+    if (value == 0 || value == 1 || value == 2) {
+        HandleInput(keycode, value != 0);
+    }
+}
+
+static void r36sx_physical_keyboard_poll(void)
+{
+    r36sx_physical_keyboard_scan();
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        int fd = g_physical_keyboard.fds[i];
+        if (fd < 0) {
+            continue;
+        }
+        for (;;) {
+            struct input_event ev;
+            ssize_t n = read(fd, &ev, sizeof(ev));
+            if (n == (ssize_t)sizeof(ev)) {
+                if (ev.type == EV_KEY) {
+                    r36sx_physical_keyboard_handle_key(ev.code, ev.value);
+                }
+                continue;
+            }
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK ||
+                    errno == EINTR) {
+                    break;
+                }
+                if (errno == ENODEV || errno == ENXIO) {
+                    r36sx_pico286_debug_log(
+                        "keyboard: removed physical input %s",
+                        g_physical_keyboard.paths[i]);
+                    r36sx_physical_keyboard_close_index(i);
+                }
+                break;
+            }
+            if (n == 0) {
+                r36sx_pico286_debug_log(
+                    "keyboard: removed physical input %s",
+                    g_physical_keyboard.paths[i]);
+                r36sx_physical_keyboard_close_index(i);
+            }
+            break;
+        }
     }
 }
 
@@ -1611,6 +1939,7 @@ int main() {
     signal(SIGBUS, fatal_signal_handler);
     signal(SIGILL, fatal_signal_handler);
     signal(SIGABRT, fatal_signal_handler);
+    r36sx_physical_keyboard_init();
 
     r36sx_pico286_debug_log("main: opening MiniFB");
     if (!mfb_open("Pico-286 Emulator", 640, 480, 1)) {
@@ -1752,6 +2081,7 @@ int main() {
             }
         }
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
+        r36sx_physical_keyboard_poll();
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_1);
         if (main_loop_count < 8u) {
@@ -1847,6 +2177,7 @@ int main() {
     r36sx_pico286_debug_log("main: cleanup begin");
     r36sx_pico286_disk_flush_all();
     linux_audio_close();
+    r36sx_physical_keyboard_close_all();
 
     mfb_close();
     r36sx_pico286_debug_log("main: exit 0");
