@@ -17,7 +17,6 @@ static inline uint32_t r36sx_cpu_real_linear(uint16_t selector,
      */
     uint32_t linear = r36sx_cpu_segbase(selector) + offset;
 
-#if !PICO_ON_DEVICE
     /*
      * The original 8086/8088 has only 20 physical address lines.  Even if the
      * host chipset/A20 state says otherwise, strict 8086 mode must wrap
@@ -26,18 +25,21 @@ static inline uint32_t r36sx_cpu_real_linear(uint16_t selector,
     if (r36sx_cpu_strict_8086_mode) {
         linear &= 0x000fffffu;
     }
-#endif
 
+    return linear;
+}
+
+static inline uint32_t r36sx_cpu_real_mask_8086(uint32_t linear)
+{
+    if (r36sx_cpu_strict_8086_mode) {
+        linear &= 0x000fffffu;
+    }
     return linear;
 }
 
 static inline uint8_t r36sx_cpu_real_read8(uint32_t linear)
 {
-#if !PICO_ON_DEVICE
-    if (r36sx_cpu_strict_8086_mode) {
-        linear &= 0x000fffffu;
-    }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     return r36sx_read86_fast(linear);
 #else
@@ -47,13 +49,12 @@ static inline uint8_t r36sx_cpu_real_read8(uint32_t linear)
 
 static inline uint16_t r36sx_cpu_real_read16(uint32_t linear)
 {
-#if !PICO_ON_DEVICE
     if (r36sx_cpu_strict_8086_mode &&
         (linear & 0x000fffffu) == 0x000fffffu) {
         return (uint16_t)r36sx_cpu_real_read8(linear) |
                ((uint16_t)r36sx_cpu_real_read8(linear + 1u) << 8);
     }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     return r36sx_readw86_fast(linear);
 #else
@@ -63,7 +64,6 @@ static inline uint16_t r36sx_cpu_real_read16(uint32_t linear)
 
 static inline uint32_t r36sx_cpu_real_read32(uint32_t linear)
 {
-#if !PICO_ON_DEVICE
     if (r36sx_cpu_strict_8086_mode &&
         (linear & 0x000fffffu) > 0x000ffffcu) {
         return (uint32_t)r36sx_cpu_real_read8(linear) |
@@ -71,7 +71,7 @@ static inline uint32_t r36sx_cpu_real_read32(uint32_t linear)
                ((uint32_t)r36sx_cpu_real_read8(linear + 2u) << 16) |
                ((uint32_t)r36sx_cpu_real_read8(linear + 3u) << 24);
     }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     return r36sx_readdw86_fast(linear);
 #else
@@ -81,11 +81,7 @@ static inline uint32_t r36sx_cpu_real_read32(uint32_t linear)
 
 static inline void r36sx_cpu_real_write8(uint32_t linear, uint8_t value)
 {
-#if !PICO_ON_DEVICE
-    if (r36sx_cpu_strict_8086_mode) {
-        linear &= 0x000fffffu;
-    }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
     r36sx_cpu_debug_note_data_write(linear, 1u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_write86_fast(linear, value);
@@ -96,14 +92,13 @@ static inline void r36sx_cpu_real_write8(uint32_t linear, uint8_t value)
 
 static inline void r36sx_cpu_real_write16(uint32_t linear, uint16_t value)
 {
-#if !PICO_ON_DEVICE
     if (r36sx_cpu_strict_8086_mode &&
         (linear & 0x000fffffu) == 0x000fffffu) {
         r36sx_cpu_real_write8(linear, (uint8_t)value);
         r36sx_cpu_real_write8(linear + 1u, (uint8_t)(value >> 8));
         return;
     }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
     r36sx_cpu_debug_note_data_write(linear, 2u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_writew86_fast(linear, value);
@@ -114,7 +109,6 @@ static inline void r36sx_cpu_real_write16(uint32_t linear, uint16_t value)
 
 static inline void r36sx_cpu_real_write32(uint32_t linear, uint32_t value)
 {
-#if !PICO_ON_DEVICE
     if (r36sx_cpu_strict_8086_mode &&
         (linear & 0x000fffffu) > 0x000ffffcu) {
         r36sx_cpu_real_write8(linear, (uint8_t)value);
@@ -123,7 +117,7 @@ static inline void r36sx_cpu_real_write32(uint32_t linear, uint32_t value)
         r36sx_cpu_real_write8(linear + 3u, (uint8_t)(value >> 24));
         return;
     }
-#endif
+    linear = r36sx_cpu_real_mask_8086(linear);
     r36sx_cpu_debug_note_data_write(linear, 4u);
 #if R36SX_NATIVE_FAST_MEMORY && !PICO_ON_DEVICE
     r36sx_writedw86_fast(linear, value);

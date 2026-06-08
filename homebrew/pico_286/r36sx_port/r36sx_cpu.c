@@ -5677,7 +5677,6 @@ static inline uint8_t r36sx_cpu_lock_prefix_allowed(uint8_t opcode)
 
 
 void reset86() {
-#if !PICO_ON_DEVICE
     r36sx_pico286_cpu_model_t cpu_model = r36sx_pico286_cpu_model();
     r36sx_cpu_strict_8086_mode =
         cpu_model == R36SX_PICO286_CPU_8086;
@@ -5685,11 +5684,6 @@ void reset86() {
         cpu_model >= R36SX_PICO286_CPU_80286;
     r36sx_cpu_model_at_least_80386 =
         cpu_model >= R36SX_PICO286_CPU_80386;
-#else
-    r36sx_cpu_strict_8086_mode = 0;
-    r36sx_cpu_model_at_least_80286 = 1;
-    r36sx_cpu_model_at_least_80386 = 1;
-#endif
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
     CPU_SP = 0x0000;
@@ -6727,6 +6721,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
 #define r36sx_cpu_protected_enabled() 0
 #define r36sx_cpu_native_protected_enabled() 0
 #define r36sx_cpu_v86_iopl_sensitive_fault(fault_ip) 0
+#define r36sx_cpu_lock_prefix_allowed(opcode) ((void)(opcode), 1)
 #define r36sx_cpu_check_segment_access(offset, bytes, write_access) \
     ((void)(offset), (void)(bytes), (void)(write_access), 1)
 #define r36sx_cpu_debug_check_execute_breakpoint(fault_ip) 0
@@ -6802,6 +6797,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
 #undef r36sx_cpu_x87_wait_available
 #undef r36sx_cpu_debug_check_execute_breakpoint
 #undef r36sx_cpu_check_segment_access
+#undef r36sx_cpu_lock_prefix_allowed
 #undef r36sx_cpu_v86_iopl_sensitive_fault
 #undef r36sx_cpu_native_protected_enabled
 #undef r36sx_cpu_protected_enabled
