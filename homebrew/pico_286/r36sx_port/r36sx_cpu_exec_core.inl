@@ -3310,7 +3310,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
 
                 CPU_AH = (CPU_AL / oper1) & 255;
                 CPU_AL = (CPU_AL % oper1) & 255;
-                flag_szp16(CPU_AX);
+                flag_szp8(CPU_AL);
                 break;
 
             case 0xD5:
@@ -3322,9 +3322,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 StepIP(1);
                 CPU_AL = (CPU_AH * oper1 + CPU_AL) & 255;
                 CPU_AH = 0;
-                flag_szp16(CPU_AH
-                           * oper1 + CPU_AL);
-                sf = 0;
+                flag_szp8(CPU_AL);
                 break;
 
             case 0xD6:
