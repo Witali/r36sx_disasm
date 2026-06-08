@@ -6718,7 +6718,6 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
 #define R36SX_CPU_EXEC_CORE_NAME r36sx_cpu_exec8086_core
 #define R36SX_CPU_CORE_8086_ONLY 1
 #define R36SX_CPU_CORE_HAS_386_EXTENDED_OPS 0
-#define R36SX_CPU_CORE_COMPUTED_GOTO 0
 #define R36SX_CPU_CORE_OPERAND_SIZE_OVERRIDE 0
 #define R36SX_CPU_CORE_ADDRESS_SIZE_OVERRIDE 0
 #define CPU_8086 1
