@@ -268,9 +268,6 @@ static inline void flag_sub32(uint32_t v1, uint32_t v2) {
 
 static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
     register uint16_t s = oper1b;
-#ifdef CPU_LIMIT_SHIFT_COUNT
-    cnt &= 0x1F;
-#endif
     /*
      * Intel rotate/shift instructions with an effective count of zero are
      * no-ops: the destination and all FLAGS bits must remain unchanged.
@@ -386,9 +383,6 @@ static __not_in_flash() uint8_t op_grp2_8(uint8_t cnt, uint8_t oper1b) {
 
 static __not_in_flash() uint16_t op_grp2_16(uint8_t cnt) {
     register uint32_t s = oper1;
-#ifdef CPU_LIMIT_SHIFT_COUNT
-    cnt &= 0x1F;
-#endif
     /*
      * Intel rotate/shift instructions with an effective count of zero are
      * no-ops: the destination and all FLAGS bits must remain unchanged.

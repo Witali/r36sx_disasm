@@ -37,6 +37,17 @@
 #define R36SX_CPU_CORE_ADDRESS_SIZE_OVERRIDE addressSizeOverride
 #endif
 
+#ifndef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT
+#define R36SX_CPU_CORE_LIMIT_SHIFT_COUNT (!R36SX_CPU_CORE_8086_ONLY)
+#define R36SX_CPU_CORE_LIMIT_SHIFT_COUNT_DEFAULTED 1
+#endif
+
+#if R36SX_CPU_CORE_LIMIT_SHIFT_COUNT
+#define R36SX_CPU_CORE_SHIFT_COUNT(count) ((uint8_t)((count) & 0x1fu))
+#else
+#define R36SX_CPU_CORE_SHIFT_COUNT(count) ((uint8_t)(count))
+#endif
+
 static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
     static uint32_t firstip;
     static bool was_TF;
@@ -2966,7 +2977,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 oper1b = readrm8(rm);
                 oper2b = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                writerm8(rm, op_grp2_8(oper2b, oper1b));
+                writerm8(rm, op_grp2_8(
+                    R36SX_CPU_CORE_SHIFT_COUNT(oper2b), oper1b));
                 break;
 
             case 0xC1:
@@ -2983,7 +2995,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 oper1 = readrm16(rm);
                 oper2 = getmem8(CPU_CS, CPU_IP);
                 StepIP(1);
-                writerm16(rm, op_grp2_16((uint8_t) oper2)
+                writerm16(rm, op_grp2_16(
+                    R36SX_CPU_CORE_SHIFT_COUNT((uint8_t)oper2))
                 );
                 break;
 
@@ -3243,7 +3256,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 modregrm();
 
                 oper1b = readrm8(rm);
-                writerm8(rm, op_grp2_8(1, oper1b));
+                writerm8(rm, op_grp2_8(R36SX_CPU_CORE_SHIFT_COUNT(1),
+                                        oper1b));
                 break;
 
             case 0xD1:
@@ -3254,7 +3268,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 modregrm();
 
                 oper1 = readrm16(rm);
-                writerm16(rm, op_grp2_16(1));
+                writerm16(rm, op_grp2_16(R36SX_CPU_CORE_SHIFT_COUNT(1)));
                 break;
 
             case 0xD2:
@@ -3265,7 +3279,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 modregrm();
 
                 oper1b = readrm8(rm);
-                writerm8(rm, op_grp2_8(CPU_CL, oper1b));
+                writerm8(rm, op_grp2_8(R36SX_CPU_CORE_SHIFT_COUNT(CPU_CL),
+                                        oper1b));
                 break;
 
             case 0xD3:
@@ -3276,7 +3291,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 modregrm();
 
                 oper1 = readrm16(rm);
-                writerm16(rm, op_grp2_16(CPU_CL)
+                writerm16(rm, op_grp2_16(
+                    R36SX_CPU_CORE_SHIFT_COUNT(CPU_CL))
                 );
                 break;
 
@@ -3875,3 +3891,8 @@ r36sx_opcode_done:
     r36sx_app_stats_record_x86(loopcount);
 }
 
+#undef R36SX_CPU_CORE_SHIFT_COUNT
+#ifdef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT_DEFAULTED
+#undef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT_DEFAULTED
+#undef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT
+#endif
