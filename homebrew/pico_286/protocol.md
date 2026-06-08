@@ -21,35 +21,9 @@
 `homebrew/pico_286/r36sx_port/r36sx_host_rpc.c.inl`; номера команд в этих
 файлах должны оставаться синхронизированными.
 
-## Совместимый Byte-Port Интерфейс
-
-Основной протокол использует stream port `E360h`. Хост также поддерживает
-совместимый набор byte ports для прямой установки request-block адреса:
-
-| Порт | Чтение | Запись |
-| --- | --- | --- |
-| `E360h` | Текущий stream latch | Stream command/data frame |
-| `E361h` | ASCII `H` | Не используется |
-| `E362h` | `RPC_VERSION` | Прямой command id `6..23` |
-| `E363h` | Status | Не используется |
-| `E364h` | Request address byte 0 | Request address byte 0 |
-| `E365h` | Request address byte 1 | Request address byte 1 |
-| `E366h` | Request address byte 2 | Request address byte 2 |
-| `E367h` | Request address byte 3 | Request address byte 3 |
-| `E368h` | Last result byte 0 | Не используется |
-| `E369h` | Last result byte 1 | Не используется |
-
-Для этого интерфейса гость сначала записывает физический адрес request block в
-`E364h..E367h`, затем пишет command id `6..23` в `E362h`. Значение `1` больше
-не является "generic call"; команды хоста вызываются непосредственно по их id.
-
-Status values:
-
-| Значение | Смысл |
-| --- | --- |
-| `00h` | Idle |
-| `01h` | Done |
-| `80h` | Bad request |
+Других HOSTRPC command/address/result портов нет. Команда, адрес request block
+и ответные коды передаются через основной stream port `E360h`. Диагностический
+trace port и emergency dump port не являются частью RPC-протокола данных.
 
 ## Формат Кадра
 

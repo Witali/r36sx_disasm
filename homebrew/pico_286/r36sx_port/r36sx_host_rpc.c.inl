@@ -40,8 +40,8 @@
 #endif
 
 #define R36SX_HOST_RPC_PORT_BASE 0xE360u
-#define R36SX_HOST_RPC_PORT_LAST (R36SX_HOST_RPC_PORT_BASE + 9u)
 #define R36SX_HOST_RPC_STREAM_PORT R36SX_HOST_RPC_PORT_BASE
+#define R36SX_HOST_RPC_PORT_LAST R36SX_HOST_RPC_STREAM_PORT
 
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
 #define R36SX_HOST_RPC_VERSION 1u
@@ -1519,66 +1519,13 @@ static void r36sx_host_rpc_stream_portout(uint8_t value)
 
 static void r36sx_host_rpc_portout(uint16_t portnum, uint8_t value)
 {
-    switch (portnum - R36SX_HOST_RPC_PORT_BASE) {
-        case 0x00:
-            r36sx_host_rpc_stream_portout(value);
-            break;
-        case 0x02:
-            if (r36sx_host_rpc_is_request_command(value)) {
-                r36sx_host_rpc_execute_request(value);
-            } else {
-                r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
-                r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
-            }
-            break;
-        case 0x04:
-            r36sx_host_rpc_request_addr =
-                (r36sx_host_rpc_request_addr & 0xFFFFFF00u) | value;
-            break;
-        case 0x05:
-            r36sx_host_rpc_request_addr =
-                (r36sx_host_rpc_request_addr & 0xFFFF00FFu) |
-                ((uint32_t)value << 8);
-            break;
-        case 0x06:
-            r36sx_host_rpc_request_addr =
-                (r36sx_host_rpc_request_addr & 0xFF00FFFFu) |
-                ((uint32_t)value << 16);
-            break;
-        case 0x07:
-            r36sx_host_rpc_request_addr =
-                (r36sx_host_rpc_request_addr & 0x00FFFFFFu) |
-                ((uint32_t)value << 24);
-            break;
-        default:
-            break;
+    if (portnum == R36SX_HOST_RPC_STREAM_PORT) {
+        r36sx_host_rpc_stream_portout(value);
     }
 }
 
 static uint8_t r36sx_host_rpc_portin(uint16_t portnum)
 {
-    switch (portnum - R36SX_HOST_RPC_PORT_BASE) {
-        case 0x00:
-            return r36sx_host_rpc_stream_value;
-        case 0x01:
-            return 'H';
-        case 0x02:
-            return R36SX_HOST_RPC_VERSION;
-        case 0x03:
-            return r36sx_host_rpc_status;
-        case 0x04:
-            return (uint8_t)r36sx_host_rpc_request_addr;
-        case 0x05:
-            return (uint8_t)(r36sx_host_rpc_request_addr >> 8);
-        case 0x06:
-            return (uint8_t)(r36sx_host_rpc_request_addr >> 16);
-        case 0x07:
-            return (uint8_t)(r36sx_host_rpc_request_addr >> 24);
-        case 0x08:
-            return (uint8_t)r36sx_host_rpc_last_result;
-        case 0x09:
-            return (uint8_t)(r36sx_host_rpc_last_result >> 8);
-        default:
-            return 0xFFu;
-    }
+    return portnum == R36SX_HOST_RPC_STREAM_PORT ?
+        r36sx_host_rpc_stream_value : 0xFFu;
 }

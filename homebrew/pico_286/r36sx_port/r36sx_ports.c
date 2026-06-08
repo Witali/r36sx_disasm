@@ -28,8 +28,8 @@ OPL *emu8950_opl;
 #include "i8237.c.inl"
 #include "r36sx_host_rpc.c.inl"
 
-#define R36SX_HOSTDRV_TRACE_PORT (R36SX_HOST_RPC_PORT_LAST + 1u)
-#define R36SX_EMERGENCY_DUMP_PORT (R36SX_HOST_RPC_PORT_LAST + 2u)
+#define R36SX_HOSTDRV_TRACE_PORT (R36SX_HOST_RPC_PORT_BASE + 0x0Au)
+#define R36SX_EMERGENCY_DUMP_PORT (R36SX_HOST_RPC_PORT_BASE + 0x0Bu)
 
 uint8_t crt_controller_idx, crt_controller[32];
 uint8_t port60, port61, port64;

@@ -13,7 +13,7 @@
   redirected drive и обслуживает `INT 2Fh/AH=11h`.
 - `hostrpc.inc` задает номера портов, команды RPC и формат общего request block.
 - `r36sx_host_rpc.c.inl` выполняет файловые операции на хосте.
-- `r36sx_ports.c` прокидывает I/O-порты `E360h..E36Bh` в HOSTRPC, trace и
+- `r36sx_ports.c` прокидывает `E360h` в HOSTRPC, а `E36Ah`/`E36Bh` в trace и
   emergency dump обработчики.
 
 Так DOS сама вызывает TSR через стандартный редиректорный интерфейс, а эмулятор
@@ -217,7 +217,6 @@ HOSTDRV записывает этот блок в DTA в формате, кот�
 | Порт | Назначение |
 | --- | --- |
 | `E360h` | Основной HOSTRPC stream. |
-| `E361h..E369h` | Зарезервированный HOSTRPC диапазон. |
 | `E36Ah` | HOSTDRV trace port. |
 | `E36Bh` | Emergency dump port. |
 
