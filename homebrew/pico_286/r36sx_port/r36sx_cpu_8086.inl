@@ -46,8 +46,18 @@ static inline void r36sx_cpu_log_invalid_opcode_dump(uint32_t fault_ip)
 }
 #endif
 
+static inline uint8_t r36sx_cpu_invalid_opcode_nop_like(void)
+{
+    return r36sx_pico286_cpu_model() == R36SX_PICO286_CPU_8086;
+}
+
 static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
 {
+    if (r36sx_cpu_invalid_opcode_nop_like()) {
+        (void)fault_ip;
+        return;
+    }
+
     r36sx_pm_diag_log_first_fault("invalid opcode", fault_ip);
 #if R36SX_DEBUG_INVALID_OPCODE_DUMP
     r36sx_pico286_debug_log(

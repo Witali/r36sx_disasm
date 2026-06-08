@@ -3851,11 +3851,12 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
             r36sx_opcode_default: ;
 #endif
 #ifdef CPU_ALLOW_ILLEGAL_OP_EXCEPTION
-                r36sx_cpu_set_ip(firstip);
-                intcall86(6); /* trip invalid opcode exception. this occurs on the 80186+, 8086/8088 CPUs treat them as NOPs. */
-                /* technically they aren't exactly like NOPs in most cases, but for our pursoses, that's accurate enough. */
-                r36sx_pico286_debug_log("[CPU] Invalid opcode 0x%02x exception at %04X:%04X",
-                                        opcode, CPU_CS, firstip);
+                r36sx_cpu_invalid_opcode(firstip);
+                if (!r36sx_cpu_invalid_opcode_nop_like()) {
+                    r36sx_pico286_debug_log(
+                        "[CPU] Invalid opcode 0x%02x exception at %04X:%04X",
+                        opcode, CPU_CS, firstip);
+                }
 #endif
                 break;
         }
