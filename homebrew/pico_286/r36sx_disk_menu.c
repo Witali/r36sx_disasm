@@ -21,6 +21,11 @@
 #define R36SX_DISK_MENU_ROW_OK 11
 #define R36SX_DISK_MENU_ROW_CANCEL 12
 #define R36SX_DISK_MENU_ROW_COUNT 13
+#define R36SX_DISK_MENU_REPEAT_DELAY_US 350000ull
+#define R36SX_DISK_MENU_REPEAT_INTERVAL_US 80000ull
+#define R36SX_DISK_MENU_REPEAT_MASK \
+    (R36SX_RKGAME_KEY_UP | R36SX_RKGAME_KEY_DOWN | \
+     R36SX_RKGAME_KEY_LEFT | R36SX_RKGAME_KEY_RIGHT)
 
 #define R36SX_DISK_BOOT_ORDER_AC 0u
 #define R36SX_DISK_BOOT_ORDER_CA 1u
@@ -711,9 +716,115 @@ static uint32_t apply_disk_bindings(struct r36sx_disk_menu *menu)
 
 static int is_action_row(uint8_t row)
 {
-    return row == R36SX_DISK_MENU_ROW_DUMP_MEMORY ||
+    return row == R36SX_DISK_MENU_ROW_EXIT ||
+           row == R36SX_DISK_MENU_ROW_DUMP_MEMORY ||
            row == R36SX_DISK_MENU_ROW_OK ||
            row == R36SX_DISK_MENU_ROW_CANCEL;
+}
+
+static uint8_t action_row_above(uint8_t row)
+{
+    switch (row) {
+    case R36SX_DISK_MENU_ROW_OK:
+        return R36SX_DISK_MENU_ROW_EXIT;
+    case R36SX_DISK_MENU_ROW_CANCEL:
+        return R36SX_DISK_MENU_ROW_DUMP_MEMORY;
+    case R36SX_DISK_MENU_ROW_EXIT:
+    case R36SX_DISK_MENU_ROW_DUMP_MEMORY:
+        return R36SX_DISK_MENU_ROW_BIOS;
+    default:
+        return R36SX_DISK_MENU_ROW_CANCEL;
+    }
+}
+
+static uint8_t action_row_below(uint8_t row)
+{
+    switch (row) {
+    case R36SX_DISK_MENU_ROW_EXIT:
+        return R36SX_DISK_MENU_ROW_OK;
+    case R36SX_DISK_MENU_ROW_DUMP_MEMORY:
+        return R36SX_DISK_MENU_ROW_CANCEL;
+    case R36SX_DISK_MENU_ROW_OK:
+    case R36SX_DISK_MENU_ROW_CANCEL:
+        return 0;
+    default:
+        return R36SX_DISK_MENU_ROW_EXIT;
+    }
+}
+
+static uint8_t action_row_horizontal(uint8_t row, uint32_t nav)
+{
+    if ((nav & R36SX_RKGAME_KEY_LEFT) != 0) {
+        switch (row) {
+        case R36SX_DISK_MENU_ROW_DUMP_MEMORY:
+            return R36SX_DISK_MENU_ROW_EXIT;
+        case R36SX_DISK_MENU_ROW_CANCEL:
+            return R36SX_DISK_MENU_ROW_OK;
+        default:
+            return row;
+        }
+    }
+    if ((nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        switch (row) {
+        case R36SX_DISK_MENU_ROW_EXIT:
+            return R36SX_DISK_MENU_ROW_DUMP_MEMORY;
+        case R36SX_DISK_MENU_ROW_OK:
+            return R36SX_DISK_MENU_ROW_CANCEL;
+        default:
+            return row;
+        }
+    }
+    return row;
+}
+
+static uint32_t first_repeat_button(uint32_t buttons)
+{
+    if ((buttons & R36SX_RKGAME_KEY_LEFT) != 0) {
+        return R36SX_RKGAME_KEY_LEFT;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        return R36SX_RKGAME_KEY_RIGHT;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_UP) != 0) {
+        return R36SX_RKGAME_KEY_UP;
+    }
+    if ((buttons & R36SX_RKGAME_KEY_DOWN) != 0) {
+        return R36SX_RKGAME_KEY_DOWN;
+    }
+    return 0;
+}
+
+static uint32_t repeat_buttons(struct r36sx_disk_menu *menu,
+                               uint32_t pressed,
+                               uint32_t held,
+                               uint64_t now_us)
+{
+    uint32_t newly_pressed =
+        first_repeat_button(pressed & R36SX_DISK_MENU_REPEAT_MASK);
+    uint32_t held_button =
+        first_repeat_button(held & R36SX_DISK_MENU_REPEAT_MASK);
+
+    if (newly_pressed != 0) {
+        menu->repeat_button = newly_pressed;
+        menu->repeat_next_us = now_us + R36SX_DISK_MENU_REPEAT_DELAY_US;
+        return pressed;
+    }
+    if (held_button == 0) {
+        menu->repeat_button = 0;
+        menu->repeat_next_us = 0;
+        return pressed;
+    }
+    if (held_button != menu->repeat_button) {
+        menu->repeat_button = held_button;
+        menu->repeat_next_us = now_us + R36SX_DISK_MENU_REPEAT_DELAY_US;
+        return pressed;
+    }
+    if (menu->repeat_next_us != 0 &&
+        (int64_t)(now_us - menu->repeat_next_us) >= 0) {
+        menu->repeat_next_us = now_us + R36SX_DISK_MENU_REPEAT_INTERVAL_US;
+        return pressed | held_button;
+    }
+    return pressed;
 }
 
 void r36sx_disk_menu_init(struct r36sx_disk_menu *menu)
@@ -736,6 +847,8 @@ void r36sx_disk_menu_set_visible(struct r36sx_disk_menu *menu, int visible)
         return;
     }
     menu->visible = (uint8_t)(visible != 0);
+    menu->repeat_button = 0;
+    menu->repeat_next_us = 0;
     if (menu->visible) {
         menu->selected_row = 0;
         menu->message[0] = '\0';
@@ -744,83 +857,79 @@ void r36sx_disk_menu_set_visible(struct r36sx_disk_menu *menu, int visible)
 }
 
 uint32_t r36sx_disk_menu_handle_buttons(struct r36sx_disk_menu *menu,
-                                        uint32_t pressed)
+                                        uint32_t pressed,
+                                        uint32_t held,
+                                        uint64_t now_us)
 {
+    uint32_t nav;
+
     if (!menu || !menu->visible) {
         return 0;
     }
+    nav = repeat_buttons(menu, pressed, held, now_us);
 
     if ((pressed & (R36SX_RKGAME_KEY_B | R36SX_RKGAME_KEY_X)) != 0) {
         r36sx_disk_menu_set_visible(menu, 0);
         return R36SX_DISK_MENU_RESULT_CLOSED;
     }
-    if ((pressed & R36SX_RKGAME_KEY_UP) != 0) {
+    if ((nav & R36SX_RKGAME_KEY_UP) != 0) {
         if (menu->selected_row == 0) {
             menu->selected_row = R36SX_DISK_MENU_ROW_CANCEL;
         } else if (is_action_row(menu->selected_row)) {
-            menu->selected_row = R36SX_DISK_MENU_ROW_EXIT;
+            menu->selected_row = action_row_above(menu->selected_row);
         } else {
             menu->selected_row--;
         }
     }
-    if ((pressed & R36SX_RKGAME_KEY_DOWN) != 0) {
-        if (menu->selected_row == R36SX_DISK_MENU_ROW_EXIT) {
-            menu->selected_row = R36SX_DISK_MENU_ROW_DUMP_MEMORY;
-        } else if (is_action_row(menu->selected_row)) {
-            menu->selected_row = 0;
+    if ((nav & R36SX_RKGAME_KEY_DOWN) != 0) {
+        if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS ||
+            is_action_row(menu->selected_row)) {
+            menu->selected_row = action_row_below(menu->selected_row);
         } else {
             menu->selected_row++;
         }
     }
-    if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0 &&
-        menu->selected_row == R36SX_DISK_MENU_ROW_CANCEL) {
-        menu->selected_row = R36SX_DISK_MENU_ROW_OK;
-    } else if ((pressed & R36SX_RKGAME_KEY_LEFT) != 0 &&
-               menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
-        menu->selected_row = R36SX_DISK_MENU_ROW_DUMP_MEMORY;
-    } else if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0 &&
-               menu->selected_row == R36SX_DISK_MENU_ROW_DUMP_MEMORY) {
-        menu->selected_row = R36SX_DISK_MENU_ROW_OK;
-    } else if ((pressed & R36SX_RKGAME_KEY_RIGHT) != 0 &&
-               menu->selected_row == R36SX_DISK_MENU_ROW_OK) {
-        menu->selected_row = R36SX_DISK_MENU_ROW_CANCEL;
+    if (((nav & R36SX_RKGAME_KEY_LEFT) != 0 ||
+         (nav & R36SX_RKGAME_KEY_RIGHT) != 0) &&
+        is_action_row(menu->selected_row)) {
+        menu->selected_row = action_row_horizontal(menu->selected_row, nav);
     }
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
-        (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+        (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_image(menu, menu->selected_row, -1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
-               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+               (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_boot_order(menu, -1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CPU &&
-               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+               (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_cpu(menu, -1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_FREQUENCY &&
-               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+               (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         adjust_cpu_frequency(menu, -1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_X87 &&
-               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+               (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_x87(menu);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
-               (pressed & R36SX_RKGAME_KEY_LEFT) != 0) {
+               (nav & R36SX_RKGAME_KEY_LEFT) != 0) {
         cycle_bios(menu);
     }
     if (menu->selected_row < R36SX_DISK_MENU_DRIVE_COUNT &&
-        (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+        (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_image(menu, menu->selected_row, 1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BOOT_ORDER &&
-               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+               (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_boot_order(menu, 1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_CPU &&
-               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+               (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_cpu(menu, 1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_FREQUENCY &&
-               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+               (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         adjust_cpu_frequency(menu, 1);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_X87 &&
-               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+               (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_x87(menu);
     } else if (menu->selected_row == R36SX_DISK_MENU_ROW_BIOS &&
-               (pressed & R36SX_RKGAME_KEY_RIGHT) != 0) {
+               (nav & R36SX_RKGAME_KEY_RIGHT) != 0) {
         cycle_bios(menu);
     }
     if ((pressed & (R36SX_RKGAME_KEY_A | R36SX_RKGAME_KEY_Y)) != 0) {
@@ -884,13 +993,13 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
     int x = 28;
     int y = 86;
     int full_w = width - x * 2;
-    int dump_w = 176;
-    int ok_w = 96;
-    int cancel_w = 128;
-    int ok_gap = 18;
-    int dump_x = (width - dump_w - ok_w - cancel_w - ok_gap * 2) / 2;
-    int ok_x = dump_x + dump_w + ok_gap;
-    int cancel_x = ok_x + ok_w + ok_gap;
+    int action_w = 176;
+    int ok_w = 128;
+    int action_gap_w = 24;
+    int action_left_x = (width - action_w * 2 - action_gap_w) / 2;
+    int action_right_x = action_left_x + action_w + action_gap_w;
+    int ok_x = (width - ok_w * 2 - action_gap_w) / 2;
+    int cancel_x = ok_x + ok_w + action_gap_w;
     const int row_h = 24;
     const int gap = 4;
     const int action_gap = 30;
@@ -942,16 +1051,17 @@ void r36sx_disk_menu_draw(const struct r36sx_disk_menu *menu,
              R36SX_DISK_MENU_ROW_BIOS, x, y, full_w, row_h, line);
     y += row_h + gap;
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_EXIT, x, y, full_w, row_h, "EXIT APP");
+             R36SX_DISK_MENU_ROW_EXIT, action_left_x, y, action_w, row_h,
+             "EXIT APP");
+    draw_row(menu, frame, width, height, stride_pixels,
+             R36SX_DISK_MENU_ROW_DUMP_MEMORY, action_right_x, y, action_w,
+             row_h, "DUMP MEMORY");
 
     y += row_h + action_gap;
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_DUMP_MEMORY, dump_x, y, dump_w, 28,
-             "DUMP MEMORY");
-    draw_row(menu, frame, width, height, stride_pixels,
              R36SX_DISK_MENU_ROW_OK, ok_x, y, ok_w, 28, "OK");
     draw_row(menu, frame, width, height, stride_pixels,
-             R36SX_DISK_MENU_ROW_CANCEL, cancel_x, y, cancel_w, 28,
+             R36SX_DISK_MENU_ROW_CANCEL, cancel_x, y, ok_w, 28,
              "CANCEL");
 
     if (menu->message[0]) {

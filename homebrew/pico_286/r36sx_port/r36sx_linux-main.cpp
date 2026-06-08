@@ -1,14 +1,22 @@
 #include <pthread.h>
 #include <unistd.h>
+#if !defined(_WIN32)
 #include <cerrno>
+#endif
 #include <cstring>
+#if !defined(_WIN32)
 #include <fcntl.h>
+#endif
 #include <signal.h>
+#if !defined(_WIN32)
 #include <sys/ioctl.h>
+#endif
 #include <sys/time.h>
 #include <time.h>
 #include <cstdio>
+#if !defined(_WIN32)
 #include <linux/input.h>
+#endif
 #include "MiniFB.h"
 #include "emulator/emulator.h"
 #include "emulator/includes/font8x16.h"
@@ -62,6 +70,7 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_EXEC86_MIN_LOOPS 1000u
 #define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
+#if !defined(_WIN32)
 enum {
     R36SX_EVDEV_MAX_FDS = 16,
     R36SX_EVDEV_RESCAN_USEC = 2000000
@@ -74,6 +83,7 @@ struct r36sx_physical_keyboard_state {
 };
 
 static struct r36sx_physical_keyboard_state g_physical_keyboard;
+#endif
 
 static int16_t audio_buffers[R36SX_AUDIO_BUFFER_COUNT]
                             [R36SX_AUDIO_BUFFER_MAX_FRAMES * 2u] = {};
@@ -1283,6 +1293,7 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
     }
 }
 
+#if !defined(_WIN32)
 #define R36SX_EVDEV_BITS_PER_LONG ((int)(sizeof(unsigned long) * 8))
 #define R36SX_EVDEV_BIT_WORD(nr) ((nr) / R36SX_EVDEV_BITS_PER_LONG)
 #define R36SX_EVDEV_BIT_MASK(nr) (1ul << ((nr) % R36SX_EVDEV_BITS_PER_LONG))
@@ -1556,6 +1567,19 @@ static void r36sx_physical_keyboard_poll(void)
         }
     }
 }
+#else
+static void r36sx_physical_keyboard_init(void)
+{
+}
+
+static void r36sx_physical_keyboard_close_all(void)
+{
+}
+
+static void r36sx_physical_keyboard_poll(void)
+{
+}
+#endif
 
 extern "C" void HandleMouse(int x, int y, int buttons) {
     static int prev_x = 0, prev_y = 0;
@@ -1576,10 +1600,25 @@ extern "C" int HanldeMenu(int menu_id, int checked) {
 }
 
 static volatile int running = 1;
+static volatile int vm_paused_by_menu = 0;
 
 extern "C" int r36sx_emergency_dump_pending(void);
 extern "C" int r36sx_memory_dump_pending(void);
 extern "C" void r36sx_emergency_dump_write_and_clear(void);
+
+static void r36sx_pico286_set_menu_pause(int paused)
+{
+    int new_paused = paused != 0;
+    int old_paused = vm_paused_by_menu != 0;
+
+    if (old_paused == new_paused) {
+        return;
+    }
+    vm_paused_by_menu = new_paused;
+    __sync_synchronize();
+    r36sx_pico286_debug_log("main: VM %s by host menu",
+                            new_paused ? "paused" : "resumed");
+}
 
 void signal_handler(int sig) {
     r36sx_pico286_debug_log("main: signal %d, stopping", sig);
@@ -1781,7 +1820,20 @@ void *ticks_thread(void *arg) {
 
     unsigned int ticks_loop_count = 0;
     while (running) {
-        if (soft_reset_in_progress) {
+        if (soft_reset_in_progress || vm_paused_by_menu) {
+            clock_gettime(CLOCK_MONOTONIC, &current);
+            if (vm_paused_by_menu) {
+                uint64_t elapsedTime =
+                    (current.tv_sec - start.tv_sec) * hostfreq +
+                    (uint64_t)(current.tv_nsec - start.tv_nsec);
+                elapsed_system_timer = elapsedTime;
+                elapsed_blink_tics = elapsedTime;
+                elapsed_frame_tics = elapsedTime;
+                last_dss_tick = elapsedTime;
+                last_sb_tick = elapsedTime;
+                last_sound_tick = elapsedTime;
+                last_audio_packet_tick = elapsedTime;
+            }
             usleep(R36SX_TICKS_THREAD_SLEEP_US);
             continue;
         }
@@ -2080,6 +2132,34 @@ int main() {
                 }
             }
         }
+        r36sx_pico286_set_menu_pause(mfb_vm_paused());
+        if (vm_paused_by_menu) {
+            if (main_loop_count <= 8u) {
+                r36sx_pico286_debug_log("main: paused before mfb_update loop=%u",
+                                        main_loop_count);
+            }
+            R36SX_PROFILE_BEGIN(profile_mfb_update);
+            int mfb_update_rc = mfb_update(SCREEN, 0);
+            R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
+            if (mfb_update_rc < 0) {
+                r36sx_pico286_debug_log("main: mfb_update requested stop");
+                running = 0;
+                break;
+            }
+            if (r36sx_emergency_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
+                running = 0;
+                break;
+            }
+            if (r36sx_memory_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
+            }
+            r36sx_pico286_set_menu_pause(mfb_vm_paused());
+            r36sx_profile_maybe_log();
+            r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
+                                                   main_loop_frame_us);
+            continue;
+        }
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_physical_keyboard_poll();
         r36sx_keyboard_tick();
@@ -2128,6 +2208,21 @@ int main() {
             r36sx_pico286_debug_log("main: mfb_update requested stop");
             running = 0;
             break;
+        }
+        r36sx_pico286_set_menu_pause(mfb_vm_paused());
+        if (vm_paused_by_menu) {
+            if (r36sx_emergency_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
+                running = 0;
+                break;
+            }
+            if (r36sx_memory_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
+            }
+            r36sx_profile_maybe_log();
+            r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
+                                                   main_loop_frame_us);
+            continue;
         }
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
         r36sx_keyboard_tick();

@@ -441,6 +441,11 @@ static int r36sx_win_menu_visible(void)
            r36sx_key_presets_is_visible(&g_key_presets);
 }
 
+int mfb_vm_paused(void)
+{
+    return r36sx_win_menu_visible();
+}
+
 static void r36sx_win_update_stats_menu_check(void)
 {
     HMENU menu = g_wnd ? GetMenu(g_wnd) : NULL;
@@ -576,9 +581,14 @@ static uint32_t r36sx_win_button_from_key(unsigned int key)
     }
 }
 
-static void r36sx_win_handle_disk_menu_buttons(uint32_t pressed)
+static void r36sx_win_handle_disk_menu_buttons(uint32_t pressed,
+                                               uint32_t held)
 {
-    uint32_t result = r36sx_disk_menu_handle_buttons(&g_disk_menu, pressed);
+    uint64_t now_us = (uint64_t)GetTickCount() * 1000ull;
+    uint32_t result = r36sx_disk_menu_handle_buttons(&g_disk_menu,
+                                                     pressed,
+                                                     held,
+                                                     now_us);
     if ((result & R36SX_DISK_MENU_RESULT_EXIT_APP) != 0) {
         g_close_requested = 1;
     }
@@ -618,11 +628,14 @@ static int r36sx_win_handle_menu_key(unsigned int key, int is_down)
 
     if (pressed) {
         if (r36sx_disk_menu_is_visible(&g_disk_menu)) {
-            r36sx_win_handle_disk_menu_buttons(pressed);
+            r36sx_win_handle_disk_menu_buttons(pressed,
+                                               g_menu_held_buttons);
         } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
             r36sx_win_handle_key_preset_buttons(pressed,
                                                 g_menu_held_buttons);
         }
+    } else if (r36sx_disk_menu_is_visible(&g_disk_menu)) {
+        r36sx_win_handle_disk_menu_buttons(0, g_menu_held_buttons);
     } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
         /*
          * The key-preset picker uses held state for virtual-keyboard modifier
@@ -914,7 +927,9 @@ int mfb_update(void *buffer, int fps_limit)
          * The Windows host draws debug overlays on a temporary RGB565 copy so
          * the emulated PC framebuffer stays untouched.
          */
-        if (r36sx_key_presets_is_visible(&g_key_presets)) {
+        if (r36sx_disk_menu_is_visible(&g_disk_menu)) {
+            r36sx_win_handle_disk_menu_buttons(0, g_menu_held_buttons);
+        } else if (r36sx_key_presets_is_visible(&g_key_presets)) {
             r36sx_win_handle_key_preset_buttons(0, g_menu_held_buttons);
         }
         memcpy(g_overlay_frame, src, pixels * sizeof(g_overlay_frame[0]));

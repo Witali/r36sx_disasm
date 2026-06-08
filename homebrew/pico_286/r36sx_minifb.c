@@ -1164,10 +1164,12 @@ static void r36sx_mfb_disk_menu_set_visible(int visible)
                             visible ? "open" : "close");
 }
 
-static uint32_t r36sx_disk_menu_handle(uint32_t pressed)
+static uint32_t r36sx_disk_menu_handle(uint32_t pressed, uint32_t held)
 {
     uint32_t result = r36sx_disk_menu_handle_buttons(&g_mfb.disk_menu,
-                                                     pressed);
+                                                     pressed,
+                                                     held,
+                                                     r36sx_mfb_now_us());
     if ((result & R36SX_DISK_MENU_RESULT_EXIT_APP) != 0) {
         r36sx_pico286_debug_log("minifb: disk menu exit requested");
         g_mfb.exit_requested = 1;
@@ -1624,6 +1626,11 @@ static int r36sx_mfb_fullscreen_menu_active(void)
            r36sx_key_presets_is_visible(&g_mfb.key_presets);
 }
 
+int mfb_vm_paused(void)
+{
+    return r36sx_mfb_fullscreen_menu_active();
+}
+
 static int r36sx_mfb_nearest_source_y(int dst_y, int dst_h, int src_h)
 {
     int sy = (int)(((int64_t)(2 * dst_y + 1) * src_h) /
@@ -1938,7 +1945,7 @@ static int r36sx_mfb_poll_input(void)
     }
 
     if (r36sx_disk_menu_is_visible(&g_mfb.disk_menu)) {
-        r36sx_disk_menu_handle(pressed);
+        r36sx_disk_menu_handle(pressed, raw);
         g_mfb.last_raw_keys = raw;
         return g_mfb.exit_requested ? -1 : 0;
     }
