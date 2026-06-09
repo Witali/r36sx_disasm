@@ -289,7 +289,7 @@ visible.
 
 Supaplex running with corrected VGA rendering.
 
-![SuperScape benchmark running in Pico-286](homebrew/screenshots/pico_286/pico_286_19700101_002911_000.png)
+![SuperScape benchmark running in Pico-286](homebrew/pico_286/screenshots/pico_286_19700101_002911_000.png)
 
 The SuperScape benchmark running in the emulator.
 
