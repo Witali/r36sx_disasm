@@ -247,11 +247,15 @@ The Pico build takes full advantage of the RP2040/RP2350's dual-core processor.
 
 This division of labor ensures that the demanding CPU emulation does not interfere with smooth video and audio output.
 
-### Windows & Linux (Multi-threaded)
-The host builds (for Windows and Linux) are multi-threaded to separate tasks.
-*   **Main Thread:** Runs the main CPU emulation loop (`exec86`) and handles the window and its events via the MiniFB library.
-*   **Ticks Thread:** A dedicated thread that acts as the system's clock. It uses high-resolution timers (`QueryPerformanceCounter` on Windows, `clock_gettime` on Linux) to trigger events like PIT timer interrupts, rendering updates, and audio sample generation at the correct frequencies.
-*   **Sound Thread:** A separate thread responsible for communicating with the host operating system's audio API (WaveOut on Windows, a custom backend on Linux) to play the generated sound without blocking the other threads.
+### Windows & Linux (Single CPU/Timer Loop)
+The host builds run CPU execution and emulated machine timing from the main
+loop.
+*   **Main Thread:** Runs `exec86` in 1 ms slices, services PIT timer events,
+    renders frames at the configured display cadence, generates audio samples,
+    and handles the window/events via the MiniFB library.
+*   **Sound Thread:** A separate output thread only hands completed audio
+    buffers to the host operating system so blocking audio writes do not stall
+    emulation.
 
 This architecture allows for accurate timing and responsive I/O on a non-real-time desktop operating system.
 

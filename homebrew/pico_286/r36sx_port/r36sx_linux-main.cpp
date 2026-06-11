@@ -64,10 +64,10 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_AUDIO_BUFFER_MAX_FRAMES \
     (R36SX_AUDIO_DRIVER_RATE / R36SX_AUDIO_BUFFER_MIN_FPS)
 #define R36SX_AUDIO_BUFFER_COUNT 4u
-#define R36SX_TICKS_THREAD_SLEEP_US 1000u
 #define R36SX_HLT_SLEEP_US 1000u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
-#define R36SX_EXEC86_MIN_LOOPS 1000u
+#define R36SX_MAIN_LOOP_SLICE_US 1000u
+#define R36SX_EXEC86_MIN_LOOPS 25u
 #define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
 #if !defined(_WIN32)
@@ -294,6 +294,26 @@ static void r36sx_pico286_wait_for_next_main_frame(uint64_t *next_frame_us,
     if (r36sx_cpu_waiting_for_interrupt()) {
         usleep(R36SX_HLT_SLEEP_US);
     }
+}
+
+static int r36sx_pico286_interval_due(uint64_t *next_us,
+                                      uint32_t interval_us)
+{
+    uint64_t now_us = r36sx_pico286_now_us();
+
+    if (interval_us == 0) {
+        interval_us = 1u;
+    }
+    if (now_us < *next_us) {
+        return 0;
+    }
+
+    if (now_us - *next_us > (uint64_t)interval_us) {
+        *next_us = now_us + interval_us;
+    } else {
+        *next_us += interval_us;
+    }
+    return 1;
 }
 
 extern "C" int r36sx_pico286_video_active_height(void) {
@@ -1779,205 +1799,275 @@ void *sound_thread(void *arg) {
     return NULL;
 }
 
-void *ticks_thread(void *arg) {
-    r36sx_pico286_debug_log("ticks_thread: start arg=%p timer_period=%d",
-                            arg, timer_period);
-    struct timespec start, current;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+struct r36sx_pico286_tick_state {
+    struct timespec start;
+    uint64_t elapsed_system_timer;
+    uint64_t elapsed_blink_tics;
+    uint64_t elapsed_frame_tics;
+    uint64_t last_dss_tick;
+    uint64_t last_sb_tick;
+    uint64_t last_sound_tick;
+    uint64_t last_audio_packet_tick;
+    uint64_t hostfreq;
+    uint64_t dss_period;
+    uint64_t sound_period;
+    uint64_t blink_period;
+    uint64_t frame_period;
+    uint64_t audio_packet_period;
+    uint32_t audio_sample_rate;
+    unsigned int max_system_catchup;
+    unsigned int max_dss_catchup;
+    unsigned int max_sb_catchup;
+    unsigned int max_audio_catchup;
+    int16_t last_dss_sample;
+    int16_t last_sb_sample;
+    int dss_audio_enabled;
+    int sb_audio_enabled;
+    unsigned int loop_count;
+};
 
-    uint64_t elapsed_system_timer = 0;
-    uint64_t elapsed_blink_tics = 0;
-    uint64_t elapsed_frame_tics = 0;
-    uint64_t last_dss_tick = 0;
-    uint64_t last_sb_tick = 0;
-    uint64_t last_sound_tick = 0;
-    uint64_t last_audio_packet_tick = 0;
+static uint64_t r36sx_pico286_ticks_elapsed_ns(
+    const struct r36sx_pico286_tick_state *state)
+{
+    struct timespec current;
+    uint64_t current_ns;
+    uint64_t start_ns;
 
-    int16_t last_dss_sample = 0;
-    int16_t last_sb_sample = 0;
+    clock_gettime(CLOCK_MONOTONIC, &current);
+    current_ns = (uint64_t)current.tv_sec * state->hostfreq +
+                 (uint64_t)current.tv_nsec;
+    start_ns = (uint64_t)state->start.tv_sec * state->hostfreq +
+               (uint64_t)state->start.tv_nsec;
+    return current_ns >= start_ns ? current_ns - start_ns : 0;
+}
 
-    const uint64_t hostfreq = 1000000000; // nanoseconds
-    const uint64_t dss_period = hostfreq / 7000;
-    const uint32_t audio_sample_rate = r36sx_sound_frequency ?
+static void r36sx_pico286_ticks_sync_to_now(
+    struct r36sx_pico286_tick_state *state)
+{
+    uint64_t elapsedTime = r36sx_pico286_ticks_elapsed_ns(state);
+
+    state->elapsed_system_timer = elapsedTime;
+    state->elapsed_blink_tics = elapsedTime;
+    state->elapsed_frame_tics = elapsedTime;
+    state->last_dss_tick = elapsedTime;
+    state->last_sb_tick = elapsedTime;
+    state->last_sound_tick = elapsedTime;
+    state->last_audio_packet_tick = elapsedTime;
+}
+
+static void r36sx_pico286_ticks_reset(
+    struct r36sx_pico286_tick_state *state)
+{
+    state->last_dss_sample = 0;
+    state->last_sb_sample = 0;
+    r36sx_pico286_ticks_sync_to_now(state);
+}
+
+static void r36sx_pico286_ticks_init(
+    struct r36sx_pico286_tick_state *state,
+    uint32_t frame_us)
+{
+    memset(state, 0, sizeof(*state));
+    clock_gettime(CLOCK_MONOTONIC, &state->start);
+
+    state->hostfreq = 1000000000ull;
+    state->dss_period = state->hostfreq / 7000ull;
+    state->audio_sample_rate = r36sx_sound_frequency ?
         r36sx_sound_frequency : R36SX_AUDIO_DRIVER_RATE;
-    const uint64_t sound_period = hostfreq / audio_sample_rate;
-    const uint64_t blink_period = 333333333;
-    const uint64_t frame_period = (uint64_t)g_main_loop_frame_us * 1000ull;
-    const uint64_t audio_packet_period =
-        g_audio_packet_target_frames > 0 ?
-            ((uint64_t)g_audio_packet_target_frames * hostfreq) /
-                (uint64_t)audio_sample_rate :
-            frame_period;
-    const unsigned int max_system_catchup = 8;
-    const unsigned int max_dss_catchup = 700;
-    const unsigned int max_sb_catchup = 2205;
-    const unsigned int max_audio_catchup =
-        audio_sample_rate / R36SX_AUDIO_BUFFER_MIN_FPS;
-    const int dss_audio_enabled = r36sx_pico286_audio_disney_enabled();
-    const int sb_audio_enabled = r36sx_pico286_audio_sound_blaster_enabled();
-    r36sx_pico286_debug_log("ticks_thread: audio dss=%d sound_blaster=%d",
-                            dss_audio_enabled, sb_audio_enabled);
-
-    unsigned int ticks_loop_count = 0;
-    while (running) {
-        if (soft_reset_in_progress || vm_paused_by_menu) {
-            clock_gettime(CLOCK_MONOTONIC, &current);
-            if (vm_paused_by_menu) {
-                uint64_t elapsedTime =
-                    (current.tv_sec - start.tv_sec) * hostfreq +
-                    (uint64_t)(current.tv_nsec - start.tv_nsec);
-                elapsed_system_timer = elapsedTime;
-                elapsed_blink_tics = elapsedTime;
-                elapsed_frame_tics = elapsedTime;
-                last_dss_tick = elapsedTime;
-                last_sb_tick = elapsedTime;
-                last_sound_tick = elapsedTime;
-                last_audio_packet_tick = elapsedTime;
-            }
-            usleep(R36SX_TICKS_THREAD_SLEEP_US);
-            continue;
-        }
-        clock_gettime(CLOCK_MONOTONIC, &current);
-        if (++ticks_loop_count <= 4u) {
-            r36sx_pico286_debug_log("ticks_thread: loop #%u timer_period=%d sample_index=%d",
-                                    ticks_loop_count, timer_period, sample_index);
-        }
-
-        uint64_t elapsedTime = (current.tv_sec - start.tv_sec) * hostfreq + (current.tv_nsec - start.tv_nsec);
-        uint64_t system_period = timer_period > 0 ? hostfreq / (uint64_t)timer_period : hostfreq / 18;
-
-        // Timer interrupt (~18.2 Hz)
-        unsigned int system_catchup_count = 0;
-        R36SX_PROFILE_BEGIN(profile_timer_irq);
-        for (;
-             elapsedTime - elapsed_system_timer >= system_period;
-             system_catchup_count++) {
-            doirq(0);
-            elapsed_system_timer += system_period;
-            if (system_catchup_count >= max_system_catchup) {
-                elapsed_system_timer = elapsedTime;
-                break;
-            }
-        }
-        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_TIMER_IRQ, profile_timer_irq,
-                                system_catchup_count);
-
-        // Disney Sound Source frequency ~7KHz
-        unsigned int dss_catchup_count = 0;
-        R36SX_PROFILE_BEGIN(profile_dss_sample);
-        for (;
-             elapsedTime - last_dss_tick >= dss_period;
-             dss_catchup_count++) {
-            const int16_t sample = dss_sample();
-            last_dss_sample = dss_audio_enabled ? sample : 0;
-            last_dss_tick += dss_period;
-            if (dss_catchup_count >= max_dss_catchup) {
-                last_dss_tick = elapsedTime;
-                break;
-            }
-        }
-        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_DSS_SAMPLE, profile_dss_sample,
-                                dss_catchup_count);
-
-        // Sound Blaster
-        unsigned int sb_catchup_count = 0;
-        const uint64_t sb_rate = sb_samplerate ? sb_samplerate : 22050ull;
-        uint64_t sb_period = hostfreq / sb_rate;
-        if (sb_period == 0) {
-            sb_period = 1;
-        }
-        R36SX_PROFILE_BEGIN(profile_sb_sample);
-        for (;
-             elapsedTime - last_sb_tick >= sb_period;
-             sb_catchup_count++) {
-            const int16_t sample = blaster_sample();
-            last_sb_sample = sb_audio_enabled ? sample : 0;
-            last_sb_tick += sb_period;
-            if (sb_catchup_count >= max_sb_catchup) {
-                last_sb_tick = elapsedTime;
-                break;
-            }
-        }
-        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_SB_SAMPLE, profile_sb_sample,
-                                sb_catchup_count);
-
-        // Audio samples
-        unsigned int audio_catchup_count = 0;
-        R36SX_PROFILE_BEGIN(profile_audio_sample);
-        for (;
-             elapsedTime - last_sound_tick >= sound_period;
-            audio_catchup_count++) {
-            get_sound_sample(last_dss_sample + last_sb_sample,
-                             &audio_buffers[audio_write_buffer][sample_index]);
-            sample_index += 2;
-
-            if (sample_index >=
-                (int)(g_audio_buffer_capacity_frames *
-                      R36SX_AUDIO_CHANNELS)) {
-                const uint32_t buffered_frames =
-                    (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
-                pthread_mutex_lock(&update_mutex);
-                r36sx_pico286_audio_queue_current_locked(buffered_frames);
-                pthread_mutex_unlock(&update_mutex);
-                last_audio_packet_tick = elapsedTime;
-            }
-
-            last_sound_tick += sound_period;
-            if (audio_catchup_count >= max_audio_catchup) {
-                last_sound_tick = elapsedTime;
-                break;
-            }
-        }
-        R36SX_PROFILE_END_UNITS(R36SX_PROFILE_AUDIO_SAMPLE,
-                                profile_audio_sample,
-                                audio_catchup_count);
-        if (sample_index > 0 &&
-            elapsedTime - last_audio_packet_tick >= audio_packet_period) {
-            uint32_t buffered_frames =
-                (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
-            uint32_t elapsed_frames =
-                r36sx_pico286_audio_frames_for_elapsed(
-                    elapsedTime - last_audio_packet_tick,
-                    audio_sample_rate,
-                    hostfreq);
-
-            if (elapsed_frames > g_audio_buffer_capacity_frames) {
-                elapsed_frames = g_audio_buffer_capacity_frames;
-            }
-            if (buffered_frames > elapsed_frames && elapsed_frames > 0) {
-                buffered_frames = elapsed_frames;
-            }
-            if (buffered_frames > 0) {
-                pthread_mutex_lock(&update_mutex);
-                r36sx_pico286_audio_queue_current_locked(buffered_frames);
-                pthread_mutex_unlock(&update_mutex);
-                last_audio_packet_tick = elapsedTime;
-            }
-        }
-
-        // Cursor blink
-        if (elapsedTime - elapsed_blink_tics >= blink_period) {
-            // ~3Hz
-            cursor_blink_state ^= 1;
-            r36sx_pico286_video_mark_dirty();
-            elapsed_blink_tics = elapsedTime;
-        }
-
-        // Frame rendering follows the configured main-loop frame budget.
-        if (elapsedTime - elapsed_frame_tics >= frame_period) {
-            if (r36sx_pico286_video_take_dirty()) {
-                R36SX_PROFILE_BEGIN(profile_renderer);
-                renderer();
-                R36SX_PROFILE_END(R36SX_PROFILE_RENDERER, profile_renderer);
-            }
-            elapsed_frame_tics = elapsedTime;
-        }
-
-        // Generate missed ticks in batches, then yield the CPU executor.
-        usleep(R36SX_TICKS_THREAD_SLEEP_US);
+    state->sound_period = state->hostfreq / state->audio_sample_rate;
+    if (state->sound_period == 0) {
+        state->sound_period = 1;
     }
-    r36sx_pico286_debug_log("ticks_thread: exit loops=%u", ticks_loop_count);
-    return NULL;
+    state->blink_period = 333333333ull;
+    state->frame_period = frame_us ? (uint64_t)frame_us * 1000ull :
+        state->hostfreq / R36SX_MAIN_LOOP_DEFAULT_FPS;
+    state->audio_packet_period =
+        g_audio_packet_target_frames > 0 ?
+            ((uint64_t)g_audio_packet_target_frames * state->hostfreq) /
+                (uint64_t)state->audio_sample_rate :
+            state->frame_period;
+    if (state->audio_packet_period == 0) {
+        state->audio_packet_period = 1;
+    }
+    state->max_system_catchup = 8;
+    state->max_dss_catchup = 700;
+    state->max_sb_catchup = 2205;
+    state->max_audio_catchup =
+        state->audio_sample_rate / R36SX_AUDIO_BUFFER_MIN_FPS;
+    if (state->max_audio_catchup == 0) {
+        state->max_audio_catchup = 1;
+    }
+    state->dss_audio_enabled = r36sx_pico286_audio_disney_enabled();
+    state->sb_audio_enabled = r36sx_pico286_audio_sound_blaster_enabled();
+    r36sx_pico286_ticks_reset(state);
+
+    r36sx_pico286_debug_log(
+        "ticks: single-loop timer_period=%d frame_us=%u audio_rate=%u dss=%d sound_blaster=%d",
+        timer_period,
+        frame_us,
+        state->audio_sample_rate,
+        state->dss_audio_enabled,
+        state->sb_audio_enabled);
+}
+
+static void r36sx_pico286_ticks_step(
+    struct r36sx_pico286_tick_state *state)
+{
+    uint64_t elapsedTime;
+    uint64_t system_period;
+
+    if (soft_reset_in_progress || vm_paused_by_menu) {
+        if (vm_paused_by_menu) {
+            r36sx_pico286_ticks_sync_to_now(state);
+        }
+        return;
+    }
+
+    elapsedTime = r36sx_pico286_ticks_elapsed_ns(state);
+    if (++state->loop_count <= 4u) {
+        r36sx_pico286_debug_log(
+            "ticks: single-loop #%u timer_period=%d sample_index=%d",
+            state->loop_count,
+            timer_period,
+            sample_index);
+    }
+
+    system_period = timer_period > 0 ?
+        state->hostfreq / (uint64_t)timer_period :
+        state->hostfreq / 18ull;
+    if (system_period == 0) {
+        system_period = 1;
+    }
+
+    // Timer interrupt (~18.2 Hz)
+    unsigned int system_catchup_count = 0;
+    R36SX_PROFILE_BEGIN(profile_timer_irq);
+    for (;
+         elapsedTime - state->elapsed_system_timer >= system_period;
+         system_catchup_count++) {
+        doirq(0);
+        state->elapsed_system_timer += system_period;
+        if (system_catchup_count >= state->max_system_catchup) {
+            state->elapsed_system_timer = elapsedTime;
+            break;
+        }
+    }
+    R36SX_PROFILE_END_UNITS(R36SX_PROFILE_TIMER_IRQ, profile_timer_irq,
+                            system_catchup_count);
+
+    // Disney Sound Source frequency ~7KHz
+    unsigned int dss_catchup_count = 0;
+    R36SX_PROFILE_BEGIN(profile_dss_sample);
+    for (;
+         elapsedTime - state->last_dss_tick >= state->dss_period;
+         dss_catchup_count++) {
+        const int16_t sample = dss_sample();
+        state->last_dss_sample =
+            state->dss_audio_enabled ? sample : 0;
+        state->last_dss_tick += state->dss_period;
+        if (dss_catchup_count >= state->max_dss_catchup) {
+            state->last_dss_tick = elapsedTime;
+            break;
+        }
+    }
+    R36SX_PROFILE_END_UNITS(R36SX_PROFILE_DSS_SAMPLE, profile_dss_sample,
+                            dss_catchup_count);
+
+    // Sound Blaster
+    unsigned int sb_catchup_count = 0;
+    const uint64_t sb_rate = sb_samplerate ? sb_samplerate : 22050ull;
+    uint64_t sb_period = state->hostfreq / sb_rate;
+    if (sb_period == 0) {
+        sb_period = 1;
+    }
+    R36SX_PROFILE_BEGIN(profile_sb_sample);
+    for (;
+         elapsedTime - state->last_sb_tick >= sb_period;
+         sb_catchup_count++) {
+        const int16_t sample = blaster_sample();
+        state->last_sb_sample =
+            state->sb_audio_enabled ? sample : 0;
+        state->last_sb_tick += sb_period;
+        if (sb_catchup_count >= state->max_sb_catchup) {
+            state->last_sb_tick = elapsedTime;
+            break;
+        }
+    }
+    R36SX_PROFILE_END_UNITS(R36SX_PROFILE_SB_SAMPLE, profile_sb_sample,
+                            sb_catchup_count);
+
+    // Audio samples
+    unsigned int audio_catchup_count = 0;
+    R36SX_PROFILE_BEGIN(profile_audio_sample);
+    for (;
+         elapsedTime - state->last_sound_tick >= state->sound_period;
+         audio_catchup_count++) {
+        get_sound_sample(state->last_dss_sample + state->last_sb_sample,
+                         &audio_buffers[audio_write_buffer][sample_index]);
+        sample_index += 2;
+
+        if (sample_index >=
+            (int)(g_audio_buffer_capacity_frames *
+                  R36SX_AUDIO_CHANNELS)) {
+            const uint32_t buffered_frames =
+                (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
+            pthread_mutex_lock(&update_mutex);
+            r36sx_pico286_audio_queue_current_locked(buffered_frames);
+            pthread_mutex_unlock(&update_mutex);
+            state->last_audio_packet_tick = elapsedTime;
+        }
+
+        state->last_sound_tick += state->sound_period;
+        if (audio_catchup_count >= state->max_audio_catchup) {
+            state->last_sound_tick = elapsedTime;
+            break;
+        }
+    }
+    R36SX_PROFILE_END_UNITS(R36SX_PROFILE_AUDIO_SAMPLE,
+                            profile_audio_sample,
+                            audio_catchup_count);
+    if (sample_index > 0 &&
+        elapsedTime - state->last_audio_packet_tick >=
+            state->audio_packet_period) {
+        uint32_t buffered_frames =
+            (uint32_t)(sample_index / (int)R36SX_AUDIO_CHANNELS);
+        uint32_t elapsed_frames =
+            r36sx_pico286_audio_frames_for_elapsed(
+                elapsedTime - state->last_audio_packet_tick,
+                state->audio_sample_rate,
+                state->hostfreq);
+
+        if (elapsed_frames > g_audio_buffer_capacity_frames) {
+            elapsed_frames = g_audio_buffer_capacity_frames;
+        }
+        if (buffered_frames > elapsed_frames && elapsed_frames > 0) {
+            buffered_frames = elapsed_frames;
+        }
+        if (buffered_frames > 0) {
+            pthread_mutex_lock(&update_mutex);
+            r36sx_pico286_audio_queue_current_locked(buffered_frames);
+            pthread_mutex_unlock(&update_mutex);
+            state->last_audio_packet_tick = elapsedTime;
+        }
+    }
+
+    // Cursor blink
+    if (elapsedTime - state->elapsed_blink_tics >= state->blink_period) {
+        // ~3Hz
+        cursor_blink_state ^= 1;
+        r36sx_pico286_video_mark_dirty();
+        state->elapsed_blink_tics = elapsedTime;
+    }
+
+    // Frame rendering follows the configured video frame budget.
+    if (elapsedTime - state->elapsed_frame_tics >= state->frame_period) {
+        if (r36sx_pico286_video_take_dirty()) {
+            R36SX_PROFILE_BEGIN(profile_renderer);
+            renderer();
+            R36SX_PROFILE_END(R36SX_PROFILE_RENDERER, profile_renderer);
+        }
+        state->elapsed_frame_tics = elapsedTime;
+    }
 }
 
 int main() {
@@ -2062,23 +2152,24 @@ int main() {
         printf("Audio: Failed to initialize, continuing without audio\n");
     }
 
-    pthread_t sound_tid = 0, ticks_tid = 0;
+    pthread_t sound_tid = 0;
     int sound_thread_rc = pthread_create(&sound_tid, NULL, sound_thread, NULL);
-    int ticks_thread_rc = pthread_create(&ticks_tid, NULL, ticks_thread, NULL);
     int sound_thread_started = sound_thread_rc == 0;
-    int ticks_thread_started = ticks_thread_rc == 0;
-    r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=%d",
-                            sound_thread_rc, ticks_thread_rc);
+    r36sx_pico286_debug_log("main: pthread_create sound=%d ticks=main-loop",
+                            sound_thread_rc);
 
     uint32_t cpu_exec_loops_per_ms =
         r36sx_pico286_cpu_exec_loops(32768u);
-    uint32_t cpu_exec_loops_per_frame_max =
+    const uint32_t main_loop_slice_us = R36SX_MAIN_LOOP_SLICE_US;
+    uint32_t cpu_exec_loops_per_slice_max =
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms,
-                                       main_loop_frame_us);
-    uint32_t cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
+                                       main_loop_slice_us);
+    uint32_t cpu_exec_loops_per_slice = cpu_exec_loops_per_slice_max;
     r36sx_cpu_exec_fn cpu_exec = r36sx_cpu_select_exec();
+    struct r36sx_pico286_tick_state tick_state;
+    r36sx_pico286_ticks_init(&tick_state, main_loop_frame_us);
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u cpu_exec_loops_per_frame_max=%u",
+        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u slice_us=%u cpu_exec_loops_per_slice_max=%u",
                             r36sx_pico286_cpu_model_name(),
                             r36sx_cpu_selected_exec_name(),
                             r36sx_pico286_cpu_mode_name(),
@@ -2087,7 +2178,8 @@ int main() {
                             cpu_exec_loops_per_ms,
                             target_fps,
                             main_loop_frame_us,
-                            cpu_exec_loops_per_frame_max);
+                            main_loop_slice_us,
+                            cpu_exec_loops_per_slice_max);
     if (r36sx_pico286_cpu_mode() == R36SX_PICO286_CPU_MODE_PROTECTED) {
         r36sx_pico286_debug_log(
             "main: cpu_mode=protected requested; guest still boots in real mode and may enter protected mode through CR0/LMSW");
@@ -2095,13 +2187,17 @@ int main() {
 
     unsigned int main_loop_count = 0;
     uint64_t next_main_loop_us =
-        r36sx_pico286_now_us() + main_loop_frame_us;
+        r36sx_pico286_now_us() + main_loop_slice_us;
+    uint64_t next_present_us = r36sx_pico286_now_us();
     while (running) {
         uint64_t exec_elapsed_us;
         r36sx_app_stats_record_quantum();
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
+            r36sx_pico286_ticks_reset(&tick_state);
+            next_main_loop_us = r36sx_pico286_now_us() + main_loop_slice_us;
+            next_present_us = r36sx_pico286_now_us();
             cpu_exec = r36sx_cpu_select_exec();
             r36sx_pico286_debug_log("main: cpu_exec=%s after reset",
                                     r36sx_cpu_selected_exec_name());
@@ -2110,30 +2206,31 @@ int main() {
         {
             uint32_t updated_loops_per_ms =
                 r36sx_pico286_cpu_exec_loops(32768u);
-            uint32_t updated_frame_max =
+            uint32_t updated_slice_max =
                 r36sx_pico286_frame_exec_loops(updated_loops_per_ms,
-                                               main_loop_frame_us);
+                                               main_loop_slice_us);
 
-            if (updated_frame_max != cpu_exec_loops_per_frame_max) {
+            if (updated_slice_max != cpu_exec_loops_per_slice_max) {
                 int was_at_max =
-                    cpu_exec_loops_per_frame >= cpu_exec_loops_per_frame_max;
+                    cpu_exec_loops_per_slice >= cpu_exec_loops_per_slice_max;
 
                 r36sx_pico286_debug_log(
-                    "main: cpu timing changed loops_per_ms=%u->%u frame_max=%u->%u",
+                    "main: cpu timing changed loops_per_ms=%u->%u slice_max=%u->%u",
                     cpu_exec_loops_per_ms,
                     updated_loops_per_ms,
-                    cpu_exec_loops_per_frame_max,
-                    updated_frame_max);
+                    cpu_exec_loops_per_slice_max,
+                    updated_slice_max);
                 cpu_exec_loops_per_ms = updated_loops_per_ms;
-                cpu_exec_loops_per_frame_max = updated_frame_max;
+                cpu_exec_loops_per_slice_max = updated_slice_max;
                 if (was_at_max ||
-                    cpu_exec_loops_per_frame > cpu_exec_loops_per_frame_max) {
-                    cpu_exec_loops_per_frame = cpu_exec_loops_per_frame_max;
+                    cpu_exec_loops_per_slice > cpu_exec_loops_per_slice_max) {
+                    cpu_exec_loops_per_slice = cpu_exec_loops_per_slice_max;
                 }
             }
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
         if (vm_paused_by_menu) {
+            r36sx_pico286_ticks_sync_to_now(&tick_state);
             if (main_loop_count <= 8u) {
                 r36sx_pico286_debug_log("main: paused before mfb_update loop=%u",
                                         main_loop_count);
@@ -2155,11 +2252,19 @@ int main() {
                 r36sx_emergency_dump_write_and_clear();
             }
             r36sx_pico286_set_menu_pause(mfb_vm_paused());
+            if (!vm_paused_by_menu) {
+                r36sx_pico286_ticks_reset(&tick_state);
+                next_main_loop_us =
+                    r36sx_pico286_now_us() + main_loop_slice_us;
+                next_present_us = r36sx_pico286_now_us();
+                continue;
+            }
             r36sx_profile_maybe_log();
             r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
                                                    main_loop_frame_us);
             continue;
         }
+        r36sx_pico286_ticks_step(&tick_state);
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_physical_keyboard_poll();
         r36sx_keyboard_tick();
@@ -2170,10 +2275,10 @@ int main() {
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
         uint64_t exec_start_us = r36sx_pico286_now_us();
-        cpu_exec(cpu_exec_loops_per_frame);
+        cpu_exec(cpu_exec_loops_per_slice);
         exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
-                                cpu_exec_loops_per_frame);
+                                cpu_exec_loops_per_slice);
         if (r36sx_emergency_dump_pending()) {
             r36sx_emergency_dump_write_and_clear();
             running = 0;
@@ -2192,68 +2297,73 @@ int main() {
             r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
                                     main_loop_count, videomode);
         }
-        if ((++main_loop_count % 300u) == 0u) {
+        if ((++main_loop_count % 3000u) == 0u) {
             r36sx_pico286_debug_log("main: alive loops=%u videomode=0x%x exec_loops=%u",
                                     main_loop_count, videomode,
-                                    cpu_exec_loops_per_frame);
+                                    cpu_exec_loops_per_slice);
         }
-        if (main_loop_count <= 8u) {
-            r36sx_pico286_debug_log("main: before mfb_update loop=%u",
-                                    main_loop_count);
-        }
-        R36SX_PROFILE_BEGIN(profile_mfb_update);
-        int mfb_update_rc = mfb_update(SCREEN, 0);
-        R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
-        if (mfb_update_rc < 0) {
-            r36sx_pico286_debug_log("main: mfb_update requested stop");
-            running = 0;
-            break;
-        }
-        r36sx_pico286_set_menu_pause(mfb_vm_paused());
-        if (vm_paused_by_menu) {
-            if (r36sx_emergency_dump_pending()) {
-                r36sx_emergency_dump_write_and_clear();
+        if (r36sx_pico286_interval_due(&next_present_us,
+                                       main_loop_frame_us)) {
+            if (main_loop_count <= 8u) {
+                r36sx_pico286_debug_log("main: before mfb_update loop=%u",
+                                        main_loop_count);
+            }
+            R36SX_PROFILE_BEGIN(profile_mfb_update);
+            int mfb_update_rc = mfb_update(SCREEN, 0);
+            R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
+            if (mfb_update_rc < 0) {
+                r36sx_pico286_debug_log("main: mfb_update requested stop");
                 running = 0;
                 break;
             }
-            if (r36sx_memory_dump_pending()) {
-                r36sx_emergency_dump_write_and_clear();
+            r36sx_pico286_set_menu_pause(mfb_vm_paused());
+            if (vm_paused_by_menu) {
+                r36sx_pico286_ticks_sync_to_now(&tick_state);
+                if (r36sx_emergency_dump_pending()) {
+                    r36sx_emergency_dump_write_and_clear();
+                    running = 0;
+                    break;
+                }
+                if (r36sx_memory_dump_pending()) {
+                    r36sx_emergency_dump_write_and_clear();
+                }
+                r36sx_profile_maybe_log();
+                r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
+                                                       main_loop_frame_us);
+                continue;
             }
-            r36sx_profile_maybe_log();
-            r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
-                                                   main_loop_frame_us);
-            continue;
+            R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
+            r36sx_keyboard_tick();
+            R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK,
+                              profile_keyboard_tick_3);
+            if (main_loop_count <= 8u) {
+                r36sx_pico286_debug_log("main: after mfb_update loop=%u",
+                                        main_loop_count);
+            }
         }
-        R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
-        r36sx_keyboard_tick();
-        R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_3);
         {
             uint32_t adjusted_exec_loops =
                 r36sx_pico286_adjust_exec_loops(
-                    cpu_exec_loops_per_frame,
-                    cpu_exec_loops_per_frame_max,
+                    cpu_exec_loops_per_slice,
+                    cpu_exec_loops_per_slice_max,
                     exec_elapsed_us,
-                    main_loop_frame_us);
+                    main_loop_slice_us);
 
-            if (adjusted_exec_loops != cpu_exec_loops_per_frame) {
-                if (main_loop_count <= 8u || (main_loop_count % 300u) == 0u) {
+            if (adjusted_exec_loops != cpu_exec_loops_per_slice) {
+                if (main_loop_count <= 8u || (main_loop_count % 3000u) == 0u) {
                     r36sx_pico286_debug_log(
                         "main: adjust exec_loops %u->%u exec_us=%llu target_us=%u",
-                        cpu_exec_loops_per_frame,
+                        cpu_exec_loops_per_slice,
                         adjusted_exec_loops,
                         (unsigned long long)exec_elapsed_us,
-                        main_loop_frame_us);
+                        main_loop_slice_us);
                 }
-                cpu_exec_loops_per_frame = adjusted_exec_loops;
+                cpu_exec_loops_per_slice = adjusted_exec_loops;
             }
-        }
-        if (main_loop_count <= 8u) {
-            r36sx_pico286_debug_log("main: after mfb_update loop=%u",
-                                    main_loop_count);
         }
         r36sx_profile_maybe_log();
         r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
-                                               main_loop_frame_us);
+                                               main_loop_slice_us);
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);
 
@@ -2261,11 +2371,6 @@ int main() {
         r36sx_pico286_debug_log("main: cancel sound thread");
         pthread_cancel(sound_tid);
         pthread_join(sound_tid, NULL);
-    }
-    if (ticks_thread_started) {
-        r36sx_pico286_debug_log("main: cancel ticks thread");
-        pthread_cancel(ticks_tid);
-        pthread_join(ticks_tid, NULL);
     }
 
     // Clean up audio
