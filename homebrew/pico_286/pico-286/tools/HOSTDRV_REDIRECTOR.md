@@ -101,7 +101,7 @@ HOSTDRV и эмулятор обмениваются request block в памят
 
 ```c
 uint16_t magic;      /* "HR" */
-uint16_t version;    /* 1 */
+uint16_t version;    /* 2 */
 uint16_t command;
 uint16_t flags;
 uint32_t path_phys;
@@ -123,34 +123,38 @@ uint32_t bytes_done;
 
 - command frame имеет bit 7 = 1;
 - data frame имеет bit 7 = 0 и несет 7 бит полезных данных;
-- после команды HOSTDRV отправляет физический адрес request block пятью
+- после команды HOSTDRV отправляет физический адрес request block ровно пятью
   7-битными data frames;
 - эмулятор выполняет команду, записывает результат обратно в request block и
   переключает sync bit в readable latch.
 
-Команды файловой системы начинаются с `6`, то есть являются обычными командами
-того же RPC-протокола, а не отдельным вложенным namespace:
+Команды файловой системы начинаются с `10`: значения `0..9` зарезервированы
+под обслуживание самого RPC-протокола. Это обычные команды того же
+RPC-протокола, а не отдельный вложенный namespace:
 
 | Команда | Значение |
 | --- | --- |
-| `CMD_PING` | `6` |
-| `CMD_OPEN_RO` | `7` |
-| `CMD_OPEN_RW` | `8` |
-| `CMD_CREATE` | `9` |
-| `CMD_CLOSE` | `10` |
-| `CMD_READ` | `11` |
-| `CMD_WRITE` | `12` |
-| `CMD_DELETE` | `13` |
-| `CMD_MKDIR` | `14` |
-| `CMD_RMDIR` | `15` |
-| `CMD_GETATTR` | `16` |
-| `CMD_RENAME` | `17` |
-| `CMD_COMMIT` | `18` |
-| `CMD_FIND_FIRST` | `19` |
-| `CMD_FIND_NEXT` | `20` |
-| `CMD_FIND_CLOSE` | `21` |
-| `CMD_CLOSE_ALL` | `22` |
-| `CMD_CHDIR` | `23` |
+| `CMD_PING` | `10` |
+| `CMD_OPEN_RO` | `11` |
+| `CMD_OPEN_RW` | `12` |
+| `CMD_CREATE` | `13` |
+| `CMD_CLOSE` | `14` |
+| `CMD_READ` | `15` |
+| `CMD_WRITE` | `16` |
+| `CMD_DELETE` | `17` |
+| `CMD_MKDIR` | `18` |
+| `CMD_RMDIR` | `19` |
+| `CMD_GETATTR` | `20` |
+| `CMD_RENAME` | `21` |
+| `CMD_COMMIT` | `22` |
+| `CMD_FIND_FIRST` | `23` |
+| `CMD_FIND_NEXT` | `24` |
+| `CMD_FIND_CLOSE` | `25` |
+| `CMD_CLOSE_ALL` | `26` |
+| `CMD_CHDIR` | `27` |
+
+Если HOSTDRV отправит меньше или больше пяти address frames для файловой
+команды, эмулятор вернет `7Fh` как ошибку протокола и сбросит текущую посылку.
 
 ## Обработка путей на стороне эмулятора
 

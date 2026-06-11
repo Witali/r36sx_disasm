@@ -44,7 +44,7 @@
 #define R36SX_HOST_RPC_PORT_LAST R36SX_HOST_RPC_STREAM_PORT
 
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
-#define R36SX_HOST_RPC_VERSION 1u
+#define R36SX_HOST_RPC_VERSION 2u
 #define R36SX_HOST_RPC_MAX_FILES 32u
 #define R36SX_HOST_RPC_MAX_FINDS 16u
 #define R36SX_HOST_RPC_MAX_PATH 260u
@@ -56,6 +56,7 @@
 #define R36SX_HOST_RPC_PROTO_DATA_MASK 0x7fu
 #define R36SX_HOST_RPC_PROTO_ERR 0x7fu
 #define R36SX_HOST_RPC_REQUEST_ADDR_CHUNKS 5u
+#define R36SX_HOST_RPC_SERVICE_COMMANDS 10u
 
 #if R36SX_DEBUG_HOSTRPC_TRACE
 extern void r36sx_pico286_debug_log(const char *format, ...);
@@ -74,24 +75,24 @@ typedef enum {
     R36SX_HOST_RPC_CONTINUE = 2,
     R36SX_HOST_RPC_ABORT = 3,
     R36SX_HOST_RPC_END = 4,
-    R36SX_HOST_RPC_CMD_PING = 6,
-    R36SX_HOST_RPC_CMD_OPEN_RO = 7,
-    R36SX_HOST_RPC_CMD_OPEN_RW = 8,
-    R36SX_HOST_RPC_CMD_CREATE = 9,
-    R36SX_HOST_RPC_CMD_CLOSE = 10,
-    R36SX_HOST_RPC_CMD_READ = 11,
-    R36SX_HOST_RPC_CMD_WRITE = 12,
-    R36SX_HOST_RPC_CMD_DELETE = 13,
-    R36SX_HOST_RPC_CMD_MKDIR = 14,
-    R36SX_HOST_RPC_CMD_RMDIR = 15,
-    R36SX_HOST_RPC_CMD_GETATTR = 16,
-    R36SX_HOST_RPC_CMD_RENAME = 17,
-    R36SX_HOST_RPC_CMD_COMMIT = 18,
-    R36SX_HOST_RPC_CMD_FIND_FIRST = 19,
-    R36SX_HOST_RPC_CMD_FIND_NEXT = 20,
-    R36SX_HOST_RPC_CMD_FIND_CLOSE = 21,
-    R36SX_HOST_RPC_CMD_CLOSE_ALL = 22,
-    R36SX_HOST_RPC_CMD_CHDIR = 23,
+    R36SX_HOST_RPC_CMD_PING = R36SX_HOST_RPC_SERVICE_COMMANDS,
+    R36SX_HOST_RPC_CMD_OPEN_RO = 11,
+    R36SX_HOST_RPC_CMD_OPEN_RW = 12,
+    R36SX_HOST_RPC_CMD_CREATE = 13,
+    R36SX_HOST_RPC_CMD_CLOSE = 14,
+    R36SX_HOST_RPC_CMD_READ = 15,
+    R36SX_HOST_RPC_CMD_WRITE = 16,
+    R36SX_HOST_RPC_CMD_DELETE = 17,
+    R36SX_HOST_RPC_CMD_MKDIR = 18,
+    R36SX_HOST_RPC_CMD_RMDIR = 19,
+    R36SX_HOST_RPC_CMD_GETATTR = 20,
+    R36SX_HOST_RPC_CMD_RENAME = 21,
+    R36SX_HOST_RPC_CMD_COMMIT = 22,
+    R36SX_HOST_RPC_CMD_FIND_FIRST = 23,
+    R36SX_HOST_RPC_CMD_FIND_NEXT = 24,
+    R36SX_HOST_RPC_CMD_FIND_CLOSE = 25,
+    R36SX_HOST_RPC_CMD_CLOSE_ALL = 26,
+    R36SX_HOST_RPC_CMD_CHDIR = 27,
 } r36sx_host_rpc_command_t;
 
 static const char *r36sx_host_rpc_command_name(uint16_t command)
@@ -1413,6 +1414,15 @@ static void r36sx_host_rpc_stream_abort_transfer(void)
     r36sx_host_rpc_stream_addr_chunks = 0;
 }
 
+static void r36sx_host_rpc_stream_bad_request(const char *reason)
+{
+    R36SX_HOSTRPC_LOG("hostrpc: stream bad request: %s", reason);
+    r36sx_host_rpc_stream_abort_transfer();
+    r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
+    r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
+    r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
+}
+
 static void r36sx_host_rpc_stream_reset_session(void)
 {
     r36sx_host_rpc_stream_abort_transfer();
@@ -1425,6 +1435,28 @@ static void r36sx_host_rpc_stream_reset_session(void)
 
 static void r36sx_host_rpc_stream_command_frame(uint8_t command)
 {
+    if (r36sx_host_rpc_is_request_command(r36sx_host_rpc_stream_command)) {
+        if (command == R36SX_HOST_RPC_RESET) {
+            R36SX_HOSTRPC_LOG("hostrpc: stream reset during request");
+            r36sx_host_rpc_stream_reset_session();
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_VERSION);
+            return;
+        }
+        if (command == R36SX_HOST_RPC_ABORT) {
+            R36SX_HOSTRPC_LOG("hostrpc: stream abort during request");
+            r36sx_host_rpc_stream_abort_transfer();
+            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_OK);
+            return;
+        }
+        R36SX_HOSTRPC_LOG("hostrpc: stream short request command=%u chunks=%u expected=%u next=%u",
+                          (unsigned)r36sx_host_rpc_stream_command,
+                          (unsigned)r36sx_host_rpc_stream_addr_chunks,
+                          (unsigned)R36SX_HOST_RPC_REQUEST_ADDR_CHUNKS,
+                          (unsigned)command);
+        r36sx_host_rpc_stream_bad_request("short request address");
+        return;
+    }
+
     if (r36sx_host_rpc_is_request_command(command)) {
         R36SX_HOSTRPC_LOG("hostrpc: stream command %s(%u) expects request address",
                           r36sx_host_rpc_command_name(command),
@@ -1464,10 +1496,7 @@ static void r36sx_host_rpc_stream_command_frame(uint8_t command)
         default:
             R36SX_HOSTRPC_LOG("hostrpc: stream bad command %u",
                               (unsigned)command);
-            r36sx_host_rpc_stream_abort_transfer();
-            r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
-            r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
-            r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
+            r36sx_host_rpc_stream_bad_request("unknown command");
             break;
     }
 }
@@ -1477,9 +1506,16 @@ static void r36sx_host_rpc_stream_data_frame(uint8_t payload)
     if (!r36sx_host_rpc_is_request_command(r36sx_host_rpc_stream_command)) {
         R36SX_HOSTRPC_LOG("hostrpc: stream data without request command payload=%u",
                           (unsigned)(payload & R36SX_HOST_RPC_PROTO_DATA_MASK));
-        r36sx_host_rpc_status = R36SX_HOST_RPC_STATUS_BAD_REQUEST;
-        r36sx_host_rpc_last_result = R36SX_HOST_RPC_ERR_BAD_REQUEST;
-        r36sx_host_rpc_stream_reply(R36SX_HOST_RPC_PROTO_ERR);
+        r36sx_host_rpc_stream_bad_request("data without request command");
+        return;
+    }
+
+    if (r36sx_host_rpc_stream_addr_chunks >=
+        R36SX_HOST_RPC_REQUEST_ADDR_CHUNKS) {
+        R36SX_HOSTRPC_LOG("hostrpc: stream oversized request command=%u chunks=%u",
+                          (unsigned)r36sx_host_rpc_stream_command,
+                          (unsigned)r36sx_host_rpc_stream_addr_chunks);
+        r36sx_host_rpc_stream_bad_request("request address too long");
         return;
     }
 

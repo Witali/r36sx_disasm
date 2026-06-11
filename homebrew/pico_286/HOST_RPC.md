@@ -24,17 +24,24 @@ using the low 7 payload bits.
 | Command | Value | Notes |
 | --- | --- | --- |
 | `RESET` | `0` | Resets HOSTRPC stream state and closes stale host handles. |
-| `PING` | `1` | Returns RPC version `1` in the low 7 bits. |
+| `PING` | `1` | Returns RPC version `2` in the low 7 bits. |
 | `CONTINUE` | `2` | Reserved for multi-frame host responses. |
 | `ABORT` | `3` | Cancels the current stream transfer. |
 | `END` | `4` | Ends the current stream transfer. |
 
-Filesystem commands use the same command-frame namespace starting at `6`.
-After a filesystem command frame, the guest sends a 32-bit physical
-request-block address as five 7-bit data frames.  The command frame selects
-the operation; the request block carries arguments and response fields.  The
+Command ids `0..9` are reserved for protocol service commands.  Filesystem
+commands use the same command-frame namespace starting at `10`.  After a
+filesystem command frame, the guest sends a 32-bit physical request-block
+address as exactly five 7-bit data frames.  The command frame selects the
+operation; the request block carries arguments and response fields.  The
 `command` field remains in the block as a staging/debug mirror, but the host
 uses the command-frame value as the operation selector.
+
+If a new command, `PING`, `CONTINUE`, or `END` arrives before all five address
+frames, the host replies with `7Fh` and drops the partial request.  `RESET` and
+`ABORT` remain emergency resynchronization commands.  A data frame without an
+active filesystem command, or any extra data frame after the fixed-size address
+payload, is also a protocol error and returns `7Fh`.
 
 ## Request Block
 
@@ -43,7 +50,7 @@ All multi-byte fields are little-endian and live in guest physical RAM.
 ```c
 struct host_rpc_request {
     uint16_t magic;      /* "HR" as 0x5248 */
-    uint16_t version;    /* 1 */
+    uint16_t version;    /* 2 */
     uint16_t command;
     uint16_t flags;
     uint32_t path_phys;
@@ -66,24 +73,24 @@ struct host_rpc_request {
 
 | Command | Name | Notes |
 | --- | --- | --- |
-| `6` | Ping | Verifies the device and writes version info. |
-| `7` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
-| `8` | Open read/write | Opens or creates `path_phys`. |
-| `9` | Create | Creates/truncates `path_phys`. |
-| `10` | Close | Closes `handle`. |
-| `11` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
-| `12` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
-| `13` | Delete | Deletes `path_phys`. |
-| `14` | Mkdir | Creates directory `path_phys`. |
-| `15` | Rmdir | Removes directory `path_phys`. |
-| `16` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
-| `17` | Rename | Renames `path_phys` to `path2_phys`. |
-| `18` | Commit | Flushes the open file in `handle`. |
-| `19` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
-| `20` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
-| `21` | Find close | Closes a search handle from find first. |
-| `22` | Close all | Closes all host handles owned by the redirector instance. |
-| `23` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
+| `10` | Ping | Verifies the device and writes version info. |
+| `11` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
+| `12` | Open read/write | Opens or creates `path_phys`. |
+| `13` | Create | Creates/truncates `path_phys`. |
+| `14` | Close | Closes `handle`. |
+| `15` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
+| `16` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
+| `17` | Delete | Deletes `path_phys`. |
+| `18` | Mkdir | Creates directory `path_phys`. |
+| `19` | Rmdir | Removes directory `path_phys`. |
+| `20` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
+| `21` | Rename | Renames `path_phys` to `path2_phys`. |
+| `22` | Commit | Flushes the open file in `handle`. |
+| `23` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
+| `24` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
+| `25` | Find close | Closes a search handle from find first. |
+| `26` | Close all | Closes all host handles owned by the redirector instance. |
+| `27` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
 
 Find commands write this fixed 20-byte result into `data_phys`, provided
 `data_len >= 20`:

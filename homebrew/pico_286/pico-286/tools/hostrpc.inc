@@ -23,28 +23,29 @@ PROTO_END       equ 4
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
-RPC_VERSION     equ 1
+RPC_VERSION     equ 2
 
 ; HOSTRPC filesystem commands are stream command-frame payloads.  Commands
-; carry a request-block physical address as five 7-bit data frames.
-CMD_PING        equ 6
-CMD_OPEN_RO     equ 7
-CMD_OPEN_RW     equ 8
-CMD_CREATE      equ 9
-CMD_CLOSE       equ 10
-CMD_READ        equ 11
-CMD_WRITE       equ 12
-CMD_DELETE      equ 13
-CMD_MKDIR       equ 14
-CMD_RMDIR       equ 15
-CMD_GETATTR     equ 16
-CMD_RENAME      equ 17
-CMD_COMMIT      equ 18
-CMD_FIND_FIRST  equ 19
-CMD_FIND_NEXT   equ 20
-CMD_FIND_CLOSE  equ 21
-CMD_CLOSE_ALL   equ 22
-CMD_CHDIR       equ 23
+; carry a request-block physical address as exactly five 7-bit data frames.
+; Command ids 0..9 are reserved for protocol service commands.
+CMD_PING        equ 10
+CMD_OPEN_RO     equ 11
+CMD_OPEN_RW     equ 12
+CMD_CREATE      equ 13
+CMD_CLOSE       equ 14
+CMD_READ        equ 15
+CMD_WRITE       equ 16
+CMD_DELETE      equ 17
+CMD_MKDIR       equ 18
+CMD_RMDIR       equ 19
+CMD_GETATTR     equ 20
+CMD_RENAME      equ 21
+CMD_COMMIT      equ 22
+CMD_FIND_FIRST  equ 23
+CMD_FIND_NEXT   equ 24
+CMD_FIND_CLOSE  equ 25
+CMD_CLOSE_ALL   equ 26
+CMD_CHDIR       equ 27
 
 ; HOSTRPC currently exposes 16 file handles.  Guest drivers may mirror handle
 ; ownership with sidecar tables, but the handle namespace itself belongs to
