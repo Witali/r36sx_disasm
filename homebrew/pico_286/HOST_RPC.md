@@ -24,7 +24,7 @@ using the low 7 payload bits.
 | Command | Value | Notes |
 | --- | --- | --- |
 | `RESET` | `0` | Resets HOSTRPC stream state and closes stale host handles. |
-| `PING` | `1` | Returns RPC version `2` in the low 7 bits. |
+| `PING` | `1` | Returns RPC version `3` in the low 7 bits. |
 | `CONTINUE` | `2` | Reserved for multi-frame host responses. |
 | `ABORT` | `3` | Cancels the current stream transfer. |
 | `END` | `4` | Ends the current stream transfer. |
@@ -50,7 +50,7 @@ All multi-byte fields are little-endian and live in guest physical RAM.
 ```c
 struct host_rpc_request {
     uint16_t magic;      /* "HR" as 0x5248 */
-    uint16_t version;    /* 2 */
+    uint16_t version;    /* 3 */
     uint16_t command;
     uint16_t flags;
     uint32_t path_phys;
@@ -73,24 +73,23 @@ struct host_rpc_request {
 
 | Command | Name | Notes |
 | --- | --- | --- |
-| `10` | Ping | Verifies the device and writes version info. |
-| `11` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
-| `12` | Open read/write | Opens or creates `path_phys`. |
-| `13` | Create | Creates/truncates `path_phys`. |
-| `14` | Close | Closes `handle`. |
-| `15` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
-| `16` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
-| `17` | Delete | Deletes `path_phys`. |
-| `18` | Mkdir | Creates directory `path_phys`. |
-| `19` | Rmdir | Removes directory `path_phys`. |
-| `20` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
-| `21` | Rename | Renames `path_phys` to `path2_phys`. |
-| `22` | Commit | Flushes the open file in `handle`. |
-| `23` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
-| `24` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
-| `25` | Find close | Closes a search handle from find first. |
-| `26` | Close all | Closes all host handles owned by the redirector instance. |
-| `27` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
+| `10` | Open read-only | Opens `path_phys`, returns `handle` and `file_size`. |
+| `11` | Open read/write | Opens or creates `path_phys`. |
+| `12` | Create | Creates/truncates `path_phys`. |
+| `13` | Close | Closes `handle`. |
+| `14` | Read | Reads `data_len` bytes at `file_pos` into `data_phys`. |
+| `15` | Write | Writes `data_len` bytes from `data_phys` at `file_pos`. |
+| `16` | Delete | Deletes `path_phys`. |
+| `17` | Mkdir | Creates directory `path_phys`. |
+| `18` | Rmdir | Removes directory `path_phys`. |
+| `19` | Getattr | Returns file size, DOS attribute bits, and packed DOS date/time. |
+| `20` | Rename | Renames `path_phys` to `path2_phys`. |
+| `21` | Commit | Flushes the open file in `handle`. |
+| `22` | Find first | Opens a host search for `path_phys`; writes a find result to `data_phys`. |
+| `23` | Find next | Continues the search in `handle`; writes a find result to `data_phys`. |
+| `24` | Find close | Closes a search handle from find first. |
+| `25` | Close all | Closes all host handles owned by the redirector instance. |
+| `26` | Chdir | Verifies a directory and updates HOSTRPC current-directory state for relative paths. |
 
 Find commands write this fixed 20-byte result into `data_phys`, provided
 `data_len >= 20`:

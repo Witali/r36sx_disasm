@@ -44,7 +44,7 @@
 #define R36SX_HOST_RPC_PORT_LAST R36SX_HOST_RPC_STREAM_PORT
 
 #define R36SX_HOST_RPC_MAGIC 0x5248u /* "HR" little-endian in guest RAM. */
-#define R36SX_HOST_RPC_VERSION 2u
+#define R36SX_HOST_RPC_VERSION 3u
 #define R36SX_HOST_RPC_MAX_FILES 32u
 #define R36SX_HOST_RPC_MAX_FINDS 16u
 #define R36SX_HOST_RPC_MAX_PATH 260u
@@ -75,24 +75,23 @@ typedef enum {
     R36SX_HOST_RPC_CONTINUE = 2,
     R36SX_HOST_RPC_ABORT = 3,
     R36SX_HOST_RPC_END = 4,
-    R36SX_HOST_RPC_CMD_PING = R36SX_HOST_RPC_SERVICE_COMMANDS,
-    R36SX_HOST_RPC_CMD_OPEN_RO = 11,
-    R36SX_HOST_RPC_CMD_OPEN_RW = 12,
-    R36SX_HOST_RPC_CMD_CREATE = 13,
-    R36SX_HOST_RPC_CMD_CLOSE = 14,
-    R36SX_HOST_RPC_CMD_READ = 15,
-    R36SX_HOST_RPC_CMD_WRITE = 16,
-    R36SX_HOST_RPC_CMD_DELETE = 17,
-    R36SX_HOST_RPC_CMD_MKDIR = 18,
-    R36SX_HOST_RPC_CMD_RMDIR = 19,
-    R36SX_HOST_RPC_CMD_GETATTR = 20,
-    R36SX_HOST_RPC_CMD_RENAME = 21,
-    R36SX_HOST_RPC_CMD_COMMIT = 22,
-    R36SX_HOST_RPC_CMD_FIND_FIRST = 23,
-    R36SX_HOST_RPC_CMD_FIND_NEXT = 24,
-    R36SX_HOST_RPC_CMD_FIND_CLOSE = 25,
-    R36SX_HOST_RPC_CMD_CLOSE_ALL = 26,
-    R36SX_HOST_RPC_CMD_CHDIR = 27,
+    R36SX_HOST_RPC_CMD_OPEN_RO = R36SX_HOST_RPC_SERVICE_COMMANDS,
+    R36SX_HOST_RPC_CMD_OPEN_RW = 11,
+    R36SX_HOST_RPC_CMD_CREATE = 12,
+    R36SX_HOST_RPC_CMD_CLOSE = 13,
+    R36SX_HOST_RPC_CMD_READ = 14,
+    R36SX_HOST_RPC_CMD_WRITE = 15,
+    R36SX_HOST_RPC_CMD_DELETE = 16,
+    R36SX_HOST_RPC_CMD_MKDIR = 17,
+    R36SX_HOST_RPC_CMD_RMDIR = 18,
+    R36SX_HOST_RPC_CMD_GETATTR = 19,
+    R36SX_HOST_RPC_CMD_RENAME = 20,
+    R36SX_HOST_RPC_CMD_COMMIT = 21,
+    R36SX_HOST_RPC_CMD_FIND_FIRST = 22,
+    R36SX_HOST_RPC_CMD_FIND_NEXT = 23,
+    R36SX_HOST_RPC_CMD_FIND_CLOSE = 24,
+    R36SX_HOST_RPC_CMD_CLOSE_ALL = 25,
+    R36SX_HOST_RPC_CMD_CHDIR = 26,
 } r36sx_host_rpc_command_t;
 
 static const char *r36sx_host_rpc_command_name(uint16_t command)
@@ -103,7 +102,6 @@ static const char *r36sx_host_rpc_command_name(uint16_t command)
         case R36SX_HOST_RPC_CONTINUE: return "CONTINUE";
         case R36SX_HOST_RPC_ABORT: return "ABORT";
         case R36SX_HOST_RPC_END: return "END";
-        case R36SX_HOST_RPC_CMD_PING: return "PING";
         case R36SX_HOST_RPC_CMD_OPEN_RO: return "OPEN_RO";
         case R36SX_HOST_RPC_CMD_OPEN_RW: return "OPEN_RW";
         case R36SX_HOST_RPC_CMD_CREATE: return "CREATE";
@@ -127,7 +125,7 @@ static const char *r36sx_host_rpc_command_name(uint16_t command)
 
 static int r36sx_host_rpc_is_request_command(uint8_t command)
 {
-    return command >= R36SX_HOST_RPC_CMD_PING &&
+    return command >= R36SX_HOST_RPC_CMD_OPEN_RO &&
            command <= R36SX_HOST_RPC_CMD_CHDIR;
 }
 
@@ -984,11 +982,6 @@ static void r36sx_host_rpc_execute_request(uint16_t command)
         (unsigned)req.flags);
 
     switch (req.command) {
-        case R36SX_HOST_RPC_CMD_PING:
-            req.file_size = R36SX_HOST_RPC_VERSION;
-            r36sx_host_rpc_finish(&req, R36SX_HOST_RPC_OK, 0);
-            break;
-
         case R36SX_HOST_RPC_CMD_OPEN_RO:
         case R36SX_HOST_RPC_CMD_OPEN_RW:
         case R36SX_HOST_RPC_CMD_CREATE: {

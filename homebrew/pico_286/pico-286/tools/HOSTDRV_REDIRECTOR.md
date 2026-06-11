@@ -101,7 +101,7 @@ HOSTDRV и эмулятор обмениваются request block в памят
 
 ```c
 uint16_t magic;      /* "HR" */
-uint16_t version;    /* 2 */
+uint16_t version;    /* 3 */
 uint16_t command;
 uint16_t flags;
 uint32_t path_phys;
@@ -134,24 +134,23 @@ RPC-протокола, а не отдельный вложенный namespace:
 
 | Команда | Значение |
 | --- | --- |
-| `CMD_PING` | `10` |
-| `CMD_OPEN_RO` | `11` |
-| `CMD_OPEN_RW` | `12` |
-| `CMD_CREATE` | `13` |
-| `CMD_CLOSE` | `14` |
-| `CMD_READ` | `15` |
-| `CMD_WRITE` | `16` |
-| `CMD_DELETE` | `17` |
-| `CMD_MKDIR` | `18` |
-| `CMD_RMDIR` | `19` |
-| `CMD_GETATTR` | `20` |
-| `CMD_RENAME` | `21` |
-| `CMD_COMMIT` | `22` |
-| `CMD_FIND_FIRST` | `23` |
-| `CMD_FIND_NEXT` | `24` |
-| `CMD_FIND_CLOSE` | `25` |
-| `CMD_CLOSE_ALL` | `26` |
-| `CMD_CHDIR` | `27` |
+| `CMD_OPEN_RO` | `10` |
+| `CMD_OPEN_RW` | `11` |
+| `CMD_CREATE` | `12` |
+| `CMD_CLOSE` | `13` |
+| `CMD_READ` | `14` |
+| `CMD_WRITE` | `15` |
+| `CMD_DELETE` | `16` |
+| `CMD_MKDIR` | `17` |
+| `CMD_RMDIR` | `18` |
+| `CMD_GETATTR` | `19` |
+| `CMD_RENAME` | `20` |
+| `CMD_COMMIT` | `21` |
+| `CMD_FIND_FIRST` | `22` |
+| `CMD_FIND_NEXT` | `23` |
+| `CMD_FIND_CLOSE` | `24` |
+| `CMD_CLOSE_ALL` | `25` |
+| `CMD_CHDIR` | `26` |
 
 Если HOSTDRV отправит меньше или больше пяти address frames для файловой
 команды, эмулятор вернет `7Fh` как ошибку протокола и сбросит текущую посылку.

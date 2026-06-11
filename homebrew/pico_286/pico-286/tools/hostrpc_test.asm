@@ -30,12 +30,6 @@ start:
 
 run_self_test:
     call clear_request
-    mov word [request + REQ_COMMAND], CMD_PING
-    call execute_request
-    jc rpc_missing
-    call require_ok
-
-    call clear_request
     mov word [request + REQ_COMMAND], CMD_CREATE
     mov si, test_path
     mov di, request + REQ_PATH_PHYS

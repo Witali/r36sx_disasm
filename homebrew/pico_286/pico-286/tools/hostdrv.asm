@@ -1661,16 +1661,10 @@ rpc_send_phys_tmp:
     ret
 
 probe_rpc:
-    ; Verify that the emulator exposes HOSTRPC and that the request/response
-    ; path is usable before installing a resident redirector.
+    ; Verify that the emulator exposes HOSTRPC before installing a resident
+    ; redirector.  File requests are validated by the first real operation.
     call rpc_init_session
     jc .fail
-    call clear_request
-    mov word [request + REQ_COMMAND], CMD_PING
-    call execute_request
-    jc .fail
-    cmp word [request + REQ_RESULT], 0
-    jne .fail
     clc
     ret
 .fail:
