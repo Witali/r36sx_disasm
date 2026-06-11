@@ -64,9 +64,11 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_AUDIO_BUFFER_MAX_FRAMES \
     (R36SX_AUDIO_DRIVER_RATE / R36SX_AUDIO_BUFFER_MIN_FPS)
 #define R36SX_AUDIO_BUFFER_COUNT 4u
-#define R36SX_HLT_SLEEP_US 1000u
+#define R36SX_HLT_SLEEP_US 100u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
 #define R36SX_MAIN_LOOP_SLICE_US 1000u
+#define R36SX_MAIN_LOOP_ACTIVE_SLEEP_MAX_US 100u
+#define R36SX_MAIN_LOOP_IDLE_SLEEP_MAX_US 1000u
 #define R36SX_EXEC86_MIN_LOOPS 25u
 #define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -275,24 +277,54 @@ static uint32_t r36sx_pico286_adjust_exec_loops(uint32_t current_loops,
     return current_loops;
 }
 
+static void r36sx_pico286_sleep_for_wait(uint64_t sleep_us,
+                                         uint32_t max_sleep_us)
+{
+    if (sleep_us == 0) {
+        return;
+    }
+    if (sleep_us > (uint64_t)max_sleep_us) {
+        sleep_us = max_sleep_us;
+    }
+
+#if defined(_WIN32)
+    if (sleep_us < 1000u) {
+        Sleep(0);
+    } else
+#endif
+    {
+        usleep((unsigned int)sleep_us);
+    }
+}
+
 static void r36sx_pico286_wait_for_next_main_frame(uint64_t *next_frame_us,
                                                    uint32_t frame_us)
 {
-    uint64_t now_us = r36sx_pico286_now_us();
+    uint64_t now_us;
+    uint32_t max_sleep_us;
 
-    if (now_us < *next_frame_us) {
-        uint64_t sleep_us = *next_frame_us - now_us;
-        if (sleep_us > 1000000ull) {
-            sleep_us = 1000000ull;
+    if (frame_us == 0) {
+        frame_us = 1u;
+    }
+    max_sleep_us = frame_us <= R36SX_MAIN_LOOP_SLICE_US
+                       ? R36SX_MAIN_LOOP_ACTIVE_SLEEP_MAX_US
+                       : R36SX_MAIN_LOOP_IDLE_SLEEP_MAX_US;
+
+    for (;;) {
+        now_us = r36sx_pico286_now_us();
+        if (now_us >= *next_frame_us) {
+            break;
         }
-        usleep((unsigned int)sleep_us);
-        *next_frame_us += frame_us;
-        return;
+        r36sx_pico286_sleep_for_wait(*next_frame_us - now_us, max_sleep_us);
     }
 
-    *next_frame_us = now_us + frame_us;
+    if (now_us - *next_frame_us > (uint64_t)frame_us) {
+        *next_frame_us = now_us + frame_us;
+    } else {
+        *next_frame_us += frame_us;
+    }
     if (r36sx_cpu_waiting_for_interrupt()) {
-        usleep(R36SX_HLT_SLEEP_US);
+        r36sx_pico286_sleep_for_wait(R36SX_HLT_SLEEP_US, max_sleep_us);
     }
 }
 
