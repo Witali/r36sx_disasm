@@ -24,7 +24,7 @@ using the low 7 payload bits.
 | Command | Value | Notes |
 | --- | --- | --- |
 | `RESET` | `0` | Resets HOSTRPC stream state and closes stale host handles. |
-| `PING` | `1` | Returns RPC version `3` in the low 7 bits. |
+| `PING` | `1` | Returns RPC version `4` in the low 7 bits. |
 | `CONTINUE` | `2` | Reserved for multi-frame host responses. |
 | `ABORT` | `3` | Cancels the current stream transfer. |
 | `END` | `4` | Ends the current stream transfer. |
@@ -38,10 +38,19 @@ operation; the request block carries arguments and response fields.  The
 uses the command-frame value as the operation selector.
 
 If a new command, `PING`, `CONTINUE`, or `END` arrives before all five address
-frames, the host replies with `7Fh` and drops the partial request.  `RESET` and
-`ABORT` remain emergency resynchronization commands.  A data frame without an
-active filesystem command, or any extra data frame after the fixed-size address
-payload, is also a protocol error and returns `7Fh`.
+frames, the host replies with `7Eh` (`PROTO_ERR_MISMATCH`) and drops the
+partial request.  `RESET` and `ABORT` remain emergency resynchronization
+commands.  An extra data frame immediately after the fixed-size address payload
+returns `7Dh` (`PROTO_ERR_TOO_LARGE`).  A data frame without an active
+filesystem command and without a preceding fixed-size request returns `7Eh`.
+
+Transport error codes are reserved at the top of the 7-bit response range:
+
+| Value | Name | Notes |
+| --- | --- | --- |
+| `7Dh` | `PROTO_ERR_TOO_LARGE` | Fixed-size request payload has extra data. |
+| `7Eh` | `PROTO_ERR_MISMATCH` | Guest and host stream states disagree. |
+| `7Fh` | `PROTO_ERR` | Generic protocol error. |
 
 ## Request Block
 
@@ -50,7 +59,7 @@ All multi-byte fields are little-endian and live in guest physical RAM.
 ```c
 struct host_rpc_request {
     uint16_t magic;      /* "HR" as 0x5248 */
-    uint16_t version;    /* 3 */
+    uint16_t version;    /* 4 */
     uint16_t command;
     uint16_t flags;
     uint32_t path_phys;

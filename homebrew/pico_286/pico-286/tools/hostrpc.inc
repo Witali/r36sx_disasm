@@ -20,10 +20,13 @@ PROTO_PING      equ 1
 PROTO_CONTINUE  equ 2
 PROTO_ABORT     equ 3
 PROTO_END       equ 4
+PROTO_ERR       equ 07Fh
+PROTO_ERR_MISMATCH equ 07Eh
+PROTO_ERR_TOO_LARGE equ 07Dh
 
 ; Request block versioning.  RPC_MAGIC is little-endian "RH".
 RPC_MAGIC       equ 05248h
-RPC_VERSION     equ 3
+RPC_VERSION     equ 4
 
 ; HOSTRPC filesystem commands are stream command-frame payloads.  Commands
 ; carry a request-block physical address as exactly five 7-bit data frames.

@@ -101,7 +101,7 @@ HOSTDRV и эмулятор обмениваются request block в памят
 
 ```c
 uint16_t magic;      /* "HR" */
-uint16_t version;    /* 3 */
+uint16_t version;    /* 4 */
 uint16_t command;
 uint16_t flags;
 uint32_t path_phys;
@@ -152,8 +152,13 @@ RPC-протокола, а не отдельный вложенный namespace:
 | `CMD_CLOSE_ALL` | `25` |
 | `CMD_CHDIR` | `26` |
 
-Если HOSTDRV отправит меньше или больше пяти address frames для файловой
-команды, эмулятор вернет `7Fh` как ошибку протокола и сбросит текущую посылку.
+Если HOSTDRV отправит меньше пяти address frames для файловой команды и вместо
+следующего data frame придет command frame, эмулятор вернет `7Eh`
+(`PROTO_ERR_MISMATCH`) и сбросит текущую посылку. Если после уже принятой
+5-кадровой посылки придет лишний data frame, эмулятор вернет `7Dh`
+(`PROTO_ERR_TOO_LARGE`). Резидентный HOSTDRV превращает transport error в DOS
+ошибку операции; диагностический HOSTRPC.COM печатает точную причину и
+завершает работу.
 
 ## Обработка путей на стороне эмулятора
 

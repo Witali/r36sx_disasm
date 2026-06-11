@@ -759,7 +759,7 @@ redir_from_rpc:
     ; Translate HOSTRPC completion into the DOS redirector convention.  A
     ; transport error (CF from execute_request) and a host-side DOS error in the
     ; request block both become CF=1 for the original INT 2Fh caller.
-    jc redir_fail
+    jc redir_transport_error
     cmp word [request + REQ_RESULT], 0
     jne redir_rpc_error
     xor ax, ax
@@ -770,7 +770,7 @@ redir_from_rpc_keep_cx:
     ; FreeDOS' redirector wrapper returns AX := CX on successful callbacks.
     ; Only read/write byte counts and extended-open action status are carried in
     ; CX; ordinary successful RPC commands must leave it zero.
-    jc redir_fail
+    jc redir_transport_error
     cmp word [request + REQ_RESULT], 0
     jne redir_rpc_error
     xor ax, ax
@@ -781,6 +781,10 @@ redir_rpc_error:
     cmp ax, 0
     jne redir_fail
     mov ax, 1
+    jmp redir_fail
+
+redir_transport_error:
+    mov ax, DOS_ERR_INVALID_FUNCTION
     jmp redir_fail
 
 redir_success:
@@ -1528,20 +1532,19 @@ execute_request:
     push dx
     push si
     push di
+    mov byte [rpc_protocol_error], 0
     mov si, request
     mov di, phys_tmp
     call store_near_phys
     mov al, [request + REQ_COMMAND]
     call rpc_send_command
     jc .done
+    call rpc_check_protocol_error
+    jc .done
     call rpc_send_phys_tmp
     jc .done
-    and al, PROTO_DATA_MASK
-    cmp al, PROTO_DATA_MASK
-    jne .ok
-    stc
-    jmp .done
-.ok:
+    call rpc_check_protocol_error
+    jc .done
     clc
 .done:
     pop di
@@ -1585,6 +1588,17 @@ rpc_send_frame:
     pop dx
     ret
 
+rpc_check_protocol_error:
+    and al, PROTO_DATA_MASK
+    cmp al, PROTO_ERR_TOO_LARGE
+    jb .ok
+    mov [rpc_protocol_error], al
+    stc
+    ret
+.ok:
+    clc
+    ret
+
 rpc_wait_toggle:
     push bx
     push cx
@@ -1620,6 +1634,8 @@ rpc_send_phys_tmp:
     and al, 07Fh
     call rpc_send_data
     jc .done
+    call rpc_check_protocol_error
+    jc .done
 
     mov al, [phys_tmp]
     mov cl, 7
@@ -1629,6 +1645,8 @@ rpc_send_phys_tmp:
     shl ah, 1
     or al, ah
     call rpc_send_data
+    jc .done
+    call rpc_check_protocol_error
     jc .done
 
     mov al, [phys_tmp + 1]
@@ -1641,6 +1659,8 @@ rpc_send_phys_tmp:
     or al, ah
     call rpc_send_data
     jc .done
+    call rpc_check_protocol_error
+    jc .done
 
     mov al, [phys_tmp + 2]
     mov cl, 5
@@ -1652,11 +1672,15 @@ rpc_send_phys_tmp:
     or al, ah
     call rpc_send_data
     jc .done
+    call rpc_check_protocol_error
+    jc .done
 
     mov al, [phys_tmp + 3]
     mov cl, 4
     shr al, cl
     call rpc_send_data
+    jc .done
+    call rpc_check_protocol_error
 .done:
     ret
 
@@ -1822,6 +1846,7 @@ ext_open_status dw 0
 ext_open_missing_error dw DOS_ERR_FILE_NOT_FOUND
 phys_tmp     dd 0
 rpc_sync_bit db 0
+rpc_protocol_error db 0
 host_file_count dw 0
 host_find_count dw 0
 host_sft_seg times HOSTDRV_MAX_HANDLES dw 0
