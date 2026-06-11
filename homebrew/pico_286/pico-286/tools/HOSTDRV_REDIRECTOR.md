@@ -101,7 +101,7 @@ HOSTDRV и эмулятор обмениваются request block в памят
 
 ```c
 uint16_t magic;      /* "HR" */
-uint16_t version;    /* 4 */
+uint16_t version;    /* 5 */
 uint16_t command;
 uint16_t flags;
 uint32_t path_phys;
@@ -119,12 +119,14 @@ uint16_t reserved;
 uint32_t bytes_done;
 ```
 
-Потоковый протокол использует один 8-битный порт `E360h`:
+Потоковый протокол использует один 16-битный порт `E360h`. HOSTDRV делает
+только word I/O (`OUT DX, AX` и `IN AX, DX`); обратной совместимости с
+8-битным HOSTRPC transport нет:
 
-- command frame имеет bit 7 = 1;
-- data frame имеет bit 7 = 0 и несет 7 бит полезных данных;
-- после команды HOSTDRV отправляет физический адрес request block ровно пятью
-  7-битными data frames;
+- command frame имеет bit 15 = 1;
+- data frame имеет bit 15 = 0 и несет 15 бит полезных данных;
+- после команды HOSTDRV отправляет физический адрес request block ровно тремя
+  15-битными data frames;
 - эмулятор выполняет команду, записывает результат обратно в request block и
   переключает sync bit в readable latch.
 
@@ -152,10 +154,10 @@ RPC-протокола, а не отдельный вложенный namespace:
 | `CMD_CLOSE_ALL` | `25` |
 | `CMD_CHDIR` | `26` |
 
-Если HOSTDRV отправит меньше пяти address frames для файловой команды и вместо
-следующего data frame придет command frame, эмулятор вернет `7Eh`
+Если HOSTDRV отправит меньше трех address frames для файловой команды и вместо
+следующего data frame придет command frame, эмулятор вернет `7FFEh`
 (`PROTO_ERR_MISMATCH`) и сбросит текущую посылку. Если после уже принятой
-5-кадровой посылки придет лишний data frame, эмулятор вернет `7Dh`
+3-кадровой посылки придет лишний data frame, эмулятор вернет `7FFDh`
 (`PROTO_ERR_TOO_LARGE`). Резидентный HOSTDRV превращает transport error в DOS
 ошибку операции; диагностический HOSTRPC.COM печатает точную причину и
 завершает работу.

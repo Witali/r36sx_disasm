@@ -972,15 +972,12 @@ static INLINE uint8_t rtc_read(uint16_t addr) {
 }
 
 void portout(uint16_t portnum, uint16_t value) {
+#if R36SX_DEBUG_HOSTRPC_TRACE
     static char hostdrv_trace_text[128];
     static uint8_t hostdrv_trace_text_len;
     static uint8_t hostdrv_trace_collecting;
+#endif
 
-    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
-        portnum <= R36SX_HOST_RPC_PORT_LAST) {
-        r36sx_host_rpc_portout(portnum, (uint8_t)value);
-        return;
-    }
     if (portnum == R36SX_HOSTDRV_TRACE_PORT) {
 #if R36SX_DEBUG_HOSTRPC_TRACE
         uint8_t code = (uint8_t)value;
@@ -1431,11 +1428,6 @@ if (sound_chips_clock) {
 }
 
 uint16_t portin(uint16_t portnum) {
-    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
-        portnum <= R36SX_HOST_RPC_PORT_LAST) {
-        return r36sx_host_rpc_portin(portnum);
-    }
-
     switch (portnum) {
         case 0x00:
         case 0x01:
@@ -1621,11 +1613,22 @@ uint16_t portin(uint16_t portnum) {
 
 
 void portout16(uint16_t portnum, uint16_t value) {
+    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
+        portnum <= R36SX_HOST_RPC_PORT_LAST) {
+        r36sx_host_rpc_portout16(portnum, value);
+        return;
+    }
+
     portout(portnum, (uint8_t) value);
     portout(portnum + 1, (uint8_t) (value >> 8));
 }
 
 uint16_t portin16(uint16_t portnum) {
+    if (portnum >= R36SX_HOST_RPC_PORT_BASE &&
+        portnum <= R36SX_HOST_RPC_PORT_LAST) {
+        return r36sx_host_rpc_portin16(portnum);
+    }
+
     return portin(portnum) | portin(portnum + 1) << 8;
 }
 

@@ -1526,17 +1526,17 @@ store_far_phys:
 
 execute_request:
     ; Submit the current request block to the emulator.  The stream command is
-    ; the RPC operation; its payload is this block's physical address as five
-    ; 7-bit data frames.  The host toggles the sync bit after each frame.
+    ; the RPC operation; its payload is this block's physical address as three
+    ; 15-bit data frames.  The host toggles the sync bit after each frame.
     push ax
     push dx
     push si
     push di
-    mov byte [rpc_protocol_error], 0
+    mov word [rpc_protocol_error], 0
     mov si, request
     mov di, phys_tmp
     call store_near_phys
-    mov al, [request + REQ_COMMAND]
+    mov ax, [request + REQ_COMMAND]
     call rpc_send_command
     jc .done
     call rpc_check_protocol_error
@@ -1555,17 +1555,17 @@ execute_request:
 
 rpc_init_session:
     mov dx, PORT_DATA
-    in al, dx
-    and al, PROTO_CMD_FLAG
-    mov [rpc_sync_bit], al
-    mov al, PROTO_RESET
+    in ax, dx
+    and ax, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], ax
+    mov ax, PROTO_RESET
     call rpc_send_command
     jc .fail
-    mov al, PROTO_PING
+    mov ax, PROTO_PING
     call rpc_send_command
     jc .fail
-    and al, PROTO_DATA_MASK
-    cmp al, RPC_VERSION
+    and ax, PROTO_DATA_MASK
+    cmp ax, RPC_VERSION
     jne .fail
     clc
     ret
@@ -1574,25 +1574,25 @@ rpc_init_session:
     ret
 
 rpc_send_command:
-    or al, PROTO_CMD_FLAG
+    or ax, PROTO_CMD_FLAG
     jmp rpc_send_frame
 
 rpc_send_data:
-    and al, PROTO_DATA_MASK
+    and ax, PROTO_DATA_MASK
 
 rpc_send_frame:
     push dx
     mov dx, PORT_DATA
-    out dx, al
+    out dx, ax
     call rpc_wait_toggle
     pop dx
     ret
 
 rpc_check_protocol_error:
-    and al, PROTO_DATA_MASK
-    cmp al, PROTO_ERR_TOO_LARGE
+    and ax, PROTO_DATA_MASK
+    cmp ax, PROTO_ERR_TOO_LARGE
     jb .ok
-    mov [rpc_protocol_error], al
+    mov [rpc_protocol_error], ax
     stc
     ret
 .ok:
@@ -1608,10 +1608,10 @@ rpc_wait_toggle:
     mov cx, 0FFFFh
 .poll:
     mov dx, PORT_DATA
-    in al, dx
-    mov ah, al
-    xor ah, [rpc_sync_bit]
-    test ah, PROTO_CMD_FLAG
+    in ax, dx
+    mov dx, ax
+    xor dx, [rpc_sync_bit]
+    test dx, PROTO_CMD_FLAG
     jnz .changed
     loop .poll
     dec bx
@@ -1619,9 +1619,9 @@ rpc_wait_toggle:
     stc
     jmp .done
 .changed:
-    mov ah, al
-    and ah, PROTO_CMD_FLAG
-    mov [rpc_sync_bit], ah
+    mov dx, ax
+    and dx, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], dx
     clc
 .done:
     pop dx
@@ -1630,54 +1630,28 @@ rpc_wait_toggle:
     ret
 
 rpc_send_phys_tmp:
-    mov al, [phys_tmp]
-    and al, 07Fh
+    mov ax, [phys_tmp]
+    and ax, PROTO_DATA_MASK
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
     jc .done
 
-    mov al, [phys_tmp]
-    mov cl, 7
-    shr al, cl
-    mov ah, [phys_tmp + 1]
-    and ah, 03Fh
-    shl ah, 1
-    or al, ah
+    mov ax, [phys_tmp]
+    mov cl, 15
+    shr ax, cl
+    mov dx, [phys_tmp + 2]
+    and dx, 03FFFh
+    shl dx, 1
+    or ax, dx
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
     jc .done
 
-    mov al, [phys_tmp + 1]
-    mov cl, 6
-    shr al, cl
-    mov ah, [phys_tmp + 2]
-    and ah, 01Fh
-    mov cl, 2
-    shl ah, cl
-    or al, ah
-    call rpc_send_data
-    jc .done
-    call rpc_check_protocol_error
-    jc .done
-
-    mov al, [phys_tmp + 2]
-    mov cl, 5
-    shr al, cl
-    mov ah, [phys_tmp + 3]
-    and ah, 00Fh
-    mov cl, 3
-    shl ah, cl
-    or al, ah
-    call rpc_send_data
-    jc .done
-    call rpc_check_protocol_error
-    jc .done
-
-    mov al, [phys_tmp + 3]
-    mov cl, 4
-    shr al, cl
+    mov ax, [phys_tmp + 2]
+    mov cl, 14
+    shr ax, cl
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
@@ -1845,8 +1819,8 @@ ext_open_attr dw 0
 ext_open_status dw 0
 ext_open_missing_error dw DOS_ERR_FILE_NOT_FOUND
 phys_tmp     dd 0
-rpc_sync_bit db 0
-rpc_protocol_error db 0
+rpc_sync_bit dw 0
+rpc_protocol_error dw 0
 host_file_count dw 0
 host_find_count dw 0
 host_sft_seg times HOSTDRV_MAX_HANDLES dw 0

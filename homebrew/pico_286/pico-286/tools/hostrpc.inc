@@ -6,30 +6,31 @@
 %ifndef R36SX_HOSTRPC_INC
 %define R36SX_HOSTRPC_INC
 
-; HOSTRPC stream protocol port.  Guest code writes command/data frames to the
-; same 8-bit port and waits for the host to toggle bit 7 in the readable latch.
+; HOSTRPC stream protocol port.  Guest code writes command/data frames as
+; 16-bit words to the same port and waits for the host to toggle bit 15 in the
+; readable latch.
 PORT_BASE       equ 0E360h
 PORT_DATA       equ PORT_BASE + 0
 HOSTDRV_TRACE_PORT equ PORT_BASE + 0Ah
 EMERGENCY_DUMP_PORT equ PORT_BASE + 0Bh
 
-PROTO_CMD_FLAG  equ 080h
-PROTO_DATA_MASK equ 07Fh
+PROTO_CMD_FLAG  equ 08000h
+PROTO_DATA_MASK equ 07FFFh
 PROTO_RESET     equ 0
 PROTO_PING      equ 1
 PROTO_CONTINUE  equ 2
 PROTO_ABORT     equ 3
 PROTO_END       equ 4
-PROTO_ERR       equ 07Fh
-PROTO_ERR_MISMATCH equ 07Eh
-PROTO_ERR_TOO_LARGE equ 07Dh
+PROTO_ERR       equ 07FFFh
+PROTO_ERR_MISMATCH equ 07FFEh
+PROTO_ERR_TOO_LARGE equ 07FFDh
 
-; Request block versioning.  RPC_MAGIC is little-endian "RH".
+; Request block versioning.  RPC_MAGIC is little-endian "HR".
 RPC_MAGIC       equ 05248h
-RPC_VERSION     equ 4
+RPC_VERSION     equ 5
 
 ; HOSTRPC filesystem commands are stream command-frame payloads.  Commands
-; carry a request-block physical address as exactly five 7-bit data frames.
+; carry a request-block physical address as exactly three 15-bit data frames.
 ; Command ids 0..9 are reserved for protocol service commands.
 CMD_OPEN_RO     equ 10
 CMD_OPEN_RW     equ 11

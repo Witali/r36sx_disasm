@@ -168,15 +168,15 @@ rpc_failed:
     int 21h
 
 rpc_request_failed:
-    cmp byte [rpc_protocol_error], 0
+    cmp word [rpc_protocol_error], 0
     jne rpc_protocol_failed
     jmp rpc_failed
 
 rpc_protocol_failed:
-    mov al, [rpc_protocol_error]
-    cmp al, PROTO_ERR_MISMATCH
+    mov ax, [rpc_protocol_error]
+    cmp ax, PROTO_ERR_MISMATCH
     je .mismatch
-    cmp al, PROTO_ERR_TOO_LARGE
+    cmp ax, PROTO_ERR_TOO_LARGE
     je .too_large
     mov dx, msg_protocol_error
     jmp .print
@@ -194,7 +194,7 @@ rpc_protocol_failed:
 rpc_transfer_failed:
     call close_host_file
     call close_dos_file
-    cmp byte [rpc_protocol_error], 0
+    cmp word [rpc_protocol_error], 0
     jne rpc_protocol_failed
     mov dx, msg_failed
     mov ah, 09h
@@ -384,14 +384,14 @@ store_phys:
 execute_request:
     ; Submit the request block through the HOSTRPC stream protocol.  The stream
     ; command is the RPC operation; the payload is this block's physical
-    ; address encoded as five 7-bit frames.  The host writes fixed response
+    ; address encoded as three 15-bit frames.  The host writes fixed response
     ; fields back into this block.
-    mov byte [rpc_protocol_error], 0
+    mov word [rpc_protocol_error], 0
     mov si, request
     mov di, phys_tmp
     call store_phys
 
-    mov al, [request + REQ_COMMAND]
+    mov ax, [request + REQ_COMMAND]
     call rpc_send_command
     jc .done
     call rpc_check_protocol_error
@@ -406,17 +406,17 @@ execute_request:
 
 rpc_init_session:
     mov dx, PORT_DATA
-    in al, dx
-    and al, PROTO_CMD_FLAG
-    mov [rpc_sync_bit], al
-    mov al, PROTO_RESET
+    in ax, dx
+    and ax, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], ax
+    mov ax, PROTO_RESET
     call rpc_send_command
     jc .fail
-    mov al, PROTO_PING
+    mov ax, PROTO_PING
     call rpc_send_command
     jc .fail
-    and al, PROTO_DATA_MASK
-    cmp al, RPC_VERSION
+    and ax, PROTO_DATA_MASK
+    cmp ax, RPC_VERSION
     jne .fail
     clc
     ret
@@ -425,25 +425,25 @@ rpc_init_session:
     ret
 
 rpc_send_command:
-    or al, PROTO_CMD_FLAG
+    or ax, PROTO_CMD_FLAG
     jmp rpc_send_frame
 
 rpc_send_data:
-    and al, PROTO_DATA_MASK
+    and ax, PROTO_DATA_MASK
 
 rpc_send_frame:
     push dx
     mov dx, PORT_DATA
-    out dx, al
+    out dx, ax
     call rpc_wait_toggle
     pop dx
     ret
 
 rpc_check_protocol_error:
-    and al, PROTO_DATA_MASK
-    cmp al, PROTO_ERR_TOO_LARGE
+    and ax, PROTO_DATA_MASK
+    cmp ax, PROTO_ERR_TOO_LARGE
     jb .ok
-    mov [rpc_protocol_error], al
+    mov [rpc_protocol_error], ax
     stc
     ret
 .ok:
@@ -459,10 +459,10 @@ rpc_wait_toggle:
     mov cx, 0FFFFh
 .poll:
     mov dx, PORT_DATA
-    in al, dx
-    mov ah, al
-    xor ah, [rpc_sync_bit]
-    test ah, PROTO_CMD_FLAG
+    in ax, dx
+    mov dx, ax
+    xor dx, [rpc_sync_bit]
+    test dx, PROTO_CMD_FLAG
     jnz .changed
     loop .poll
     dec bx
@@ -470,9 +470,9 @@ rpc_wait_toggle:
     stc
     jmp .done
 .changed:
-    mov ah, al
-    and ah, PROTO_CMD_FLAG
-    mov [rpc_sync_bit], ah
+    mov dx, ax
+    and dx, PROTO_CMD_FLAG
+    mov [rpc_sync_bit], dx
     clc
 .done:
     pop dx
@@ -481,54 +481,28 @@ rpc_wait_toggle:
     ret
 
 rpc_send_phys_tmp:
-    mov al, [phys_tmp]
-    and al, 07Fh
+    mov ax, [phys_tmp]
+    and ax, PROTO_DATA_MASK
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
     jc .done
 
-    mov al, [phys_tmp]
-    mov cl, 7
-    shr al, cl
-    mov ah, [phys_tmp + 1]
-    and ah, 03Fh
-    shl ah, 1
-    or al, ah
+    mov ax, [phys_tmp]
+    mov cl, 15
+    shr ax, cl
+    mov dx, [phys_tmp + 2]
+    and dx, 03FFFh
+    shl dx, 1
+    or ax, dx
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
     jc .done
 
-    mov al, [phys_tmp + 1]
-    mov cl, 6
-    shr al, cl
-    mov ah, [phys_tmp + 2]
-    and ah, 01Fh
-    mov cl, 2
-    shl ah, cl
-    or al, ah
-    call rpc_send_data
-    jc .done
-    call rpc_check_protocol_error
-    jc .done
-
-    mov al, [phys_tmp + 2]
-    mov cl, 5
-    shr al, cl
-    mov ah, [phys_tmp + 3]
-    and ah, 00Fh
-    mov cl, 3
-    shl ah, cl
-    or al, ah
-    call rpc_send_data
-    jc .done
-    call rpc_check_protocol_error
-    jc .done
-
-    mov al, [phys_tmp + 3]
-    mov cl, 4
-    shr al, cl
+    mov ax, [phys_tmp + 2]
+    mov cl, 14
+    shr ax, cl
     call rpc_send_data
     jc .done
     call rpc_check_protocol_error
@@ -540,8 +514,8 @@ dos_handle dw 0FFFFh
 file_pos dd 0
 read_count dw 0
 phys_tmp dd 0
-rpc_sync_bit db 0
-rpc_protocol_error db 0
+rpc_sync_bit dw 0
+rpc_protocol_error dw 0
 transfer_mode db 0
 
 msg_ok      db 'HOSTRPC OK: wrote HOSTRPC.TXT in the host drive.',13,10,'$'
