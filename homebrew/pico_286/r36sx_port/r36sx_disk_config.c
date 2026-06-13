@@ -1969,8 +1969,9 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "cpu_mhz=%s\n", cpu_mhz_text);
     fprintf(fp, "x87_enabled=%s\n\n", x87_enabled_text);
 
-    fprintf(fp, "# Main loop timing. target_fps sets the frame budget used by\n");
-    fprintf(fp, "# adaptive exec86 quantum control and display pacing.\n");
+    fprintf(fp, "# Main loop timing. target_fps sets display pacing.  Each frame gives\n");
+    fprintf(fp, "# CPU/audio a 10 ms emulation budget and stretches virtual timers over\n");
+    fprintf(fp, "# the full frame.\n");
     fprintf(fp, "[timing]\n");
     fprintf(fp, "target_fps=%s\n\n", target_fps_text);
 
