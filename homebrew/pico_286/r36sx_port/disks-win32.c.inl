@@ -1,7 +1,10 @@
 #pragma once
 
 #include "emulator.h"
+#include "r36sx_bios_rom.h"
 #include "r36sx_host_disk_io.h"
+
+#include <string.h>
 
 int hdcount = 0, fdcount = 0;
 
@@ -12,6 +15,9 @@ typedef unsigned long DWORD;
 #define R36SX_FLOPPY_IMAGE_MAX_BYTES (2880UL * 1024UL)
 #define R36SX_HARD_IMAGE_MAX_BYTES ((size_t)0x7ffffe00UL)
 #define R36SX_BIOS_MAX_CHS_CYLINDERS 1024u
+#define R36SX_BIOS_INT41_VECTOR 0x41u
+#define R36SX_BIOS_INT46_VECTOR 0x46u
+#define R36SX_BIOS_FDPT_BYTES 16u
 
 struct struct_drive {
     FILE *diskfile;
@@ -31,6 +37,17 @@ static inline int normalize_disk_number(uint8_t *drivenum) {
 
 static inline void update_bios_disk_counts(void) {
     RAM[0x475] = (uint8_t)hdcount;  // BIOS Data Area: fixed disk count.
+}
+
+static inline void disk_write_ivt_pointer(uint8_t vector,
+                                          uint16_t segment,
+                                          uint16_t offset) {
+    uint32_t address = (uint32_t)vector * 4u;
+
+    RAM[address + 0u] = (uint8_t)offset;
+    RAM[address + 1u] = (uint8_t)(offset >> 8);
+    RAM[address + 2u] = (uint8_t)segment;
+    RAM[address + 3u] = (uint8_t)(segment >> 8);
 }
 
 static inline void disk_choose_floppy_geometry(size_t size,
@@ -134,6 +151,59 @@ static inline void disk_choose_hdd_geometry(size_t size,
     *heads = chosen_heads;
 }
 
+static void disk_build_fixed_parameter_table(
+    uint8_t drivenum,
+    uint8_t table[R36SX_BIOS_FDPT_BYTES]) {
+    uint16_t cyls = disk[drivenum].cyls;
+    uint16_t landing_zone = cyls ? cyls : 1u;
+
+    memset(table, 0, R36SX_BIOS_FDPT_BYTES);
+    table[0] = (uint8_t)cyls;
+    table[1] = (uint8_t)(cyls >> 8);
+    table[2] = (uint8_t)disk[drivenum].heads;
+    table[3] = 0xffu;  // Reduced write current cylinder, unused by emulator.
+    table[4] = 0xffu;
+    table[5] = 0xffu;  // Write precomp cylinder, unused by emulator.
+    table[6] = 0xffu;
+    table[7] = 0x0bu;  // Common AT BIOS ECC burst length.
+    table[8] = disk[drivenum].heads > 8u ? 0x08u : 0x00u;
+    table[12] = (uint8_t)landing_zone;
+    table[13] = (uint8_t)(landing_zone >> 8);
+    table[14] = (uint8_t)disk[drivenum].sects;
+}
+
+static void disk_update_fixed_parameter_table(uint8_t drivenum) {
+    uint8_t index;
+    uint8_t vector;
+
+    if (drivenum < 2u || drivenum > 3u) {
+        return;
+    }
+
+    index = (uint8_t)(drivenum - 2u);
+    vector = index == 0u ? R36SX_BIOS_INT41_VECTOR : R36SX_BIOS_INT46_VECTOR;
+
+    if (!disk[drivenum].inserted) {
+        r36sx_bios_rom_set_fixed_disk_parameter_table(index, NULL);
+        disk_write_ivt_pointer(vector, 0, 0);
+        return;
+    }
+
+    {
+        uint8_t table[R36SX_BIOS_FDPT_BYTES];
+        uint16_t segment;
+        uint16_t offset;
+
+        disk_build_fixed_parameter_table(drivenum, table);
+        r36sx_bios_rom_set_fixed_disk_parameter_table(index, table);
+        if (r36sx_bios_rom_fixed_disk_parameter_pointer(index,
+                                                        &segment,
+                                                        &offset)) {
+            disk_write_ivt_pointer(vector, segment, offset);
+        }
+    }
+}
+
 static inline void ejectdisk(uint8_t drivenum) {
     if (!normalize_disk_number(&drivenum)) return;
 
@@ -143,6 +213,7 @@ static inline void ejectdisk(uint8_t drivenum) {
         disk[drivenum].inserted = 0;
         if (drivenum >= 2) {
             if (hdcount > 0) hdcount--;
+            disk_update_fixed_parameter_table(drivenum);
         } else {
             if (fdcount > 0) fdcount--;
         }
@@ -217,6 +288,7 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     // Update drive counts
     if (drivenum >= 2) {
         hdcount++;
+        disk_update_fixed_parameter_table(drivenum);
     } else {
         fdcount++;
     }

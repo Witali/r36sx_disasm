@@ -525,7 +525,9 @@ images should be placed in `image_dir` and selected through the disk image
 menu.  `.img` remains a floppy-only extension in the menu so the FreeDOS
 diskettes keep their original names; hard disks use `.hdd` by default.
 
-Hard-disk CHS geometry is derived automatically from the mounted image size.
+Hard-disk CHS geometry is derived automatically from the mounted image size
+and exposed through the BIOS Data Area fixed-disk count, `INT 13h AH=08h`,
+and fixed-disk parameter table vectors `INT 41h` / `INT 46h`.
 
 The R36SX hard-disk BIOS path also exposes basic Enhanced Disk Drive / LBA
 services through `INT 13h`: `AH=41h` checks extension presence, `AH=42h` reads
