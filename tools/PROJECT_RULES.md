@@ -94,3 +94,19 @@ current local build/copy time in `YYYY-MM-DD HH:MM:SS` format.
 This keeps device-test patches from booting DOS with a stale synthetic RTC
 date after the console's Linux environment starts without real-time clock
 hardware.
+
+## Codex Agent Files Rule
+
+Rule: keep `AGENTS.md` and project-local `.codex/skills/` files in sync with
+the repository's actual workflow.
+
+When a repeated project practice becomes stable, such as a preferred build
+command, disk-image workflow, patch-copy convention, or commit/push cadence,
+add it to the appropriate agent file instead of relying on chat history. Keep
+`AGENTS.md` short and immediately useful; put subsystem-specific details in a
+project skill reference file.
+
+When changing agent files, validate the skill structure when the local
+validator is usable. If validation cannot run because a local dependency is
+missing, inspect the frontmatter and generated metadata manually and mention
+the validator limitation in the task result.
