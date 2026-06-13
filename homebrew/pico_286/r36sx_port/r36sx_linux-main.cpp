@@ -20,8 +20,19 @@
 #include <sys/time.h>
 #include <time.h>
 #include <cstdio>
+#include <cstdarg>
 #if R36SX_PICO286_USE_EVDEV_INPUT
 #include <linux/input.h>
+#endif
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dbghelp.h>
 #endif
 #include "MiniFB.h"
 #include "emulator/emulator.h"
@@ -1961,6 +1972,180 @@ void fatal_signal_handler(int sig) {
     raise(sig);
 }
 
+#if defined(_WIN32)
+static volatile LONG r36sx_windows_crash_written = 0;
+
+static void r36sx_windows_crash_write(HANDLE file, const char *text)
+{
+    DWORD written = 0;
+    if (file == INVALID_HANDLE_VALUE || !text) {
+        return;
+    }
+    WriteFile(file, text, (DWORD)strlen(text), &written, NULL);
+}
+
+static void r36sx_windows_crash_printf(HANDLE file, const char *format, ...)
+{
+    char buffer[512];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    buffer[sizeof(buffer) - 1] = '\0';
+    r36sx_windows_crash_write(file, buffer);
+}
+
+static void r36sx_windows_write_minidump(EXCEPTION_POINTERS *info)
+{
+    HANDLE dump_file = CreateFileA("pico_286_crash.dmp",
+                                   GENERIC_WRITE,
+                                   0,
+                                   NULL,
+                                   CREATE_ALWAYS,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+    if (dump_file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    MINIDUMP_EXCEPTION_INFORMATION exception_info;
+    exception_info.ThreadId = GetCurrentThreadId();
+    exception_info.ExceptionPointers = info;
+    exception_info.ClientPointers = FALSE;
+
+    MiniDumpWriteDump(GetCurrentProcess(),
+                      GetCurrentProcessId(),
+                      dump_file,
+                      (MINIDUMP_TYPE)(MiniDumpNormal | MiniDumpWithDataSegs |
+                                      MiniDumpWithIndirectlyReferencedMemory),
+                      &exception_info,
+                      NULL,
+                      NULL);
+    CloseHandle(dump_file);
+}
+
+static void r36sx_windows_write_crash_report(EXCEPTION_POINTERS *info)
+{
+    HANDLE text_file = CreateFileA("pico_286_crash.txt",
+                                   GENERIC_WRITE,
+                                   0,
+                                   NULL,
+                                   CREATE_ALWAYS,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+    if (text_file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    EXCEPTION_RECORD *exception = info ? info->ExceptionRecord : NULL;
+    CONTEXT *context = info ? info->ContextRecord : NULL;
+    r36sx_windows_crash_write(text_file, "Pico-286 Windows crash report\n");
+    if (exception) {
+        r36sx_windows_crash_printf(text_file,
+                                   "exception_code=%08lX flags=%08lX address=%p\n",
+                                   (unsigned long)exception->ExceptionCode,
+                                   (unsigned long)exception->ExceptionFlags,
+                                   exception->ExceptionAddress);
+    }
+
+#if defined(_M_X64) || defined(__x86_64__)
+    if (context) {
+        r36sx_windows_crash_printf(text_file,
+                                   "host rip=%016llX rsp=%016llX rbp=%016llX\n",
+                                   (unsigned long long)context->Rip,
+                                   (unsigned long long)context->Rsp,
+                                   (unsigned long long)context->Rbp);
+        r36sx_windows_crash_printf(text_file,
+                                   "host rax=%016llX rbx=%016llX rcx=%016llX rdx=%016llX\n",
+                                   (unsigned long long)context->Rax,
+                                   (unsigned long long)context->Rbx,
+                                   (unsigned long long)context->Rcx,
+                                   (unsigned long long)context->Rdx);
+        r36sx_windows_crash_printf(text_file,
+                                   "host rsi=%016llX rdi=%016llX r8=%016llX r9=%016llX\n",
+                                   (unsigned long long)context->Rsi,
+                                   (unsigned long long)context->Rdi,
+                                   (unsigned long long)context->R8,
+                                   (unsigned long long)context->R9);
+        r36sx_windows_crash_printf(text_file,
+                                   "host r10=%016llX r11=%016llX r12=%016llX r13=%016llX\n",
+                                   (unsigned long long)context->R10,
+                                   (unsigned long long)context->R11,
+                                   (unsigned long long)context->R12,
+                                   (unsigned long long)context->R13);
+        r36sx_windows_crash_printf(text_file,
+                                   "host r14=%016llX r15=%016llX eflags=%08lX\n",
+                                   (unsigned long long)context->R14,
+                                   (unsigned long long)context->R15,
+                                   (unsigned long)context->EFlags);
+    }
+#elif defined(_M_IX86) || defined(__i386__)
+    if (context) {
+        r36sx_windows_crash_printf(text_file,
+                                   "host eip=%08lX esp=%08lX ebp=%08lX eflags=%08lX\n",
+                                   (unsigned long)context->Eip,
+                                   (unsigned long)context->Esp,
+                                   (unsigned long)context->Ebp,
+                                   (unsigned long)context->EFlags);
+        r36sx_windows_crash_printf(text_file,
+                                   "host eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX\n",
+                                   (unsigned long)context->Eax,
+                                   (unsigned long)context->Ebx,
+                                   (unsigned long)context->Ecx,
+                                   (unsigned long)context->Edx,
+                                   (unsigned long)context->Esi,
+                                   (unsigned long)context->Edi);
+    }
+#endif
+
+    r36sx_windows_crash_printf(text_file,
+                               "guest cs:ip=%04X:%08lX ss:sp=%04X:%08lX flags=%08lX\n",
+                               (unsigned)CPU_CS,
+                               (unsigned long)CPU_IP,
+                               (unsigned)CPU_SS,
+                               (unsigned long)CPU_ESP,
+                               (unsigned long)x86_flags.value);
+    r36sx_windows_crash_printf(text_file,
+                               "guest eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX\n",
+                               (unsigned long)CPU_EAX,
+                               (unsigned long)CPU_EBX,
+                               (unsigned long)CPU_ECX,
+                               (unsigned long)CPU_EDX);
+    r36sx_windows_crash_printf(text_file,
+                               "guest esi=%08lX edi=%08lX ebp=%08lX esp=%08lX\n",
+                               (unsigned long)CPU_ESI,
+                               (unsigned long)CPU_EDI,
+                               (unsigned long)CPU_EBP,
+                               (unsigned long)CPU_ESP);
+    r36sx_windows_crash_printf(text_file,
+                               "guest es=%04X cs=%04X ss=%04X ds=%04X fs=%04X gs=%04X\n",
+                               (unsigned)CPU_ES,
+                               (unsigned)CPU_CS,
+                               (unsigned)CPU_SS,
+                               (unsigned)CPU_DS,
+                               (unsigned)CPU_FS,
+                               (unsigned)CPU_GS);
+    CloseHandle(text_file);
+}
+
+static LONG WINAPI r36sx_windows_exception_handler(EXCEPTION_POINTERS *info)
+{
+    if (InterlockedCompareExchange(&r36sx_windows_crash_written, 1, 0) == 0) {
+        r36sx_windows_write_crash_report(info);
+        r36sx_windows_write_minidump(info);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void r36sx_windows_install_crash_handler(void)
+{
+    ULONG stack_guarantee = 64u * 1024u;
+    SetThreadStackGuarantee(&stack_guarantee);
+    AddVectoredExceptionHandler(1, r36sx_windows_exception_handler);
+    SetUnhandledExceptionFilter(r36sx_windows_exception_handler);
+}
+#endif
+
 pthread_mutex_t update_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t update_cond = PTHREAD_COND_INITIALIZER;
 volatile int update_ready = 0;
@@ -2313,6 +2498,9 @@ void *ticks_thread(void *arg) {
 
 int main() {
     r36sx_pico286_debug_reset();
+#if defined(_WIN32)
+    r36sx_windows_install_crash_handler();
+#endif
     r36sx_pico286_debug_log_build_info();
     r36sx_pico286_debug_log("main: start");
     r36sx_profile_init();

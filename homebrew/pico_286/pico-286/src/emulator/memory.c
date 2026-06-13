@@ -452,7 +452,7 @@ void write86_mp(const uint32_t address, const uint8_t value) {
             SRAM[address - HMA_START] = value;
         }
     } else if (!a20_enabled && address >= HMA_END) {
-        write86(address - HMA_START, value);
+        write86(a20_wrap_address(address), value);
     }
 }
 
@@ -481,7 +481,7 @@ void writew86_mp(const uint32_t address, const uint16_t value) {
                 *(uint16_t *) &SRAM[address - HMA_START] = value;
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writew86(address - HMA_START, value);
+            writew86(a20_wrap_address(address), value);
         }
     }
 }
@@ -512,7 +512,7 @@ void writedw86_mp(const uint32_t address, const uint32_t value) {
                 *(uint32_t *) &SRAM[address - HMA_START] = value;
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writedw86(address - HMA_START, value);
+            writedw86(a20_wrap_address(address), value);
         }
     }
 }
@@ -555,7 +555,7 @@ uint8_t read86_mp(const uint32_t address) {
         return SRAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return read86_mp(address - HMA_START);
+        return read86_mp(a20_wrap_address(address));
     }
     return 0xFF;
 }
@@ -598,7 +598,7 @@ uint16_t readw86_mp(const uint32_t address) {
         return *(uint16_t *) &SRAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readw86_mp(address - HMA_START);
+        return readw86_mp(a20_wrap_address(address));
     }
     return 0xFFFF;
 }
@@ -640,7 +640,7 @@ uint32_t readdw86_mp(const uint32_t address) {
         return *(uint32_t *) &SRAM[address - HMA_START];
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readdw86_mp(address - HMA_START);
+        return readdw86_mp(a20_wrap_address(address));
     }
     return 0xFFFFFFFF;
 }
@@ -668,7 +668,7 @@ void write86_sw(const uint32_t address, const uint8_t value) {
             swap_write(address - HMA_START, value);
         }
     } else if (!a20_enabled && address >= HMA_END) {
-        write86(address - HMA_START, value);
+        write86(a20_wrap_address(address), value);
     }
 }
 
@@ -695,7 +695,7 @@ void writew86_sw(const uint32_t address, const uint16_t value) {
                 swap_write16(address - HMA_START, value);
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writew86(address - HMA_START, value);
+            writew86(a20_wrap_address(address), value);
         }
     }
 }
@@ -724,7 +724,7 @@ void writedw86_sw(const uint32_t address, const uint32_t value) {
                 swap_write32(address - HMA_START, value);
             }
         } else if (!a20_enabled && address >= HMA_END) {
-            writedw86(address - HMA_START, value);
+            writedw86(a20_wrap_address(address), value);
         }
     }
 }
@@ -764,7 +764,7 @@ uint8_t read86_sw(const uint32_t address) {
         return swap_read(address - HMA_START);
     }
     if (!a20_enabled && address >= HMA_END) {
-        return read86_sw(address - HMA_START);
+        return read86_sw(a20_wrap_address(address));
     }
     return 0xFF;
 }
@@ -804,7 +804,7 @@ uint16_t readw86_sw(const uint32_t address) {
         return swap_read16(address - HMA_START);
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readw86_sw(address - HMA_START);
+        return readw86_sw(a20_wrap_address(address));
     }
     return 0xFFFF;
 }
@@ -843,7 +843,7 @@ uint32_t readdw86_sw(const uint32_t address) {
         return swap_read32(address - HMA_START);
     }
     if (!a20_enabled && address >= HMA_END) {
-        return readdw86_sw(address - HMA_START);
+        return readdw86_sw(a20_wrap_address(address));
     }
     return 0xFFFFFFFF;
 }

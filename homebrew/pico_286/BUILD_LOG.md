@@ -1,5 +1,56 @@
 # pico-286 Build Log
 
+## 2026-06-13 Windows full FreeDOS protected-mode boot crash
+
+Investigated a Windows-only hard close while booting a full FreeDOS install from
+the patch copy.  The first reproduced failure exited with `0xC00000FD`
+(`STATUS_STACK_OVERFLOW`).  A Windows crash handler/minidump path now writes
+`pico_286_crash.txt` and `pico_286_crash.dmp` next to the patch executable when
+the host process faults.
+
+The minidump and `pico_286.log` showed recursive protected-mode exception
+delivery:
+
+```text
+INT 21h from CPL3/DPMI code -> IDT read -> #PF err=00000005 -> #DF -> triple fault
+```
+
+Checked the current Intel 64 and IA-32 SDM page, whose system programming guide
+covers memory management, protection, task management, and interrupt/exception
+handling:
+
+```text
+https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+```
+
+The fix separates normal guest linear accesses from CPU-internal system table
+accesses.  Guest loads/stores still derive the page U/S check from current CPL,
+while descriptor-table, IDT gate, TSS, task-switch, and I/O-permission-bitmap
+accesses use supervisor/system paging semantics.  A guarded double/triple-fault
+path was also added so a real unrecoverable exception delivery failure produces
+an emergency dump instead of recursing until the Windows stack overflows.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -Out .\homebrew\pico_286\build\pico_286_win.exe
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Build succeeded with the existing `network-redirector.c.inl` unused-variable
+  warnings.
+- Smoke run of the patch Windows executable stayed alive for 45 seconds and was
+  killed by the test timeout: `timeout_killed exit=-1`.
+- No new `pico_286_crash.txt` update and no new `emergency_dump_*` directory
+  were produced.
+- Fresh log lines show the previous failing `INT 21h` now reads a valid
+  protected-mode gate and is handled:
+  `IDT[21] ... sel=0008 ... valid=1`, followed by
+  `software INT 21 handled=1`.
+
 ## 2026-06-05 C0000-EFFFF upper memory
 
 Freed the PC address range `C0000h..EFFFFh` for DOS upper memory blocks.  VGA

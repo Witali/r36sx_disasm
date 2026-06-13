@@ -257,7 +257,8 @@ foreach ($File in $CFiles) {
 Compile-Cpp (Join-Path $PicoRoot "src\emu8950\slot_render.cpp")
 Compile-Cpp (Join-Path $PortRoot "r36sx_linux-main.cpp")
 
-Invoke-Checked { & $Zig c++ -target x86_64-windows-gnu @Objects "-o" $Out "-luser32" "-lgdi32" "-lshell32" "-lwinmm" }
+$PdbOut = [IO.Path]::ChangeExtension([IO.Path]::GetFullPath($Out), ".pdb")
+Invoke-Checked { & $Zig c++ -target x86_64-windows-gnu @Objects "-o" $Out "-luser32" "-lgdi32" "-lshell32" "-lwinmm" "-ldbghelp" }
 
 foreach ($Asset in @("pico_286.conf", "keypresets.conf", "test386.bin", "test286.bin")) {
     $Source = Join-Path $PSScriptRoot $Asset
@@ -275,6 +276,11 @@ if (!$NoPatchCopy) {
         New-Item -ItemType Directory -Force $PatchDir | Out-Null
     }
     Copy-Item -LiteralPath $Out -Destination (Join-Path $PatchDir ([IO.Path]::GetFileName($Out))) -Force
+    foreach ($Artifact in @($PdbOut)) {
+        if (Test-Path $Artifact) {
+            Copy-Item -LiteralPath $Artifact -Destination (Join-Path $PatchDir ([IO.Path]::GetFileName($Artifact))) -Force
+        }
+    }
     Write-Host "Copied Windows debug executable to $PatchDir"
 }
 
