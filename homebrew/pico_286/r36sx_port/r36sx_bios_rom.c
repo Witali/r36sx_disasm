@@ -7,8 +7,13 @@
 
 #define R36SX_TEST_BIOS_START 0xF0000u
 #define R36SX_TEST_BIOS_SIZE 0x10000u
-#define R36SX_BIOS_FDPT_BASE 0xE0000u
-#define R36SX_BIOS_FDPT_SEGMENT 0xE000u
+/*
+ * Keep the fixed disk parameter tables in the reserved system BIOS area.
+ * C0000h..EFFFFh may be exposed as UMB/RAM to DOS memory managers such as
+ * JemmEx; placing ROM-like tables there creates a partial read-only overlap.
+ */
+#define R36SX_BIOS_FDPT_BASE 0xF0000u
+#define R36SX_BIOS_FDPT_SEGMENT 0xF000u
 #define R36SX_BIOS_FDPT_OFFSET 0x0000u
 #define R36SX_BIOS_FDPT_COUNT 2u
 #define R36SX_BIOS_FDPT_SIZE 16u

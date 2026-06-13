@@ -1,5 +1,28 @@
 # pico-286 Build Log
 
+## 2026-06-13 FDPT F000 JemmEx retest
+
+Rebuilt the Windows debug executable with the fixed-disk parameter table
+relocated from the UMB range to the system BIOS range (`F000:0000`) and copied
+the result to the active patch directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Then ran the patch copy `pico_286_win.exe`, waited 45 seconds, requested a
+Windows UI memory dump, and captured a screenshot:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/memory_dump_001/`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260613_220433_d543b28f_000.bmp`
+
+Result: FreeDOS with JemmEx still stops at `Bad or missing Command Interpreter:
+C:\FreeDOS\BIN\COMMAND.COM ...`. The JemmEx warning changed from the previous
+split `c000-dfff` plus `e100-efff` shape to one continuous `c000-efff` range,
+confirming that the old FDPT placement at `E0000h` did create a visible ROM/RAM
+overlap in UMB space, but that overlap is not the only cause of the remaining
+`COMMAND.COM` failure.
+
 ## 2026-06-13 Windows RTC host-time default
 
 Changed the Windows build's RTC default so `rtc_start_time` in `pico_286.conf`
