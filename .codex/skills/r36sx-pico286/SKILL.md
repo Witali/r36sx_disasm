@@ -52,3 +52,10 @@ notes.
 - Read `references/workflows.md` for exact commands, paths, and subsystem notes.
 - Read `tools/PROJECT_RULES.md` for logging, git, and RTC patch-copy rules.
 - Read `tools/SECURITY_RULES.md` before using downloaded tools or binaries.
+- For DOS x86 assembly, BIOS ROM, `.COM`, `.EXE`, boot-sector, or disassembly
+  patch work, use the `x86-dos-binary-patching` skill as well.
+- For MIPS/MIPSEL ELF, toolchain, ABI, disassembly, or R36SX native binary
+  work, use the `mips-r36sx-binary-workflow` skill as well.
+- For Ghidra imports, headless analysis, decompiler exports, or generated
+  disassembly, use the `ghidra-disassembly-workflow` skill as well and keep
+  durable outputs under `disasm/`.

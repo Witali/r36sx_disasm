@@ -1,0 +1,4 @@
+interface:
+  display_name: "MIPS R36SX Binary Workflow"
+  short_description: "MIPS docs, disasm, and build checks"
+  default_prompt: "Use $mips-r36sx-binary-workflow to analyze, patch, or verify R36SX MIPS binaries."

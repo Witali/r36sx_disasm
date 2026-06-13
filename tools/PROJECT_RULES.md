@@ -110,3 +110,27 @@ When changing agent files, validate the skill structure when the local
 validator is usable. If validation cannot run because a local dependency is
 missing, inspect the frontmatter and generated metadata manually and mention
 the validator limitation in the task result.
+
+## Official Documentation Rule
+
+Rule: for semantic changes to CPU emulation, assembly/binary patches, ABI
+behavior, BIOS/DOS interfaces, hardware ports, or native MIPS build/toolchain
+assumptions, consult official documentation for the target before changing
+behavior.
+
+Prefer vendor manuals, official source trees, ABI specifications, and toolchain
+manuals over wiki/blog/forum summaries. If official documentation is unavailable
+or incomplete, state that limitation and label any secondary source used. Record
+the exact manual/source and section when the fact is likely to affect future
+work.
+
+## Ghidra Disassembly Artifact Rule
+
+Rule: durable Ghidra-generated disassembly, decompiler output, symbol/function
+exports, range dumps, and reverse-engineering notes belong under `disasm/`.
+
+Use `ghidra_projects/` only for local Ghidra project databases and caches. Treat
+`ghidra_exports/` as legacy scratch output; do not rely on it for files that
+future work should read. When running Ghidra scripts, pass an explicit output
+directory under `disasm/<type>/<target>/`, sorting first by executable or target
+type such as `dos`, `mips`, `linux`, `BIOS`, or `firmware`.

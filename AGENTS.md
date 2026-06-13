@@ -17,10 +17,21 @@ and the active Pico-286 emulator port under `homebrew/pico_286`.
   edits, analysis findings, and reusable facts in repository files.
 - Follow `tools/SECURITY_RULES.md`: scan downloaded tools, archives,
   executables, scripts, and extracted directories before use.
+- For CPU, ABI, BIOS, DOS, hardware-port, or binary-layout semantics, check
+  official documentation before changing behavior. Record the manual/source
+  when the fact will matter later.
 
 ## Pico-286 Workflow
 
 - Use the project skill `.codex/skills/r36sx-pico286` for Pico-286/R36SX work.
+- Use `.codex/skills/x86-dos-binary-patching` for `.ASM`, `.COM`, `.EXE`, BIOS
+  ROM, boot-sector, option-ROM, Ghidra, and ndisasm patch work.
+- Use `.codex/skills/mips-r36sx-binary-workflow` for MIPS/MIPSEL ELF,
+  disassembly, toolchain, ABI, `driver.so`, and R36SX native binary work.
+- Use `.codex/skills/ghidra-disassembly-workflow` for Ghidra imports,
+  `analyzeHeadless`, Java Ghidra scripts, decompiler exports, and generated
+  disassembly. Durable generated disassembly/decompile files must live under
+  `disasm/`, sorted first by target type such as `dos`, `mips`, or `linux`.
 - Treat `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286` as the user's
   active test copy. The user normally tests that patch copy, not `disk_image`.
 - Use WSL/GCC for MIPS Pico-286 builds. The Zig/Clang MIPS path is fallback

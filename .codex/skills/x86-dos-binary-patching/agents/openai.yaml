@@ -1,0 +1,4 @@
+interface:
+  display_name: "x86 DOS Binary Patching"
+  short_description: "Patch and verify DOS x86 binaries"
+  default_prompt: "Use $x86-dos-binary-patching to safely edit and verify DOS x86 binaries."
