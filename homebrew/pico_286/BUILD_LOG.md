@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-13 Windows RTC host-time default
+
+Changed the Windows build's RTC default so `rtc_start_time` in `pico_286.conf`
+no longer freezes guest time unless `rtc_use_system_time=0` is explicitly set.
+`rtc_use_system_time` defaults to `1` for `_WIN32` builds and `0` for
+MIPS/device builds, preserving the fixed config-driven clock on handhelds.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- SHA256:
+  `A74432447D432F82C63D600DCA1869EBE446493D4CAA56305A3EC634A7C1F81F`
+- Verification: F12 screenshot after launch was saved as
+  `pico_286_win_20260613_214433_f8cf083c_000.bmp`, confirming that the Windows
+  build used the host system date instead of the configured
+  `rtc_start_time=2026-06-03 00:00:00`.
+
 ## 2026-06-13 Windows full FreeDOS protected-mode boot crash
 
 Investigated a Windows-only hard close while booting a full FreeDOS install from

@@ -14,6 +14,13 @@
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
 #define R36SX_PICO286_DEFAULT_RTC_START_TIME "2026-06-03 00:00:00"
+#if defined(_WIN32)
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME 1
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT "1"
+#else
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME 0
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT "0"
+#endif
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 50.000
 /* Round historical throughput estimates used to turn MHz into exec86 IPS. */
@@ -101,6 +108,8 @@ static char target_fps_text[16] = "60";
 static char rtc_enabled_text[8] = "1";
 static char rtc_at_enabled_text[8] = "1";
 static char rtc_xt_enabled_text[8] = "1";
+static char rtc_use_system_time_text[8] =
+    R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT;
 static char rtc_start_time_text[32] =
     R36SX_PICO286_DEFAULT_RTC_START_TIME;
 static char screenshot_format_text[8] = "png";
@@ -139,6 +148,7 @@ static uint32_t target_fps = 60u;
 static int rtc_enabled = 1;
 static int rtc_at_enabled = 1;
 static int rtc_xt_enabled = 1;
+static int rtc_use_system_time = R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME;
 static int64_t rtc_start_time_unix = 0;
 static int rtc_start_time_valid = 0;
 static int screenshot_build_hash_enabled = 1;
@@ -1353,6 +1363,16 @@ static int set_rtc_value(const char *key, const char *value, int line_no)
             sizeof(rtc_xt_enabled_text));
     }
 
+    if (key_equals(key, "rtc_use_system_time") ||
+        key_equals(key, "rtc_use_host_time") ||
+        key_equals(key, "rtc_system_time") ||
+        key_equals(key, "rtc_host_time")) {
+        return set_rtc_bool_value(
+            key, value, line_no, "rtc_use_system_time",
+            &rtc_use_system_time, rtc_use_system_time_text,
+            sizeof(rtc_use_system_time_text));
+    }
+
     return 0;
 }
 
@@ -1911,6 +1931,8 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# rtc_enabled disables both AT and XT RTC interfaces when 0.\n");
     fprintf(fp, "# rtc_at_enabled controls AT CMOS ports 70h/71h.\n");
     fprintf(fp, "# rtc_xt_enabled controls XT-compatible ports 240h..257h.\n");
+    fprintf(fp, "# rtc_use_system_time=1 starts from host local time; when 0,\n");
+    fprintf(fp, "# rtc_start_time below is used. Windows defaults to 1, MIPS to 0.\n");
     fprintf(fp, "# RTC start time is local time.\n");
     fprintf(fp, "# Format: YYYY-MM-DD HH:MM:SS.  If omitted, the built-in\n");
     fprintf(fp, "# default is %s.\n", R36SX_PICO286_DEFAULT_RTC_START_TIME);
@@ -1918,6 +1940,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "rtc_enabled=%s\n", rtc_enabled_text);
     fprintf(fp, "rtc_at_enabled=%s\n", rtc_at_enabled_text);
     fprintf(fp, "rtc_xt_enabled=%s\n", rtc_xt_enabled_text);
+    fprintf(fp, "rtc_use_system_time=%s\n", rtc_use_system_time_text);
     fprintf(fp, "rtc_start_time=%s\n\n", rtc_start_time_text);
 
     fprintf(fp, "# Scaling filter used when the DOS image is resized.\n");
@@ -2073,7 +2096,13 @@ uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps)
 
 int64_t r36sx_pico286_rtc_start_time_unix(void)
 {
+    time_t host_time;
+
     load_disk_config();
+
+    if (rtc_use_system_time && time(&host_time) != (time_t)-1) {
+        return (int64_t)host_time;
+    }
 
     if (!rtc_start_time_valid &&
         !parse_rtc_start_time_text(rtc_start_time_text,

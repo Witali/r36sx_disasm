@@ -71,6 +71,11 @@ physical keyboard input, disk images, config loading, RTC, profiling, and debug
 logs are active; the R36SX `driver.so` video/audio paths, joypad Fn overlays,
 and device-only audio output are not used in this build.
 
+Windows builds default `rtc_use_system_time` to `1`, so the emulated RTC starts
+from the host system clock even when an old `rtc_start_time` is still present in
+`pico_286.conf`.  MIPS/device builds default it to `0`, preserving the fixed
+config-driven start time used on handhelds without a reliable host RTC.
+
 Current workflow rule: build Pico-286 for Windows by default while CPU, BIOS,
 VGA, disk, and DOS compatibility debugging is active.  Rebuild the MIPS/device
 binary only when a change is ready to be tested on the handheld or when the
