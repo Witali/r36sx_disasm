@@ -2019,6 +2019,7 @@ static void r36sx_pico286_soft_reset(void) {
     soft_reset_in_progress = 1;
     __sync_synchronize();
     r36sx_pico286_disk_flush_all();
+    r36sx_pico286_reload_config();
 
     r36sx_keyboard_reset();
     port60 = 0;

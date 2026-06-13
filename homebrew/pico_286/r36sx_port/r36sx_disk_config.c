@@ -2119,6 +2119,13 @@ int r36sx_pico286_save_config(void)
     return 1;
 }
 
+void r36sx_pico286_reload_config(void)
+{
+    r36sx_pico286_debug_log("diskcfg: reload requested");
+    disk_config_loaded = 0;
+    load_disk_config();
+}
+
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
 {
     load_disk_config();

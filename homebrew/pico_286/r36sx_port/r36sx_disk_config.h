@@ -76,6 +76,9 @@ const char *r36sx_pico286_host_drive_value(void);
 // Write the current Pico-286 configuration back to pico_286.conf.
 int r36sx_pico286_save_config(void);
 
+// Force the next config access to reread pico_286.conf from disk.
+void r36sx_pico286_reload_config(void);
+
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
 

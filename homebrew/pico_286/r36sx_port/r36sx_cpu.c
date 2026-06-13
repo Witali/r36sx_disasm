@@ -4534,10 +4534,31 @@ static void r36sx_bios_attach_configured_disks(void)
     const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
     const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
     const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
-    uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
-    uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
-    uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
-    uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
+    uint8_t fdd0_ok = 0;
+    uint8_t fdd1_ok = 0;
+    uint8_t hdd0_ok = 0;
+    uint8_t hdd1_ok = 0;
+
+    if (fdd0_path[0]) {
+        fdd0_ok = insertdisk(0, fdd0_path);
+    } else {
+        ejectdisk(0);
+    }
+    if (fdd1_path[0]) {
+        fdd1_ok = insertdisk(1, fdd1_path);
+    } else {
+        ejectdisk(1);
+    }
+    if (hdd0_path[0]) {
+        hdd0_ok = insertdisk(128, hdd0_path);
+    } else {
+        ejectdisk(128);
+    }
+    if (hdd1_path[0]) {
+        hdd1_ok = insertdisk(129, hdd1_path);
+    } else {
+        ejectdisk(129);
+    }
 
     r36sx_pico286_debug_log(
         "cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",

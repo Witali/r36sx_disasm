@@ -53,6 +53,9 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
 
     r36sx_host_disk_cache_t cache;
     size_t size = 0;
+
+    ejectdisk(drivenum);
+
     FILE *file = r36sx_host_disk_open(pathname, &cache, &size);
     if (!file) {
         printf( "DISK: ERROR: cannot open disk file %s for drive %02Xh\n", pathname, drivenum);
@@ -119,9 +122,6 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
 //        fprintf(stderr, "DISK: ERROR: Cannot determine correct CHS geometry for drive %02Xh\n", drivenum);
 //        return 0;
     }
-
-    // Eject any existing disk and insert the new one
-    ejectdisk(drivenum);
 
     disk[drivenum].diskfile = file;
     disk[drivenum].cache = cache;
