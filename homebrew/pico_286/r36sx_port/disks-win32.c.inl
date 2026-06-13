@@ -8,6 +8,11 @@ int hdcount = 0, fdcount = 0;
 static uint8_t sectorbuffer[512];
 typedef unsigned long DWORD;
 
+#define R36SX_FLOPPY_IMAGE_MIN_BYTES (360UL * 1024UL)
+#define R36SX_FLOPPY_IMAGE_MAX_BYTES (2880UL * 1024UL)
+#define R36SX_HARD_IMAGE_MAX_BYTES ((size_t)0x7ffffe00UL)
+#define R36SX_BIOS_MAX_CHS_CYLINDERS 1024u
+
 struct struct_drive {
     FILE *diskfile;
     r36sx_host_disk_cache_t cache;
@@ -26,6 +31,107 @@ static inline int normalize_disk_number(uint8_t *drivenum) {
 
 static inline void update_bios_disk_counts(void) {
     RAM[0x475] = (uint8_t)hdcount;  // BIOS Data Area: fixed disk count.
+}
+
+static inline void disk_choose_floppy_geometry(size_t size,
+                                               uint16_t *cyls,
+                                               uint16_t *heads,
+                                               uint16_t *sects) {
+    uint64_t total_sectors = (uint64_t)(size / 512UL);
+
+    *cyls = 80;
+    *heads = 2;
+    *sects = 18;
+
+    if (size <= 360UL * 1024UL) {
+        *cyls = 40;
+        *sects = 9;
+    } else if (size <= 720UL * 1024UL) {
+        *sects = 9;
+    } else if (size <= 1200UL * 1024UL) {
+        *sects = 15;
+    } else if (size > 1440UL * 1024UL) {
+        *sects = 36;
+    }
+
+    if ((uint64_t)*cyls * (uint64_t)*heads * (uint64_t)*sects !=
+        total_sectors &&
+        total_sectors % 160ULL == 0) {
+        uint64_t auto_sects = total_sectors / 160ULL;
+        if (auto_sects >= 1 && auto_sects <= 36) {
+            *cyls = 80;
+            *heads = 2;
+            *sects = (uint16_t)auto_sects;
+        }
+    }
+}
+
+static inline void disk_choose_hdd_geometry(size_t size,
+                                            uint16_t *cyls,
+                                            uint16_t *heads,
+                                            uint16_t *sects) {
+    static const uint16_t preferred_heads[] = {
+        16, 32, 64, 128, 255, 8, 4, 2, 1
+    };
+    static const uint16_t preferred_sects[] = {
+        63, 32, 17, 16, 15, 9, 18, 36
+    };
+    uint64_t total_sectors = (uint64_t)(size / 512UL);
+    uint16_t chosen_heads = 16;
+    uint64_t chosen_cyls;
+
+    for (size_t hi = 0; hi < sizeof(preferred_heads) / sizeof(preferred_heads[0]);
+         hi++) {
+        for (size_t si = 0;
+             si < sizeof(preferred_sects) / sizeof(preferred_sects[0]);
+             si++) {
+            uint64_t track_sectors =
+                (uint64_t)preferred_heads[hi] * (uint64_t)preferred_sects[si];
+            uint64_t exact_cyls;
+
+            if (track_sectors == 0 || total_sectors % track_sectors != 0) {
+                continue;
+            }
+            exact_cyls = total_sectors / track_sectors;
+            if (exact_cyls >= 1 &&
+                exact_cyls <= R36SX_BIOS_MAX_CHS_CYLINDERS) {
+                *cyls = (uint16_t)exact_cyls;
+                *heads = preferred_heads[hi];
+                *sects = preferred_sects[si];
+                return;
+            }
+        }
+    }
+
+    *sects = 63;
+
+    if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 16ULL * 63ULL) {
+        chosen_heads = 16;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 32ULL * 63ULL) {
+        chosen_heads = 32;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 64ULL * 63ULL) {
+        chosen_heads = 64;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 128ULL * 63ULL) {
+        chosen_heads = 128;
+    } else {
+        chosen_heads = 255;
+    }
+
+    chosen_cyls = total_sectors / ((uint64_t)chosen_heads * (uint64_t)*sects);
+    if (chosen_cyls == 0) {
+        chosen_heads = 1;
+        chosen_cyls = total_sectors / (uint64_t)*sects;
+        if (chosen_cyls == 0) {
+            *sects = total_sectors ? (uint16_t)total_sectors : 1;
+            chosen_cyls = 1;
+        }
+    }
+    if (chosen_cyls > R36SX_BIOS_MAX_CHS_CYLINDERS) {
+        chosen_cyls = R36SX_BIOS_MAX_CHS_CYLINDERS;
+    }
+
+    *cyls = (uint16_t)chosen_cyls;
+    *heads = chosen_heads;
 }
 
 static inline void ejectdisk(uint8_t drivenum) {
@@ -62,10 +168,18 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
         return 0;
     }
 
+    const size_t min_size = R36SX_FLOPPY_IMAGE_MIN_BYTES;
+    const size_t max_size = drivenum >= 2 ?
+        R36SX_HARD_IMAGE_MAX_BYTES : R36SX_FLOPPY_IMAGE_MAX_BYTES;
+
     // Validate size constraints
-    if (size < 360 * 1024 || size > 0x1f782000UL || (size & 511)) {
+    if (size < min_size || size > max_size || (size & 511u)) {
+        r36sx_pico286_debug_log(
+            "disk: reject drive %02xh image '%s' size=%lu min=%lu max=%lu",
+            bios_drive, pathname ? pathname : "<null>",
+            (unsigned long)size, (unsigned long)min_size,
+            (unsigned long)max_size);
         r36sx_host_disk_close(&file, &cache, drivenum);
-//        fprintf(stderr, "DISK: ERROR: invalid disk size for drive %02Xh (%lu bytes)\n", drivenum, (unsigned long) size);
         return 0;
     }
 
@@ -73,47 +187,15 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     uint16_t cyls = 0, heads = 0, sects = 0;
 
     if (drivenum >= 2) {  // Hard disk
-        r36sx_pico286_chs_t configured_geometry;
-
-        if (r36sx_pico286_hdd_geometry(bios_drive, &configured_geometry)) {
-            size_t configured_size =
-                (size_t)configured_geometry.cyls *
-                (size_t)configured_geometry.heads *
-                (size_t)configured_geometry.sects * 512UL;
-            if (configured_size <= size) {
-                cyls = configured_geometry.cyls;
-                heads = configured_geometry.heads;
-                sects = configured_geometry.sects;
-                r36sx_pico286_debug_log(
-                    "disk: drive %02xh using configured CHS=%u,%u,%u",
-                    bios_drive, cyls, heads, sects);
-            } else {
-                r36sx_pico286_debug_log(
-                    "disk: drive %02xh ignores CHS=%u,%u,%u larger than image",
-                    bios_drive, configured_geometry.cyls,
-                    configured_geometry.heads, configured_geometry.sects);
-            }
-        }
-
-        if (!cyls || !heads || !sects) {
-            sects = 63;
-            heads = 16;
-            cyls = size / (sects * heads * 512);
-        }
+        disk_choose_hdd_geometry(size, &cyls, &heads, &sects);
+        r36sx_pico286_debug_log(
+            "disk: drive %02xh auto CHS=%u,%u,%u size=%lu",
+            bios_drive, cyls, heads, sects, (unsigned long)size);
     } else {  // Floppy disk
-        cyls = 80;
-        sects = 18;
-        heads = 2;
-
-        if (size <= 368640) {  // 360 KB or lower
-            cyls = 40;
-            sects = 9;
-            heads = 2;
-        } else if (size <= 737280) {
-            sects = 9;
-        } else if (size <= 1228800) {
-            sects = 15;
-        }
+        disk_choose_floppy_geometry(size, &cyls, &heads, &sects);
+        r36sx_pico286_debug_log(
+            "disk: drive %02xh floppy CHS=%u,%u,%u size=%lu",
+            bios_drive, cyls, heads, sects, (unsigned long)size);
     }
 
     // Validate geometry
@@ -794,10 +876,12 @@ static INLINE void diskhandler() {
 
         case 0x08:  // Get drive parameters
             if (disk[drivenum].inserted) {
+                uint16_t max_cyl = disk[drivenum].cyls - 1u;
                 CPU_FL_CF = 0;
                 CPU_AH = 0;
-                CPU_CH = disk[drivenum].cyls - 1;
-                CPU_CL = (disk[drivenum].sects & 63) + ((disk[drivenum].cyls / 256) * 64);
+                CPU_CH = (uint8_t)max_cyl;
+                CPU_CL = (disk[drivenum].sects & 63) |
+                         (uint8_t)((max_cyl >> 2) & 0xC0);
                 CPU_DH = disk[drivenum].heads - 1;
 
                 // Set DL and BL for floppy or hard drive
@@ -828,10 +912,9 @@ static INLINE void diskhandler() {
             if (disk[drivenum].inserted) {
                 CPU_FL_CF = 0;
                 if (drivenum >= 2) {
-                    uint32_t total_sectors =
-                        (uint32_t)disk[drivenum].cyls *
-                        (uint32_t)disk[drivenum].heads *
-                        (uint32_t)disk[drivenum].sects;
+                    uint64_t total_sectors64 = disk_total_sectors(drivenum);
+                    uint32_t total_sectors = total_sectors64 > 0xffffffffULL ?
+                        0xffffffffUL : (uint32_t)total_sectors64;
                     CPU_AH = 0x03;  // Fixed disk.
                     CPU_CX = (uint16_t)(total_sectors >> 16);
                     CPU_DX = (uint16_t)(total_sectors & 0xFFFF);

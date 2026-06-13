@@ -350,9 +350,7 @@ fdd1=sopwith.img
 
 [hard_drives]
 hdd0=hdd.hdd
-hdd0_geometry=65,16,63
 hdd1=hdd2.hdd
-hdd1_geometry=800,16,32
 ```
 
 `cpu_model` selects the emulated instruction compatibility level: `8086`,
@@ -527,9 +525,7 @@ images should be placed in `image_dir` and selected through the disk image
 menu.  `.img` remains a floppy-only extension in the menu so the FreeDOS
 diskettes keep their original names; hard disks use `.hdd` by default.
 
-`hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
-`cylinders,heads,sectors` order.  The current bundled hard disk images are
-33,546,240 bytes, which matches `65,16,63`.
+Hard-disk CHS geometry is derived automatically from the mounted image size.
 
 The R36SX hard-disk BIOS path also exposes basic Enhanced Disk Drive / LBA
 services through `INT 13h`: `AH=41h` checks extension presence, `AH=42h` reads

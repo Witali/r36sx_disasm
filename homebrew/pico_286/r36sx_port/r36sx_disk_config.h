@@ -9,12 +9,6 @@
 extern "C" {
 #endif
 
-typedef struct {
-    uint16_t cyls;
-    uint16_t heads;
-    uint16_t sects;
-} r36sx_pico286_chs_t;
-
 typedef enum {
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG = 0,
     R36SX_PICO286_SCREENSHOT_FORMAT_BMP = 1,
@@ -156,10 +150,6 @@ uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives);
 
 // Update the configured boot order text in memory. Call save_config to persist.
 int r36sx_pico286_set_boot_order_value(const char *value);
-
-// Return non-zero when a configured hard-disk CHS geometry exists.
-int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
-                               r36sx_pico286_chs_t *geometry);
 
 // Return the stdio buffer size to use for each host disk image file.
 uint32_t r36sx_pico286_disk_cache_buffer_bytes(void);
