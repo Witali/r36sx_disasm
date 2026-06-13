@@ -250,9 +250,11 @@ This division of labor ensures that the demanding CPU emulation does not interfe
 ### Windows & Linux (Single CPU/Timer Loop)
 The host builds run CPU execution and emulated machine timing from the main
 loop.
-*   **Main Thread:** Runs `exec86` in 1 ms slices, services PIT timer events,
-    renders frames at the configured display cadence, generates audio samples,
-    and handles the window/events via the MiniFB library.
+*   **Main Thread:** Runs one budgeted frame loop at the configured display
+    cadence.  At 60 Hz, the first 10 ms are reserved for small `exec86` quanta
+    and audio sample generation while virtual PIT/audio time is stretched
+    across the full frame.  The remaining frame time is reserved for rendering,
+    overlays, buffer handoff, and sleeping when there is spare time.
 *   **Sound Thread:** A separate output thread only hands completed audio
     buffers to the host operating system so blocking audio writes do not stall
     emulation.

@@ -66,7 +66,9 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_AUDIO_BUFFER_COUNT 4u
 #define R36SX_HLT_SLEEP_US 100u
 #define R36SX_MAIN_LOOP_DEFAULT_FPS 60u
-#define R36SX_MAIN_LOOP_SLICE_US 1000u
+#define R36SX_MAIN_LOOP_ACTIVE_WAIT_THRESHOLD_US 1000u
+#define R36SX_MAIN_LOOP_EMULATION_BUDGET_US 10000u
+#define R36SX_MAIN_LOOP_MICRO_EXEC_LOOPS 100u
 #define R36SX_MAIN_LOOP_ACTIVE_SLEEP_MAX_US 100u
 #define R36SX_MAIN_LOOP_IDLE_SLEEP_MAX_US 1000u
 #define R36SX_EXEC86_MIN_LOOPS 25u
@@ -222,59 +224,17 @@ static uint32_t r36sx_pico286_frame_exec_loops(uint32_t loops_per_ms,
     return (uint32_t)loops;
 }
 
-static uint32_t r36sx_pico286_adjust_exec_loops(uint32_t current_loops,
-                                                uint32_t max_loops,
-                                                uint64_t exec_us,
-                                                uint32_t target_us)
+static uint64_t r36sx_pico286_scaled_frame_time(uint64_t frame_start_ns,
+                                                uint64_t frame_period_ns,
+                                                uint32_t done_loops,
+                                                uint32_t total_loops)
 {
-    if (max_loops < R36SX_EXEC86_MIN_LOOPS) {
-        max_loops = R36SX_EXEC86_MIN_LOOPS;
+    if (total_loops == 0 || done_loops >= total_loops) {
+        return frame_start_ns + frame_period_ns;
     }
-    if (current_loops < R36SX_EXEC86_MIN_LOOPS) {
-        current_loops = R36SX_EXEC86_MIN_LOOPS;
-    }
-    if (current_loops > max_loops) {
-        current_loops = max_loops;
-    }
-    if (target_us == 0) {
-        return current_loops;
-    }
-
-    if (exec_us > target_us) {
-        uint64_t scaled = (uint64_t)current_loops * target_us / exec_us;
-        uint32_t target_loops;
-        uint32_t step;
-        uint32_t stepped;
-
-        if (scaled < R36SX_EXEC86_MIN_LOOPS) {
-            target_loops = R36SX_EXEC86_MIN_LOOPS;
-        } else if (scaled > max_loops) {
-            target_loops = max_loops;
-        } else {
-            target_loops = (uint32_t)scaled;
-        }
-
-        step = current_loops / 4u;
-        if (step == 0) {
-            step = 1u;
-        }
-        stepped = current_loops > step ? current_loops - step
-                                       : R36SX_EXEC86_MIN_LOOPS;
-        return stepped < target_loops ? target_loops : stepped;
-    }
-
-    if (current_loops < max_loops) {
-        uint32_t step = current_loops / 4u;
-        uint64_t grown;
-
-        if (step == 0) {
-            step = 1u;
-        }
-        grown = (uint64_t)current_loops + step;
-        return grown > max_loops ? max_loops : (uint32_t)grown;
-    }
-
-    return current_loops;
+    return frame_start_ns +
+           (frame_period_ns * (uint64_t)done_loops) /
+               (uint64_t)total_loops;
 }
 
 static void r36sx_pico286_sleep_for_wait(uint64_t sleep_us,
@@ -306,7 +266,7 @@ static void r36sx_pico286_wait_for_next_main_frame(uint64_t *next_frame_us,
     if (frame_us == 0) {
         frame_us = 1u;
     }
-    max_sleep_us = frame_us <= R36SX_MAIN_LOOP_SLICE_US
+    max_sleep_us = frame_us <= R36SX_MAIN_LOOP_ACTIVE_WAIT_THRESHOLD_US
                        ? R36SX_MAIN_LOOP_ACTIVE_SLEEP_MAX_US
                        : R36SX_MAIN_LOOP_IDLE_SLEEP_MAX_US;
 
@@ -326,26 +286,6 @@ static void r36sx_pico286_wait_for_next_main_frame(uint64_t *next_frame_us,
     if (r36sx_cpu_waiting_for_interrupt()) {
         r36sx_pico286_sleep_for_wait(R36SX_HLT_SLEEP_US, max_sleep_us);
     }
-}
-
-static int r36sx_pico286_interval_due(uint64_t *next_us,
-                                      uint32_t interval_us)
-{
-    uint64_t now_us = r36sx_pico286_now_us();
-
-    if (interval_us == 0) {
-        interval_us = 1u;
-    }
-    if (now_us < *next_us) {
-        return 0;
-    }
-
-    if (now_us - *next_us > (uint64_t)interval_us) {
-        *next_us = now_us + interval_us;
-    } else {
-        *next_us += interval_us;
-    }
-    return 1;
 }
 
 extern "C" int r36sx_pico286_video_active_height(void) {
@@ -1832,7 +1772,7 @@ void *sound_thread(void *arg) {
 }
 
 struct r36sx_pico286_tick_state {
-    struct timespec start;
+    uint64_t virtual_elapsed_time;
     uint64_t elapsed_system_timer;
     uint64_t elapsed_blink_tics;
     uint64_t elapsed_frame_tics;
@@ -1861,16 +1801,7 @@ struct r36sx_pico286_tick_state {
 static uint64_t r36sx_pico286_ticks_elapsed_ns(
     const struct r36sx_pico286_tick_state *state)
 {
-    struct timespec current;
-    uint64_t current_ns;
-    uint64_t start_ns;
-
-    clock_gettime(CLOCK_MONOTONIC, &current);
-    current_ns = (uint64_t)current.tv_sec * state->hostfreq +
-                 (uint64_t)current.tv_nsec;
-    start_ns = (uint64_t)state->start.tv_sec * state->hostfreq +
-               (uint64_t)state->start.tv_nsec;
-    return current_ns >= start_ns ? current_ns - start_ns : 0;
+    return state->virtual_elapsed_time;
 }
 
 static void r36sx_pico286_ticks_sync_to_now(
@@ -1900,7 +1831,6 @@ static void r36sx_pico286_ticks_init(
     uint32_t frame_us)
 {
     memset(state, 0, sizeof(*state));
-    clock_gettime(CLOCK_MONOTONIC, &state->start);
 
     state->hostfreq = 1000000000ull;
     state->dss_period = state->hostfreq / 7000ull;
@@ -1934,7 +1864,7 @@ static void r36sx_pico286_ticks_init(
     r36sx_pico286_ticks_reset(state);
 
     r36sx_pico286_debug_log(
-        "ticks: single-loop timer_period=%d frame_us=%u audio_rate=%u dss=%d sound_blaster=%d",
+        "ticks: frame-budget timer_period=%d frame_us=%u audio_rate=%u dss=%d sound_blaster=%d",
         timer_period,
         frame_us,
         state->audio_sample_rate,
@@ -1942,10 +1872,10 @@ static void r36sx_pico286_ticks_init(
         state->sb_audio_enabled);
 }
 
-static void r36sx_pico286_ticks_step(
-    struct r36sx_pico286_tick_state *state)
+static void r36sx_pico286_ticks_step_to(
+    struct r36sx_pico286_tick_state *state,
+    uint64_t elapsedTime)
 {
-    uint64_t elapsedTime;
     uint64_t system_period;
 
     if (soft_reset_in_progress || vm_paused_by_menu) {
@@ -1955,13 +1885,17 @@ static void r36sx_pico286_ticks_step(
         return;
     }
 
-    elapsedTime = r36sx_pico286_ticks_elapsed_ns(state);
+    if (elapsedTime < state->virtual_elapsed_time) {
+        elapsedTime = state->virtual_elapsed_time;
+    }
+    state->virtual_elapsed_time = elapsedTime;
     if (++state->loop_count <= 4u) {
         r36sx_pico286_debug_log(
-            "ticks: single-loop #%u timer_period=%d sample_index=%d",
+            "ticks: frame-budget #%u timer_period=%d sample_index=%d virtual_ns=%llu",
             state->loop_count,
             timer_period,
-            sample_index);
+            sample_index,
+            (unsigned long long)elapsedTime);
     }
 
     system_period = timer_period > 0 ?
@@ -2091,7 +2025,12 @@ static void r36sx_pico286_ticks_step(
         state->elapsed_blink_tics = elapsedTime;
     }
 
-    // Frame rendering follows the configured video frame budget.
+}
+
+static void r36sx_pico286_render_frame_step(
+    struct r36sx_pico286_tick_state *state,
+    uint64_t elapsedTime)
+{
     if (elapsedTime - state->elapsed_frame_tics >= state->frame_period) {
         if (r36sx_pico286_video_take_dirty()) {
             R36SX_PROFILE_BEGIN(profile_renderer);
@@ -2192,16 +2131,19 @@ int main() {
 
     uint32_t cpu_exec_loops_per_ms =
         r36sx_pico286_cpu_exec_loops(32768u);
-    const uint32_t main_loop_slice_us = R36SX_MAIN_LOOP_SLICE_US;
-    uint32_t cpu_exec_loops_per_slice_max =
+    const uint32_t emulation_budget_us =
+        main_loop_frame_us < R36SX_MAIN_LOOP_EMULATION_BUDGET_US
+            ? main_loop_frame_us
+            : R36SX_MAIN_LOOP_EMULATION_BUDGET_US;
+    const uint32_t micro_exec_loops = R36SX_MAIN_LOOP_MICRO_EXEC_LOOPS;
+    uint32_t cpu_exec_loops_per_frame =
         r36sx_pico286_frame_exec_loops(cpu_exec_loops_per_ms,
-                                       main_loop_slice_us);
-    uint32_t cpu_exec_loops_per_slice = cpu_exec_loops_per_slice_max;
+                                       main_loop_frame_us);
     r36sx_cpu_exec_fn cpu_exec = r36sx_cpu_select_exec();
     struct r36sx_pico286_tick_state tick_state;
     r36sx_pico286_ticks_init(&tick_state, main_loop_frame_us);
     r36sx_pico286_debug_log(
-        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u slice_us=%u cpu_exec_loops_per_slice_max=%u",
+        "main: cpu_model=%s cpu_exec=%s cpu_mode=%s x87=%s bios=%s cpu_exec_loops_per_ms=%u target_fps=%u frame_us=%u emu_budget_us=%u micro_exec=%u cpu_exec_loops_per_frame=%u",
                             r36sx_pico286_cpu_model_name(),
                             r36sx_cpu_selected_exec_name(),
                             r36sx_pico286_cpu_mode_name(),
@@ -2210,26 +2152,24 @@ int main() {
                             cpu_exec_loops_per_ms,
                             target_fps,
                             main_loop_frame_us,
-                            main_loop_slice_us,
-                            cpu_exec_loops_per_slice_max);
+                            emulation_budget_us,
+                            micro_exec_loops,
+                            cpu_exec_loops_per_frame);
     if (r36sx_pico286_cpu_mode() == R36SX_PICO286_CPU_MODE_PROTECTED) {
         r36sx_pico286_debug_log(
             "main: cpu_mode=protected requested; guest still boots in real mode and may enter protected mode through CR0/LMSW");
     }
 
     unsigned int main_loop_count = 0;
-    uint64_t next_main_loop_us =
-        r36sx_pico286_now_us() + main_loop_slice_us;
-    uint64_t next_present_us = r36sx_pico286_now_us();
+    uint64_t next_frame_us =
+        r36sx_pico286_now_us() + main_loop_frame_us;
     while (running) {
-        uint64_t exec_elapsed_us;
         r36sx_app_stats_record_quantum();
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
             r36sx_pico286_ticks_reset(&tick_state);
-            next_main_loop_us = r36sx_pico286_now_us() + main_loop_slice_us;
-            next_present_us = r36sx_pico286_now_us();
+            next_frame_us = r36sx_pico286_now_us() + main_loop_frame_us;
             cpu_exec = r36sx_cpu_select_exec();
             r36sx_pico286_debug_log("main: cpu_exec=%s after reset",
                                     r36sx_cpu_selected_exec_name());
@@ -2238,26 +2178,19 @@ int main() {
         {
             uint32_t updated_loops_per_ms =
                 r36sx_pico286_cpu_exec_loops(32768u);
-            uint32_t updated_slice_max =
+            uint32_t updated_frame_loops =
                 r36sx_pico286_frame_exec_loops(updated_loops_per_ms,
-                                               main_loop_slice_us);
+                                               main_loop_frame_us);
 
-            if (updated_slice_max != cpu_exec_loops_per_slice_max) {
-                int was_at_max =
-                    cpu_exec_loops_per_slice >= cpu_exec_loops_per_slice_max;
-
+            if (updated_frame_loops != cpu_exec_loops_per_frame) {
                 r36sx_pico286_debug_log(
-                    "main: cpu timing changed loops_per_ms=%u->%u slice_max=%u->%u",
+                    "main: cpu timing changed loops_per_ms=%u->%u frame_loops=%u->%u",
                     cpu_exec_loops_per_ms,
                     updated_loops_per_ms,
-                    cpu_exec_loops_per_slice_max,
-                    updated_slice_max);
+                    cpu_exec_loops_per_frame,
+                    updated_frame_loops);
                 cpu_exec_loops_per_ms = updated_loops_per_ms;
-                cpu_exec_loops_per_slice_max = updated_slice_max;
-                if (was_at_max ||
-                    cpu_exec_loops_per_slice > cpu_exec_loops_per_slice_max) {
-                    cpu_exec_loops_per_slice = cpu_exec_loops_per_slice_max;
-                }
+                cpu_exec_loops_per_frame = updated_frame_loops;
             }
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
@@ -2286,31 +2219,58 @@ int main() {
             r36sx_pico286_set_menu_pause(mfb_vm_paused());
             if (!vm_paused_by_menu) {
                 r36sx_pico286_ticks_reset(&tick_state);
-                next_main_loop_us =
-                    r36sx_pico286_now_us() + main_loop_slice_us;
-                next_present_us = r36sx_pico286_now_us();
+                next_frame_us =
+                    r36sx_pico286_now_us() + main_loop_frame_us;
                 continue;
             }
             r36sx_profile_maybe_log();
-            r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
+            r36sx_pico286_wait_for_next_main_frame(&next_frame_us,
                                                    main_loop_frame_us);
             continue;
         }
-        r36sx_pico286_ticks_step(&tick_state);
+
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_physical_keyboard_poll();
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_1);
+        uint64_t frame_host_start_us = r36sx_pico286_now_us();
+        uint64_t emulation_deadline_us =
+            frame_host_start_us + emulation_budget_us;
+        uint64_t virtual_frame_start_ns =
+            r36sx_pico286_ticks_elapsed_ns(&tick_state);
+        uint64_t virtual_frame_end_ns =
+            virtual_frame_start_ns + tick_state.frame_period;
+        uint32_t frame_exec_done = 0;
+
         if (main_loop_count < 8u) {
-            r36sx_pico286_debug_log("main: before exec loop=%u videomode=0x%x",
-                                    main_loop_count, videomode);
+            r36sx_pico286_debug_log(
+                "main: before frame loop=%u videomode=0x%x frame_loops=%u",
+                main_loop_count, videomode, cpu_exec_loops_per_frame);
         }
         R36SX_PROFILE_BEGIN(profile_exec86);
-        uint64_t exec_start_us = r36sx_pico286_now_us();
-        cpu_exec(cpu_exec_loops_per_slice);
-        exec_elapsed_us = r36sx_pico286_now_us() - exec_start_us;
+        while (running && frame_exec_done < cpu_exec_loops_per_frame) {
+            uint32_t remaining_loops =
+                cpu_exec_loops_per_frame - frame_exec_done;
+            uint32_t step_loops = remaining_loops > micro_exec_loops
+                                      ? micro_exec_loops
+                                      : remaining_loops;
+            uint64_t virtual_now_ns;
+
+            if (r36sx_pico286_now_us() >= emulation_deadline_us) {
+                break;
+            }
+            cpu_exec(step_loops);
+            frame_exec_done += step_loops;
+            virtual_now_ns =
+                r36sx_pico286_scaled_frame_time(virtual_frame_start_ns,
+                                                tick_state.frame_period,
+                                                frame_exec_done,
+                                                cpu_exec_loops_per_frame);
+            r36sx_pico286_ticks_step_to(&tick_state, virtual_now_ns);
+        }
         R36SX_PROFILE_END_UNITS(R36SX_PROFILE_EXEC86, profile_exec86,
-                                cpu_exec_loops_per_slice);
+                                frame_exec_done);
+        r36sx_pico286_ticks_step_to(&tick_state, virtual_frame_end_ns);
         if (r36sx_emergency_dump_pending()) {
             r36sx_emergency_dump_write_and_clear();
             running = 0;
@@ -2326,76 +2286,57 @@ int main() {
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_2);
         if (main_loop_count < 8u) {
-            r36sx_pico286_debug_log("main: after exec loop=%u videomode=0x%x",
-                                    main_loop_count, videomode);
+            r36sx_pico286_debug_log(
+                "main: after emu loop=%u videomode=0x%x exec_done=%u/%u",
+                main_loop_count, videomode, frame_exec_done,
+                cpu_exec_loops_per_frame);
         }
-        if ((++main_loop_count % 3000u) == 0u) {
-            r36sx_pico286_debug_log("main: alive loops=%u videomode=0x%x exec_loops=%u",
-                                    main_loop_count, videomode,
-                                    cpu_exec_loops_per_slice);
+        if ((++main_loop_count % 180u) == 0u) {
+            r36sx_pico286_debug_log(
+                "main: alive frames=%u videomode=0x%x exec_done=%u/%u",
+                main_loop_count, videomode, frame_exec_done,
+                cpu_exec_loops_per_frame);
         }
-        if (r36sx_pico286_interval_due(&next_present_us,
-                                       main_loop_frame_us)) {
-            if (main_loop_count <= 8u) {
-                r36sx_pico286_debug_log("main: before mfb_update loop=%u",
-                                        main_loop_count);
-            }
-            R36SX_PROFILE_BEGIN(profile_mfb_update);
-            int mfb_update_rc = mfb_update(SCREEN, 0);
-            R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
-            if (mfb_update_rc < 0) {
-                r36sx_pico286_debug_log("main: mfb_update requested stop");
+        r36sx_pico286_render_frame_step(&tick_state, virtual_frame_end_ns);
+        if (main_loop_count <= 8u) {
+            r36sx_pico286_debug_log("main: before mfb_update frame=%u",
+                                    main_loop_count);
+        }
+        R36SX_PROFILE_BEGIN(profile_mfb_update);
+        int mfb_update_rc = mfb_update(SCREEN, 0);
+        R36SX_PROFILE_END(R36SX_PROFILE_MFB_UPDATE, profile_mfb_update);
+        if (mfb_update_rc < 0) {
+            r36sx_pico286_debug_log("main: mfb_update requested stop");
+            running = 0;
+            break;
+        }
+        r36sx_pico286_set_menu_pause(mfb_vm_paused());
+        if (vm_paused_by_menu) {
+            r36sx_pico286_ticks_sync_to_now(&tick_state);
+            if (r36sx_emergency_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
                 running = 0;
                 break;
             }
-            r36sx_pico286_set_menu_pause(mfb_vm_paused());
-            if (vm_paused_by_menu) {
-                r36sx_pico286_ticks_sync_to_now(&tick_state);
-                if (r36sx_emergency_dump_pending()) {
-                    r36sx_emergency_dump_write_and_clear();
-                    running = 0;
-                    break;
-                }
-                if (r36sx_memory_dump_pending()) {
-                    r36sx_emergency_dump_write_and_clear();
-                }
-                r36sx_profile_maybe_log();
-                r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
-                                                       main_loop_frame_us);
-                continue;
+            if (r36sx_memory_dump_pending()) {
+                r36sx_emergency_dump_write_and_clear();
             }
-            R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
-            r36sx_keyboard_tick();
-            R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK,
-                              profile_keyboard_tick_3);
-            if (main_loop_count <= 8u) {
-                r36sx_pico286_debug_log("main: after mfb_update loop=%u",
-                                        main_loop_count);
-            }
+            r36sx_profile_maybe_log();
+            r36sx_pico286_wait_for_next_main_frame(&next_frame_us,
+                                                   main_loop_frame_us);
+            continue;
         }
-        {
-            uint32_t adjusted_exec_loops =
-                r36sx_pico286_adjust_exec_loops(
-                    cpu_exec_loops_per_slice,
-                    cpu_exec_loops_per_slice_max,
-                    exec_elapsed_us,
-                    main_loop_slice_us);
-
-            if (adjusted_exec_loops != cpu_exec_loops_per_slice) {
-                if (main_loop_count <= 8u || (main_loop_count % 3000u) == 0u) {
-                    r36sx_pico286_debug_log(
-                        "main: adjust exec_loops %u->%u exec_us=%llu target_us=%u",
-                        cpu_exec_loops_per_slice,
-                        adjusted_exec_loops,
-                        (unsigned long long)exec_elapsed_us,
-                        main_loop_slice_us);
-                }
-                cpu_exec_loops_per_slice = adjusted_exec_loops;
-            }
+        R36SX_PROFILE_BEGIN(profile_keyboard_tick_3);
+        r36sx_keyboard_tick();
+        R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK,
+                          profile_keyboard_tick_3);
+        if (main_loop_count <= 8u) {
+            r36sx_pico286_debug_log("main: after mfb_update frame=%u",
+                                    main_loop_count);
         }
         r36sx_profile_maybe_log();
-        r36sx_pico286_wait_for_next_main_frame(&next_main_loop_us,
-                                               main_loop_slice_us);
+        r36sx_pico286_wait_for_next_main_frame(&next_frame_us,
+                                               main_loop_frame_us);
     }
     r36sx_pico286_debug_log("main: leaving loop loops=%u", main_loop_count);
 

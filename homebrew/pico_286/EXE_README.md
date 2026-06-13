@@ -226,16 +226,14 @@ This makes `cpu_mhz=10` roughly mean 0.75 MIPS for 8086, 1.5 MIPS for 80286,
 and 3.0 MIPS for 80386.  It is a practical speed knob, not cycle-exact CPU
 timing.
 
-`target_fps` controls display pacing and the nominal audio packet cadence.  CPU
-execution, PIT interrupts, cursor blink, video rendering checks, and audio
-sample generation run from the main loop in 1 ms slices.  Pico-286
-automatically reduces the `exec86()` quantum when emulation itself overruns,
-grows it back when there is spare CPU time, caps it at the `cpu_mhz` limit, and
-never drops below 25 instructions per slice.  Rendering overlays such as the
-on-screen keyboard do not reduce the CPU quantum.  At 60 Hz the audio packet
-cadence is about 735 stereo frames at 44.1 kHz, but delayed packets are sized
-from the actual elapsed time since the previous audio send, up to the 100 ms
-source buffer capacity.
+`target_fps` controls display pacing and the nominal audio packet cadence.  The
+host loop runs one budgeted emulation pass per frame: at 60 Hz the first 10 ms
+are reserved for small `exec86()` quanta of 100 instructions and audio sample
+generation, while virtual PIT/audio/cursor time is stretched across the full
+16.7 ms frame.  The remaining frame time is reserved for rendering, overlays,
+buffer handoff, and sleeping when there is spare time.  If the emulation budget
+expires before the configured `cpu_mhz` instruction quota is complete, the
+frame still advances timers for the full display period.
 
 Minimal banked VBE modes `103h` (800x600x8 packed pixel) and `114h`
 (800x600x16 RGB565) are supported.  The banked VGA window is `A000:0000`, and
