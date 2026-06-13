@@ -1,20 +1,26 @@
+#if defined(__linux__) && !defined(_WIN32)
+#define R36SX_PICO286_USE_EVDEV_INPUT 1
+#else
+#define R36SX_PICO286_USE_EVDEV_INPUT 0
+#endif
+
 #include <pthread.h>
 #include <unistd.h>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <cerrno>
 #endif
 #include <cstring>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <fcntl.h>
 #endif
 #include <signal.h>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
 #include <time.h>
 #include <cstdio>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <linux/input.h>
 #endif
 #include "MiniFB.h"
@@ -70,7 +76,7 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_EXEC86_MIN_LOOPS 1000u
 #define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 enum {
     R36SX_EVDEV_MAX_FDS = 16,
     R36SX_EVDEV_RESCAN_USEC = 2000000
@@ -82,7 +88,18 @@ struct r36sx_physical_keyboard_state {
     uint64_t next_scan_us;
 };
 
+struct r36sx_physical_mouse_state {
+    int fds[R36SX_EVDEV_MAX_FDS];
+    char paths[R36SX_EVDEV_MAX_FDS][32];
+    uint8_t buttons[R36SX_EVDEV_MAX_FDS];
+    int pending_dx[R36SX_EVDEV_MAX_FDS];
+    int pending_dy[R36SX_EVDEV_MAX_FDS];
+    uint8_t pending_event[R36SX_EVDEV_MAX_FDS];
+    uint64_t next_scan_us;
+};
+
 static struct r36sx_physical_keyboard_state g_physical_keyboard;
+static struct r36sx_physical_mouse_state g_physical_mouse;
 #endif
 
 static int16_t audio_buffers[R36SX_AUDIO_BUFFER_COUNT]
@@ -1293,7 +1310,9 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
     }
 }
 
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
+extern "C" void HandleMouseRelative(int dx, int dy, int buttons);
+
 #define R36SX_EVDEV_BITS_PER_LONG ((int)(sizeof(unsigned long) * 8))
 #define R36SX_EVDEV_BIT_WORD(nr) ((nr) / R36SX_EVDEV_BITS_PER_LONG)
 #define R36SX_EVDEV_BIT_MASK(nr) (1ul << ((nr) % R36SX_EVDEV_BITS_PER_LONG))
@@ -1369,6 +1388,90 @@ static int r36sx_physical_keyboard_is_keyboard_fd(int fd)
                                 (int)R36SX_ARRAY_COUNT(key_bits));
 }
 
+static void r36sx_physical_mouse_init(void)
+{
+    memset(&g_physical_mouse, 0, sizeof(g_physical_mouse));
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        g_physical_mouse.fds[i] = -1;
+    }
+}
+
+static void r36sx_physical_mouse_close_index(int index)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS) {
+        return;
+    }
+    if (g_physical_mouse.fds[index] >= 0) {
+        close(g_physical_mouse.fds[index]);
+    }
+    if (g_physical_mouse.buttons[index] != 0 ||
+        g_physical_mouse.pending_event[index] != 0) {
+        HandleMouseRelative(0, 0, 0);
+    }
+    g_physical_mouse.fds[index] = -1;
+    g_physical_mouse.paths[index][0] = '\0';
+    g_physical_mouse.buttons[index] = 0;
+    g_physical_mouse.pending_dx[index] = 0;
+    g_physical_mouse.pending_dy[index] = 0;
+    g_physical_mouse.pending_event[index] = 0;
+}
+
+static void r36sx_physical_mouse_close_all(void)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        r36sx_physical_mouse_close_index(i);
+    }
+}
+
+static int r36sx_physical_mouse_path_is_open(const char *path)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_mouse.fds[i] >= 0 &&
+            strcmp(g_physical_mouse.paths[i], path) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int r36sx_physical_mouse_is_mouse_fd(int fd)
+{
+    unsigned long ev_bits[R36SX_EVDEV_BIT_WORD(EV_MAX) + 1];
+    unsigned long rel_bits[R36SX_EVDEV_BIT_WORD(REL_MAX) + 1];
+    unsigned long key_bits[R36SX_EVDEV_BIT_WORD(KEY_MAX) + 1];
+
+    memset(ev_bits, 0, sizeof(ev_bits));
+    memset(rel_bits, 0, sizeof(rel_bits));
+    memset(key_bits, 0, sizeof(key_bits));
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(EV_REL, ev_bits,
+                              (int)R36SX_ARRAY_COUNT(ev_bits))) {
+        return 0;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits) < 0) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(REL_X, rel_bits,
+                              (int)R36SX_ARRAY_COUNT(rel_bits)) ||
+        !r36sx_evdev_test_bit(REL_Y, rel_bits,
+                              (int)R36SX_ARRAY_COUNT(rel_bits))) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(EV_KEY, ev_bits,
+                              (int)R36SX_ARRAY_COUNT(ev_bits))) {
+        return 1;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) < 0) {
+        return 1;
+    }
+    return r36sx_evdev_test_bit(BTN_LEFT, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits)) ||
+           r36sx_evdev_test_bit(BTN_RIGHT, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits));
+}
+
 static void r36sx_physical_keyboard_try_open(const char *path)
 {
     if (r36sx_physical_keyboard_path_is_open(path)) {
@@ -1401,6 +1504,38 @@ static void r36sx_physical_keyboard_try_open(const char *path)
     r36sx_pico286_debug_log("keyboard: opened physical input %s", path);
 }
 
+static void r36sx_physical_mouse_try_open(const char *path)
+{
+    if (r36sx_physical_mouse_path_is_open(path)) {
+        return;
+    }
+
+    int slot = -1;
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_mouse.fds[i] < 0) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        return;
+    }
+
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    if (fd < 0) {
+        return;
+    }
+    if (!r36sx_physical_mouse_is_mouse_fd(fd)) {
+        close(fd);
+        return;
+    }
+
+    g_physical_mouse.fds[slot] = fd;
+    snprintf(g_physical_mouse.paths[slot],
+             sizeof(g_physical_mouse.paths[slot]), "%s", path);
+    r36sx_pico286_debug_log("mouse: opened physical input %s", path);
+}
+
 static void r36sx_physical_keyboard_scan(void)
 {
     uint64_t now = r36sx_pico286_now_us();
@@ -1413,6 +1548,21 @@ static void r36sx_physical_keyboard_scan(void)
         char path[32];
         snprintf(path, sizeof(path), "/dev/input/event%d", i);
         r36sx_physical_keyboard_try_open(path);
+    }
+}
+
+static void r36sx_physical_mouse_scan(void)
+{
+    uint64_t now = r36sx_pico286_now_us();
+    if (now < g_physical_mouse.next_scan_us) {
+        return;
+    }
+    g_physical_mouse.next_scan_us = now + R36SX_EVDEV_RESCAN_USEC;
+
+    for (int i = 0; i < 32; i++) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        r36sx_physical_mouse_try_open(path);
     }
 }
 
@@ -1527,6 +1677,69 @@ static void r36sx_physical_keyboard_handle_key(unsigned int code, int value)
     }
 }
 
+static uint8_t r36sx_physical_mouse_button_bit(unsigned int code)
+{
+    switch (code) {
+        case BTN_RIGHT:
+            return 1;
+        case BTN_LEFT:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
+static void r36sx_physical_mouse_flush(int index)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS ||
+        !g_physical_mouse.pending_event[index]) {
+        return;
+    }
+
+    HandleMouseRelative(g_physical_mouse.pending_dx[index],
+                        g_physical_mouse.pending_dy[index],
+                        g_physical_mouse.buttons[index]);
+    g_physical_mouse.pending_dx[index] = 0;
+    g_physical_mouse.pending_dy[index] = 0;
+    g_physical_mouse.pending_event[index] = 0;
+}
+
+static void r36sx_physical_mouse_handle_event(int index,
+                                              const struct input_event *ev)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS || ev == NULL) {
+        return;
+    }
+
+    if (ev->type == EV_REL) {
+        if (ev->code == REL_X) {
+            g_physical_mouse.pending_dx[index] += ev->value;
+            g_physical_mouse.pending_event[index] = 1;
+        } else if (ev->code == REL_Y) {
+            g_physical_mouse.pending_dy[index] += ev->value;
+            g_physical_mouse.pending_event[index] = 1;
+        }
+        return;
+    }
+
+    if (ev->type == EV_KEY) {
+        const uint8_t bit = r36sx_physical_mouse_button_bit(ev->code);
+        if (bit != 0 && (ev->value == 0 || ev->value == 1)) {
+            if (ev->value != 0) {
+                g_physical_mouse.buttons[index] |= bit;
+            } else {
+                g_physical_mouse.buttons[index] &= (uint8_t)~bit;
+            }
+            g_physical_mouse.pending_event[index] = 1;
+        }
+        return;
+    }
+
+    if (ev->type == EV_SYN && ev->code == SYN_REPORT) {
+        r36sx_physical_mouse_flush(index);
+    }
+}
+
 static void r36sx_physical_keyboard_poll(void)
 {
     r36sx_physical_keyboard_scan();
@@ -1567,6 +1780,46 @@ static void r36sx_physical_keyboard_poll(void)
         }
     }
 }
+
+static void r36sx_physical_mouse_poll(void)
+{
+    r36sx_physical_mouse_scan();
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        int fd = g_physical_mouse.fds[i];
+        if (fd < 0) {
+            continue;
+        }
+        for (;;) {
+            struct input_event ev;
+            ssize_t n = read(fd, &ev, sizeof(ev));
+            if (n == (ssize_t)sizeof(ev)) {
+                r36sx_physical_mouse_handle_event(i, &ev);
+                continue;
+            }
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK ||
+                    errno == EINTR) {
+                    r36sx_physical_mouse_flush(i);
+                    break;
+                }
+                if (errno == ENODEV || errno == ENXIO) {
+                    r36sx_pico286_debug_log(
+                        "mouse: removed physical input %s",
+                        g_physical_mouse.paths[i]);
+                    r36sx_physical_mouse_close_index(i);
+                }
+                break;
+            }
+            if (n == 0) {
+                r36sx_pico286_debug_log(
+                    "mouse: removed physical input %s",
+                    g_physical_mouse.paths[i]);
+                r36sx_physical_mouse_close_index(i);
+            }
+            break;
+        }
+    }
+}
 #else
 static void r36sx_physical_keyboard_init(void)
 {
@@ -1579,12 +1832,25 @@ static void r36sx_physical_keyboard_close_all(void)
 static void r36sx_physical_keyboard_poll(void)
 {
 }
+
+static void r36sx_physical_mouse_init(void)
+{
+}
+
+static void r36sx_physical_mouse_close_all(void)
+{
+}
+
+static void r36sx_physical_mouse_poll(void)
+{
+}
 #endif
 
 static int r36sx_mouse_prev_x;
 static int r36sx_mouse_prev_y;
 static int r36sx_mouse_prev_buttons;
 static int r36sx_mouse_initialized;
+static int r36sx_mouse_absolute_initialized;
 
 extern "C" void HandleMouseReset(void)
 {
@@ -1592,6 +1858,7 @@ extern "C" void HandleMouseReset(void)
     r36sx_mouse_prev_y = 0;
     r36sx_mouse_prev_buttons = 0;
     r36sx_mouse_initialized = 0;
+    r36sx_mouse_absolute_initialized = 0;
 }
 
 static int r36sx_mouse_clamp_delta(int value)
@@ -1605,28 +1872,14 @@ static int r36sx_mouse_clamp_delta(int value)
     return value;
 }
 
-extern "C" void HandleMouse(int x, int y, int buttons)
+extern "C" void HandleMouseRelative(int dx, int dy, int buttons)
 {
-    int dx;
-    int dy;
     int sent = 0;
 
     buttons &= 3;
     if (!r36sx_mouse_initialized) {
-        r36sx_mouse_prev_x = x;
-        r36sx_mouse_prev_y = y;
-        r36sx_mouse_prev_buttons = buttons;
         r36sx_mouse_initialized = 1;
-        if (buttons != 0) {
-            sermouseevent((uint8_t)buttons, 0, 0);
-        }
-        return;
     }
-
-    dx = x - r36sx_mouse_prev_x;
-    dy = y - r36sx_mouse_prev_y;
-    r36sx_mouse_prev_x = x;
-    r36sx_mouse_prev_y = y;
 
     while (dx != 0 || dy != 0) {
         const int step_x = r36sx_mouse_clamp_delta(dx);
@@ -1641,6 +1894,28 @@ extern "C" void HandleMouse(int x, int y, int buttons)
         sermouseevent((uint8_t)buttons, 0, 0);
     }
     r36sx_mouse_prev_buttons = buttons;
+}
+
+extern "C" void HandleMouse(int x, int y, int buttons)
+{
+    int dx;
+    int dy;
+
+    buttons &= 3;
+    if (!r36sx_mouse_absolute_initialized) {
+        r36sx_mouse_prev_x = x;
+        r36sx_mouse_prev_y = y;
+        r36sx_mouse_absolute_initialized = 1;
+        HandleMouseRelative(0, 0, buttons);
+        return;
+    }
+
+    dx = x - r36sx_mouse_prev_x;
+    dy = y - r36sx_mouse_prev_y;
+    r36sx_mouse_prev_x = x;
+    r36sx_mouse_prev_y = y;
+
+    HandleMouseRelative(dx, dy, buttons);
 }
 
 extern "C" int HanldeMenu(int menu_id, int checked) {
@@ -2047,6 +2322,7 @@ int main() {
     signal(SIGILL, fatal_signal_handler);
     signal(SIGABRT, fatal_signal_handler);
     r36sx_physical_keyboard_init();
+    r36sx_physical_mouse_init();
 
     r36sx_pico286_debug_log("main: opening MiniFB");
     if (!mfb_open("Pico-286 Emulator", 640, 480, 1)) {
@@ -2217,6 +2493,7 @@ int main() {
         }
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_physical_keyboard_poll();
+        r36sx_physical_mouse_poll();
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_1);
         if (main_loop_count < 8u) {
@@ -2328,6 +2605,7 @@ int main() {
     r36sx_pico286_disk_flush_all();
     linux_audio_close();
     r36sx_physical_keyboard_close_all();
+    r36sx_physical_mouse_close_all();
 
     mfb_close();
     r36sx_pico286_debug_log("main: exit 0");
