@@ -1581,11 +1581,66 @@ static void r36sx_physical_keyboard_poll(void)
 }
 #endif
 
-extern "C" void HandleMouse(int x, int y, int buttons) {
-    static int prev_x = 0, prev_y = 0;
-    sermouseevent(buttons, x - prev_x, y - prev_y);
-    prev_y = y;
-    prev_x = x;
+static int r36sx_mouse_prev_x;
+static int r36sx_mouse_prev_y;
+static int r36sx_mouse_prev_buttons;
+static int r36sx_mouse_initialized;
+
+extern "C" void HandleMouseReset(void)
+{
+    r36sx_mouse_prev_x = 0;
+    r36sx_mouse_prev_y = 0;
+    r36sx_mouse_prev_buttons = 0;
+    r36sx_mouse_initialized = 0;
+}
+
+static int r36sx_mouse_clamp_delta(int value)
+{
+    if (value > 63) {
+        return 63;
+    }
+    if (value < -63) {
+        return -63;
+    }
+    return value;
+}
+
+extern "C" void HandleMouse(int x, int y, int buttons)
+{
+    int dx;
+    int dy;
+    int sent = 0;
+
+    buttons &= 3;
+    if (!r36sx_mouse_initialized) {
+        r36sx_mouse_prev_x = x;
+        r36sx_mouse_prev_y = y;
+        r36sx_mouse_prev_buttons = buttons;
+        r36sx_mouse_initialized = 1;
+        if (buttons != 0) {
+            sermouseevent((uint8_t)buttons, 0, 0);
+        }
+        return;
+    }
+
+    dx = x - r36sx_mouse_prev_x;
+    dy = y - r36sx_mouse_prev_y;
+    r36sx_mouse_prev_x = x;
+    r36sx_mouse_prev_y = y;
+
+    while (dx != 0 || dy != 0) {
+        const int step_x = r36sx_mouse_clamp_delta(dx);
+        const int step_y = r36sx_mouse_clamp_delta(dy);
+        sermouseevent((uint8_t)buttons, (int8_t)step_x, (int8_t)step_y);
+        dx -= step_x;
+        dy -= step_y;
+        sent = 1;
+    }
+
+    if (!sent && buttons != r36sx_mouse_prev_buttons) {
+        sermouseevent((uint8_t)buttons, 0, 0);
+    }
+    r36sx_mouse_prev_buttons = buttons;
 }
 
 extern "C" int HanldeMenu(int menu_id, int checked) {

@@ -22,6 +22,7 @@
 
 extern void HandleInput(unsigned int keycode, int isKeyDown);
 extern void HandleMouse(int x, int y, int buttons);
+extern void HandleMouseReset(void);
 extern void r36sx_pico286_request_soft_reset(void);
 extern void r36sx_memory_dump_request(uint8_t code, const char *reason);
 
@@ -63,6 +64,7 @@ static struct r36sx_disk_menu g_disk_menu;
 static struct r36sx_key_presets g_key_presets;
 static uint32_t g_menu_held_buttons;
 static uint8_t g_post_codes_visible;
+static uint8_t g_mouse_leave_tracking;
 static volatile LONG g_post_code_generation;
 static volatile LONG g_post_code_port;
 static volatile LONG g_post_code_value;
@@ -696,6 +698,74 @@ static unsigned int r36sx_win_keycode(WPARAM w_param, LPARAM l_param)
     return key;
 }
 
+static int r36sx_win_mouse_buttons(WPARAM w_param)
+{
+    int buttons = 0;
+    if ((w_param & MK_RBUTTON) != 0) {
+        buttons |= 1;
+    }
+    if ((w_param & MK_LBUTTON) != 0) {
+        buttons |= 2;
+    }
+    return buttons;
+}
+
+static int r36sx_win_mouse_coord_to_frame(int value, int limit)
+{
+    const int scale = g_scale > 0 ? g_scale : 1;
+    value /= scale;
+    if (value < 0) {
+        return 0;
+    }
+    if (value >= limit) {
+        return limit > 0 ? limit - 1 : 0;
+    }
+    return value;
+}
+
+static void r36sx_win_track_mouse_leave(HWND wnd)
+{
+    TRACKMOUSEEVENT tme;
+
+    if (g_mouse_leave_tracking) {
+        return;
+    }
+
+    memset(&tme, 0, sizeof(tme));
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = wnd;
+    if (TrackMouseEvent(&tme)) {
+        g_mouse_leave_tracking = 1;
+    }
+}
+
+static void r36sx_win_handle_mouse(HWND wnd, UINT msg, WPARAM w_param,
+                                   LPARAM l_param)
+{
+    int x;
+    int y;
+    int buttons;
+
+    if (r36sx_win_menu_visible()) {
+        HandleMouseReset();
+        return;
+    }
+
+    buttons = r36sx_win_mouse_buttons(w_param);
+    if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN) {
+        SetCapture(wnd);
+    } else if ((msg == WM_LBUTTONUP || msg == WM_RBUTTONUP) &&
+               buttons == 0 && GetCapture() == wnd) {
+        ReleaseCapture();
+    }
+
+    r36sx_win_track_mouse_leave(wnd);
+    x = r36sx_win_mouse_coord_to_frame((int)(short)LOWORD(l_param), g_width);
+    y = r36sx_win_mouse_coord_to_frame((int)(short)HIWORD(l_param), g_height);
+    HandleMouse(x, y, buttons);
+}
+
 static LRESULT CALLBACK r36sx_win_wndproc(HWND wnd, UINT msg,
                                           WPARAM w_param, LPARAM l_param)
 {
@@ -727,25 +797,20 @@ static LRESULT CALLBACK r36sx_win_wndproc(HWND wnd, UINT msg,
         }
 
         case WM_MOUSEMOVE:
-            HandleMouse((int)(short)LOWORD(l_param),
-                        (int)(short)HIWORD(l_param), 0);
+            r36sx_win_handle_mouse(wnd, msg, w_param, l_param);
             return 0;
 
         case WM_LBUTTONDOWN:
         case WM_LBUTTONUP:
         case WM_RBUTTONDOWN:
-        case WM_RBUTTONUP: {
-            int buttons = 0;
-            if (w_param & MK_RBUTTON) {
-                buttons |= 1;
-            }
-            if (w_param & MK_LBUTTON) {
-                buttons |= 2;
-            }
-            HandleMouse((int)(short)LOWORD(l_param),
-                        (int)(short)HIWORD(l_param), buttons);
+        case WM_RBUTTONUP:
+            r36sx_win_handle_mouse(wnd, msg, w_param, l_param);
             return 0;
-        }
+
+        case WM_MOUSELEAVE:
+            g_mouse_leave_tracking = 0;
+            HandleMouseReset();
+            return 0;
 
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
@@ -806,6 +871,8 @@ int mfb_open(const char *name, int width, int height, int scale)
     g_screenshot_counter = 0;
     g_menu_held_buttons = 0;
     g_post_codes_visible = 0;
+    g_mouse_leave_tracking = 0;
+    HandleMouseReset();
     g_post_code_generation = 0;
     g_post_code_port = 0;
     g_post_code_value = 0;
@@ -988,6 +1055,8 @@ void mfb_set_pallete(const uint8_t color_index, const uint32_t color)
 
 void mfb_close(void)
 {
+    g_mouse_leave_tracking = 0;
+    HandleMouseReset();
     if (g_hdc && g_wnd) {
         ReleaseDC(g_wnd, g_hdc);
     }
