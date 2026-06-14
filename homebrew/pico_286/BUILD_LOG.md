@@ -1,5 +1,36 @@
 # pico-286 Build Log
 
+## 2026-06-14 Copy Volkov Commander to hdd2_1gb
+
+Copied the `VC` directory from the active patch `hdd.hdd` image to
+`hdd2_1gb.hdd` using WSL `mtools`, without loop-mounting either image.
+
+Source image:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd`
+- FAT partition offset: `32256`
+- Source path: `::/VC`
+
+Target image:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd`
+- FAT partition offset: `16384` (MBR start sector `32`)
+- Target path: `::/VC`
+
+Commands used:
+
+```powershell
+wsl mcopy -s -m -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 ::/VC /mnt/c/Work/r36sx_disasm/.tmp/vc_from_hdd_to_hdd2_1gb_preserve/
+wsl mcopy -s -m -o -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd@@16384 /mnt/c/Work/r36sx_disasm/.tmp/vc_from_hdd_to_hdd2_1gb_preserve/VC ::/
+```
+
+Verification:
+
+- `mdir ::/VC` on `hdd2_1gb.hdd@@16384` shows 25 files.
+- Total copied file size: `434779` bytes.
+- File timestamps were preserved with `mcopy -m`; the directory timestamp is
+  the copy time.
+
 ## 2026-06-14 HMA dump and ATA reset diagnostics
 
 Investigated the remaining FreeDOS/JemmEx `COMMAND.COM` failure from the latest
