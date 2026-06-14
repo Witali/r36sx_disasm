@@ -5855,6 +5855,45 @@ static inline uint8_t r36sx_cpu_lock_prefix_allowed(uint8_t opcode)
 
 
 
+static void r36sx_cpu_reset_interpreter_state(void)
+{
+    memset(dwordregs, 0, sizeof(dwordregs));
+    memset(segregs32, 0, sizeof(segregs32));
+    memset(segselector16, 0, sizeof(segselector16));
+    memset(segbase32, 0, sizeof(segbase32));
+    memset(r36sx_seg_cache, 0, sizeof(r36sx_seg_cache));
+    memset(&r36sx_ldtr_cache, 0, sizeof(r36sx_ldtr_cache));
+    memset(&r36sx_tr_cache, 0, sizeof(r36sx_tr_cache));
+
+    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE;
+    segoverride = 0;
+    reptype = 0;
+    lockPrefix = 0;
+    useseg = 0;
+    oldsp = 0;
+    useseg_base = 0;
+    ip32 = 0;
+    tempcf = 0;
+    oldcf = 0;
+    mode = 0;
+    reg = 0;
+    rm = 0;
+    sib = 0;
+    nestlev = 0;
+    saveip = 0;
+    savecs = 0;
+    oper1 = 0;
+    oper2 = 0;
+    res16 = 0;
+    temp16 = 0;
+    dummy = 0;
+    stacksize = 0;
+    disp32 = 0;
+    ea = 0;
+    operandSizeOverride = false;
+    addressSizeOverride = false;
+}
+
 void reset86() {
     r36sx_pico286_cpu_model_t cpu_model = r36sx_pico286_cpu_model();
     r36sx_cpu_strict_8086_mode =
@@ -5863,12 +5902,18 @@ void reset86() {
         cpu_model >= R36SX_PICO286_CPU_80286;
     r36sx_cpu_model_at_least_80386 =
         cpu_model >= R36SX_PICO286_CPU_80386;
+    r36sx_cpu_reset_interpreter_state();
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
+    CPU_DS = 0x0000;
+    CPU_ES = 0x0000;
+    CPU_FS = 0x0000;
+    CPU_GS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
     r36sx_cpu_maskable_interrupt_shadow = 0;
     r36sx_cpu_current_cpl = 0;
+    r36sx_cpu_fault_ip_context = 0;
     r36sx_cpu_exception_pending = 0;
     r36sx_cpu_exception_delivery_depth = 0;
     r36sx_cpu_exception_delivery_vector = 0;
@@ -5897,6 +5942,7 @@ void reset86() {
     r36sx_pm_diag_first_fault_logged = 0;
 #endif
     r36sx_cpu_real_cache_all_segments();
+    r36sx_cpu_use_segment(regds);
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));
     r36sx_pico286_video_mark_dirty();
@@ -5914,6 +5960,7 @@ void reset86() {
     }
     init_umb();
     ip = 0x0000;
+    OpFinit();
     i8237_reset();
     vga_init();
 }

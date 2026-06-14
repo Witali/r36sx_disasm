@@ -1,5 +1,37 @@
 # pico-286 Build Log
 
+## 2026-06-14 Complete Ctrl+R machine reset state
+
+Tightened the Pico-286 soft reset path so Ctrl+R no longer inherits stale CPU
+or host-side state from the previous guest run.
+
+Reset now clears the interpreter's general registers, visible segment
+registers, segment base/cache arrays, LDTR/TR descriptor caches, FLAGS,
+prefix/ModRM scratch state, pending exception/debug state, and x87 state via
+`OpFinit()`.  The existing emulator BIOS bootstrap contract remains
+`FFFF:0000`; moving 286/386 models to their architectural high reset vectors is
+left as a separate BIOS mapping change.
+
+Soft reset also resets HOSTRPC stream/session state and closes the network
+redirector's host files and find handles, so a new DOS boot cannot see stale
+host resources after guest memory was cleared.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory. Existing warnings remain in FPU, audio, and redirector
+sources.
+
+Artifact verification:
+
+- SHA256:
+  `9A973458B0C4941F9093EFF1FD2BE76C54A0026FE14F852132512A1A436FCAB3`
+- Microsoft Defender scan via `tools/scan-download.ps1`: no threats found.
+
 ## 2026-06-14 Disk-read failure and reset A20 state
 
 Investigated the recurring "disks stop reading / COMMAND.COM not found"

@@ -1432,6 +1432,11 @@ static void r36sx_host_rpc_stream_reset_session(void)
     (void)r36sx_host_rpc_close_all_handles();
 }
 
+void r36sx_host_rpc_reset(void)
+{
+    r36sx_host_rpc_stream_reset_session();
+}
+
 static void r36sx_host_rpc_stream_command_frame(uint16_t command)
 {
     if (r36sx_host_rpc_is_request_command(r36sx_host_rpc_stream_command)) {

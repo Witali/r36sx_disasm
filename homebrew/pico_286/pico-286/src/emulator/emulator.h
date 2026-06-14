@@ -358,6 +358,7 @@ void vga_set_standard_mode(uint8_t mode);
 #endif
 
 int OpFwait(void);
+void OpFinit(void);
 void OpFpu(uint8_t opcode);
 
 // Memory
@@ -516,6 +517,8 @@ extern uint8_t r36sx_cpu_waiting_for_interrupt(void);
 
 extern void reset86();
 void r36sx_keyboard_reset(void);
+void r36sx_host_rpc_reset(void);
+void r36sx_redirector_reset(void);
 
 // i8253
     extern struct i8253_s {

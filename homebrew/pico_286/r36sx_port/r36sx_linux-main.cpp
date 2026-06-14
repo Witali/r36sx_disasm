@@ -2184,6 +2184,8 @@ static void r36sx_pico286_soft_reset(void) {
     r36sx_pico286_disk_flush_all();
     r36sx_pico286_reload_config();
 
+    r36sx_host_rpc_reset();
+    r36sx_redirector_reset();
     r36sx_keyboard_reset();
     port60 = 0;
     port61 = 0;

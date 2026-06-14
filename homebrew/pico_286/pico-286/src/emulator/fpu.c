@@ -1087,7 +1087,7 @@ static void OpFnop() {
     /* do nothing */
 }
 
-void OpFinit() {
+void OpFinit(void) {
     fpu.cw = 0x037f;
     fpu.sw = 0;
     fpu.tw = -1;
