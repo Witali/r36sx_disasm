@@ -9,6 +9,7 @@ extern "C" {
 
 int r36sx_bios_rom_read8(uint32_t address, uint8_t *value);
 int r36sx_bios_rom_contains(uint32_t address, uint32_t bytes);
+int r36sx_bios_rom_write_protected(uint32_t address, uint32_t bytes);
 int r36sx_bios_rom_fixed_disk_parameter_pointer(uint8_t index,
                                                 uint16_t *segment,
                                                 uint16_t *offset);

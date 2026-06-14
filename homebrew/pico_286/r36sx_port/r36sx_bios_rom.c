@@ -5,8 +5,10 @@
 
 #include "r36sx_disk_config.h"
 
-#define R36SX_TEST_BIOS_START 0xF0000u
-#define R36SX_TEST_BIOS_SIZE 0x10000u
+#define R36SX_SYSTEM_BIOS_START 0xF0000u
+#define R36SX_SYSTEM_BIOS_SIZE 0x10000u
+#define R36SX_TEST_BIOS_START R36SX_SYSTEM_BIOS_START
+#define R36SX_TEST_BIOS_SIZE R36SX_SYSTEM_BIOS_SIZE
 /*
  * Keep the fixed disk parameter tables in the reserved system BIOS area.
  * C0000h..EFFFFh may be exposed as UMB/RAM to DOS memory managers such as
@@ -23,6 +25,17 @@ static int test_bios_load_attempted;
 static int test_bios_loaded;
 static uint8_t fixed_disk_parameter_table[R36SX_BIOS_FDPT_COUNT][R36SX_BIOS_FDPT_SIZE];
 static uint8_t fixed_disk_parameter_table_present[R36SX_BIOS_FDPT_COUNT];
+
+static int r36sx_bios_rom_range_inside(uint32_t address,
+                                       uint32_t bytes,
+                                       uint32_t base,
+                                       uint32_t size)
+{
+    return bytes != 0u &&
+           address >= base &&
+           address < base + size &&
+           bytes <= base + size - address;
+}
 
 static int r36sx_bios_rom_fdpt_range(uint32_t address,
                                      uint32_t bytes,
@@ -107,10 +120,19 @@ int r36sx_bios_rom_contains(uint32_t address, uint32_t bytes)
     if (!r36sx_bios_rom_uses_test_bios()) {
         return 0;
     }
-    return bytes != 0u &&
-           address >= R36SX_TEST_BIOS_START &&
-           address < R36SX_TEST_BIOS_START + R36SX_TEST_BIOS_SIZE &&
-           bytes <= R36SX_TEST_BIOS_START + R36SX_TEST_BIOS_SIZE - address;
+    return r36sx_bios_rom_range_inside(address, bytes,
+                                       R36SX_TEST_BIOS_START,
+                                       R36SX_TEST_BIOS_SIZE);
+}
+
+int r36sx_bios_rom_write_protected(uint32_t address, uint32_t bytes)
+{
+    if (r36sx_bios_rom_range_inside(address, bytes,
+                                    R36SX_SYSTEM_BIOS_START,
+                                    R36SX_SYSTEM_BIOS_SIZE)) {
+        return 1;
+    }
+    return r36sx_bios_rom_fdpt_range(address, bytes, NULL, NULL);
 }
 
 int r36sx_bios_rom_read8(uint32_t address, uint8_t *value)

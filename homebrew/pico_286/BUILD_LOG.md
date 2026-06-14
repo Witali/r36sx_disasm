@@ -1,5 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-14 Explicit BIOS Write Protection
+
+Split BIOS read presence from write protection.  `r36sx_bios_rom_contains()`
+continues to describe externally supplied readable ROM bytes such as the FDPT
+and test BIOS images, while the new `r36sx_bios_rom_write_protected()` models
+the system BIOS ROM window as write-protected for all BIOS modes.  All memory
+write backends now consult the write-protection helper before writing RAM/UMB
+storage, so guest x86 writes to `F0000h-FFFFFh` are explicitly ignored instead
+of relying on gaps in the memory dispatch.
+
+Changed files:
+
+- `homebrew/pico_286/r36sx_port/r36sx_bios_rom.c`
+- `homebrew/pico_286/r36sx_port/r36sx_bios_rom.h`
+- `homebrew/pico_286/pico-286/src/emulator/memory.c`
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  The build still emits existing warnings in unrelated
+FPU/audio/redirector code.
+
 ## 2026-06-13 FDPT F000 JemmEx retest
 
 Rebuilt the Windows debug executable with the fixed-disk parameter table

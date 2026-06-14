@@ -238,7 +238,7 @@ void write86_ob(const uint32_t address, const uint8_t value) {
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
-    } else if (r36sx_bios_rom_contains(address, 1u)) {
+    } else if (r36sx_bios_rom_write_protected(address, 1u)) {
         return;
     } else if (address >= UMB_START && address < UMB_END) {
         UMB[address - UMB_START] = value;
@@ -261,7 +261,7 @@ void writew86_ob(const uint32_t address, const uint16_t value) {
             videoram_write16(address, value);
         } else if (memory_range_inside(address, EMS_START, EMS_END, 2u)) {
             ems_writew(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 2u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 2u)) {
             return;
         } else if (memory_range_inside(address, UMB_START, UMB_END, 2u)) {
             *(uint16_t *) &UMB[address - UMB_START] = value;
@@ -289,7 +289,7 @@ void writedw86_ob(const uint32_t address, const uint32_t value) {
             videoram_write32(address, value);
         } else if (memory_range_inside(address, EMS_START, EMS_END, 4u)) {
             ems_writedw(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 4u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 4u)) {
             return;
         } else if (memory_range_inside(address, UMB_START, UMB_END, 4u)) {
             *(uint32_t *) &UMB[address - UMB_START] = value;
@@ -441,7 +441,7 @@ void write86_mp(const uint32_t address, const uint8_t value) {
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
-    } else if (r36sx_bios_rom_contains(address, 1u)) {
+    } else if (r36sx_bios_rom_write_protected(address, 1u)) {
         return;
     } else if (address >= UMB_START && address < UMB_END) {
         write8psram(address - UMB_START, value);
@@ -470,7 +470,7 @@ void writew86_mp(const uint32_t address, const uint16_t value) {
             videoram_write16(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writew(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 2u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 2u)) {
             return;
         } else if (address >= UMB_START && address < UMB_END) {
             write16psram(address - UMB_START, value);
@@ -501,7 +501,7 @@ void writedw86_mp(const uint32_t address, const uint32_t value) {
             videoram_write32(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writedw(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 4u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 4u)) {
             return;
         } else if (address >= UMB_START && address < UMB_END) {
             write32psram(address - UMB_START, value);
@@ -657,7 +657,7 @@ void write86_sw(const uint32_t address, const uint8_t value) {
         // VIDEORAM[(address - VIDEORAM_START) & VIDEORAM_MASK] = value;
     } else if (address >= EMS_START && address < EMS_END) {
         ems_write(address - EMS_START, value);
-    } else if (r36sx_bios_rom_contains(address, 1u)) {
+    } else if (r36sx_bios_rom_write_protected(address, 1u)) {
         return;
     } else if (address >= UMB_START && address < UMB_END) {
         swap_write(address, value);
@@ -684,7 +684,7 @@ void writew86_sw(const uint32_t address, const uint16_t value) {
             videoram_write16(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writew(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 2u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 2u)) {
             return;
         } else if (address >= UMB_START && address < UMB_END) {
             swap_write16(address, value);
@@ -713,7 +713,7 @@ void writedw86_sw(const uint32_t address, const uint32_t value) {
             videoram_write32(address, value);
         } else if (address >= EMS_START && address < EMS_END) {
             ems_writedw(address - EMS_START, value);
-        } else if (r36sx_bios_rom_contains(address, 4u)) {
+        } else if (r36sx_bios_rom_write_protected(address, 4u)) {
             return;
         } else if (address >= UMB_START && address < UMB_END) {
             swap_write32(address, value);
