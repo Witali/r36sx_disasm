@@ -94,6 +94,7 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 
 #define HMA_START (0x100000)
 #define HMA_END (0x110000-16)
+#define HMA_SIZE (HMA_END - HMA_START)
 
 #define BIOS_START (0xFE000)
 
@@ -119,7 +120,7 @@ extern uint8_t RAM[RAM_SIZE];
 extern uint32_t VIDEORAM[VIDEORAM_SIZE];
 extern uint8_t SVGA_VRAM[SVGA_VRAM_SIZE];
 extern uint8_t UMB[UMB_END - UMB_START];
-extern uint8_t HMA[HMA_END - HMA_START];
+/* HMA is the first HMA_SIZE bytes of XMS/extended memory. */
 extern uint8_t XMS[XMS_MEMORY_SIZE];
 uint32_t xms_configured_memory_bytes(void);
 // for non-butter-psram modes
