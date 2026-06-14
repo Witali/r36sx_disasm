@@ -5874,6 +5874,7 @@ void reset86() {
     r36sx_cpu_exception_delivery_vector = 0;
     r36sx_cpu_exception_abort_delivery_depth = 0;
     r36sx_cpu_triple_fault_latched = 0;
+    r36sx_cpu_interpreter_protected = 0;
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
     r36sx_cr3 = 0;

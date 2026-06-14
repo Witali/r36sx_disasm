@@ -593,8 +593,9 @@ void r36sx_keyboard_reset(void) {
         keyboard_controller_config_byte |=
             R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED;
     }
-    keyboard_controller_output_port =
-        a20_enabled ? R36SX_FAST_A20_ENABLE_BIT : 0x00u;
+    /* Reset must not preserve a memory-manager-enabled A20 gate across Ctrl+R. */
+    a20_enabled = 0;
+    keyboard_controller_output_port = 0;
     ps2_mouse_queue_head = 0;
     ps2_mouse_queue_count = 0;
     ps2_mouse_output_full = 0;

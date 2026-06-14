@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-06-14 Disk-read failure and reset A20 state
+
+Investigated the recurring "disks stop reading / COMMAND.COM not found"
+symptom in the active patch log:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.log`
+
+The current host disk layer did not report `fread`, `fwrite`, `fseek`, invalid
+CHS/LBA, or out-of-range failures. The attached hard disks were mounted with
+auto geometry matching their image layout in this test:
+
+- `hdd0=images/hdd2_1gb.hdd`: `1024,64,32`
+- `hdd1=images/hdd.hdd`: `65,16,63`
+
+The failure instead followed a soft reset after a memory manager had enabled
+A20. The second boot reached the same protected-mode setup code but then
+faulted on `0F 00 D0` (`LLDT AX`) and spiraled into repeated INT 6/triple-fault
+diagnostics. Reset now clears the emulated 8042 output-port A20 gate and the
+CPU interpreter protected-mode cache bit so Ctrl+R starts DOS from the same
+power-on A20 state. The A20 behavior was cross-checked against the XMS
+specification note that HMA access depends on enabling A20, and against the
+IBM PC/AT-compatible convention that BIOS leaves A20 disabled before handing
+control to DOS.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: build succeeded and copied the Windows debug executable to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`.
+Existing warnings remain in FPU, audio, and network redirector sources.
+
+Artifact verification:
+
+- SHA256:
+  `1ADF2BDCD82216386D5BA732F60FFF935268AD9A44181F4F40FEEFAC918C3376`
+- Microsoft Defender scan via `tools/scan-download.ps1`: no threats found.
+
 ## 2026-06-14 JemmEx HMA/INT13 Diagnostics
 
 Investigated the remaining full FreeDOS boot failure shown in:
