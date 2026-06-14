@@ -668,7 +668,7 @@ static __not_in_flash() void op_grp5(uint32_t fault_ip) {
             }
             oper1 = readw86(ea);
             oper2 = readw86(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_call(oper2, oper1, 0, fault_ip);
                 break;
             }
@@ -689,7 +689,7 @@ static __not_in_flash() void op_grp5(uint32_t fault_ip) {
             }
             oper1 = readw86(ea);
             oper2 = readw86(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_jump(oper2, oper1, fault_ip);
                 break;
             }

@@ -7177,7 +7177,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
             }
             oper1 = r36sx_cpu_read_linear16_286(ea);
             oper2 = r36sx_cpu_read_linear16_286(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_call(oper2, oper1, 0, fault_ip);
                 break;
             }
@@ -7199,7 +7199,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
             }
             oper1 = r36sx_cpu_read_linear16_286(ea);
             oper2 = r36sx_cpu_read_linear16_286(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_jump(oper2, oper1, fault_ip);
                 break;
             }

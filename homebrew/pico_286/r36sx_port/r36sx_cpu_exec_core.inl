@@ -2377,7 +2377,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_far_call(oper2, oper1, 0, firstip);
                     break;
                 }
@@ -3541,7 +3541,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_far_jump(oper2, oper1, firstip);
                     break;
                 }
