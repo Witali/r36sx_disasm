@@ -95,6 +95,14 @@ This keeps device-test patches from booting DOS with a stale synthetic RTC
 date after the console's Linux environment starts without real-time clock
 hardware.
 
+## Disk Image Editing Rule
+
+Rule: use WSL `mtools` for FAT disk image inspection and edits.
+
+Do not loop-mount FAT images for normal Pico-286 and patch workflow tasks.
+Only use mounting when a task explicitly requires it and the target image,
+partition offset, and write scope have been verified first.
+
 ## Codex Agent Files Rule
 
 Rule: keep `AGENTS.md` and project-local `.codex/skills/` files in sync with
