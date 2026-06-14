@@ -348,6 +348,7 @@ for src in \
     "$PORT_ROOT/r36sx_bios_rom.c" \
     "$PORT_ROOT/r36sx_host_disk_io.c" \
     "$PORT_ROOT/r36sx_disk_config.c" \
+    "$PORT_ROOT/r36sx_debug_control.c" \
     "$PORT_ROOT/r36sx_profile.c" \
     "$PORT_ROOT/r36sx_cpu.c" \
     "$PORT_ROOT/r36sx_cpu_dispatch.c" \

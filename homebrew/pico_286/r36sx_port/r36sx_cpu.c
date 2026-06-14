@@ -5,6 +5,7 @@
 #include <unistd.h>
 #endif
 #include "emulator.h"
+#include "r36sx_cpu.h"
 #include "r36sx_cpu_internal.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
@@ -7619,4 +7620,34 @@ void __not_in_flash() r36sx_cpu_exec_protected(uint32_t execloops)
 {
     r36sx_cpu_interpreter_protected = 1;
     r36sx_cpu_exec86_core(execloops);
+}
+
+void r36sx_cpu_debug_snapshot(r36sx_cpu_debug_snapshot_t *snapshot)
+{
+    if (!snapshot) {
+        return;
+    }
+
+    snapshot->eax = CPU_EAX;
+    snapshot->ebx = CPU_EBX;
+    snapshot->ecx = CPU_ECX;
+    snapshot->edx = CPU_EDX;
+    snapshot->esi = CPU_ESI;
+    snapshot->edi = CPU_EDI;
+    snapshot->ebp = CPU_EBP;
+    snapshot->esp = CPU_ESP;
+    snapshot->eip = CPU_IP;
+    snapshot->eflags = x86_flags.value;
+    snapshot->es = CPU_ES;
+    snapshot->cs = CPU_CS;
+    snapshot->ss = CPU_SS;
+    snapshot->ds = CPU_DS;
+    snapshot->fs = CPU_FS;
+    snapshot->gs = CPU_GS;
+    snapshot->cr0 = r36sx_cr0;
+    snapshot->cr2 = r36sx_cr2;
+    snapshot->cr3 = r36sx_cr3;
+    snapshot->protected_mode = r36sx_cpu_protected_enabled();
+    snapshot->vm86_mode = r36sx_cpu_v86_enabled();
+    snapshot->cpl = r36sx_cpu_cpl();
 }

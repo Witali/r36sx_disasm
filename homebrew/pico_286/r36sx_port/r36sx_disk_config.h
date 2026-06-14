@@ -183,6 +183,18 @@ int r36sx_pico286_log_truncate_on_start(void);
 // Return the maximum pico_286.log size in bytes; 0 means no size cap.
 uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes);
 
+// Return non-zero when the live debug-control mailbox is enabled.
+int r36sx_pico286_debug_control_enabled(void);
+
+// Return the command mailbox path used by the live debug-control interface.
+const char *r36sx_pico286_debug_control_command_path(void);
+
+// Return the response mailbox path used by the live debug-control interface.
+const char *r36sx_pico286_debug_control_response_path(void);
+
+// Return the directory used for live debug-control binary artifacts.
+const char *r36sx_pico286_debug_control_artifact_dir(void);
+
 // Return non-zero when AdLib/OPL2 audio is mixed into the output stream.
 int r36sx_pico286_audio_adlib_enabled(void);
 

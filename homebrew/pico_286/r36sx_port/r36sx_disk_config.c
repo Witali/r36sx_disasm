@@ -37,6 +37,13 @@
 #define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
 #define R36SX_PICO286_DEFAULT_LOG_MAX_BYTES (2UL * 1024UL * 1024UL)
 #define R36SX_PICO286_MAX_LOG_MAX_BYTES (64UL * 1024UL * 1024UL)
+#if defined(DEBUG)
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED 1
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT "1"
+#else
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED 0
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT "0"
+#endif
 #define R36SX_PICO286_MIN_TARGET_FPS 1UL
 #define R36SX_PICO286_MAX_TARGET_FPS 240UL
 #define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
@@ -102,6 +109,13 @@ static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char log_truncate_on_start_text[8] = "0";
 static char log_max_bytes_text[16] = "2097152";
+static char debug_control_enabled_text[8] =
+    R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT;
+static char debug_control_command_path[R36SX_PICO286_MAX_DISK_PATH] =
+    "pico_286_debug.cmd";
+static char debug_control_response_path[R36SX_PICO286_MAX_DISK_PATH] =
+    "pico_286_debug.out";
+static char debug_control_artifact_dir[R36SX_PICO286_MAX_DISK_PATH] = ".";
 static char app_stats_enabled_text[8] = "1";
 static char int2f_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
@@ -143,6 +157,8 @@ static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int log_truncate_on_start = 0;
 static uint32_t log_max_bytes = (uint32_t)R36SX_PICO286_DEFAULT_LOG_MAX_BYTES;
+static int debug_control_enabled =
+    R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED;
 static int app_stats_enabled = 1;
 static int int2f_enabled = 1;
 static uint32_t target_fps = 60u;
@@ -856,6 +872,65 @@ static int set_debug_uint_value(const char *key, const char *value,
         snprintf(log_max_bytes_text, sizeof(log_max_bytes_text),
                  "%lu", bytes);
         r36sx_pico286_debug_log("diskcfg: log_max_bytes=%lu", bytes);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int set_debug_control_value(const char *key, const char *value,
+                                   int line_no)
+{
+    int enabled;
+
+    if (key_equals(key, "debug_control_enabled") ||
+        key_equals(key, "debug_control") ||
+        key_equals(key, "debug_mailbox_enabled")) {
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        debug_control_enabled = enabled;
+        snprintf(debug_control_enabled_text,
+                 sizeof(debug_control_enabled_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: debug_control_enabled=%d",
+                                debug_control_enabled);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_command_path") ||
+        key_equals(key, "debug_control_cmd") ||
+        key_equals(key, "debug_command_path")) {
+        snprintf(debug_control_command_path,
+                 sizeof(debug_control_command_path),
+                 "%s", value ? value : "");
+        r36sx_pico286_debug_log("diskcfg: debug_control_command_path='%s'",
+                                debug_control_command_path);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_response_path") ||
+        key_equals(key, "debug_control_out") ||
+        key_equals(key, "debug_response_path")) {
+        snprintf(debug_control_response_path,
+                 sizeof(debug_control_response_path),
+                 "%s", value ? value : "");
+        r36sx_pico286_debug_log("diskcfg: debug_control_response_path='%s'",
+                                debug_control_response_path);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_artifact_dir") ||
+        key_equals(key, "debug_artifact_dir")) {
+        snprintf(debug_control_artifact_dir,
+                 sizeof(debug_control_artifact_dir),
+                 "%s", value && value[0] ? value : ".");
+        r36sx_pico286_debug_log("diskcfg: debug_control_artifact_dir='%s'",
+                                debug_control_artifact_dir);
         return 1;
     }
 
@@ -1722,6 +1797,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_debug_uint_value(key, value, line_no)) {
         return 1;
     }
+    if (set_debug_control_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
@@ -2073,10 +2151,21 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# log_truncate_on_start=1 clears pico_286.log before writing\n");
     fprintf(fp, "# the new run's log start marker. 0 keeps append-only logs.\n");
     fprintf(fp, "# log_max_bytes limits pico_286.log growth; 0 disables the cap.\n");
+    fprintf(fp, "# debug_control_* enables a file-mailbox live debug interface.\n");
+    fprintf(fp, "# The emulator consumes debug_control_command_path and writes\n");
+    fprintf(fp, "# debug_control_response_path; binary dumps go to artifact_dir.\n");
     fprintf(fp, "[debug]\n");
     fprintf(fp, "log_truncate_on_start=%s\n",
             log_truncate_on_start_text);
-    fprintf(fp, "log_max_bytes=%s\n\n", log_max_bytes_text);
+    fprintf(fp, "log_max_bytes=%s\n", log_max_bytes_text);
+    fprintf(fp, "debug_control_enabled=%s\n",
+            debug_control_enabled_text);
+    fprintf(fp, "debug_control_command_path=%s\n",
+            debug_control_command_path);
+    fprintf(fp, "debug_control_response_path=%s\n",
+            debug_control_response_path);
+    fprintf(fp, "debug_control_artifact_dir=%s\n\n",
+            debug_control_artifact_dir);
 
     fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
     fprintf(fp, "[stats]\n");
@@ -2417,6 +2506,34 @@ uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes)
     load_disk_config();
 
     return log_max_bytes;
+}
+
+int r36sx_pico286_debug_control_enabled(void)
+{
+    load_disk_config();
+
+    return debug_control_enabled;
+}
+
+const char *r36sx_pico286_debug_control_command_path(void)
+{
+    load_disk_config();
+
+    return debug_control_command_path;
+}
+
+const char *r36sx_pico286_debug_control_response_path(void)
+{
+    load_disk_config();
+
+    return debug_control_response_path;
+}
+
+const char *r36sx_pico286_debug_control_artifact_dir(void)
+{
+    load_disk_config();
+
+    return debug_control_artifact_dir;
 }
 
 int r36sx_pico286_audio_adlib_enabled(void)

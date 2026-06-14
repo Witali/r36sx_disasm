@@ -1,5 +1,31 @@
 # pico-286 Build Log
 
+## 2026-06-14 Live debug-control mailbox
+
+Added a file-mailbox debug-control interface for live Pico-286 diagnostics.
+Debug builds poll `pico_286_debug.cmd` from the config directory, remove it
+after reading, and write `pico_286_debug.out` with `ok 1` or `ok 0`.
+
+Supported commands:
+
+- `ping`
+- `regs`
+- `mem <address|seg:off> <length> [file]`
+- `vram [offset] [length] [file]`
+- `screen [file]`
+- `key`, `keydown`, `keyup`
+- `dump`, `stopdump`, `help`
+
+The helper client is `homebrew/pico_286/tools/pico286_debug_client.py`.
+
+Verification:
+
+- Windows debug build succeeded and was copied to the active patch directory.
+- Live smoke test against `pico_286_win.exe` returned `ok 1` for `ping`,
+  returned live CPU registers for `regs`, and read BIOS bytes from
+  `mem F000:FFF0 16`.
+- WSL/GCC MIPS release build succeeded to `.tmp/pico_286_debug_control_mips`.
+
 ## 2026-06-14 Copy Volkov Commander to hdd2_1gb
 
 Copied the `VC` directory from the active patch `hdd.hdd` image to

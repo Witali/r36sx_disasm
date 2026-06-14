@@ -106,6 +106,23 @@ behavior.  By default logs are appended across runs; set
 `log_truncate_on_start=1` in `[debug]` to clear the log at process start.
 Set `log_max_bytes=0` to disable the size cap.
 
+Debug builds also enable a live debug-control mailbox by default.  The emulator
+polls `pico_286_debug.cmd` beside `pico_286.conf`, deletes it after reading,
+and writes `pico_286_debug.out` with either `ok 1` or `ok 0`.  Use the helper
+client from the repository root while the patch-copy executable is running:
+
+```powershell
+python homebrew\pico_286\tools\pico286_debug_client.py regs
+python homebrew\pico_286\tools\pico286_debug_client.py mem F000:FFF0 16
+python homebrew\pico_286\tools\pico286_debug_client.py screen debug_screen_rgb565.bin
+python homebrew\pico_286\tools\pico286_debug_client.py key 1c
+```
+
+Supported commands are `ping`, `regs`, `mem <address|seg:off> <length> [file]`,
+`vram [offset] [length] [file]`, `screen [file]`, `key`, `keydown`, `keyup`,
+`dump`, `stopdump`, and `help`.  Release builds default the mailbox to disabled;
+override `[debug] debug_control_enabled=1` only for intentional diagnostics.
+
 The Windows host has its own menu entry and shortcuts for debug-only actions
 that would normally be opened through handheld Fn combinations:
 

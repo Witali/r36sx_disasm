@@ -42,6 +42,7 @@
 #include "linux-audio.h"
 #include "r36sx_app_stats.h"
 #include "r36sx_cpu.h"
+#include "r36sx_debug_control.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
@@ -2512,6 +2513,8 @@ int main() {
     r36sx_pico286_debug_log("main: memory backend read=%p write=%p",
                             read86, write86);
     memset(SCREEN, 0, sizeof(SCREEN));
+    r36sx_debug_control_set_framebuffer(SCREEN, 640u, 480u, 640u);
+    r36sx_debug_control_init();
     r36sx_mfb_mark_frame_ready();
     r36sx_pico286_debug_log("main: screen cleared");
     const uint32_t target_fps =
@@ -2601,6 +2604,7 @@ int main() {
     while (running) {
         uint64_t exec_elapsed_us;
         r36sx_app_stats_record_quantum();
+        r36sx_debug_control_poll();
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
