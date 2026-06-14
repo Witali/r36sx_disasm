@@ -466,6 +466,535 @@ void r36sx_pico286_disk_flush_all(void) {
     }
 }
 
+/*
+ * Minimal PATA/IDE task-file register emulation.
+ *
+ * This implements the ISA-compatible command block ports documented by the
+ * ATA/T13 family of specifications: data, error/features, sector count,
+ * sector/LBA, cylinder/LBA, drive/head, status/command, and alternate
+ * status/device control.  The first two configured BIOS hard disks are exposed
+ * as primary master/slave.  DMA, IRQ14/15 signalling, and ATAPI are intentionally
+ * outside this first pass; PIO polling software can use IDENTIFY DEVICE and
+ * READ/WRITE SECTOR(S).
+ */
+#define R36SX_ATA_PRIMARY_BASE 0x1f0u
+#define R36SX_ATA_SECONDARY_BASE 0x170u
+#define R36SX_ATA_PRIMARY_CTRL 0x3f6u
+#define R36SX_ATA_SECONDARY_CTRL 0x376u
+
+#define R36SX_ATA_SR_ERR 0x01u
+#define R36SX_ATA_SR_DRQ 0x08u
+#define R36SX_ATA_SR_DF  0x20u
+#define R36SX_ATA_SR_DRDY 0x40u
+#define R36SX_ATA_SR_BSY 0x80u
+
+#define R36SX_ATA_ER_ABRT 0x04u
+#define R36SX_ATA_ER_IDNF 0x10u
+#define R36SX_ATA_ER_WP   0x40u
+
+typedef enum r36sx_ata_phase_e {
+    R36SX_ATA_PHASE_NONE = 0,
+    R36SX_ATA_PHASE_IDENTIFY,
+    R36SX_ATA_PHASE_READ,
+    R36SX_ATA_PHASE_WRITE,
+} r36sx_ata_phase_t;
+
+typedef struct r36sx_ata_channel_s {
+    uint16_t base;
+    uint16_t ctrl;
+    uint8_t selected;
+    uint8_t feature;
+    uint8_t error;
+    uint8_t sector_count;
+    uint8_t lba_low;
+    uint8_t lba_mid;
+    uint8_t lba_high;
+    uint8_t device;
+    uint8_t status;
+    uint8_t device_control;
+    r36sx_ata_phase_t phase;
+    uint64_t transfer_lba;
+    uint16_t sectors_remaining;
+    uint16_t data_index;
+    uint8_t data[512];
+} r36sx_ata_channel_t;
+
+static r36sx_ata_channel_t r36sx_ata_channels[2];
+static uint8_t r36sx_ata_initialized;
+
+static void r36sx_ata_init_once(void)
+{
+    if (r36sx_ata_initialized) {
+        return;
+    }
+    memset(r36sx_ata_channels, 0, sizeof(r36sx_ata_channels));
+    r36sx_ata_channels[0].base = R36SX_ATA_PRIMARY_BASE;
+    r36sx_ata_channels[0].ctrl = R36SX_ATA_PRIMARY_CTRL;
+    r36sx_ata_channels[1].base = R36SX_ATA_SECONDARY_BASE;
+    r36sx_ata_channels[1].ctrl = R36SX_ATA_SECONDARY_CTRL;
+    r36sx_ata_channels[0].device = 0xa0u;
+    r36sx_ata_channels[1].device = 0xa0u;
+    r36sx_ata_initialized = 1;
+}
+
+static int r36sx_ata_decode_port(uint16_t portnum, uint8_t *channel,
+                                 uint8_t *offset, uint8_t *control)
+{
+    r36sx_ata_init_once();
+    for (uint8_t i = 0; i < 2u; i++) {
+        uint16_t base = r36sx_ata_channels[i].base;
+        if (portnum >= base && portnum <= (uint16_t)(base + 7u)) {
+            *channel = i;
+            *offset = (uint8_t)(portnum - base);
+            *control = 0;
+            return 1;
+        }
+        if (portnum == r36sx_ata_channels[i].ctrl) {
+            *channel = i;
+            *offset = 7;
+            *control = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int r36sx_ata_drive_for(const r36sx_ata_channel_t *ch)
+{
+    if (ch == &r36sx_ata_channels[0]) {
+        return 2 + (int)(ch->selected & 1u);
+    }
+    return -1;
+}
+
+static int r36sx_ata_drive_present(const r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    return drivenum >= 2 && drivenum < 4 && disk[drivenum].inserted;
+}
+
+static void r36sx_ata_ready_or_float(r36sx_ata_channel_t *ch)
+{
+    if (r36sx_ata_drive_present(ch)) {
+        if (ch->phase == R36SX_ATA_PHASE_NONE) {
+            ch->status = R36SX_ATA_SR_DRDY;
+        }
+    } else {
+        ch->status = 0xffu;
+        ch->phase = R36SX_ATA_PHASE_NONE;
+    }
+}
+
+static void r36sx_ata_fail(r36sx_ata_channel_t *ch, uint8_t error)
+{
+    ch->error = error;
+    ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_ERR;
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+}
+
+static uint16_t r36sx_ata_sector_count(const r36sx_ata_channel_t *ch)
+{
+    return ch->sector_count ? ch->sector_count : 256u;
+}
+
+static int r36sx_ata_current_lba(r36sx_ata_channel_t *ch, uint64_t *lba)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    if (!r36sx_ata_drive_present(ch)) {
+        return 0;
+    }
+    if (ch->device & 0x40u) {
+        *lba = ((uint64_t)(ch->device & 0x0fu) << 24) |
+               ((uint64_t)ch->lba_high << 16) |
+               ((uint64_t)ch->lba_mid << 8) |
+               (uint64_t)ch->lba_low;
+        return 1;
+    }
+
+    uint16_t sector = ch->lba_low;
+    uint16_t cylinder = (uint16_t)ch->lba_mid |
+                        ((uint16_t)ch->lba_high << 8);
+    uint16_t head = ch->device & 0x0fu;
+    if (sector == 0 || sector > disk[drivenum].sects ||
+        head >= disk[drivenum].heads || cylinder >= disk[drivenum].cyls) {
+        return 0;
+    }
+    *lba = (((uint64_t)cylinder * disk[drivenum].heads) + head) *
+           disk[drivenum].sects + (sector - 1u);
+    return 1;
+}
+
+static void r36sx_ata_update_lba_regs(r36sx_ata_channel_t *ch, uint64_t lba)
+{
+    if (ch->device & 0x40u) {
+        ch->lba_low = (uint8_t)lba;
+        ch->lba_mid = (uint8_t)(lba >> 8);
+        ch->lba_high = (uint8_t)(lba >> 16);
+        ch->device = (uint8_t)((ch->device & 0xf0u) |
+                               ((uint8_t)(lba >> 24) & 0x0fu));
+    }
+}
+
+static void r36sx_ata_put_word(uint8_t *dst, uint16_t word, uint16_t value)
+{
+    dst[(uint16_t)(word * 2u)] = (uint8_t)value;
+    dst[(uint16_t)(word * 2u + 1u)] = (uint8_t)(value >> 8);
+}
+
+static void r36sx_ata_put_string(uint8_t *dst, uint16_t word, uint16_t words,
+                                 const char *text)
+{
+    for (uint16_t i = 0; i < words; i++) {
+        uint8_t a = ' ';
+        uint8_t b = ' ';
+        uint16_t pos = (uint16_t)(i * 2u);
+        if (text[pos]) {
+            a = (uint8_t)text[pos];
+            if (text[(uint16_t)(pos + 1u)]) {
+                b = (uint8_t)text[(uint16_t)(pos + 1u)];
+            }
+        }
+        r36sx_ata_put_word(dst, (uint16_t)(word + i),
+                           (uint16_t)((uint16_t)a << 8) | b);
+    }
+}
+
+static void r36sx_ata_build_identify(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    uint64_t total = disk_total_sectors((uint8_t)drivenum);
+    uint32_t total28 = total > 0x0fffffffULL ? 0x0fffffffUL :
+                       (uint32_t)total;
+    char model[41];
+
+    memset(ch->data, 0, sizeof(ch->data));
+    snprintf(model, sizeof(model), "R36SX PATA HDD %u", (unsigned)(drivenum - 2));
+
+    r36sx_ata_put_word(ch->data, 0, 0x0040u); /* fixed disk */
+    r36sx_ata_put_word(ch->data, 1, disk[drivenum].cyls);
+    r36sx_ata_put_word(ch->data, 3, disk[drivenum].heads);
+    r36sx_ata_put_word(ch->data, 6, disk[drivenum].sects);
+    r36sx_ata_put_string(ch->data, 10, 10, "R36SX00000000000000");
+    r36sx_ata_put_string(ch->data, 23, 4, "1.0 ");
+    r36sx_ata_put_string(ch->data, 27, 20, model);
+    r36sx_ata_put_word(ch->data, 47, 0x8001u);
+    r36sx_ata_put_word(ch->data, 49, 0x0200u); /* LBA supported */
+    r36sx_ata_put_word(ch->data, 53, 0x0007u);
+    r36sx_ata_put_word(ch->data, 54, disk[drivenum].cyls);
+    r36sx_ata_put_word(ch->data, 55, disk[drivenum].heads);
+    r36sx_ata_put_word(ch->data, 56, disk[drivenum].sects);
+    r36sx_ata_put_word(ch->data, 57, (uint16_t)total28);
+    r36sx_ata_put_word(ch->data, 58, (uint16_t)(total28 >> 16));
+    r36sx_ata_put_word(ch->data, 60, (uint16_t)total28);
+    r36sx_ata_put_word(ch->data, 61, (uint16_t)(total28 >> 16));
+}
+
+static int r36sx_ata_read_sector(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t fileoffset = 0;
+    if (drivenum < 2 || !disk_lba_to_fileoffset((uint8_t)drivenum,
+                                                ch->transfer_lba, 1,
+                                                &fileoffset)) {
+        return 0;
+    }
+    return r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
+                                   ch->data, sizeof(ch->data)) == 0;
+}
+
+static int r36sx_ata_write_sector(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t fileoffset = 0;
+    if (drivenum < 2 || disk[drivenum].readonly) {
+        ch->error = R36SX_ATA_ER_WP;
+        return 0;
+    }
+    if (!disk_lba_to_fileoffset((uint8_t)drivenum, ch->transfer_lba, 1,
+                                &fileoffset)) {
+        ch->error = R36SX_ATA_ER_IDNF;
+        return 0;
+    }
+    return r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                    &disk[drivenum].cache,
+                                    (uint8_t)drivenum, fileoffset,
+                                    ch->data, sizeof(ch->data), 1) == 0;
+}
+
+static void r36sx_ata_prepare_next_read(r36sx_ata_channel_t *ch)
+{
+    if (ch->sectors_remaining == 0) {
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        ch->status = R36SX_ATA_SR_DRDY;
+        return;
+    }
+    if (!r36sx_ata_read_sector(ch)) {
+        r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+        return;
+    }
+    ch->data_index = 0;
+    ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+}
+
+static void r36sx_ata_finish_sector(r36sx_ata_channel_t *ch)
+{
+    if (ch->phase == R36SX_ATA_PHASE_IDENTIFY) {
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        ch->status = R36SX_ATA_SR_DRDY;
+        ch->data_index = 0;
+        return;
+    }
+
+    if (ch->phase == R36SX_ATA_PHASE_READ) {
+        if (ch->sectors_remaining > 0) {
+            ch->sectors_remaining--;
+        }
+        ch->transfer_lba++;
+        r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+        r36sx_ata_prepare_next_read(ch);
+        return;
+    }
+
+    if (ch->phase == R36SX_ATA_PHASE_WRITE) {
+        if (!r36sx_ata_write_sector(ch)) {
+            r36sx_ata_fail(ch, ch->error ? ch->error : R36SX_ATA_ER_IDNF);
+            return;
+        }
+        if (ch->sectors_remaining > 0) {
+            ch->sectors_remaining--;
+        }
+        ch->transfer_lba++;
+        r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+        ch->data_index = 0;
+        if (ch->sectors_remaining == 0) {
+            ch->phase = R36SX_ATA_PHASE_NONE;
+            ch->status = R36SX_ATA_SR_DRDY;
+        } else {
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+        }
+    }
+}
+
+static uint8_t r36sx_ata_data_read8(r36sx_ata_channel_t *ch)
+{
+    uint8_t value = 0xffu;
+    if ((ch->status & R36SX_ATA_SR_DRQ) &&
+        (ch->phase == R36SX_ATA_PHASE_IDENTIFY ||
+         ch->phase == R36SX_ATA_PHASE_READ)) {
+        value = ch->data[ch->data_index++];
+        if (ch->data_index >= sizeof(ch->data)) {
+            r36sx_ata_finish_sector(ch);
+        }
+    }
+    return value;
+}
+
+static void r36sx_ata_data_write8(r36sx_ata_channel_t *ch, uint8_t value)
+{
+    if ((ch->status & R36SX_ATA_SR_DRQ) &&
+        ch->phase == R36SX_ATA_PHASE_WRITE) {
+        ch->data[ch->data_index++] = value;
+        if (ch->data_index >= sizeof(ch->data)) {
+            r36sx_ata_finish_sector(ch);
+        }
+    }
+}
+
+static void r36sx_ata_soft_reset(r36sx_ata_channel_t *ch)
+{
+    ch->feature = 0;
+    ch->error = 1;
+    ch->sector_count = 1;
+    ch->lba_low = 1;
+    ch->lba_mid = 0;
+    ch->lba_high = 0;
+    ch->device = (uint8_t)(0xa0u | (ch->selected ? 0x10u : 0u));
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+    ch->sectors_remaining = 0;
+    ch->status = r36sx_ata_drive_present(ch) ? R36SX_ATA_SR_DRDY : 0xffu;
+}
+
+static void r36sx_ata_execute(r36sx_ata_channel_t *ch, uint8_t command)
+{
+    uint64_t lba = 0;
+    uint16_t count = r36sx_ata_sector_count(ch);
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t ignored_offset = 0;
+
+    if (!r36sx_ata_drive_present(ch)) {
+        ch->status = 0xffu;
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        return;
+    }
+
+    ch->error = 0;
+    ch->status = R36SX_ATA_SR_DRDY;
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+
+    switch (command) {
+        case 0xec: /* IDENTIFY DEVICE */
+            r36sx_ata_build_identify(ch);
+            ch->phase = R36SX_ATA_PHASE_IDENTIFY;
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+            return;
+
+        case 0x20: /* READ SECTORS */
+        case 0x21: /* READ SECTORS without retry */
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            ch->phase = R36SX_ATA_PHASE_READ;
+            ch->transfer_lba = lba;
+            ch->sectors_remaining = count;
+            r36sx_ata_prepare_next_read(ch);
+            return;
+
+        case 0x30: /* WRITE SECTORS */
+        case 0x31: /* WRITE SECTORS without retry */
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            if (disk[drivenum].readonly) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_WP);
+                return;
+            }
+            ch->phase = R36SX_ATA_PHASE_WRITE;
+            ch->transfer_lba = lba;
+            ch->sectors_remaining = count;
+            ch->data_index = 0;
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+            return;
+
+        case 0x40: /* VERIFY SECTORS */
+        case 0x41:
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            ch->transfer_lba = lba + count;
+            r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        case 0x10: /* RECALIBRATE */
+        case 0x70: /* SEEK */
+        case 0x91: /* INITIALIZE DEVICE PARAMETERS */
+        case 0xe3: /* IDLE */
+        case 0xe7: /* FLUSH CACHE */
+        case 0xef: /* SET FEATURES */
+            if (command == 0xe7) {
+                disk_flush_drive((uint8_t)drivenum, "ata-flush-cache");
+            }
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        case 0x90: /* EXECUTE DEVICE DIAGNOSTIC */
+            ch->error = 0x01u;
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        default:
+            r36sx_pico286_debug_log("ata: unsupported command=%02x drive=%d",
+                                    command, drivenum);
+            r36sx_ata_fail(ch, R36SX_ATA_ER_ABRT);
+            return;
+    }
+}
+
+uint8_t r36sx_ata_portin8(uint16_t portnum)
+{
+    uint8_t channel, offset, control;
+    r36sx_ata_channel_t *ch;
+    if (!r36sx_ata_decode_port(portnum, &channel, &offset, &control)) {
+        return 0xffu;
+    }
+    ch = &r36sx_ata_channels[channel];
+    r36sx_ata_ready_or_float(ch);
+    if (control) {
+        return ch->status;
+    }
+    switch (offset) {
+        case 0: return r36sx_ata_data_read8(ch);
+        case 1: return ch->error;
+        case 2: return ch->sector_count;
+        case 3: return ch->lba_low;
+        case 4: return ch->lba_mid;
+        case 5: return ch->lba_high;
+        case 6: return ch->device;
+        case 7: return ch->status;
+        default: return 0xffu;
+    }
+}
+
+uint16_t r36sx_ata_portin16(uint16_t portnum)
+{
+    uint16_t low = r36sx_ata_portin8(portnum);
+    uint16_t high = r36sx_ata_portin8(portnum);
+    return low | (uint16_t)(high << 8);
+}
+
+void r36sx_ata_portout8(uint16_t portnum, uint8_t value)
+{
+    uint8_t channel, offset, control;
+    r36sx_ata_channel_t *ch;
+    if (!r36sx_ata_decode_port(portnum, &channel, &offset, &control)) {
+        return;
+    }
+    ch = &r36sx_ata_channels[channel];
+    if (control) {
+        ch->device_control = value;
+        if (value & 0x04u) {
+            r36sx_ata_soft_reset(ch);
+        }
+        return;
+    }
+    switch (offset) {
+        case 0:
+            r36sx_ata_data_write8(ch, value);
+            return;
+        case 1:
+            ch->feature = value;
+            return;
+        case 2:
+            ch->sector_count = value;
+            return;
+        case 3:
+            ch->lba_low = value;
+            return;
+        case 4:
+            ch->lba_mid = value;
+            return;
+        case 5:
+            ch->lba_high = value;
+            return;
+        case 6:
+            ch->selected = (value & 0x10u) ? 1u : 0u;
+            ch->device = value;
+            r36sx_ata_ready_or_float(ch);
+            return;
+        case 7:
+            r36sx_ata_execute(ch, value);
+            return;
+    }
+}
+
+void r36sx_ata_portout16(uint16_t portnum, uint16_t value)
+{
+    r36sx_ata_portout8(portnum, (uint8_t)value);
+    r36sx_ata_portout8(portnum, (uint8_t)(value >> 8));
+}
+
 static void readdisk(uint8_t drivenum,
               uint16_t dstseg, uint16_t dstoff,
               uint16_t cyl, uint16_t sect, uint16_t head,

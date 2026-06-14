@@ -1,5 +1,12 @@
 # pico-286 Build Log
 
+## 2026-06-14 PATA task-file port emulation
+
+Built the Windows debug emulator with `build_pico_286_windows.ps1 -DebugLog`
+after adding host-side primary and secondary ATA task-file I/O ports for
+Pico-286 hard-disk images. The build completed and copied `pico_286_win.exe`
+to the active patch directory.
+
 ## 2026-06-14 Complete Ctrl+R machine reset state
 
 Tightened the Pico-286 soft reset path so Ctrl+R no longer inherits stale CPU

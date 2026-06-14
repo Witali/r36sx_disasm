@@ -294,6 +294,12 @@ void r36sx_emergency_dump_write_and_clear(void)
 extern void r36sx_pico286_post_code_out(uint16_t portnum, uint8_t value);
 extern void r36sx_pico286_post_code_reset(void);
 extern void r36sx_cpu_debug_test386_subpost(uint16_t portnum, uint8_t value);
+#if !PICO_ON_DEVICE
+extern uint8_t r36sx_ata_portin8(uint16_t portnum);
+extern uint16_t r36sx_ata_portin16(uint16_t portnum);
+extern void r36sx_ata_portout8(uint16_t portnum, uint8_t value);
+extern void r36sx_ata_portout16(uint16_t portnum, uint16_t value);
+#endif
 
 #if R36SX_DEBUG_TEST_BIOS_TRACE
 #define R36SX_TEST_BIOS_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
@@ -1739,6 +1745,30 @@ if (sound_chips_clock) {
 // EMS
             return out_ems(portnum, value);
 
+#if !PICO_ON_DEVICE
+        case 0x170:
+        case 0x171:
+        case 0x172:
+        case 0x173:
+        case 0x174:
+        case 0x175:
+        case 0x176:
+        case 0x177:
+        case 0x1F0:
+        case 0x1F1:
+        case 0x1F2:
+        case 0x1F3:
+        case 0x1F4:
+        case 0x1F5:
+        case 0x1F6:
+        case 0x1F7:
+        case 0x376:
+        case 0x3F6:
+// PATA/IDE task-file registers.
+            r36sx_ata_portout8(portnum, (uint8_t)value);
+            return;
+#endif
+
         case 0x278:
 // Covox Speech Thing
             covox_sample = (int16_t)((value - 128) << 6);
@@ -2017,6 +2047,28 @@ uint16_t portin(uint16_t portnum) {
             return r36sx_pico286_rtc_xt_enabled() ? rtc_read(portnum) : 0xFF;
         case 0x27A: // Covox Speech Thing
             return 0;
+#if !PICO_ON_DEVICE
+        case 0x170:
+        case 0x171:
+        case 0x172:
+        case 0x173:
+        case 0x174:
+        case 0x175:
+        case 0x176:
+        case 0x177:
+        case 0x1F0:
+        case 0x1F1:
+        case 0x1F2:
+        case 0x1F3:
+        case 0x1F4:
+        case 0x1F5:
+        case 0x1F6:
+        case 0x1F7:
+        case 0x376:
+        case 0x3F6:
+// PATA/IDE task-file registers.
+            return r36sx_ata_portin8(portnum);
+#endif
         case 0x330:
         case 0x331:
 // MPU-401
@@ -2082,6 +2134,13 @@ void portout16(uint16_t portnum, uint16_t value) {
         return;
     }
 
+#if !PICO_ON_DEVICE
+    if (portnum == 0x1F0u || portnum == 0x170u) {
+        r36sx_ata_portout16(portnum, value);
+        return;
+    }
+#endif
+
     portout(portnum, (uint8_t) value);
     portout(portnum + 1, (uint8_t) (value >> 8));
 }
@@ -2091,6 +2150,12 @@ uint16_t portin16(uint16_t portnum) {
         portnum <= R36SX_HOST_RPC_PORT_LAST) {
         return r36sx_host_rpc_portin16(portnum);
     }
+
+#if !PICO_ON_DEVICE
+    if (portnum == 0x1F0u || portnum == 0x170u) {
+        return r36sx_ata_portin16(portnum);
+    }
+#endif
 
     return portin(portnum) | portin(portnum + 1) << 8;
 }
