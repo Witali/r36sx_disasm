@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-14 FreeDOS menu regression check
+
+Investigated a regression where the active Windows patch build no longer showed
+the FreeDOS memory-manager boot menu. The failing build had included an
+uncommitted experimental BIOS `INT 13h` vector trap that intercepted execution
+at `F000:E82E` before opcode fetch and manually popped an interrupt frame after
+calling `diskhandler()`. The log showed repeated `BIOS INT13 vector trap`
+entries and the guest reached the JemmEx/default boot path without the menu
+being visible.
+
+Removed that experimental trap from the working tree and rebuilt:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+  was rebuilt at `2026-06-14 13:48:20`.
+- Live debug-control framebuffer captures showed BIOS POST at 0.5s, the
+  FreeDOS memory-manager menu at 2.0s, and the same menu still counting down at
+  6.0s.
+- The new log no longer contains `BIOS INT13 vector trap`.
+
 ## 2026-06-14 Live debug-control mailbox
 
 Added a file-mailbox debug-control interface for live Pico-286 diagnostics.
