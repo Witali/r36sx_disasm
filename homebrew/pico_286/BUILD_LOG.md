@@ -31,6 +31,13 @@ Verification:
 - File timestamps were preserved with `mcopy -m`; the directory timestamp is
   the copy time.
 
+Follow-up serial update:
+
+- Command:
+  `wsl mlabel -N 20260614 -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd@@16384 ::FREEDOS2025`
+- Verified with `mdir`: label remains `FREEDOS2025`, volume serial is now
+  `2026-0614`, distinct from the source `hdd.hdd` serial `2026-0529`.
+
 ## 2026-06-14 HMA dump and ATA reset diagnostics
 
 Investigated the remaining FreeDOS/JemmEx `COMMAND.COM` failure from the latest
