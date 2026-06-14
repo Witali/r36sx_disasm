@@ -1,5 +1,53 @@
 # pico-286 Build Log
 
+## 2026-06-14 JemmEx HMA/INT13 Diagnostics
+
+Investigated the remaining full FreeDOS boot failure shown in:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260614_103241_1e56ef20_000.bmp`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260614_103251_1e56ef20_001.bmp`
+
+The failing screen appears after `JemmEx loaded` and after FreeDOS reports
+`Diskbuffers = ... in HMA`, then DOS cannot load
+`C:\FreeDOS\BIN\COMMAND.COM`.  That makes the first suspect the interaction
+between XMS/HMA/A20 state and disk reads into DOS-managed buffers rather than
+the image file itself disappearing.
+
+Reference checked: Microsoft/Lotus/Intel/AST, *eXtended Memory Specification
+(XMS), version 2.00*, July 19, 1988.  The spec defines HMA as the first
+64 KB of extended memory, officially `FFFF:0010h..FFFF:FFFFh`, and notes that
+disk I/O directly into HMA is not recommended.  The new diagnostics therefore
+log both XMS/HMA ownership and INT 13h transfer destinations.
+
+Changes:
+
+- Added `R36SX_DEBUG_XMS_TRACE` and `R36SX_DEBUG_DISK_TRACE`, enabled by
+  `DEBUG=1`.
+- Added XMS trace lines for version, HMA request/release, A20 enable/disable
+  and query, EMB allocation/free, and EMB move requests.
+- Fixed XMS Query A20 to return `BL=00h` on a successful state query, matching
+  the XMS success/error convention instead of leaving stale `BL` state.
+- Added INT 13h CHS/LBA trace lines with drive, sector location, guest transfer
+  buffer, destination memory class (`ram`, `hma`, `xms`, `a20-wrap`, etc.),
+  path (`bulk` vs `mapped`), A20 state, and image offset.
+- Moved the shared `XMS_PSRAM_OFFSET` definition to `emulator.h` and made the
+  device/swap HMA memory backends treat HMA as offset 0 inside XMS, matching the
+  host/Windows memory backend.
+- Reset now clears the configured XMS backing memory on the host/butter path,
+  instead of clearing only the first HMA-sized slice.
+
+Build commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\.tmp\pico_286_mips_hma_debug_test
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  WSL/GCC MIPS release test build completed into `.tmp`.
+Both builds still emit the existing warning set in unrelated FPU/audio/
+redirector/helper code.
+
 ## 2026-06-14 Configurable PS/2 Mouse Interface
 
 Added a `mouse_type` config setting with `serial` and `ps2` values.  The default

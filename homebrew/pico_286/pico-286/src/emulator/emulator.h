@@ -101,6 +101,7 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 #define EMS_MEMORY_SIZE (2048 << 10) // 2 MB
 #define XMS_MEMORY_KB 15360u // Physical RAM above 1 MB in a 16 MB PC map.
 #define XMS_MEMORY_SIZE (XMS_MEMORY_KB << 10)
+#define XMS_PSRAM_OFFSET (4096u * 1024u)
 #define EXTENDED_MEMORY_START HMA_START
 #define EXTENDED_MEMORY_END (EXTENDED_MEMORY_START + XMS_MEMORY_SIZE)
 

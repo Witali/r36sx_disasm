@@ -2,6 +2,7 @@
 
 #include "emulator.h"
 #include "r36sx_bios_rom.h"
+#include "r36sx_debug_config.h"
 #include "r36sx_host_disk_io.h"
 
 #include <string.h>
@@ -329,6 +330,58 @@ static inline int disk_memory_range_is_plain_ram(uint32_t address,
            bytecount <= (size_t)(RAM_SIZE - address);
 }
 
+#if R36SX_DEBUG_DISK_TRACE
+#define R36SX_DISK_TRACE_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_DISK_TRACE_LOG(...) ((void)0)
+#endif
+
+static inline int disk_memory_range_inside(uint32_t address,
+                                           uint32_t start,
+                                           uint32_t end,
+                                           size_t bytecount) {
+    return bytecount > 0 &&
+           address >= start &&
+           address < end &&
+           bytecount <= (size_t)(end - address);
+}
+
+static const char *disk_memory_range_name(uint32_t address,
+                                          size_t bytecount) {
+    if (bytecount == 0) {
+        return "empty";
+    }
+    if (!a20_enabled && address >= HMA_START) {
+        return "a20-wrap";
+    }
+    if (disk_memory_range_is_plain_ram(address, bytecount)) {
+        return "ram";
+    }
+    if (disk_memory_range_inside(address,
+                                 VIDEORAM_START,
+                                 VIDEORAM_END,
+                                 bytecount)) {
+        return "video";
+    }
+    if (disk_memory_range_inside(address, UMB_START, UMB_END, bytecount)) {
+        return "umb";
+    }
+    if (disk_memory_range_inside(address, BIOS_START, HMA_START, bytecount)) {
+        return "bios";
+    }
+    if (disk_memory_range_inside(address, HMA_START, HMA_END, bytecount)) {
+        return "hma";
+    }
+    if (disk_memory_range_inside(address,
+                                 EXTENDED_MEMORY_START,
+                                 EXTENDED_MEMORY_START +
+                                     xms_configured_memory_bytes(),
+                                 bytecount)) {
+        return "xms";
+    }
+    return "mapped";
+}
+
 static inline uint32_t disk_real_mode_linear(uint16_t segment,
                                              uint16_t offset) {
     return ((uint32_t)segment << 4) + (uint32_t)offset;
@@ -447,6 +500,7 @@ static void readdisk(uint8_t drivenum,
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
+    const uint32_t memstart = memdest;
 
     // Check if fileoffset is valid
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
@@ -461,7 +515,17 @@ static void readdisk(uint8_t drivenum,
         return;
     }
 
-    if (!is_verify && disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    int use_bulk = !is_verify &&
+                   disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: read drive=%u chs=%u/%u/%u count=%u verify=%d es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, cyl, head, sect, sectcount, is_verify,
+        dstseg, dstoff, (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+
+    if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -566,6 +630,7 @@ static void writedisk(uint8_t drivenum,
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
+    const uint32_t memstart = memdest;
 
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
         r36sx_pico286_debug_log(
@@ -587,7 +652,16 @@ static void writedisk(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: write drive=%u chs=%u/%u/%u count=%u es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, cyl, head, sect, sectcount,
+        dstseg, dstoff, (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+
+    if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -680,7 +754,17 @@ static void readdisk_lba(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    const uint32_t memstart = memdest;
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: lba read drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, (unsigned long)lba, sectcount,
+        (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+
+    if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -764,7 +848,17 @@ static void writedisk_lba(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    const uint32_t memstart = memdest;
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: lba write drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, (unsigned long)lba, sectcount,
+        (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+
+    if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -823,16 +917,26 @@ static int disk_read_address_packet(uint32_t dap,
     uint64_t lba = disk_mem_read64(dap + 8u);
 
     if (packet_size < 0x10u || reserved != 0 || sector_count > 127u) {
+        R36SX_DISK_TRACE_LOG(
+            "disk: dap invalid addr=%05lx size=%u reserved=%u count=%u buffer=%04x:%04x lba=%lu",
+            (unsigned long)dap, packet_size, reserved, sector_count,
+            buffer_segment, buffer_offset, (unsigned long)lba);
         return 0;
     }
 
     if (buffer_offset == 0xffffu && buffer_segment == 0xffffu) {
         uint64_t flat_buffer;
         if (packet_size < 0x18u) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid flat addr=%05lx size=%u lba=%lu",
+                (unsigned long)dap, packet_size, (unsigned long)lba);
             return 0;
         }
         flat_buffer = disk_mem_read64(dap + 16u);
         if (flat_buffer > 0xffffffffULL) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid flat buffer=%lu addr=%05lx",
+                (unsigned long)flat_buffer, (unsigned long)dap);
             return 0;
         }
         packet->buffer = (uint32_t)flat_buffer;
@@ -842,6 +946,11 @@ static int disk_read_address_packet(uint32_t dap,
 
     packet->sector_count = sector_count;
     packet->lba = lba;
+    R36SX_DISK_TRACE_LOG(
+        "disk: dap addr=%05lx count=%u buffer=%05lx mem=%s lba=%lu",
+        (unsigned long)dap, sector_count, (unsigned long)packet->buffer,
+        disk_memory_range_name(packet->buffer, (size_t)sector_count * 512UL),
+        (unsigned long)lba);
     return 1;
 }
 
