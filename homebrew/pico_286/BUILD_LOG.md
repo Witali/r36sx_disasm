@@ -1,5 +1,30 @@
 # pico-286 Build Log
 
+## 2026-06-14 Protected-mode state in emergency dumps
+
+Extended Pico-286 emergency memory dumps so `registers.txt` includes special CPU
+state needed to debug DOS memory-manager and protected-mode failures:
+
+- control registers `CR0`, `CR2`, and `CR3`;
+- debug registers `DR0..DR7` and test registers `TR0..TR7`;
+- `GDTR`, `IDTR`, `LDTR`, and task-register selectors;
+- visible segment values and cached descriptor base/limit/access/flag state for
+  `ES`, `CS`, `SS`, `DS`, `FS`, `GS`, `LDTR`, and `TR`;
+- protected/v86 mode, native protected-mode cache state, CPL, and IOPL.
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\.tmp\pico_286_dump_pm_state_mips
+```
+
+The Windows debug build completed and copied `pico_286_win.exe` to the active
+patch directory. The WSL/GCC MIPS release build completed into `.tmp`. A live
+debug-control `dump` smoke test against a temporary patch-copy run created
+`memory_dump_001/registers.txt` with the new `control_registers`,
+`debug_registers`, `descriptor_tables`, and `descriptor_cache_*` lines.
+
 ## 2026-06-14 FreeDOS menu regression check
 
 Investigated a regression where the active Windows patch build no longer showed

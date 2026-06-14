@@ -7622,6 +7622,18 @@ void __not_in_flash() r36sx_cpu_exec_protected(uint32_t execloops)
     r36sx_cpu_exec86_core(execloops);
 }
 
+static void r36sx_cpu_debug_copy_segment_cache(
+    r36sx_cpu_debug_segment_cache_t *dst,
+    const r36sx_segment_cache_t *src)
+{
+    dst->selector = src->selector;
+    dst->base = src->base;
+    dst->limit = src->limit;
+    dst->access = src->access;
+    dst->flags = src->flags;
+    dst->valid = src->valid;
+}
+
 void r36sx_cpu_debug_snapshot(r36sx_cpu_debug_snapshot_t *snapshot)
 {
     if (!snapshot) {
@@ -7647,7 +7659,30 @@ void r36sx_cpu_debug_snapshot(r36sx_cpu_debug_snapshot_t *snapshot)
     snapshot->cr0 = r36sx_cr0;
     snapshot->cr2 = r36sx_cr2;
     snapshot->cr3 = r36sx_cr3;
+    for (uint8_t i = 0; i < R36SX_CPU_DEBUG_REGISTER_COUNT; i++) {
+        snapshot->debug_regs[i] = r36sx_dr[i];
+        snapshot->test_regs[i] = r36sx_tr[i];
+    }
+    snapshot->gdtr_base = r36sx_gdtr_base;
+    snapshot->idtr_base = r36sx_idtr_base;
+    snapshot->gdtr_limit = r36sx_gdtr_limit;
+    snapshot->idtr_limit = r36sx_idtr_limit;
+    snapshot->ldtr_selector = r36sx_ldtr_selector;
+    snapshot->tr_selector = r36sx_tr_selector;
+    for (uint8_t i = 0; i < R36SX_CPU_DEBUG_SEGMENT_COUNT; i++) {
+        snapshot->segment_values[i] = segregs32[i];
+        snapshot->segment_selectors[i] = segselector16[i];
+        snapshot->segment_bases[i] = segbase32[i];
+        r36sx_cpu_debug_copy_segment_cache(&snapshot->segment_cache[i],
+                                           &r36sx_seg_cache[i]);
+    }
+    r36sx_cpu_debug_copy_segment_cache(&snapshot->ldtr_cache,
+                                       &r36sx_ldtr_cache);
+    r36sx_cpu_debug_copy_segment_cache(&snapshot->tr_cache,
+                                       &r36sx_tr_cache);
     snapshot->protected_mode = r36sx_cpu_protected_enabled();
+    snapshot->native_protected_mode = r36sx_cpu_native_protected_enabled();
     snapshot->vm86_mode = r36sx_cpu_v86_enabled();
     snapshot->cpl = r36sx_cpu_cpl();
+    snapshot->iopl = r36sx_cpu_iopl();
 }

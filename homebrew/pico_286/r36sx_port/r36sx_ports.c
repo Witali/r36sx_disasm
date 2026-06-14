@@ -9,6 +9,7 @@
 #endif
 #include <time.h>
 #include "emulator.h"
+#include "r36sx_cpu.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #if PICO_ON_DEVICE
@@ -53,6 +54,49 @@ static char r36sx_emergency_dump_reason[64];
 static unsigned r36sx_emergency_dump_sequence;
 
 extern uint8_t r36sx_cpu_is_protected_enabled(void);
+
+static const char *r36sx_debug_segment_name(unsigned index)
+{
+    static const char *names[R36SX_CPU_DEBUG_SEGMENT_COUNT] = {
+        "es", "cs", "ss", "ds", "fs", "gs"
+    };
+
+    return index < R36SX_CPU_DEBUG_SEGMENT_COUNT ? names[index] : "unknown";
+}
+
+static void r36sx_emergency_dump_descriptor_cache(
+    FILE *fp,
+    const char *name,
+    const r36sx_cpu_debug_segment_cache_t *cache)
+{
+    uint8_t type = cache->access & 0x0fu;
+    uint8_t system = (cache->access & 0x10u) ? 1u : 0u;
+    uint8_t dpl = (cache->access >> 5) & 3u;
+    uint8_t present = (cache->access >> 7) & 1u;
+    uint8_t avl = cache->flags & 1u;
+    uint8_t long_mode = (cache->flags >> 1) & 1u;
+    uint8_t db = (cache->flags >> 2) & 1u;
+    uint8_t granular = (cache->flags >> 3) & 1u;
+
+    fprintf(fp,
+            "%s selector=%04x base=%08lx limit=%08lx access=%02x flags=%x "
+            "valid=%u type=%x s=%u dpl=%u p=%u avl=%u l=%u db=%u g=%u\n",
+            name,
+            (unsigned)cache->selector,
+            (unsigned long)cache->base,
+            (unsigned long)cache->limit,
+            (unsigned)cache->access,
+            (unsigned)cache->flags,
+            (unsigned)cache->valid,
+            (unsigned)type,
+            (unsigned)system,
+            (unsigned)dpl,
+            (unsigned)present,
+            (unsigned)avl,
+            (unsigned)long_mode,
+            (unsigned)db,
+            (unsigned)granular);
+}
 
 static int r36sx_emergency_mkdir(const char *path)
 {
@@ -118,11 +162,14 @@ static void r36sx_emergency_dump_text_screen(const char *path)
 static void r36sx_emergency_dump_registers(const char *path)
 {
     FILE *fp = fopen(path, "wb");
+    r36sx_cpu_debug_snapshot_t cpu;
     if (!fp) {
         r36sx_pico286_debug_log("emergency_dump: open failed path='%s' errno=%d",
                                 path, errno);
         return;
     }
+
+    r36sx_cpu_debug_snapshot(&cpu);
     fprintf(fp, "reason=%s\n", r36sx_emergency_dump_reason);
     fprintf(fp, "code=%u\n", (unsigned)r36sx_emergency_dump_code);
     fprintf(fp, "cpu_protected=%u\n",
@@ -175,6 +222,64 @@ static void r36sx_emergency_dump_registers(const char *path)
     fprintf(fp, "linear_cs_ip=%05lx linear_ss_sp=%05lx\n",
             (unsigned long)(((uint32_t)CPU_CS << 4) + (uint16_t)CPU_IP),
             (unsigned long)(((uint32_t)CPU_SS << 4) + CPU_SP));
+    fprintf(fp, "cpu_modes protected=%u native_protected=%u vm86=%u cpl=%u iopl=%u\n",
+            (unsigned)cpu.protected_mode,
+            (unsigned)cpu.native_protected_mode,
+            (unsigned)cpu.vm86_mode,
+            (unsigned)cpu.cpl,
+            (unsigned)cpu.iopl);
+    fprintf(fp, "control_registers cr0=%08lx cr2=%08lx cr3=%08lx\n",
+            (unsigned long)cpu.cr0,
+            (unsigned long)cpu.cr2,
+            (unsigned long)cpu.cr3);
+    fprintf(fp,
+            "debug_registers dr0=%08lx dr1=%08lx dr2=%08lx dr3=%08lx "
+            "dr4=%08lx dr5=%08lx dr6=%08lx dr7=%08lx\n",
+            (unsigned long)cpu.debug_regs[0],
+            (unsigned long)cpu.debug_regs[1],
+            (unsigned long)cpu.debug_regs[2],
+            (unsigned long)cpu.debug_regs[3],
+            (unsigned long)cpu.debug_regs[4],
+            (unsigned long)cpu.debug_regs[5],
+            (unsigned long)cpu.debug_regs[6],
+            (unsigned long)cpu.debug_regs[7]);
+    fprintf(fp,
+            "test_registers tr0=%08lx tr1=%08lx tr2=%08lx tr3=%08lx "
+            "tr4=%08lx tr5=%08lx tr6=%08lx tr7=%08lx\n",
+            (unsigned long)cpu.test_regs[0],
+            (unsigned long)cpu.test_regs[1],
+            (unsigned long)cpu.test_regs[2],
+            (unsigned long)cpu.test_regs[3],
+            (unsigned long)cpu.test_regs[4],
+            (unsigned long)cpu.test_regs[5],
+            (unsigned long)cpu.test_regs[6],
+            (unsigned long)cpu.test_regs[7]);
+    fprintf(fp,
+            "descriptor_tables gdtr_base=%08lx gdtr_limit=%04x "
+            "idtr_base=%08lx idtr_limit=%04x ldtr=%04x tr=%04x\n",
+            (unsigned long)cpu.gdtr_base,
+            (unsigned)cpu.gdtr_limit,
+            (unsigned long)cpu.idtr_base,
+            (unsigned)cpu.idtr_limit,
+            (unsigned)cpu.ldtr_selector,
+            (unsigned)cpu.tr_selector);
+    for (unsigned i = 0; i < R36SX_CPU_DEBUG_SEGMENT_COUNT; i++) {
+        char label[32];
+        const char *name = r36sx_debug_segment_name(i);
+        fprintf(fp,
+                "segment_%s value=%08lx selector_cache=%04x base_cache=%08lx\n",
+                name,
+                (unsigned long)cpu.segment_values[i],
+                (unsigned)cpu.segment_selectors[i],
+                (unsigned long)cpu.segment_bases[i]);
+        snprintf(label, sizeof(label), "descriptor_cache_%s", name);
+        r36sx_emergency_dump_descriptor_cache(
+            fp, label, &cpu.segment_cache[i]);
+    }
+    r36sx_emergency_dump_descriptor_cache(
+        fp, "descriptor_cache_ldtr", &cpu.ldtr_cache);
+    r36sx_emergency_dump_descriptor_cache(
+        fp, "descriptor_cache_tr", &cpu.tr_cache);
     fclose(fp);
 }
 
