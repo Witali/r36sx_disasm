@@ -122,6 +122,53 @@ static inline void r36sx_pm_diag_log_idt_gate_if_interesting(
 }
 #endif
 
+typedef enum {
+    R36SX_CPU_DF_CLASS_BENIGN = 0,
+    R36SX_CPU_DF_CLASS_CONTRIBUTORY,
+    R36SX_CPU_DF_CLASS_PAGE_FAULT
+} r36sx_cpu_df_class_t;
+
+static r36sx_cpu_df_class_t r36sx_cpu_exception_df_class(uint8_t intnum)
+{
+    /*
+     * Intel 80386 PRM, Table 9-3/9-4.  #DF is raised only for selected
+     * exception pairs; most nested exceptions are delivered serially.
+     */
+    switch (intnum) {
+    case R36SX_EXCEPTION_PF:
+        return R36SX_CPU_DF_CLASS_PAGE_FAULT;
+
+    case 0u:
+    case 9u:
+    case R36SX_EXCEPTION_INVALID_TSS:
+    case R36SX_EXCEPTION_NOT_PRESENT:
+    case R36SX_EXCEPTION_STACK:
+    case R36SX_EXCEPTION_GP:
+        return R36SX_CPU_DF_CLASS_CONTRIBUTORY;
+
+    default:
+        return R36SX_CPU_DF_CLASS_BENIGN;
+    }
+}
+
+static uint8_t r36sx_cpu_exception_pair_causes_df(uint8_t first,
+                                                  uint8_t second)
+{
+    r36sx_cpu_df_class_t first_class =
+        r36sx_cpu_exception_df_class(first);
+    r36sx_cpu_df_class_t second_class =
+        r36sx_cpu_exception_df_class(second);
+
+    if (first_class == R36SX_CPU_DF_CLASS_CONTRIBUTORY) {
+        return second_class == R36SX_CPU_DF_CLASS_CONTRIBUTORY;
+    }
+    if (first_class == R36SX_CPU_DF_CLASS_PAGE_FAULT) {
+        return second_class == R36SX_CPU_DF_CLASS_CONTRIBUTORY ||
+               second_class == R36SX_CPU_DF_CLASS_PAGE_FAULT;
+    }
+    return 0;
+}
+
 static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
                                              uint32_t error_code,
                                              uint8_t has_error_code,
@@ -471,22 +518,28 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
         r36sx_cpu_exception_delivery_depth != 0u) {
         uint8_t active = r36sx_cpu_exception_delivery_vector;
         if (active == R36SX_EXCEPTION_DOUBLE_FAULT ||
-            intnum == R36SX_EXCEPTION_DOUBLE_FAULT ||
-            r36sx_cpu_exception_delivery_depth > 1u) {
+            intnum == R36SX_EXCEPTION_DOUBLE_FAULT) {
             r36sx_cpu_latch_triple_fault(
                 intnum, error_code, has_error_code, fault_ip);
             return;
         }
 
-        r36sx_pico286_debug_log(
-            "[PM] exception delivery fault active=%02X nested=%02X "
-            "err=%08lX -> #DF",
-            active, intnum, (unsigned long)error_code);
         r36sx_cpu_exception_abort_delivery_depth =
             r36sx_cpu_exception_delivery_depth;
-        intnum = R36SX_EXCEPTION_DOUBLE_FAULT;
-        error_code = 0;
-        has_error_code = 1u;
+        if (r36sx_cpu_exception_pair_causes_df(active, intnum)) {
+            r36sx_pico286_debug_log(
+                "[PM] exception delivery fault active=%02X nested=%02X "
+                "err=%08lX -> #DF",
+                active, intnum, (unsigned long)error_code);
+            intnum = R36SX_EXCEPTION_DOUBLE_FAULT;
+            error_code = 0;
+            has_error_code = 1u;
+        } else {
+            r36sx_pico286_debug_log(
+                "[PM] exception delivery fault active=%02X nested=%02X "
+                "err=%08lX -> serial",
+                active, intnum, (unsigned long)error_code);
+        }
     }
 
     r36sx_cpu_exception_pending = 1u;
@@ -547,7 +600,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
         r36sx_cpu_exception_delivery_depth = saved_depth + 1u;
         r36sx_cpu_exception_delivery_vector = intnum;
         handled = r36sx_cpu_protected_interrupt(
-            intnum, error_code, has_error_code, 0, fault_ip, 0);
+            intnum, error_code, has_error_code, 0, fault_ip, 1);
         aborted = r36sx_cpu_exception_abort_delivery_depth != 0u;
         r36sx_cpu_exception_delivery_vector = saved_vector;
         r36sx_cpu_exception_delivery_depth = saved_depth;

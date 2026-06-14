@@ -1,5 +1,29 @@
 # pico-286 Build Log
 
+## 2026-06-14 Intel 386 Double-Fault Classification
+
+Changed protected-mode exception delivery to follow Intel 80386 PRM
+Section 9.8.8, Tables 9-3 and 9-4.  Nested exception delivery now classifies
+the active and nested exceptions as benign, contributory, or page fault before
+deciding whether to deliver the nested exception serially or convert it to
+`#DF`.  Exceptions while invoking the double-fault handler still latch a
+triple fault.
+
+Changed files:
+
+- `homebrew/pico_286/r36sx_port/r36sx_cpu_80286_interrupts.inl`
+
+Verification:
+
+```powershell
+git diff --check -- homebrew/pico_286/r36sx_port/r36sx_cpu_80286_interrupts.inl
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  The build still emits existing warnings in unrelated
+FPU/audio/redirector code.
+
 ## 2026-06-14 Explicit BIOS Write Protection
 
 Split BIOS read presence from write protection.  `r36sx_bios_rom_contains()`
