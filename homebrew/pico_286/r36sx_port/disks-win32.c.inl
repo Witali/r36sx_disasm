@@ -269,8 +269,13 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
             bios_drive, cyls, heads, sects, (unsigned long)size);
     }
 
-    // Validate geometry
-    if (cyls > 1023 || cyls * heads * sects * 512 != size) {
+    /*
+     * INT 13h AH=08 returns the maximum cylinder index in 10 bits, so a
+     * 1024-cylinder disk is reported as max cylinder 1023.  The fixed disk
+     * parameter table stores the cylinder count, where 1024 is valid.
+     */
+    if (cyls > R36SX_BIOS_MAX_CHS_CYLINDERS ||
+        (size_t)cyls * (size_t)heads * (size_t)sects * 512UL != size) {
 //        fclose(file);
 //        fprintf(stderr, "DISK: ERROR: Cannot determine correct CHS geometry for drive %02Xh\n", drivenum);
 //        return 0;
