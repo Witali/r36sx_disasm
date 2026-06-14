@@ -168,6 +168,10 @@ static void r36sx_emergency_dump_registers(const char *path)
             (unsigned)CPU_SS,
             (unsigned)CPU_FS,
             (unsigned)CPU_GS);
+    fprintf(fp, "a20=%d xms_bytes=%lu hma_bytes=%lu\n",
+            a20_enabled,
+            (unsigned long)xms_configured_memory_bytes(),
+            (unsigned long)HMA_SIZE);
     fprintf(fp, "linear_cs_ip=%05lx linear_ss_sp=%05lx\n",
             (unsigned long)(((uint32_t)CPU_CS << 4) + (uint16_t)CPU_IP),
             (unsigned long)(((uint32_t)CPU_SS << 4) + CPU_SP));
@@ -239,6 +243,20 @@ void r36sx_emergency_dump_write_and_clear(void)
     r36sx_emergency_dump_registers(path);
     snprintf(path, sizeof(path), "%s/ram.bin", dir);
     r36sx_emergency_write_file(path, RAM, RAM_SIZE);
+    {
+        size_t xms_bytes = xms_configured_memory_bytes();
+        size_t hma_bytes = HMA_SIZE;
+        if (xms_bytes > XMS_MEMORY_SIZE) {
+            xms_bytes = XMS_MEMORY_SIZE;
+        }
+        if (hma_bytes > xms_bytes) {
+            hma_bytes = xms_bytes;
+        }
+        snprintf(path, sizeof(path), "%s/xms.bin", dir);
+        r36sx_emergency_write_file(path, XMS, xms_bytes);
+        snprintf(path, sizeof(path), "%s/hma.bin", dir);
+        r36sx_emergency_write_file(path, XMS, hma_bytes);
+    }
     snprintf(path, sizeof(path), "%s/videoram.bin", dir);
     r36sx_emergency_write_file(path, VIDEORAM,
                                sizeof(VIDEORAM[0]) * (size_t)VIDEORAM_SIZE);

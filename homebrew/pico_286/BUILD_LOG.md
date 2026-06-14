@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-06-14 HMA dump and ATA reset diagnostics
+
+Investigated the remaining FreeDOS/JemmEx `COMMAND.COM` failure from the latest
+patch screenshot and memory dump. The on-screen failure happens after JemmEx
+loads and DOS allocates disk buffers in HMA; the captured registers show
+execution at `FFFF:1CB7` (`0x101CA7`), but the previous dump only wrote
+conventional `ram.bin`, so the active HMA/XMS code bytes were not available.
+
+Memory dumps now include `xms.bin` and `hma.bin`, and `registers.txt` records
+the A20 state plus configured XMS/HMA byte counts. Ctrl+R also resets the new
+PATA task-file state after disk config reload, so direct ATA port users cannot
+inherit a stale DRQ/command phase from the previous guest session.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory. Existing warnings remain in FPU, audio, VGA, and
+redirector sources.
+
+Artifact verification:
+
+- SHA256:
+  `A6478AA732EA4A837BE53D13CC1FD213DC7F0E499448D550B65D88FACFA383AB`
+
 ## 2026-06-14 PATA task-file port emulation
 
 Built the Windows debug emulator with `build_pico_286_windows.ps1 -DebugLog`

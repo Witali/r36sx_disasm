@@ -816,6 +816,23 @@ static void r36sx_ata_soft_reset(r36sx_ata_channel_t *ch)
     ch->status = r36sx_ata_drive_present(ch) ? R36SX_ATA_SR_DRDY : 0xffu;
 }
 
+void r36sx_ata_reset_all(void)
+{
+    memset(r36sx_ata_channels, 0, sizeof(r36sx_ata_channels));
+    r36sx_ata_channels[0].base = R36SX_ATA_PRIMARY_BASE;
+    r36sx_ata_channels[0].ctrl = R36SX_ATA_PRIMARY_CTRL;
+    r36sx_ata_channels[1].base = R36SX_ATA_SECONDARY_BASE;
+    r36sx_ata_channels[1].ctrl = R36SX_ATA_SECONDARY_CTRL;
+    r36sx_ata_channels[0].device = 0xa0u;
+    r36sx_ata_channels[1].device = 0xa0u;
+    r36sx_ata_initialized = 1;
+    r36sx_ata_soft_reset(&r36sx_ata_channels[0]);
+    r36sx_ata_soft_reset(&r36sx_ata_channels[1]);
+    r36sx_pico286_debug_log("ata: reset all primary=%02x secondary=%02x",
+                            r36sx_ata_channels[0].status,
+                            r36sx_ata_channels[1].status);
+}
+
 static void r36sx_ata_execute(r36sx_ata_channel_t *ch, uint8_t command)
 {
     uint64_t lba = 0;

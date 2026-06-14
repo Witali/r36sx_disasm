@@ -72,6 +72,7 @@ extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
+extern "C" void r36sx_ata_reset_all(void);
 extern "C" void r36sx_pico286_post_reset(void);
 extern "C" uint64_t sb_samplerate;
 
@@ -2183,6 +2184,7 @@ static void r36sx_pico286_soft_reset(void) {
     __sync_synchronize();
     r36sx_pico286_disk_flush_all();
     r36sx_pico286_reload_config();
+    r36sx_ata_reset_all();
 
     r36sx_host_rpc_reset();
     r36sx_redirector_reset();
