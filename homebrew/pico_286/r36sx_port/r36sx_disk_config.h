@@ -25,6 +25,11 @@ typedef enum {
 } r36sx_pico286_keyboard_mode_t;
 
 typedef enum {
+    R36SX_PICO286_MOUSE_SERIAL = 0,
+    R36SX_PICO286_MOUSE_PS2 = 1,
+} r36sx_pico286_mouse_type_t;
+
+typedef enum {
     R36SX_PICO286_CPU_8086 = 0,
     R36SX_PICO286_CPU_80286 = 1,
     R36SX_PICO286_CPU_80386 = 2,
@@ -237,6 +242,12 @@ r36sx_pico286_keyboard_mode_t r36sx_pico286_keyboard_mode(void);
 
 // Return the configured keyboard mode text used when rewriting config.
 const char *r36sx_pico286_keyboard_mode_name(void);
+
+// Return which emulated mouse interface receives host mouse movement.
+r36sx_pico286_mouse_type_t r36sx_pico286_mouse_type(void);
+
+// Return the configured mouse type text used when rewriting config.
+const char *r36sx_pico286_mouse_type_name(void);
 
 #ifdef __cplusplus
 }

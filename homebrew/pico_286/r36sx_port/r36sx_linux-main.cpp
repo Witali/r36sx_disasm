@@ -1872,37 +1872,15 @@ extern "C" void HandleMouseReset(void)
     r36sx_mouse_absolute_initialized = 0;
 }
 
-static int r36sx_mouse_clamp_delta(int value)
-{
-    if (value > 63) {
-        return 63;
-    }
-    if (value < -63) {
-        return -63;
-    }
-    return value;
-}
-
 extern "C" void HandleMouseRelative(int dx, int dy, int buttons)
 {
-    int sent = 0;
-
     buttons &= 3;
     if (!r36sx_mouse_initialized) {
         r36sx_mouse_initialized = 1;
     }
 
-    while (dx != 0 || dy != 0) {
-        const int step_x = r36sx_mouse_clamp_delta(dx);
-        const int step_y = r36sx_mouse_clamp_delta(dy);
-        sermouseevent((uint8_t)buttons, (int8_t)step_x, (int8_t)step_y);
-        dx -= step_x;
-        dy -= step_y;
-        sent = 1;
-    }
-
-    if (!sent && buttons != r36sx_mouse_prev_buttons) {
-        sermouseevent((uint8_t)buttons, 0, 0);
+    if (dx != 0 || dy != 0 || buttons != r36sx_mouse_prev_buttons) {
+        r36sx_mouse_event((uint8_t)buttons, dx, dy);
     }
     r36sx_mouse_prev_buttons = buttons;
 }

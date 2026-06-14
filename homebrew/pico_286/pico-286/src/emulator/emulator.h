@@ -536,6 +536,7 @@ extern int speakerenabled;
 
 // Mouse
 extern void sermouseevent(uint8_t buttons, int8_t xrel, int8_t yrel);
+extern void r36sx_mouse_event(uint8_t buttons, int xrel, int yrel);
 
 extern uint8_t mouse_portin(uint16_t portnum);
 

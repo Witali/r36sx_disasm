@@ -1,5 +1,63 @@
 # pico-286 Build Log
 
+## 2026-06-14 Configurable PS/2 Mouse Interface
+
+Added a `mouse_type` config setting with `serial` and `ps2` values.  The default
+remains `serial`, preserving the existing COM1 Microsoft serial mouse path.
+When `mouse_type=ps2`, host mouse events are routed through an emulated 8042
+auxiliary PS/2 mouse channel on ports `60h/64h`.
+
+Implemented the 8042 pieces needed by DOS PS/2 mouse drivers:
+
+- controller configuration byte read/write commands `20h/60h`;
+- auxiliary-port enable/disable/test commands `A8h/A7h/A9h`;
+- controller self-test and first-port test commands `AAh/ABh`;
+- controller output-port read/write `D0h/D1h` retained for A20;
+- `D4h` "next byte to second PS/2 port" command;
+- status bit 0 for output full and bit 5 for second-port mouse data;
+- generic PS/2 mouse ACK/reset/identify/status/defaults/enable/disable,
+  set-sample-rate, set-resolution, stream/remote/read-data commands;
+- 3-byte generic PS/2 mouse packets delivered through IRQ12 when enabled by the
+  controller config byte.
+
+References checked:
+
+- OSDev `I8042 PS/2 Controller`, especially ports `60h/64h`, status bits,
+  controller commands, configuration byte, output port, and second-port `D4h`.
+- OSDev `PS/2 Mouse`, especially generic packet bits and mouse command set.
+- Wikipedia `PS/2 port` for IBM PS/2 origin and electrical/protocol overview.
+
+Note: a directly usable public IBM/Intel command table was not found during this
+pass, so the implementation follows the OSDev PC-compatible 8042/PS/2 summaries.
+
+Builds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286
+```
+
+The first Windows build attempt caught a local typo in the PS/2 reset path
+(`r36sx_ps2_mouse_buttons` vs `ps2_mouse_buttons`).  After fixing it, both
+Windows and MIPS/GCC release builds succeeded with the existing upstream warning
+sets.
+
+Artifacts:
+
+- `homebrew/pico_286/build/pico_286_win.exe`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- `homebrew/pico_286/pico_286`
+
+Hashes:
+
+```text
+E05AE5C9DF27C184D7548F6558B1188E2B9CB7ECECC0470122CC70345D6B822B  pico_286_win.exe
+1BF7BAEF90919D4A3DEAF9AD4184999C8DEB8A0A468A359C8C92FE865FEEF26F  pico_286
+```
+
+Microsoft Defender scans found no threats in the Windows build executable, the
+patch-copy Windows executable, or the MIPS executable.
+
 ## 2026-06-14 Intel 386 Double-Fault Classification
 
 Changed protected-mode exception delivery to follow Intel 80386 PRM

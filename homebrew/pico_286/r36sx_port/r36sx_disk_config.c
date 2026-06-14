@@ -116,6 +116,7 @@ static char screenshot_format_text[8] = "png";
 static char screenshot_build_hash_text[8] = "1";
 static char scaling_filter_text[16] = "nearest";
 static char keyboard_mode_text[16] = "normal";
+static char mouse_type_text[16] = "serial";
 static char audio_adlib_enabled_text[8] = "1";
 static char audio_sound_blaster_enabled_text[8] = "1";
 static char audio_cms_enabled_text[8] = "1";
@@ -176,6 +177,8 @@ static r36sx_pico286_scaling_filter_t scaling_filter =
     R36SX_PICO286_SCALING_NEAREST;
 static r36sx_pico286_keyboard_mode_t keyboard_mode =
     R36SX_PICO286_KEYBOARD_NORMAL;
+static r36sx_pico286_mouse_type_t mouse_type =
+    R36SX_PICO286_MOUSE_SERIAL;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
@@ -990,6 +993,41 @@ static int set_keyboard_mode(const char *key, const char *value,
     return 1;
 }
 
+static int set_mouse_type(const char *key, const char *value, int line_no)
+{
+    if (!(key_equals(key, "mouse_type") ||
+          key_equals(key, "mouse") ||
+          key_equals(key, "mouse_interface") ||
+          key_equals(key, "pointing_device"))) {
+        return 0;
+    }
+
+    if (key_equals(value, "serial") ||
+        key_equals(value, "com") ||
+        key_equals(value, "rs232") ||
+        key_equals(value, "rs-232")) {
+        mouse_type = R36SX_PICO286_MOUSE_SERIAL;
+        snprintf(mouse_type_text, sizeof(mouse_type_text), "serial");
+        r36sx_pico286_debug_log("diskcfg: mouse_type=serial");
+        return 1;
+    }
+
+    if (key_equals(value, "ps2") ||
+        key_equals(value, "ps/2") ||
+        key_equals(value, "aux") ||
+        key_equals(value, "8042")) {
+        mouse_type = R36SX_PICO286_MOUSE_PS2;
+        snprintf(mouse_type_text, sizeof(mouse_type_text), "ps2");
+        r36sx_pico286_debug_log("diskcfg: mouse_type=ps2");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid %s '%s' at line %d",
+        key, value, line_no);
+    return 1;
+}
+
 static int set_app_stats_value(const char *key, const char *value,
                                int line_no)
 {
@@ -1711,6 +1749,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_keyboard_mode(key, value, line_no)) {
         return 1;
     }
+    if (set_mouse_type(key, value, line_no)) {
+        return 1;
+    }
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
@@ -1950,6 +1991,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[video]\n");
     fprintf(fp, "scaling_filter=%s\n", scaling_filter_text);
     fprintf(fp, "keyboard_mode=%s\n\n", keyboard_mode_text);
+
+    fprintf(fp, "# Host mouse input target.\n");
+    fprintf(fp, "# mouse_type=serial uses the COM1 Microsoft serial mouse.\n");
+    fprintf(fp, "# mouse_type=ps2 uses the 8042 auxiliary PS/2 mouse port.\n");
+    fprintf(fp, "[input]\n");
+    fprintf(fp, "mouse_type=%s\n\n", mouse_type_text);
 
     fprintf(fp, "# Emulated audio devices mixed into the output stream.\n");
     fprintf(fp, "# The built-in PC speaker/beeper is always enabled.\n");
@@ -2510,4 +2557,18 @@ const char *r36sx_pico286_keyboard_mode_name(void)
     load_disk_config();
 
     return keyboard_mode_text;
+}
+
+r36sx_pico286_mouse_type_t r36sx_pico286_mouse_type(void)
+{
+    load_disk_config();
+
+    return mouse_type;
+}
+
+const char *r36sx_pico286_mouse_type_name(void)
+{
+    load_disk_config();
+
+    return mouse_type_text;
 }

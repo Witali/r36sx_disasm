@@ -251,12 +251,36 @@ void r36sx_emergency_dump_write_and_clear(void)
 }
 
 #define R36SX_KEYBOARD_QUEUE_CAPACITY 8u
+#define R36SX_PS2_MOUSE_QUEUE_CAPACITY 48u
 #define R36SX_KEYBOARD_BYTE_DELAY_US 1000ull
 #define R36SX_KBD_STATUS_OUTPUT_FULL 0x01u
-#define R36SX_KBD_STATUS_COMPAT_DATA 0x02u
+#define R36SX_KBD_STATUS_INPUT_FULL 0x02u
+#define R36SX_KBD_STATUS_MOUSE_OUTPUT_FULL 0x20u
+#define R36SX_KBD_CMD_READ_CONFIG 0x20u
+#define R36SX_KBD_CMD_WRITE_CONFIG 0x60u
+#define R36SX_KBD_CMD_DISABLE_AUX 0xA7u
+#define R36SX_KBD_CMD_ENABLE_AUX 0xA8u
+#define R36SX_KBD_CMD_TEST_AUX 0xA9u
+#define R36SX_KBD_CMD_SELF_TEST 0xAAu
+#define R36SX_KBD_CMD_TEST_KEYBOARD 0xABu
+#define R36SX_KBD_CMD_DISABLE_KEYBOARD 0xADu
+#define R36SX_KBD_CMD_ENABLE_KEYBOARD 0xAEu
 #define R36SX_KBD_CMD_READ_OUTPUT_PORT 0xD0u
 #define R36SX_KBD_CMD_WRITE_OUTPUT_PORT 0xD1u
+#define R36SX_KBD_CMD_WRITE_AUX_OUTPUT 0xD3u
+#define R36SX_KBD_CMD_WRITE_AUX_INPUT 0xD4u
+#define R36SX_KBD_CONFIG_KEYBOARD_IRQ 0x01u
+#define R36SX_KBD_CONFIG_AUX_IRQ 0x02u
+#define R36SX_KBD_CONFIG_SYSTEM_FLAG 0x04u
+#define R36SX_KBD_CONFIG_KEYBOARD_CLOCK_DISABLED 0x10u
+#define R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED 0x20u
+#define R36SX_KBD_CONFIG_TRANSLATION 0x40u
 #define R36SX_FAST_A20_ENABLE_BIT 0x02u
+#define R36SX_PS2_ACK 0xFAu
+#define R36SX_PS2_RESEND 0xFEu
+#define R36SX_PS2_MOUSE_PENDING_NONE 0u
+#define R36SX_PS2_MOUSE_PENDING_RESOLUTION 1u
+#define R36SX_PS2_MOUSE_PENDING_SAMPLE_RATE 2u
 #define R36SX_PC_POST_PORT 0x80u
 #define R36SX_TEST386_SUBPOST_PORT 0x190u
 #define R36SX_TEST386_ASCII_PORT 0x191u
@@ -289,8 +313,24 @@ static uint8_t keyboard_queue_count;
 static uint8_t keyboard_output_full;
 static uint64_t keyboard_next_ready_us;
 static uint8_t keyboard_controller_response_ready;
+static uint8_t keyboard_controller_write_config_byte;
 static uint8_t keyboard_controller_write_output_port;
+static uint8_t keyboard_controller_write_aux_output;
+static uint8_t keyboard_controller_write_aux_input;
+static uint8_t keyboard_controller_config_byte;
 static uint8_t keyboard_controller_output_port;
+static uint8_t ps2_mouse_queue[R36SX_PS2_MOUSE_QUEUE_CAPACITY];
+static uint8_t ps2_mouse_queue_head;
+static uint8_t ps2_mouse_queue_count;
+static uint8_t ps2_mouse_output_full;
+static uint64_t ps2_mouse_next_ready_us;
+static uint8_t ps2_mouse_reporting_enabled;
+static uint8_t ps2_mouse_stream_mode;
+static uint8_t ps2_mouse_scaling_2_1;
+static uint8_t ps2_mouse_resolution;
+static uint8_t ps2_mouse_sample_rate;
+static uint8_t ps2_mouse_pending_param;
+static uint8_t ps2_mouse_buttons;
 static uint8_t r36sx_test386_current_post;
 
 void r36sx_pico286_post_reset(void)
@@ -387,27 +427,111 @@ static INLINE uint64_t r36sx_keyboard_now_us(void) {
     return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
 }
 
+static INLINE int r36sx_ps2_mouse_config_enabled(void)
+{
+    return r36sx_pico286_mouse_type() == R36SX_PICO286_MOUSE_PS2;
+}
+
+static INLINE int r36sx_ps2_mouse_aux_enabled(void)
+{
+    return r36sx_ps2_mouse_config_enabled() &&
+           (keyboard_controller_config_byte &
+            R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED) == 0;
+}
+
+static INLINE int r36sx_ps2_mouse_irq_enabled(void)
+{
+    return r36sx_ps2_mouse_aux_enabled() &&
+           (keyboard_controller_config_byte & R36SX_KBD_CONFIG_AUX_IRQ) != 0;
+}
+
+static INLINE void r36sx_ps2_mouse_set_defaults(void)
+{
+    ps2_mouse_reporting_enabled = 0;
+    ps2_mouse_stream_mode = 1;
+    ps2_mouse_scaling_2_1 = 0;
+    ps2_mouse_resolution = 2;
+    ps2_mouse_sample_rate = 100;
+    ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_NONE;
+}
+
 static INLINE void r36sx_keyboard_refresh_status(void) {
+    port64 &= (uint8_t)~(R36SX_KBD_STATUS_OUTPUT_FULL |
+                         R36SX_KBD_STATUS_INPUT_FULL |
+                         R36SX_KBD_STATUS_MOUSE_OUTPUT_FULL);
+
     if (keyboard_controller_response_ready) {
-        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
+        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL;
+    } else if (ps2_mouse_output_full && ps2_mouse_queue_count > 0) {
+        port60 = ps2_mouse_queue[ps2_mouse_queue_head];
+        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL |
+                  R36SX_KBD_STATUS_MOUSE_OUTPUT_FULL;
     } else if (keyboard_output_full && keyboard_queue_count > 0) {
         port60 = keyboard_queue[keyboard_queue_head];
-        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL | R36SX_KBD_STATUS_COMPAT_DATA;
-    } else {
-        port64 &= (uint8_t)~(R36SX_KBD_STATUS_OUTPUT_FULL |
-                             R36SX_KBD_STATUS_COMPAT_DATA);
+        port64 |= R36SX_KBD_STATUS_OUTPUT_FULL;
+    }
+}
+
+static void r36sx_ps2_mouse_enqueue(uint8_t data)
+{
+    uint8_t was_idle = ps2_mouse_queue_count == 0 && !ps2_mouse_output_full;
+
+    if (!r36sx_ps2_mouse_config_enabled()) {
+        return;
+    }
+    if (ps2_mouse_queue_count >= R36SX_PS2_MOUSE_QUEUE_CAPACITY) {
+        R36SX_KBD_LOG("ps2mouse: queue full, drop data=0x%02x", data);
+        return;
+    }
+
+    ps2_mouse_queue[(ps2_mouse_queue_head + ps2_mouse_queue_count) %
+                    R36SX_PS2_MOUSE_QUEUE_CAPACITY] = data;
+    ps2_mouse_queue_count++;
+    r36sx_keyboard_refresh_status();
+
+    if (was_idle) {
+        ps2_mouse_next_ready_us = r36sx_keyboard_now_us();
+    }
+}
+
+static INLINE void r36sx_ps2_mouse_tick(uint64_t now)
+{
+    if (ps2_mouse_queue_count == 0 || ps2_mouse_output_full ||
+        keyboard_controller_response_ready || keyboard_output_full ||
+        !r36sx_ps2_mouse_aux_enabled()) {
+        return;
+    }
+
+    if (ps2_mouse_next_ready_us == 0) {
+        ps2_mouse_next_ready_us = now + R36SX_KEYBOARD_BYTE_DELAY_US;
+        return;
+    }
+    if ((int64_t)(now - ps2_mouse_next_ready_us) < 0) {
+        return;
+    }
+
+    ps2_mouse_output_full = 1;
+    ps2_mouse_next_ready_us = 0;
+    r36sx_keyboard_refresh_status();
+    R36SX_KBD_LOG("ps2mouse: ready data=0x%02x count=%u",
+                  port60, (unsigned int)ps2_mouse_queue_count);
+    if (r36sx_ps2_mouse_irq_enabled()) {
+        doirq(12);
     }
 }
 
 void r36sx_keyboard_tick(void) {
     uint64_t now;
 
-    if (keyboard_queue_count == 0 || keyboard_output_full) {
+    now = r36sx_keyboard_now_us();
+    r36sx_ps2_mouse_tick(now);
+
+    if (keyboard_controller_response_ready || ps2_mouse_output_full ||
+        keyboard_queue_count == 0 || keyboard_output_full) {
         r36sx_keyboard_refresh_status();
         return;
     }
 
-    now = r36sx_keyboard_now_us();
     if (keyboard_next_ready_us == 0) {
         keyboard_next_ready_us = now + R36SX_KEYBOARD_BYTE_DELAY_US;
         r36sx_keyboard_refresh_status();
@@ -449,14 +573,34 @@ void r36sx_keyboard_enqueue_scancode(uint8_t scancode) {
 
 void r36sx_keyboard_reset(void) {
     memset(keyboard_queue, 0, sizeof(keyboard_queue));
+    memset(ps2_mouse_queue, 0, sizeof(ps2_mouse_queue));
     keyboard_queue_head = 0;
     keyboard_queue_count = 0;
     keyboard_output_full = 0;
     keyboard_next_ready_us = 0;
     keyboard_controller_response_ready = 0;
+    keyboard_controller_write_config_byte = 0;
     keyboard_controller_write_output_port = 0;
+    keyboard_controller_write_aux_output = 0;
+    keyboard_controller_write_aux_input = 0;
+    keyboard_controller_config_byte =
+        R36SX_KBD_CONFIG_SYSTEM_FLAG |
+        R36SX_KBD_CONFIG_KEYBOARD_IRQ |
+        R36SX_KBD_CONFIG_TRANSLATION;
+    if (r36sx_ps2_mouse_config_enabled()) {
+        keyboard_controller_config_byte |= R36SX_KBD_CONFIG_AUX_IRQ;
+    } else {
+        keyboard_controller_config_byte |=
+            R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED;
+    }
     keyboard_controller_output_port =
         a20_enabled ? R36SX_FAST_A20_ENABLE_BIT : 0x00u;
+    ps2_mouse_queue_head = 0;
+    ps2_mouse_queue_count = 0;
+    ps2_mouse_output_full = 0;
+    ps2_mouse_next_ready_us = 0;
+    ps2_mouse_buttons = 0;
+    r36sx_ps2_mouse_set_defaults();
     port60 = 0;
     r36sx_keyboard_refresh_status();
 }
@@ -472,6 +616,19 @@ static INLINE uint8_t r36sx_keyboard_read_data(void) {
     }
 
     r36sx_keyboard_tick();
+    if (ps2_mouse_output_full && ps2_mouse_queue_count > 0) {
+        data = ps2_mouse_queue[ps2_mouse_queue_head];
+        ps2_mouse_queue_head =
+            (ps2_mouse_queue_head + 1u) % R36SX_PS2_MOUSE_QUEUE_CAPACITY;
+        ps2_mouse_queue_count--;
+        ps2_mouse_output_full = 0;
+        ps2_mouse_next_ready_us = ps2_mouse_queue_count > 0 ?
+            r36sx_keyboard_now_us() + R36SX_KEYBOARD_BYTE_DELAY_US : 0;
+        r36sx_keyboard_refresh_status();
+        R36SX_KBD_LOG("ps2mouse: read data=0x%02x remaining=%u",
+                      data, (unsigned int)ps2_mouse_queue_count);
+        return data;
+    }
     if (keyboard_output_full && keyboard_queue_count > 0) {
         data = keyboard_queue[keyboard_queue_head];
         keyboard_queue_head =
@@ -486,6 +643,201 @@ static INLINE uint8_t r36sx_keyboard_read_data(void) {
     }
 
     return data;
+}
+
+static INLINE uint8_t r36sx_ps2_mouse_packet_buttons(uint8_t buttons)
+{
+    uint8_t packet_buttons = 0;
+
+    if (buttons & 0x02u) {
+        packet_buttons |= 0x01u;
+    }
+    if (buttons & 0x01u) {
+        packet_buttons |= 0x02u;
+    }
+    if (buttons & 0x04u) {
+        packet_buttons |= 0x04u;
+    }
+    return packet_buttons;
+}
+
+static void r36sx_ps2_mouse_enqueue_packet(uint8_t buttons, int xrel,
+                                           int yrel)
+{
+    const int packet_y = -yrel;
+    uint8_t packet0 = (uint8_t)(0x08u |
+                                r36sx_ps2_mouse_packet_buttons(buttons));
+
+    if (xrel < 0) {
+        packet0 |= 0x10u;
+    }
+    if (packet_y < 0) {
+        packet0 |= 0x20u;
+    }
+
+    r36sx_ps2_mouse_enqueue(packet0);
+    r36sx_ps2_mouse_enqueue((uint8_t)(xrel & 0xff));
+    r36sx_ps2_mouse_enqueue((uint8_t)(packet_y & 0xff));
+}
+
+static void r36sx_ps2_mouse_status(void)
+{
+    uint8_t status = r36sx_ps2_mouse_packet_buttons(ps2_mouse_buttons);
+
+    if (!ps2_mouse_stream_mode) {
+        status |= 0x40u;
+    }
+    if (ps2_mouse_reporting_enabled) {
+        status |= 0x20u;
+    }
+    if (ps2_mouse_scaling_2_1) {
+        status |= 0x10u;
+    }
+
+    r36sx_ps2_mouse_enqueue(status);
+    r36sx_ps2_mouse_enqueue(ps2_mouse_resolution);
+    r36sx_ps2_mouse_enqueue(ps2_mouse_sample_rate);
+}
+
+static void r36sx_ps2_mouse_write(uint8_t value)
+{
+    if (!r36sx_ps2_mouse_aux_enabled()) {
+        return;
+    }
+
+    if (ps2_mouse_pending_param == R36SX_PS2_MOUSE_PENDING_RESOLUTION) {
+        ps2_mouse_resolution = (uint8_t)(value & 0x03u);
+        ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_NONE;
+        r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+        R36SX_KBD_LOG("ps2mouse: set resolution=%u",
+                      (unsigned int)ps2_mouse_resolution);
+        return;
+    }
+    if (ps2_mouse_pending_param == R36SX_PS2_MOUSE_PENDING_SAMPLE_RATE) {
+        ps2_mouse_sample_rate = value;
+        ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_NONE;
+        r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+        R36SX_KBD_LOG("ps2mouse: set sample_rate=%u",
+                      (unsigned int)ps2_mouse_sample_rate);
+        return;
+    }
+
+    switch (value) {
+        case 0xE6:
+            ps2_mouse_scaling_2_1 = 0;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xE7:
+            ps2_mouse_scaling_2_1 = 1;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xE8:
+            ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_RESOLUTION;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xE9:
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            r36sx_ps2_mouse_status();
+            return;
+        case 0xEA:
+            ps2_mouse_stream_mode = 1;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xEB:
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            r36sx_ps2_mouse_enqueue_packet(ps2_mouse_buttons, 0, 0);
+            return;
+        case 0xF0:
+            ps2_mouse_stream_mode = 0;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xF2:
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            r36sx_ps2_mouse_enqueue(0x00u);
+            return;
+        case 0xF3:
+            ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_SAMPLE_RATE;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xF4:
+            ps2_mouse_reporting_enabled = 1;
+            ps2_mouse_stream_mode = 1;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xF5:
+            ps2_mouse_reporting_enabled = 0;
+            ps2_mouse_pending_param = R36SX_PS2_MOUSE_PENDING_NONE;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xF6:
+            r36sx_ps2_mouse_set_defaults();
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xFE:
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            return;
+        case 0xFF:
+            r36sx_ps2_mouse_set_defaults();
+            ps2_mouse_buttons = 0;
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_ACK);
+            r36sx_ps2_mouse_enqueue(0xAAu);
+            r36sx_ps2_mouse_enqueue(0x00u);
+            return;
+        default:
+            r36sx_ps2_mouse_enqueue(R36SX_PS2_RESEND);
+            R36SX_KBD_LOG("ps2mouse: unsupported command=0x%02x", value);
+            return;
+    }
+}
+
+static INLINE int r36sx_mouse_clamp_delta(int value, int limit)
+{
+    if (value > limit) {
+        return limit;
+    }
+    if (value < -limit) {
+        return -limit;
+    }
+    return value;
+}
+
+static void r36sx_ps2_mouse_event(uint8_t buttons, int xrel, int yrel)
+{
+    ps2_mouse_buttons = buttons;
+    if (!r36sx_ps2_mouse_aux_enabled() || !ps2_mouse_reporting_enabled ||
+        !ps2_mouse_stream_mode) {
+        return;
+    }
+    r36sx_ps2_mouse_enqueue_packet(buttons, xrel, yrel);
+}
+
+void r36sx_mouse_event(uint8_t buttons, int xrel, int yrel)
+{
+    const int ps2_mode = r36sx_pico286_mouse_type() == R36SX_PICO286_MOUSE_PS2;
+    const int limit = ps2_mode ? 255 : 63;
+    int sent = 0;
+
+    buttons &= 0x07u;
+    while (xrel != 0 || yrel != 0) {
+        const int step_x = r36sx_mouse_clamp_delta(xrel, limit);
+        const int step_y = r36sx_mouse_clamp_delta(yrel, limit);
+        if (ps2_mode) {
+            r36sx_ps2_mouse_event(buttons, step_x, step_y);
+        } else {
+            sermouseevent(buttons, (int8_t)step_x, (int8_t)step_y);
+        }
+        xrel -= step_x;
+        yrel -= step_y;
+        sent = 1;
+    }
+
+    if (!sent) {
+        if (ps2_mode) {
+            r36sx_ps2_mouse_event(buttons, 0, 0);
+        } else {
+            sermouseevent(buttons, 0, 0);
+        }
+    }
 }
 
 static INLINE void r36sx_keyboard_output_port_write(uint8_t value) {
@@ -1079,9 +1431,43 @@ void portout(uint16_t portnum, uint16_t value) {
         case 0x43: // i8253 PIT
             return out8253(portnum, value);
         case 0x60: // Keyboard Controller data port
+            if (keyboard_controller_write_config_byte) {
+                keyboard_controller_write_config_byte = 0;
+                keyboard_controller_config_byte =
+                    (uint8_t)(value & (R36SX_KBD_CONFIG_KEYBOARD_IRQ |
+                                       R36SX_KBD_CONFIG_AUX_IRQ |
+                                       R36SX_KBD_CONFIG_SYSTEM_FLAG |
+                                       R36SX_KBD_CONFIG_KEYBOARD_CLOCK_DISABLED |
+                                       R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED |
+                                       R36SX_KBD_CONFIG_TRANSLATION));
+                if (!r36sx_ps2_mouse_config_enabled()) {
+                    keyboard_controller_config_byte |=
+                        R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED;
+                    keyboard_controller_config_byte &=
+                        (uint8_t)~R36SX_KBD_CONFIG_AUX_IRQ;
+                }
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: config byte write value=0x%02x",
+                              keyboard_controller_config_byte);
+                return;
+            }
             if (keyboard_controller_write_output_port) {
                 keyboard_controller_write_output_port = 0;
                 r36sx_keyboard_output_port_write((uint8_t)value);
+                r36sx_keyboard_refresh_status();
+                return;
+            }
+            if (keyboard_controller_write_aux_output) {
+                keyboard_controller_write_aux_output = 0;
+                if (r36sx_ps2_mouse_config_enabled()) {
+                    r36sx_ps2_mouse_enqueue((uint8_t)value);
+                }
+                r36sx_keyboard_refresh_status();
+                return;
+            }
+            if (keyboard_controller_write_aux_input) {
+                keyboard_controller_write_aux_input = 0;
+                r36sx_ps2_mouse_write((uint8_t)value);
                 r36sx_keyboard_refresh_status();
                 return;
             }
@@ -1109,6 +1495,70 @@ void portout(uint16_t portnum, uint16_t value) {
 
             break;
         case 0x64: // Keyboard Controller
+            if ((uint8_t)value == R36SX_KBD_CMD_READ_CONFIG) {
+                port60 = keyboard_controller_config_byte;
+                keyboard_controller_response_ready = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command read config");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_WRITE_CONFIG) {
+                keyboard_controller_write_config_byte = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command write config");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_DISABLE_AUX) {
+                keyboard_controller_config_byte |=
+                    R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command disable aux");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_ENABLE_AUX) {
+                if (r36sx_ps2_mouse_config_enabled()) {
+                    keyboard_controller_config_byte &=
+                        (uint8_t)~R36SX_KBD_CONFIG_AUX_CLOCK_DISABLED;
+                }
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command enable aux");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_TEST_AUX) {
+                port60 = r36sx_ps2_mouse_config_enabled() ? 0x00u : 0x01u;
+                keyboard_controller_response_ready = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command test aux result=0x%02x", port60);
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_SELF_TEST) {
+                port60 = 0x55u;
+                keyboard_controller_response_ready = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command self-test");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_TEST_KEYBOARD) {
+                port60 = 0x00u;
+                keyboard_controller_response_ready = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command test keyboard");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_DISABLE_KEYBOARD) {
+                keyboard_controller_config_byte |=
+                    R36SX_KBD_CONFIG_KEYBOARD_CLOCK_DISABLED;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command disable keyboard");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_ENABLE_KEYBOARD) {
+                keyboard_controller_config_byte &=
+                    (uint8_t)~R36SX_KBD_CONFIG_KEYBOARD_CLOCK_DISABLED;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command enable keyboard");
+                return;
+            }
             if ((uint8_t)value == R36SX_KBD_CMD_READ_OUTPUT_PORT) {
                 port60 = (uint8_t)((keyboard_controller_output_port &
                                     (uint8_t)~R36SX_FAST_A20_ENABLE_BIT) |
@@ -1123,6 +1573,18 @@ void portout(uint16_t portnum, uint16_t value) {
                 keyboard_controller_write_output_port = 1;
                 r36sx_keyboard_refresh_status();
                 R36SX_KBD_LOG("kbd: command write output port");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_WRITE_AUX_OUTPUT) {
+                keyboard_controller_write_aux_output = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command write aux output");
+                return;
+            }
+            if ((uint8_t)value == R36SX_KBD_CMD_WRITE_AUX_INPUT) {
+                keyboard_controller_write_aux_input = 1;
+                r36sx_keyboard_refresh_status();
+                R36SX_KBD_LOG("kbd: command write aux input");
                 return;
             }
 #if PICO_ON_DEVICE
@@ -1462,7 +1924,7 @@ uint16_t portin(uint16_t portnum) {
         case 0x61:
             return port61;
         case 0x64:
-            r36sx_keyboard_refresh_status();
+            r36sx_keyboard_tick();
             return port64;
         case 0x70:
             if (r36sx_pico286_rtc_at_enabled()) {
