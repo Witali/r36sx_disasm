@@ -94,12 +94,14 @@ static inline void r36sx_pico286_video_mark_dirty(void) {}
 
 #define HMA_START (0x100000)
 #define HMA_END (0x110000-16)
+#define HMA_SIZE (HMA_END - HMA_START)
 
 #define BIOS_START (0xFE000)
 
 #define EMS_MEMORY_SIZE (2048 << 10) // 2 MB
 #define XMS_MEMORY_KB 15360u // Physical RAM above 1 MB in a 16 MB PC map.
 #define XMS_MEMORY_SIZE (XMS_MEMORY_KB << 10)
+#define XMS_PSRAM_OFFSET (4096u * 1024u)
 #define EXTENDED_MEMORY_START HMA_START
 #define EXTENDED_MEMORY_END (EXTENDED_MEMORY_START + XMS_MEMORY_SIZE)
 
@@ -119,7 +121,7 @@ extern uint8_t RAM[RAM_SIZE];
 extern uint32_t VIDEORAM[VIDEORAM_SIZE];
 extern uint8_t SVGA_VRAM[SVGA_VRAM_SIZE];
 extern uint8_t UMB[UMB_END - UMB_START];
-extern uint8_t HMA[HMA_END - HMA_START];
+/* HMA is the first HMA_SIZE bytes of XMS/extended memory. */
 extern uint8_t XMS[XMS_MEMORY_SIZE];
 uint32_t xms_configured_memory_bytes(void);
 // for non-butter-psram modes
@@ -356,6 +358,7 @@ void vga_set_standard_mode(uint8_t mode);
 #endif
 
 int OpFwait(void);
+void OpFinit(void);
 void OpFpu(uint8_t opcode);
 
 // Memory
@@ -514,6 +517,8 @@ extern uint8_t r36sx_cpu_waiting_for_interrupt(void);
 
 extern void reset86();
 void r36sx_keyboard_reset(void);
+void r36sx_host_rpc_reset(void);
+void r36sx_redirector_reset(void);
 
 // i8253
     extern struct i8253_s {
@@ -535,6 +540,7 @@ extern int speakerenabled;
 
 // Mouse
 extern void sermouseevent(uint8_t buttons, int8_t xrel, int8_t yrel);
+extern void r36sx_mouse_event(uint8_t buttons, int xrel, int yrel);
 
 extern uint8_t mouse_portin(uint16_t portnum);
 

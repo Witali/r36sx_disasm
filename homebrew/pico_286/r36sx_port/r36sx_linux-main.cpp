@@ -1,21 +1,38 @@
+#if defined(__linux__) && !defined(_WIN32)
+#define R36SX_PICO286_USE_EVDEV_INPUT 1
+#else
+#define R36SX_PICO286_USE_EVDEV_INPUT 0
+#endif
+
 #include <pthread.h>
 #include <unistd.h>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <cerrno>
 #endif
 #include <cstring>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <fcntl.h>
 #endif
 #include <signal.h>
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
 #include <time.h>
 #include <cstdio>
-#if !defined(_WIN32)
+#include <cstdarg>
+#if R36SX_PICO286_USE_EVDEV_INPUT
 #include <linux/input.h>
+#endif
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dbghelp.h>
 #endif
 #include "MiniFB.h"
 #include "emulator/emulator.h"
@@ -25,6 +42,7 @@
 #include "linux-audio.h"
 #include "r36sx_app_stats.h"
 #include "r36sx_cpu.h"
+#include "r36sx_debug_control.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
 #include "r36sx_mips_dsp.h"
@@ -55,6 +73,7 @@ extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);
 extern "C" void r36sx_pico286_disk_flush_pending(void);
 extern "C" void r36sx_pico286_disk_flush_all(void);
+extern "C" void r36sx_ata_reset_all(void);
 extern "C" void r36sx_pico286_post_reset(void);
 extern "C" uint64_t sb_samplerate;
 
@@ -74,7 +93,7 @@ extern "C" uint64_t sb_samplerate;
 #define R36SX_EXEC86_MIN_LOOPS 25u
 #define R36SX_ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
 enum {
     R36SX_EVDEV_MAX_FDS = 16,
     R36SX_EVDEV_RESCAN_USEC = 2000000
@@ -86,7 +105,18 @@ struct r36sx_physical_keyboard_state {
     uint64_t next_scan_us;
 };
 
+struct r36sx_physical_mouse_state {
+    int fds[R36SX_EVDEV_MAX_FDS];
+    char paths[R36SX_EVDEV_MAX_FDS][32];
+    uint8_t buttons[R36SX_EVDEV_MAX_FDS];
+    int pending_dx[R36SX_EVDEV_MAX_FDS];
+    int pending_dy[R36SX_EVDEV_MAX_FDS];
+    uint8_t pending_event[R36SX_EVDEV_MAX_FDS];
+    uint64_t next_scan_us;
+};
+
 static struct r36sx_physical_keyboard_state g_physical_keyboard;
+static struct r36sx_physical_mouse_state g_physical_mouse;
 #endif
 
 static int16_t audio_buffers[R36SX_AUDIO_BUFFER_COUNT]
@@ -1285,7 +1315,9 @@ extern "C" void HandleInput(unsigned int keycode, int isKeyDown) {
     }
 }
 
-#if !defined(_WIN32)
+#if R36SX_PICO286_USE_EVDEV_INPUT
+extern "C" void HandleMouseRelative(int dx, int dy, int buttons);
+
 #define R36SX_EVDEV_BITS_PER_LONG ((int)(sizeof(unsigned long) * 8))
 #define R36SX_EVDEV_BIT_WORD(nr) ((nr) / R36SX_EVDEV_BITS_PER_LONG)
 #define R36SX_EVDEV_BIT_MASK(nr) (1ul << ((nr) % R36SX_EVDEV_BITS_PER_LONG))
@@ -1361,6 +1393,90 @@ static int r36sx_physical_keyboard_is_keyboard_fd(int fd)
                                 (int)R36SX_ARRAY_COUNT(key_bits));
 }
 
+static void r36sx_physical_mouse_init(void)
+{
+    memset(&g_physical_mouse, 0, sizeof(g_physical_mouse));
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        g_physical_mouse.fds[i] = -1;
+    }
+}
+
+static void r36sx_physical_mouse_close_index(int index)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS) {
+        return;
+    }
+    if (g_physical_mouse.fds[index] >= 0) {
+        close(g_physical_mouse.fds[index]);
+    }
+    if (g_physical_mouse.buttons[index] != 0 ||
+        g_physical_mouse.pending_event[index] != 0) {
+        HandleMouseRelative(0, 0, 0);
+    }
+    g_physical_mouse.fds[index] = -1;
+    g_physical_mouse.paths[index][0] = '\0';
+    g_physical_mouse.buttons[index] = 0;
+    g_physical_mouse.pending_dx[index] = 0;
+    g_physical_mouse.pending_dy[index] = 0;
+    g_physical_mouse.pending_event[index] = 0;
+}
+
+static void r36sx_physical_mouse_close_all(void)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        r36sx_physical_mouse_close_index(i);
+    }
+}
+
+static int r36sx_physical_mouse_path_is_open(const char *path)
+{
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_mouse.fds[i] >= 0 &&
+            strcmp(g_physical_mouse.paths[i], path) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int r36sx_physical_mouse_is_mouse_fd(int fd)
+{
+    unsigned long ev_bits[R36SX_EVDEV_BIT_WORD(EV_MAX) + 1];
+    unsigned long rel_bits[R36SX_EVDEV_BIT_WORD(REL_MAX) + 1];
+    unsigned long key_bits[R36SX_EVDEV_BIT_WORD(KEY_MAX) + 1];
+
+    memset(ev_bits, 0, sizeof(ev_bits));
+    memset(rel_bits, 0, sizeof(rel_bits));
+    memset(key_bits, 0, sizeof(key_bits));
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(EV_REL, ev_bits,
+                              (int)R36SX_ARRAY_COUNT(ev_bits))) {
+        return 0;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits) < 0) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(REL_X, rel_bits,
+                              (int)R36SX_ARRAY_COUNT(rel_bits)) ||
+        !r36sx_evdev_test_bit(REL_Y, rel_bits,
+                              (int)R36SX_ARRAY_COUNT(rel_bits))) {
+        return 0;
+    }
+    if (!r36sx_evdev_test_bit(EV_KEY, ev_bits,
+                              (int)R36SX_ARRAY_COUNT(ev_bits))) {
+        return 1;
+    }
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) < 0) {
+        return 1;
+    }
+    return r36sx_evdev_test_bit(BTN_LEFT, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits)) ||
+           r36sx_evdev_test_bit(BTN_RIGHT, key_bits,
+                                (int)R36SX_ARRAY_COUNT(key_bits));
+}
+
 static void r36sx_physical_keyboard_try_open(const char *path)
 {
     if (r36sx_physical_keyboard_path_is_open(path)) {
@@ -1393,6 +1509,38 @@ static void r36sx_physical_keyboard_try_open(const char *path)
     r36sx_pico286_debug_log("keyboard: opened physical input %s", path);
 }
 
+static void r36sx_physical_mouse_try_open(const char *path)
+{
+    if (r36sx_physical_mouse_path_is_open(path)) {
+        return;
+    }
+
+    int slot = -1;
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        if (g_physical_mouse.fds[i] < 0) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        return;
+    }
+
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
+    if (fd < 0) {
+        return;
+    }
+    if (!r36sx_physical_mouse_is_mouse_fd(fd)) {
+        close(fd);
+        return;
+    }
+
+    g_physical_mouse.fds[slot] = fd;
+    snprintf(g_physical_mouse.paths[slot],
+             sizeof(g_physical_mouse.paths[slot]), "%s", path);
+    r36sx_pico286_debug_log("mouse: opened physical input %s", path);
+}
+
 static void r36sx_physical_keyboard_scan(void)
 {
     uint64_t now = r36sx_pico286_now_us();
@@ -1405,6 +1553,21 @@ static void r36sx_physical_keyboard_scan(void)
         char path[32];
         snprintf(path, sizeof(path), "/dev/input/event%d", i);
         r36sx_physical_keyboard_try_open(path);
+    }
+}
+
+static void r36sx_physical_mouse_scan(void)
+{
+    uint64_t now = r36sx_pico286_now_us();
+    if (now < g_physical_mouse.next_scan_us) {
+        return;
+    }
+    g_physical_mouse.next_scan_us = now + R36SX_EVDEV_RESCAN_USEC;
+
+    for (int i = 0; i < 32; i++) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/input/event%d", i);
+        r36sx_physical_mouse_try_open(path);
     }
 }
 
@@ -1519,6 +1682,69 @@ static void r36sx_physical_keyboard_handle_key(unsigned int code, int value)
     }
 }
 
+static uint8_t r36sx_physical_mouse_button_bit(unsigned int code)
+{
+    switch (code) {
+        case BTN_RIGHT:
+            return 1;
+        case BTN_LEFT:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
+static void r36sx_physical_mouse_flush(int index)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS ||
+        !g_physical_mouse.pending_event[index]) {
+        return;
+    }
+
+    HandleMouseRelative(g_physical_mouse.pending_dx[index],
+                        g_physical_mouse.pending_dy[index],
+                        g_physical_mouse.buttons[index]);
+    g_physical_mouse.pending_dx[index] = 0;
+    g_physical_mouse.pending_dy[index] = 0;
+    g_physical_mouse.pending_event[index] = 0;
+}
+
+static void r36sx_physical_mouse_handle_event(int index,
+                                              const struct input_event *ev)
+{
+    if (index < 0 || index >= R36SX_EVDEV_MAX_FDS || ev == NULL) {
+        return;
+    }
+
+    if (ev->type == EV_REL) {
+        if (ev->code == REL_X) {
+            g_physical_mouse.pending_dx[index] += ev->value;
+            g_physical_mouse.pending_event[index] = 1;
+        } else if (ev->code == REL_Y) {
+            g_physical_mouse.pending_dy[index] += ev->value;
+            g_physical_mouse.pending_event[index] = 1;
+        }
+        return;
+    }
+
+    if (ev->type == EV_KEY) {
+        const uint8_t bit = r36sx_physical_mouse_button_bit(ev->code);
+        if (bit != 0 && (ev->value == 0 || ev->value == 1)) {
+            if (ev->value != 0) {
+                g_physical_mouse.buttons[index] |= bit;
+            } else {
+                g_physical_mouse.buttons[index] &= (uint8_t)~bit;
+            }
+            g_physical_mouse.pending_event[index] = 1;
+        }
+        return;
+    }
+
+    if (ev->type == EV_SYN && ev->code == SYN_REPORT) {
+        r36sx_physical_mouse_flush(index);
+    }
+}
+
 static void r36sx_physical_keyboard_poll(void)
 {
     r36sx_physical_keyboard_scan();
@@ -1559,6 +1785,46 @@ static void r36sx_physical_keyboard_poll(void)
         }
     }
 }
+
+static void r36sx_physical_mouse_poll(void)
+{
+    r36sx_physical_mouse_scan();
+    for (int i = 0; i < R36SX_EVDEV_MAX_FDS; i++) {
+        int fd = g_physical_mouse.fds[i];
+        if (fd < 0) {
+            continue;
+        }
+        for (;;) {
+            struct input_event ev;
+            ssize_t n = read(fd, &ev, sizeof(ev));
+            if (n == (ssize_t)sizeof(ev)) {
+                r36sx_physical_mouse_handle_event(i, &ev);
+                continue;
+            }
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK ||
+                    errno == EINTR) {
+                    r36sx_physical_mouse_flush(i);
+                    break;
+                }
+                if (errno == ENODEV || errno == ENXIO) {
+                    r36sx_pico286_debug_log(
+                        "mouse: removed physical input %s",
+                        g_physical_mouse.paths[i]);
+                    r36sx_physical_mouse_close_index(i);
+                }
+                break;
+            }
+            if (n == 0) {
+                r36sx_pico286_debug_log(
+                    "mouse: removed physical input %s",
+                    g_physical_mouse.paths[i]);
+                r36sx_physical_mouse_close_index(i);
+            }
+            break;
+        }
+    }
+}
 #else
 static void r36sx_physical_keyboard_init(void)
 {
@@ -1571,13 +1837,68 @@ static void r36sx_physical_keyboard_close_all(void)
 static void r36sx_physical_keyboard_poll(void)
 {
 }
+
+static void r36sx_physical_mouse_init(void)
+{
+}
+
+static void r36sx_physical_mouse_close_all(void)
+{
+}
+
+static void r36sx_physical_mouse_poll(void)
+{
+}
 #endif
 
-extern "C" void HandleMouse(int x, int y, int buttons) {
-    static int prev_x = 0, prev_y = 0;
-    sermouseevent(buttons, x - prev_x, y - prev_y);
-    prev_y = y;
-    prev_x = x;
+static int r36sx_mouse_prev_x;
+static int r36sx_mouse_prev_y;
+static int r36sx_mouse_prev_buttons;
+static int r36sx_mouse_initialized;
+static int r36sx_mouse_absolute_initialized;
+
+extern "C" void HandleMouseReset(void)
+{
+    r36sx_mouse_prev_x = 0;
+    r36sx_mouse_prev_y = 0;
+    r36sx_mouse_prev_buttons = 0;
+    r36sx_mouse_initialized = 0;
+    r36sx_mouse_absolute_initialized = 0;
+}
+
+extern "C" void HandleMouseRelative(int dx, int dy, int buttons)
+{
+    buttons &= 3;
+    if (!r36sx_mouse_initialized) {
+        r36sx_mouse_initialized = 1;
+    }
+
+    if (dx != 0 || dy != 0 || buttons != r36sx_mouse_prev_buttons) {
+        r36sx_mouse_event((uint8_t)buttons, dx, dy);
+    }
+    r36sx_mouse_prev_buttons = buttons;
+}
+
+extern "C" void HandleMouse(int x, int y, int buttons)
+{
+    int dx;
+    int dy;
+
+    buttons &= 3;
+    if (!r36sx_mouse_absolute_initialized) {
+        r36sx_mouse_prev_x = x;
+        r36sx_mouse_prev_y = y;
+        r36sx_mouse_absolute_initialized = 1;
+        HandleMouseRelative(0, 0, buttons);
+        return;
+    }
+
+    dx = x - r36sx_mouse_prev_x;
+    dy = y - r36sx_mouse_prev_y;
+    r36sx_mouse_prev_x = x;
+    r36sx_mouse_prev_y = y;
+
+    HandleMouseRelative(dx, dy, buttons);
 }
 
 extern "C" int HanldeMenu(int menu_id, int checked) {
@@ -1622,6 +1943,180 @@ void fatal_signal_handler(int sig) {
     signal(sig, SIG_DFL);
     raise(sig);
 }
+
+#if defined(_WIN32)
+static volatile LONG r36sx_windows_crash_written = 0;
+
+static void r36sx_windows_crash_write(HANDLE file, const char *text)
+{
+    DWORD written = 0;
+    if (file == INVALID_HANDLE_VALUE || !text) {
+        return;
+    }
+    WriteFile(file, text, (DWORD)strlen(text), &written, NULL);
+}
+
+static void r36sx_windows_crash_printf(HANDLE file, const char *format, ...)
+{
+    char buffer[512];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    buffer[sizeof(buffer) - 1] = '\0';
+    r36sx_windows_crash_write(file, buffer);
+}
+
+static void r36sx_windows_write_minidump(EXCEPTION_POINTERS *info)
+{
+    HANDLE dump_file = CreateFileA("pico_286_crash.dmp",
+                                   GENERIC_WRITE,
+                                   0,
+                                   NULL,
+                                   CREATE_ALWAYS,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+    if (dump_file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    MINIDUMP_EXCEPTION_INFORMATION exception_info;
+    exception_info.ThreadId = GetCurrentThreadId();
+    exception_info.ExceptionPointers = info;
+    exception_info.ClientPointers = FALSE;
+
+    MiniDumpWriteDump(GetCurrentProcess(),
+                      GetCurrentProcessId(),
+                      dump_file,
+                      (MINIDUMP_TYPE)(MiniDumpNormal | MiniDumpWithDataSegs |
+                                      MiniDumpWithIndirectlyReferencedMemory),
+                      &exception_info,
+                      NULL,
+                      NULL);
+    CloseHandle(dump_file);
+}
+
+static void r36sx_windows_write_crash_report(EXCEPTION_POINTERS *info)
+{
+    HANDLE text_file = CreateFileA("pico_286_crash.txt",
+                                   GENERIC_WRITE,
+                                   0,
+                                   NULL,
+                                   CREATE_ALWAYS,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+    if (text_file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    EXCEPTION_RECORD *exception = info ? info->ExceptionRecord : NULL;
+    CONTEXT *context = info ? info->ContextRecord : NULL;
+    r36sx_windows_crash_write(text_file, "Pico-286 Windows crash report\n");
+    if (exception) {
+        r36sx_windows_crash_printf(text_file,
+                                   "exception_code=%08lX flags=%08lX address=%p\n",
+                                   (unsigned long)exception->ExceptionCode,
+                                   (unsigned long)exception->ExceptionFlags,
+                                   exception->ExceptionAddress);
+    }
+
+#if defined(_M_X64) || defined(__x86_64__)
+    if (context) {
+        r36sx_windows_crash_printf(text_file,
+                                   "host rip=%016llX rsp=%016llX rbp=%016llX\n",
+                                   (unsigned long long)context->Rip,
+                                   (unsigned long long)context->Rsp,
+                                   (unsigned long long)context->Rbp);
+        r36sx_windows_crash_printf(text_file,
+                                   "host rax=%016llX rbx=%016llX rcx=%016llX rdx=%016llX\n",
+                                   (unsigned long long)context->Rax,
+                                   (unsigned long long)context->Rbx,
+                                   (unsigned long long)context->Rcx,
+                                   (unsigned long long)context->Rdx);
+        r36sx_windows_crash_printf(text_file,
+                                   "host rsi=%016llX rdi=%016llX r8=%016llX r9=%016llX\n",
+                                   (unsigned long long)context->Rsi,
+                                   (unsigned long long)context->Rdi,
+                                   (unsigned long long)context->R8,
+                                   (unsigned long long)context->R9);
+        r36sx_windows_crash_printf(text_file,
+                                   "host r10=%016llX r11=%016llX r12=%016llX r13=%016llX\n",
+                                   (unsigned long long)context->R10,
+                                   (unsigned long long)context->R11,
+                                   (unsigned long long)context->R12,
+                                   (unsigned long long)context->R13);
+        r36sx_windows_crash_printf(text_file,
+                                   "host r14=%016llX r15=%016llX eflags=%08lX\n",
+                                   (unsigned long long)context->R14,
+                                   (unsigned long long)context->R15,
+                                   (unsigned long)context->EFlags);
+    }
+#elif defined(_M_IX86) || defined(__i386__)
+    if (context) {
+        r36sx_windows_crash_printf(text_file,
+                                   "host eip=%08lX esp=%08lX ebp=%08lX eflags=%08lX\n",
+                                   (unsigned long)context->Eip,
+                                   (unsigned long)context->Esp,
+                                   (unsigned long)context->Ebp,
+                                   (unsigned long)context->EFlags);
+        r36sx_windows_crash_printf(text_file,
+                                   "host eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX esi=%08lX edi=%08lX\n",
+                                   (unsigned long)context->Eax,
+                                   (unsigned long)context->Ebx,
+                                   (unsigned long)context->Ecx,
+                                   (unsigned long)context->Edx,
+                                   (unsigned long)context->Esi,
+                                   (unsigned long)context->Edi);
+    }
+#endif
+
+    r36sx_windows_crash_printf(text_file,
+                               "guest cs:ip=%04X:%08lX ss:sp=%04X:%08lX flags=%08lX\n",
+                               (unsigned)CPU_CS,
+                               (unsigned long)CPU_IP,
+                               (unsigned)CPU_SS,
+                               (unsigned long)CPU_ESP,
+                               (unsigned long)x86_flags.value);
+    r36sx_windows_crash_printf(text_file,
+                               "guest eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX\n",
+                               (unsigned long)CPU_EAX,
+                               (unsigned long)CPU_EBX,
+                               (unsigned long)CPU_ECX,
+                               (unsigned long)CPU_EDX);
+    r36sx_windows_crash_printf(text_file,
+                               "guest esi=%08lX edi=%08lX ebp=%08lX esp=%08lX\n",
+                               (unsigned long)CPU_ESI,
+                               (unsigned long)CPU_EDI,
+                               (unsigned long)CPU_EBP,
+                               (unsigned long)CPU_ESP);
+    r36sx_windows_crash_printf(text_file,
+                               "guest es=%04X cs=%04X ss=%04X ds=%04X fs=%04X gs=%04X\n",
+                               (unsigned)CPU_ES,
+                               (unsigned)CPU_CS,
+                               (unsigned)CPU_SS,
+                               (unsigned)CPU_DS,
+                               (unsigned)CPU_FS,
+                               (unsigned)CPU_GS);
+    CloseHandle(text_file);
+}
+
+static LONG WINAPI r36sx_windows_exception_handler(EXCEPTION_POINTERS *info)
+{
+    if (InterlockedCompareExchange(&r36sx_windows_crash_written, 1, 0) == 0) {
+        r36sx_windows_write_crash_report(info);
+        r36sx_windows_write_minidump(info);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void r36sx_windows_install_crash_handler(void)
+{
+    ULONG stack_guarantee = 64u * 1024u;
+    SetThreadStackGuarantee(&stack_guarantee);
+    AddVectoredExceptionHandler(1, r36sx_windows_exception_handler);
+    SetUnhandledExceptionFilter(r36sx_windows_exception_handler);
+}
+#endif
 
 pthread_mutex_t update_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t update_cond = PTHREAD_COND_INITIALIZER;
@@ -1681,7 +2176,11 @@ static void r36sx_pico286_soft_reset(void) {
     soft_reset_in_progress = 1;
     __sync_synchronize();
     r36sx_pico286_disk_flush_all();
+    r36sx_pico286_reload_config();
+    r36sx_ata_reset_all();
 
+    r36sx_host_rpc_reset();
+    r36sx_redirector_reset();
     r36sx_keyboard_reset();
     port60 = 0;
     port61 = 0;
@@ -1878,8 +2377,10 @@ static void r36sx_pico286_ticks_step_to(
 {
     uint64_t system_period;
 
-    if (soft_reset_in_progress || vm_paused_by_menu) {
-        if (vm_paused_by_menu) {
+    if (soft_reset_in_progress || vm_paused_by_menu ||
+        r36sx_cpu_debug_host_breakpoint_paused()) {
+        if (vm_paused_by_menu ||
+            r36sx_cpu_debug_host_breakpoint_paused()) {
             r36sx_pico286_ticks_sync_to_now(state);
         }
         return;
@@ -2043,6 +2544,9 @@ static void r36sx_pico286_render_frame_step(
 
 int main() {
     r36sx_pico286_debug_reset();
+#if defined(_WIN32)
+    r36sx_windows_install_crash_handler();
+#endif
     r36sx_pico286_debug_log_build_info();
     r36sx_pico286_debug_log("main: start");
     r36sx_profile_init();
@@ -2053,6 +2557,7 @@ int main() {
     signal(SIGILL, fatal_signal_handler);
     signal(SIGABRT, fatal_signal_handler);
     r36sx_physical_keyboard_init();
+    r36sx_physical_mouse_init();
 
     r36sx_pico286_debug_log("main: opening MiniFB");
     if (!mfb_open("Pico-286 Emulator", 640, 480, 1)) {
@@ -2071,6 +2576,8 @@ int main() {
     r36sx_pico286_debug_log("main: memory backend read=%p write=%p",
                             read86, write86);
     memset(SCREEN, 0, sizeof(SCREEN));
+    r36sx_debug_control_set_framebuffer(SCREEN, 640u, 480u, 640u);
+    r36sx_debug_control_init();
     r36sx_mfb_mark_frame_ready();
     r36sx_pico286_debug_log("main: screen cleared");
     const uint32_t target_fps =
@@ -2165,6 +2672,7 @@ int main() {
         r36sx_pico286_now_us() + main_loop_frame_us;
     while (running) {
         r36sx_app_stats_record_quantum();
+        r36sx_debug_control_poll();
         if (soft_reset_requested) {
             R36SX_PROFILE_BEGIN(profile_soft_reset);
             r36sx_pico286_soft_reset();
@@ -2194,7 +2702,7 @@ int main() {
             }
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
-        if (vm_paused_by_menu) {
+        if (vm_paused_by_menu || r36sx_cpu_debug_host_breakpoint_paused()) {
             r36sx_pico286_ticks_sync_to_now(&tick_state);
             if (main_loop_count <= 8u) {
                 r36sx_pico286_debug_log("main: paused before mfb_update loop=%u",
@@ -2217,7 +2725,8 @@ int main() {
                 r36sx_emergency_dump_write_and_clear();
             }
             r36sx_pico286_set_menu_pause(mfb_vm_paused());
-            if (!vm_paused_by_menu) {
+            if (!vm_paused_by_menu &&
+                !r36sx_cpu_debug_host_breakpoint_paused()) {
                 r36sx_pico286_ticks_reset(&tick_state);
                 next_frame_us =
                     r36sx_pico286_now_us() + main_loop_frame_us;
@@ -2231,6 +2740,7 @@ int main() {
 
         R36SX_PROFILE_BEGIN(profile_keyboard_tick_1);
         r36sx_physical_keyboard_poll();
+        r36sx_physical_mouse_poll();
         r36sx_keyboard_tick();
         R36SX_PROFILE_END(R36SX_PROFILE_KEYBOARD_TICK, profile_keyboard_tick_1);
         uint64_t frame_host_start_us = r36sx_pico286_now_us();
@@ -2311,7 +2821,7 @@ int main() {
             break;
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
-        if (vm_paused_by_menu) {
+        if (vm_paused_by_menu || r36sx_cpu_debug_host_breakpoint_paused()) {
             r36sx_pico286_ticks_sync_to_now(&tick_state);
             if (r36sx_emergency_dump_pending()) {
                 r36sx_emergency_dump_write_and_clear();
@@ -2351,6 +2861,7 @@ int main() {
     r36sx_pico286_disk_flush_all();
     linux_audio_close();
     r36sx_physical_keyboard_close_all();
+    r36sx_physical_mouse_close_all();
 
     mfb_close();
     r36sx_pico286_debug_log("main: exit 0");

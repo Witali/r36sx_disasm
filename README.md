@@ -280,16 +280,16 @@ The native Pico-286 DOS emulator has progressed far enough to boot DOS and run
 real DOS software on the console. The following programs have been successfully
 started and rendered on the R36SX Pico-286 build:
 
-![Volkov Commander running in Pico-286](homebrew/pico_286/pico_286_19700101_000336_000.png)
+![Volkov Commander running in Pico-286](homebrew/pico_286/screenshots/pico_286_19700101_000336_000.png)
 
 Volkov Commander running inside the emulator, with the R36SX on-screen keyboard
 visible.
 
-![Supaplex running in Pico-286](homebrew/pico_286/pico_286_19700101_001320_001.png)
+![Supaplex running in Pico-286](homebrew/pico_286/screenshots/pico_286_19700101_001320_001.png)
 
 Supaplex running with corrected VGA rendering.
 
-![SuperScape benchmark running in Pico-286](homebrew/pico_286/pico_286_19700101_002911_000.png)
+![SuperScape benchmark running in Pico-286](homebrew/pico_286/screenshots/pico_286_19700101_002911_000.png)
 
 The SuperScape benchmark running in the emulator.
 

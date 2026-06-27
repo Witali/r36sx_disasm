@@ -326,6 +326,8 @@ typedef struct __attribute__((packed)) {
 #define SDA_MIN_SAFE_SIZE 0x300u
 
 static uint32_t sda_addr = 0;
+static sdbstruct *redirector_find_dta_ptr = NULL;
+static intptr_t redirector_find_handle = -1;
 
 static inline bool guest_sft_address(uint32_t *address) {
     *address = ((uint32_t) CPU_ES << 4) + CPU_DI;
@@ -733,6 +735,28 @@ static inline void redirector_close_find_search(intptr_t *find_handle,
     }
 }
 
+void r36sx_redirector_reset(void)
+{
+    redirector_close_find_search(&redirector_find_handle,
+                                 &redirector_find_dta_ptr);
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (open_files[i]) {
+            errno = 0;
+            if (fclose(open_files[i]) != 0) {
+                redirector_error_log(
+                    "redir: reset close handle=%d error=%d",
+                    i, errno ? errno : EIO);
+            }
+        }
+        open_files[i] = NULL;
+        open_file_sft_addr[i] = 0;
+        open_file_device_info[i] = 0;
+    }
+    redirector_mapped_drive_letter = 0;
+    current_remote_dir[0] = '\0';
+    redirector_trace_slots("reset");
+}
+
 static inline bool redirector_handler() {
     char path[256];
     /*
@@ -756,10 +780,6 @@ static inline bool redirector_handler() {
  * Ptr to current CDS          282h    26Ch
  * Extended open mode          2E1h    Not supported
  */
-
-    static sdbstruct *dta_ptr;
-    static intptr_t handle = -1;
-
 #if R36SX_DEBUG_REDIRECTOR_TRACE
     const uint16_t request_ax = CPU_AX;
     const uint32_t trace_id = ++redirector_trace_seq;
@@ -1458,39 +1478,43 @@ static inline bool redirector_handler() {
                                  dos_path, path);
 
 
-            redirector_close_find_search(&handle, &dta_ptr);
+            redirector_close_find_search(&redirector_find_handle,
+                                         &redirector_find_dta_ptr);
 
-            if ((handle = _findfirst(path, &fileinfo)) != -1) {
+            redirector_find_handle = _findfirst(path, &fileinfo);
+            if (redirector_find_handle != -1) {
                 // Set actual DTA pointer
 
                 uint32_t dta_addr = 0;
                 if (!guest_dta_address(&dta_addr) ||
                     !guest_ram_range_ok(dta_addr, sizeof(sdbstruct))) {
-                    redirector_close_find_search(&handle, &dta_ptr);
+                    redirector_close_find_search(&redirector_find_handle,
+                                                 &redirector_find_dta_ptr);
                     guest_memory_error();
                     break;
                 }
-                dta_ptr = (sdbstruct *) &RAM[dta_addr];
-                dta_ptr->drive_letter =
+                redirector_find_dta_ptr = (sdbstruct *) &RAM[dta_addr];
+                redirector_find_dta_ptr->drive_letter =
                     redirector_effective_drive_letter() | 128;
                 /* bit 7 set means 'network drive' (RBIL6 compliance) */
 
-                to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
-                dta_ptr->foundfile.fsize = fileinfo.size;
-                dta_ptr->foundfile.fattr = fileinfo.attrib;
+                to_dos_name(fileinfo.name,
+                            redirector_find_dta_ptr->foundfile.fname);
+                redirector_find_dta_ptr->foundfile.fsize = fileinfo.size;
+                redirector_find_dta_ptr->foundfile.fattr = fileinfo.attrib;
 
                 // Other attributes can be set here if needed
                 redirector_trace_log(
                     "redir: find_first ok handle=%ld dta=%p name='%.11s' size=%lu attr=%02x",
-                    (long)handle,
-                    (void *)dta_ptr,
-                    dta_ptr->foundfile.fname,
-                    (unsigned long)dta_ptr->foundfile.fsize,
-                    dta_ptr->foundfile.fattr);
+                    (long)redirector_find_handle,
+                    (void *)redirector_find_dta_ptr,
+                    redirector_find_dta_ptr->foundfile.fname,
+                    (unsigned long)redirector_find_dta_ptr->foundfile.fsize,
+                    redirector_find_dta_ptr->foundfile.fattr);
                 redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: find_first no_match host='%s'", path);
-                dta_ptr = NULL;
+                redirector_find_dta_ptr = NULL;
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
             }
@@ -1504,29 +1528,33 @@ static inline bool redirector_handler() {
             // Output: CF=0 if file found with DTA updated, CF=1 if no more files with AX=18
             //         Must preserve bit 7 in DTA first byte (RBIL6 requirement)
             struct _finddata_t fileinfo;
-            if (!redirector_dta_is_mine(dta_ptr)) {
+            if (!redirector_dta_is_mine(redirector_find_dta_ptr)) {
                 return false;
             }
-            if (handle != -1 && dta_ptr && _findnext(handle, &fileinfo) == 0) {
-                dta_ptr->drive_letter |= 128; // Ensure bit 7 remains set (RBIL6 compliance)
-                to_dos_name(fileinfo.name, dta_ptr->foundfile.fname);
+            if (redirector_find_handle != -1 && redirector_find_dta_ptr &&
+                _findnext(redirector_find_handle, &fileinfo) == 0) {
+                redirector_find_dta_ptr->drive_letter |= 128;
+                to_dos_name(fileinfo.name,
+                            redirector_find_dta_ptr->foundfile.fname);
                 // Set file size
-                dta_ptr->foundfile.fattr = fileinfo.attrib;
-                dta_ptr->foundfile.fsize = fileinfo.size;
-                dta_ptr->foundfile.start_clstr = 0;
+                redirector_find_dta_ptr->foundfile.fattr = fileinfo.attrib;
+                redirector_find_dta_ptr->foundfile.fsize = fileinfo.size;
+                redirector_find_dta_ptr->foundfile.start_clstr = 0;
 
                 redirector_trace_log(
                     "redir: find_next ok handle=%ld dta=%p name='%.11s' size=%lu attr=%02x",
-                    (long)handle,
-                    (void *)dta_ptr,
-                    dta_ptr->foundfile.fname,
-                    (unsigned long)dta_ptr->foundfile.fsize,
-                    dta_ptr->foundfile.fattr);
+                    (long)redirector_find_handle,
+                    (void *)redirector_find_dta_ptr,
+                    redirector_find_dta_ptr->foundfile.fname,
+                    (unsigned long)redirector_find_dta_ptr->foundfile.fsize,
+                    redirector_find_dta_ptr->foundfile.fattr);
                 redirector_success_zero_cx();
             } else {
                 redirector_trace_log("redir: find_next done handle=%ld dta=%p",
-                                     (long)handle, (void *)dta_ptr);
-                redirector_close_find_search(&handle, &dta_ptr);
+                                     (long)redirector_find_handle,
+                                     (void *)redirector_find_dta_ptr);
+                redirector_close_find_search(&redirector_find_handle,
+                                             &redirector_find_dta_ptr);
                 CPU_AX = 18; // No more files
                 CPU_FL_CF = 1;
             }

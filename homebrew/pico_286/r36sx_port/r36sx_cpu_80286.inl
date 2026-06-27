@@ -392,8 +392,8 @@ static uint8_t r36sx_cpu_decode_descriptor_from_table(
     }
 
     uint32_t addr = table_base + descriptor_offset;
-    uint32_t lo = readdw86(addr);
-    uint32_t hi = readdw86(addr + 4u);
+    uint32_t lo = r36sx_cpu_system_read_linear32(addr);
+    uint32_t hi = r36sx_cpu_system_read_linear32(addr + 4u);
     r36sx_cpu_fill_descriptor_cache(selector, lo, hi, cache);
     return require_present ? cache->valid : 1u;
 }

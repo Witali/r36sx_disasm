@@ -1,5 +1,480 @@
 # pico-286 Build Log
 
+## 2026-06-14 Protected-mode state in emergency dumps
+
+Extended Pico-286 emergency memory dumps so `registers.txt` includes special CPU
+state needed to debug DOS memory-manager and protected-mode failures:
+
+- control registers `CR0`, `CR2`, and `CR3`;
+- debug registers `DR0..DR7` and test registers `TR0..TR7`;
+- `GDTR`, `IDTR`, `LDTR`, and task-register selectors;
+- visible segment values and cached descriptor base/limit/access/flag state for
+  `ES`, `CS`, `SS`, `DS`, `FS`, `GS`, `LDTR`, and `TR`;
+- protected/v86 mode, native protected-mode cache state, CPL, and IOPL.
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\.tmp\pico_286_dump_pm_state_mips
+```
+
+The Windows debug build completed and copied `pico_286_win.exe` to the active
+patch directory. The WSL/GCC MIPS release build completed into `.tmp`. A live
+debug-control `dump` smoke test against a temporary patch-copy run created
+`memory_dump_001/registers.txt` with the new `control_registers`,
+`debug_registers`, `descriptor_tables`, and `descriptor_cache_*` lines.
+
+## 2026-06-14 FreeDOS menu regression check
+
+Investigated a regression where the active Windows patch build no longer showed
+the FreeDOS memory-manager boot menu. The failing build had included an
+uncommitted experimental BIOS `INT 13h` vector trap that intercepted execution
+at `F000:E82E` before opcode fetch and manually popped an interrupt frame after
+calling `diskhandler()`. The log showed repeated `BIOS INT13 vector trap`
+entries and the guest reached the JemmEx/default boot path without the menu
+being visible.
+
+Removed that experimental trap from the working tree and rebuilt:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+  was rebuilt at `2026-06-14 13:48:20`.
+- Live debug-control framebuffer captures showed BIOS POST at 0.5s, the
+  FreeDOS memory-manager menu at 2.0s, and the same menu still counting down at
+  6.0s.
+- The new log no longer contains `BIOS INT13 vector trap`.
+
+## 2026-06-14 Live debug-control mailbox
+
+Added a file-mailbox debug-control interface for live Pico-286 diagnostics.
+Debug builds poll `pico_286_debug.cmd` from the config directory, remove it
+after reading, and write `pico_286_debug.out` with `ok 1` or `ok 0`.
+
+Supported commands:
+
+- `ping`
+- `regs`
+- `mem <address|seg:off> <length> [file]`
+- `vram [offset] [length] [file]`
+- `screen [file]`
+- `key`, `keydown`, `keyup`
+- `dump`, `stopdump`, `help`
+
+The helper client is `homebrew/pico_286/tools/pico286_debug_client.py`.
+
+Verification:
+
+- Windows debug build succeeded and was copied to the active patch directory.
+- Live smoke test against `pico_286_win.exe` returned `ok 1` for `ping`,
+  returned live CPU registers for `regs`, and read BIOS bytes from
+  `mem F000:FFF0 16`.
+- WSL/GCC MIPS release build succeeded to `.tmp/pico_286_debug_control_mips`.
+
+## 2026-06-14 Copy Volkov Commander to hdd2_1gb
+
+Copied the `VC` directory from the active patch `hdd.hdd` image to
+`hdd2_1gb.hdd` using WSL `mtools`, without loop-mounting either image.
+
+Source image:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd`
+- FAT partition offset: `32256`
+- Source path: `::/VC`
+
+Target image:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd`
+- FAT partition offset: `16384` (MBR start sector `32`)
+- Target path: `::/VC`
+
+Commands used:
+
+```powershell
+wsl mcopy -s -m -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd.hdd@@32256 ::/VC /mnt/c/Work/r36sx_disasm/.tmp/vc_from_hdd_to_hdd2_1gb_preserve/
+wsl mcopy -s -m -o -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd@@16384 /mnt/c/Work/r36sx_disasm/.tmp/vc_from_hdd_to_hdd2_1gb_preserve/VC ::/
+```
+
+Verification:
+
+- `mdir ::/VC` on `hdd2_1gb.hdd@@16384` shows 25 files.
+- Total copied file size: `434779` bytes.
+- File timestamps were preserved with `mcopy -m`; the directory timestamp is
+  the copy time.
+
+Follow-up serial update:
+
+- Command:
+  `wsl mlabel -N 20260614 -i /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/images/hdd2_1gb.hdd@@16384 ::FREEDOS2025`
+- Verified with `mdir`: label remains `FREEDOS2025`, volume serial is now
+  `2026-0614`, distinct from the source `hdd.hdd` serial `2026-0529`.
+
+## 2026-06-14 HMA dump and ATA reset diagnostics
+
+Investigated the remaining FreeDOS/JemmEx `COMMAND.COM` failure from the latest
+patch screenshot and memory dump. The on-screen failure happens after JemmEx
+loads and DOS allocates disk buffers in HMA; the captured registers show
+execution at `FFFF:1CB7` (`0x101CA7`), but the previous dump only wrote
+conventional `ram.bin`, so the active HMA/XMS code bytes were not available.
+
+Memory dumps now include `xms.bin` and `hma.bin`, and `registers.txt` records
+the A20 state plus configured XMS/HMA byte counts. Ctrl+R also resets the new
+PATA task-file state after disk config reload, so direct ATA port users cannot
+inherit a stale DRQ/command phase from the previous guest session.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory. Existing warnings remain in FPU, audio, VGA, and
+redirector sources.
+
+Artifact verification:
+
+- SHA256:
+  `A6478AA732EA4A837BE53D13CC1FD213DC7F0E499448D550B65D88FACFA383AB`
+
+## 2026-06-14 PATA task-file port emulation
+
+Built the Windows debug emulator with `build_pico_286_windows.ps1 -DebugLog`
+after adding host-side primary and secondary ATA task-file I/O ports for
+Pico-286 hard-disk images. The build completed and copied `pico_286_win.exe`
+to the active patch directory.
+
+## 2026-06-14 Complete Ctrl+R machine reset state
+
+Tightened the Pico-286 soft reset path so Ctrl+R no longer inherits stale CPU
+or host-side state from the previous guest run.
+
+Reset now clears the interpreter's general registers, visible segment
+registers, segment base/cache arrays, LDTR/TR descriptor caches, FLAGS,
+prefix/ModRM scratch state, pending exception/debug state, and x87 state via
+`OpFinit()`.  The existing emulator BIOS bootstrap contract remains
+`FFFF:0000`; moving 286/386 models to their architectural high reset vectors is
+left as a separate BIOS mapping change.
+
+Soft reset also resets HOSTRPC stream/session state and closes the network
+redirector's host files and find handles, so a new DOS boot cannot see stale
+host resources after guest memory was cleared.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory. Existing warnings remain in FPU, audio, and redirector
+sources.
+
+Artifact verification:
+
+- SHA256:
+  `9A973458B0C4941F9093EFF1FD2BE76C54A0026FE14F852132512A1A436FCAB3`
+- Microsoft Defender scan via `tools/scan-download.ps1`: no threats found.
+
+## 2026-06-14 Disk-read failure and reset A20 state
+
+Investigated the recurring "disks stop reading / COMMAND.COM not found"
+symptom in the active patch log:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286.log`
+
+The current host disk layer did not report `fread`, `fwrite`, `fseek`, invalid
+CHS/LBA, or out-of-range failures. The attached hard disks were mounted with
+auto geometry matching their image layout in this test:
+
+- `hdd0=images/hdd2_1gb.hdd`: `1024,64,32`
+- `hdd1=images/hdd.hdd`: `65,16,63`
+
+The failure instead followed a soft reset after a memory manager had enabled
+A20. The second boot reached the same protected-mode setup code but then
+faulted on `0F 00 D0` (`LLDT AX`) and spiraled into repeated INT 6/triple-fault
+diagnostics. Reset now clears the emulated 8042 output-port A20 gate and the
+CPU interpreter protected-mode cache bit so Ctrl+R starts DOS from the same
+power-on A20 state. The A20 behavior was cross-checked against the XMS
+specification note that HMA access depends on enabling A20, and against the
+IBM PC/AT-compatible convention that BIOS leaves A20 disabled before handing
+control to DOS.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: build succeeded and copied the Windows debug executable to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`.
+Existing warnings remain in FPU, audio, and network redirector sources.
+
+Artifact verification:
+
+- SHA256:
+  `1ADF2BDCD82216386D5BA732F60FFF935268AD9A44181F4F40FEEFAC918C3376`
+- Microsoft Defender scan via `tools/scan-download.ps1`: no threats found.
+
+## 2026-06-14 JemmEx HMA/INT13 Diagnostics
+
+Investigated the remaining full FreeDOS boot failure shown in:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260614_103241_1e56ef20_000.bmp`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260614_103251_1e56ef20_001.bmp`
+
+The failing screen appears after `JemmEx loaded` and after FreeDOS reports
+`Diskbuffers = ... in HMA`, then DOS cannot load
+`C:\FreeDOS\BIN\COMMAND.COM`.  That makes the first suspect the interaction
+between XMS/HMA/A20 state and disk reads into DOS-managed buffers rather than
+the image file itself disappearing.
+
+Reference checked: Microsoft/Lotus/Intel/AST, *eXtended Memory Specification
+(XMS), version 2.00*, July 19, 1988.  The spec defines HMA as the first
+64 KB of extended memory, officially `FFFF:0010h..FFFF:FFFFh`, and notes that
+disk I/O directly into HMA is not recommended.  The new diagnostics therefore
+log both XMS/HMA ownership and INT 13h transfer destinations.
+
+Changes:
+
+- Added `R36SX_DEBUG_XMS_TRACE` and `R36SX_DEBUG_DISK_TRACE`, enabled by
+  `DEBUG=1`.
+- Added XMS trace lines for version, HMA request/release, A20 enable/disable
+  and query, EMB allocation/free, and EMB move requests.
+- Fixed XMS Query A20 to return `BL=00h` on a successful state query, matching
+  the XMS success/error convention instead of leaving stale `BL` state.
+- Added INT 13h CHS/LBA trace lines with drive, sector location, guest transfer
+  buffer, destination memory class (`ram`, `hma`, `xms`, `a20-wrap`, etc.),
+  path (`bulk` vs `mapped`), A20 state, and image offset.
+- Moved the shared `XMS_PSRAM_OFFSET` definition to `emulator.h` and made the
+  device/swap HMA memory backends treat HMA as offset 0 inside XMS, matching the
+  host/Windows memory backend.
+- Reset now clears the configured XMS backing memory on the host/butter path,
+  instead of clearing only the first HMA-sized slice.
+
+Build commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\.tmp\pico_286_mips_hma_debug_test
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  WSL/GCC MIPS release test build completed into `.tmp`.
+Both builds still emit the existing warning set in unrelated FPU/audio/
+redirector/helper code.
+
+## 2026-06-14 Configurable PS/2 Mouse Interface
+
+Added a `mouse_type` config setting with `serial` and `ps2` values.  The default
+remains `serial`, preserving the existing COM1 Microsoft serial mouse path.
+When `mouse_type=ps2`, host mouse events are routed through an emulated 8042
+auxiliary PS/2 mouse channel on ports `60h/64h`.
+
+Implemented the 8042 pieces needed by DOS PS/2 mouse drivers:
+
+- controller configuration byte read/write commands `20h/60h`;
+- auxiliary-port enable/disable/test commands `A8h/A7h/A9h`;
+- controller self-test and first-port test commands `AAh/ABh`;
+- controller output-port read/write `D0h/D1h` retained for A20;
+- `D4h` "next byte to second PS/2 port" command;
+- status bit 0 for output full and bit 5 for second-port mouse data;
+- generic PS/2 mouse ACK/reset/identify/status/defaults/enable/disable,
+  set-sample-rate, set-resolution, stream/remote/read-data commands;
+- 3-byte generic PS/2 mouse packets delivered through IRQ12 when enabled by the
+  controller config byte.
+
+References checked:
+
+- OSDev `I8042 PS/2 Controller`, especially ports `60h/64h`, status bits,
+  controller commands, configuration byte, output port, and second-port `D4h`.
+- OSDev `PS/2 Mouse`, especially generic packet bits and mouse command set.
+- Wikipedia `PS/2 port` for IBM PS/2 origin and electrical/protocol overview.
+
+Note: a directly usable public IBM/Intel command table was not found during this
+pass, so the implementation follows the OSDev PC-compatible 8042/PS/2 summaries.
+
+Builds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\homebrew\pico_286\pico_286
+```
+
+The first Windows build attempt caught a local typo in the PS/2 reset path
+(`r36sx_ps2_mouse_buttons` vs `ps2_mouse_buttons`).  After fixing it, both
+Windows and MIPS/GCC release builds succeeded with the existing upstream warning
+sets.
+
+Artifacts:
+
+- `homebrew/pico_286/build/pico_286_win.exe`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- `homebrew/pico_286/pico_286`
+
+Hashes:
+
+```text
+E05AE5C9DF27C184D7548F6558B1188E2B9CB7ECECC0470122CC70345D6B822B  pico_286_win.exe
+1BF7BAEF90919D4A3DEAF9AD4184999C8DEB8A0A468A359C8C92FE865FEEF26F  pico_286
+```
+
+Microsoft Defender scans found no threats in the Windows build executable, the
+patch-copy Windows executable, or the MIPS executable.
+
+## 2026-06-14 Intel 386 Double-Fault Classification
+
+Changed protected-mode exception delivery to follow Intel 80386 PRM
+Section 9.8.8, Tables 9-3 and 9-4.  Nested exception delivery now classifies
+the active and nested exceptions as benign, contributory, or page fault before
+deciding whether to deliver the nested exception serially or convert it to
+`#DF`.  Exceptions while invoking the double-fault handler still latch a
+triple fault.
+
+Changed files:
+
+- `homebrew/pico_286/r36sx_port/r36sx_cpu_80286_interrupts.inl`
+
+Verification:
+
+```powershell
+git diff --check -- homebrew/pico_286/r36sx_port/r36sx_cpu_80286_interrupts.inl
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  The build still emits existing warnings in unrelated
+FPU/audio/redirector code.
+
+## 2026-06-14 Explicit BIOS Write Protection
+
+Split BIOS read presence from write protection.  `r36sx_bios_rom_contains()`
+continues to describe externally supplied readable ROM bytes such as the FDPT
+and test BIOS images, while the new `r36sx_bios_rom_write_protected()` models
+the system BIOS ROM window as write-protected for all BIOS modes.  All memory
+write backends now consult the write-protection helper before writing RAM/UMB
+storage, so guest x86 writes to `F0000h-FFFFFh` are explicitly ignored instead
+of relying on gaps in the memory dispatch.
+
+Changed files:
+
+- `homebrew/pico_286/r36sx_port/r36sx_bios_rom.c`
+- `homebrew/pico_286/r36sx_port/r36sx_bios_rom.h`
+- `homebrew/pico_286/pico-286/src/emulator/memory.c`
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result: Windows debug build completed and copied `pico_286_win.exe` to the
+active patch directory.  The build still emits existing warnings in unrelated
+FPU/audio/redirector code.
+
+## 2026-06-13 FDPT F000 JemmEx retest
+
+Rebuilt the Windows debug executable with the fixed-disk parameter table
+relocated from the UMB range to the system BIOS range (`F000:0000`) and copied
+the result to the active patch directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Then ran the patch copy `pico_286_win.exe`, waited 45 seconds, requested a
+Windows UI memory dump, and captured a screenshot:
+
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/memory_dump_001/`
+- `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/pico_286_win_20260613_220433_d543b28f_000.bmp`
+
+Result: FreeDOS with JemmEx still stops at `Bad or missing Command Interpreter:
+C:\FreeDOS\BIN\COMMAND.COM ...`. The JemmEx warning changed from the previous
+split `c000-dfff` plus `e100-efff` shape to one continuous `c000-efff` range,
+confirming that the old FDPT placement at `E0000h` did create a visible ROM/RAM
+overlap in UMB space, but that overlap is not the only cause of the remaining
+`COMMAND.COM` failure.
+
+## 2026-06-13 Windows RTC host-time default
+
+Changed the Windows build's RTC default so `rtc_start_time` in `pico_286.conf`
+no longer freezes guest time unless `rtc_use_system_time=0` is explicitly set.
+`rtc_use_system_time` defaults to `1` for `_WIN32` builds and `0` for
+MIPS/device builds, preserving the fixed config-driven clock on handhelds.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- SHA256:
+  `A74432447D432F82C63D600DCA1869EBE446493D4CAA56305A3EC634A7C1F81F`
+- Verification: F12 screenshot after launch was saved as
+  `pico_286_win_20260613_214433_f8cf083c_000.bmp`, confirming that the Windows
+  build used the host system date instead of the configured
+  `rtc_start_time=2026-06-03 00:00:00`.
+
+## 2026-06-13 Windows full FreeDOS protected-mode boot crash
+
+Investigated a Windows-only hard close while booting a full FreeDOS install from
+the patch copy.  The first reproduced failure exited with `0xC00000FD`
+(`STATUS_STACK_OVERFLOW`).  A Windows crash handler/minidump path now writes
+`pico_286_crash.txt` and `pico_286_crash.dmp` next to the patch executable when
+the host process faults.
+
+The minidump and `pico_286.log` showed recursive protected-mode exception
+delivery:
+
+```text
+INT 21h from CPL3/DPMI code -> IDT read -> #PF err=00000005 -> #DF -> triple fault
+```
+
+Checked the current Intel 64 and IA-32 SDM page, whose system programming guide
+covers memory management, protection, task management, and interrupt/exception
+handling:
+
+```text
+https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+```
+
+The fix separates normal guest linear accesses from CPU-internal system table
+accesses.  Guest loads/stores still derive the page U/S check from current CPL,
+while descriptor-table, IDT gate, TSS, task-switch, and I/O-permission-bitmap
+accesses use supervisor/system paging semantics.  A guarded double/triple-fault
+path was also added so a real unrecoverable exception delivery failure produces
+an emergency dump instead of recursing until the Windows stack overflows.
+
+Rebuild command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -Out .\homebrew\pico_286\build\pico_286_win.exe
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Build succeeded with the existing `network-redirector.c.inl` unused-variable
+  warnings.
+- Smoke run of the patch Windows executable stayed alive for 45 seconds and was
+  killed by the test timeout: `timeout_killed exit=-1`.
+- No new `pico_286_crash.txt` update and no new `emergency_dump_*` directory
+  were produced.
+- Fresh log lines show the previous failing `INT 21h` now reads a valid
+  protected-mode gate and is handled:
+  `IDT[21] ... sel=0008 ... valid=1`, followed by
+  `software INT 21 handled=1`.
+
 ## 2026-06-05 C0000-EFFFF upper memory
 
 Freed the PC address range `C0000h..EFFFFh` for DOS upper memory blocks.  VGA

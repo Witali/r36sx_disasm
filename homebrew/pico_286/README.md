@@ -71,6 +71,11 @@ physical keyboard input, disk images, config loading, RTC, profiling, and debug
 logs are active; the R36SX `driver.so` video/audio paths, joypad Fn overlays,
 and device-only audio output are not used in this build.
 
+Windows builds default `rtc_use_system_time` to `1`, so the emulated RTC starts
+from the host system clock even when an old `rtc_start_time` is still present in
+`pico_286.conf`.  MIPS/device builds default it to `0`, preserving the fixed
+config-driven start time used on handhelds without a reliable host RTC.
+
 Current workflow rule: build Pico-286 for Windows by default while CPU, BIOS,
 VGA, disk, and DOS compatibility debugging is active.  Rebuild the MIPS/device
 binary only when a change is ready to be tested on the handheld or when the
@@ -100,6 +105,23 @@ growing at the `[debug] log_max_bytes` cap, matching the bounded device-log
 behavior.  By default logs are appended across runs; set
 `log_truncate_on_start=1` in `[debug]` to clear the log at process start.
 Set `log_max_bytes=0` to disable the size cap.
+
+Debug builds also enable a live debug-control mailbox by default.  The emulator
+polls `pico_286_debug.cmd` beside `pico_286.conf`, deletes it after reading,
+and writes `pico_286_debug.out` with either `ok 1` or `ok 0`.  Use the helper
+client from the repository root while the patch-copy executable is running:
+
+```powershell
+python homebrew\pico_286\tools\pico286_debug_client.py regs
+python homebrew\pico_286\tools\pico286_debug_client.py mem F000:FFF0 16
+python homebrew\pico_286\tools\pico286_debug_client.py screen debug_screen_rgb565.bin
+python homebrew\pico_286\tools\pico286_debug_client.py key 1c
+```
+
+Supported commands are `ping`, `regs`, `mem <address|seg:off> <length> [file]`,
+`vram [offset] [length] [file]`, `screen [file]`, `key`, `keydown`, `keyup`,
+`dump`, `stopdump`, and `help`.  Release builds default the mailbox to disabled;
+override `[debug] debug_control_enabled=1` only for intentional diagnostics.
 
 The Windows host has its own menu entry and shortcuts for debug-only actions
 that would normally be opened through handheld Fn combinations:
@@ -350,9 +372,7 @@ fdd1=sopwith.img
 
 [hard_drives]
 hdd0=hdd.hdd
-hdd0_geometry=65,16,63
 hdd1=hdd2.hdd
-hdd1_geometry=800,16,32
 ```
 
 `cpu_model` selects the emulated instruction compatibility level: `8086`,
@@ -524,9 +544,9 @@ images should be placed in `image_dir` and selected through the disk image
 menu.  `.img` remains a floppy-only extension in the menu so the FreeDOS
 diskettes keep their original names; hard disks use `.hdd` by default.
 
-`hdd0_geometry` and `hdd1_geometry` are optional CHS overrides in
-`cylinders,heads,sectors` order.  The current bundled hard disk images are
-33,546,240 bytes, which matches `65,16,63`.
+Hard-disk CHS geometry is derived automatically from the mounted image size
+and exposed through the BIOS Data Area fixed-disk count, `INT 13h AH=08h`,
+and fixed-disk parameter table vectors `INT 41h` / `INT 46h`.
 
 The R36SX hard-disk BIOS path also exposes basic Enhanced Disk Drive / LBA
 services through `INT 13h`: `AH=41h` checks extension presence, `AH=42h` reads

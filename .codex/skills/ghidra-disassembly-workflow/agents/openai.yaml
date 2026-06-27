@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ghidra Disassembly Workflow"
+  short_description: "Headless Ghidra exports into disasm"
+  default_prompt: "Use $ghidra-disassembly-workflow to import, analyze, and export binaries with Ghidra into disasm."

@@ -192,9 +192,7 @@ fdd1=sopwith.img
 
 [hard_drives]
 hdd0=hdd.hdd
-hdd0_geometry=65,16,63
 hdd1=hdd2.hdd
-hdd1_geometry=800,16,32
 ```
 
 `cpu_model` can be `8086`, `80286`, or `80386`.  The default is `80386`.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "R36SX Pico-286"
+  short_description: "Workflow rules for this emulator project"
+  default_prompt: "Use $r36sx-pico286 to work safely on the R36SX Pico-286 emulator."

@@ -1,5 +1,6 @@
 #pragma GCC optimize("Ofast")
 #include "emulator.h"
+#include "r36sx_debug_config.h"
 #include <string.h>
 #if !PICO_ON_DEVICE
 #include "r36sx_disk_config.h"
@@ -12,11 +13,10 @@
 // http://www.techhelpmanual.com/943-extended_memory_specification__xms_.html
 // http://www.techhelpmanual.com/698-int_2fh_43xxh__himem_sys__extended_memory_manager__services.html
 
-//#define DEBUG_XMS
-#if defined(DEBUG_XMS)
-#define debug_log(...) printf(__VA_ARGS__)
+#if R36SX_DEBUG_XMS_TRACE
+#define xms_trace_log(...) r36sx_pico286_debug_log(__VA_ARGS__)
 #else
-#define debug_log(...) ((void)0)
+#define xms_trace_log(...) ((void)0)
 #endif
 
 #define XMS_VERSION 0x00
@@ -42,7 +42,7 @@
 #define RELEASE_UMB 0x11
 
 #define XMS_HANDLES 64
-#define HMA_SIZE_BYTES (HMA_END - HMA_START)
+#define HMA_SIZE_BYTES HMA_SIZE
 #define HMA_RESERVED_KB 64u
 
 #define XMS_ERR_HMA_NOT_EXIST 0x90
@@ -50,8 +50,6 @@
 #define XMS_ERR_HMA_NOT_ALLOCATED 0x93
 
 // FIXME: Calculate with EMS offset
-#define XMS_PSRAM_OFFSET (4096*1024)
-
 //typedef struct __attribute__((packed, aligned)) {
 typedef struct __attribute__((packed, aligned)) {
     uint32_t length;
@@ -298,40 +296,56 @@ static INLINE void xms_move_from(const uint32_t source, register uint32_t destin
 #define to_physical_offset(offset) (((uint16_t)(((offset) >> 16) & 0xFFFF) << 4) + (uint16_t)((offset) & 0xFFFF))
 
 uint8_t __not_in_flash() xms_handler() {
-    switch (CPU_AH) {
+    const uint8_t function = CPU_AH;
+
+    switch (function) {
         case XMS_VERSION: {
             // Get XMS Version
             CPU_AX = 0x0200; // We are himem 2.06
             CPU_BX = 0x0206; // driver version
             CPU_DX = hma_available() ? 0x0001 : 0x0000; // HMA exists
+            xms_trace_log(
+                "xms: version ax=%04x bx=%04x hma=%u configured_kb=%lu a20=%d",
+                CPU_AX, CPU_BX, CPU_DX,
+                (unsigned long)configured_xms_memory_kb(),
+                a20_enabled);
             break;
         }
         case REQUEST_HMA: {
+            xms_trace_log(
+                "xms: request hma dx=%04x available=%d allocated=%d a20=%d",
+                CPU_DX, hma_available(), hma_allocated, a20_enabled);
             if (!hma_available()) {
                 CPU_AX = 0;
                 CPU_BL = XMS_ERR_HMA_NOT_EXIST;
+                xms_trace_log("xms: request hma fail bl=%02x", CPU_BL);
                 break;
             }
             if (hma_allocated) {
                 CPU_AX = 0;
                 CPU_BL = XMS_ERR_HMA_IN_USE;
+                xms_trace_log("xms: request hma fail bl=%02x", CPU_BL);
                 break;
             }
             hma_allocated = 1;
             a20_enabled = 1;
             CPU_AX = 1;
             CPU_BL = 0;
+            xms_trace_log("xms: request hma ok a20=%d", a20_enabled);
             break;
         }
         case RELEASE_HMA: {
+            xms_trace_log("xms: release hma allocated=%d", hma_allocated);
             if (!hma_allocated) {
                 CPU_AX = 0;
                 CPU_BL = XMS_ERR_HMA_NOT_ALLOCATED;
+                xms_trace_log("xms: release hma fail bl=%02x", CPU_BL);
                 break;
             }
             hma_allocated = 0;
             CPU_AX = 1;
             CPU_BL = 0;
+            xms_trace_log("xms: release hma ok a20=%d", a20_enabled);
             break;
         }
         case GLOBAL_ENABLE_A20:
@@ -340,6 +354,8 @@ uint8_t __not_in_flash() xms_handler() {
             CPU_AX = 1; // Success
             CPU_BL = 0;
             a20_enabled = 1;
+            xms_trace_log("xms: enable a20 fn=%02x a20=%d", function,
+                          a20_enabled);
             break;
         }
         case GLOBAL_DISABLE_A20:
@@ -348,11 +364,15 @@ uint8_t __not_in_flash() xms_handler() {
             CPU_AX = 1; // Success
             CPU_BL = 0;
             a20_enabled = 0;
+            xms_trace_log("xms: disable a20 fn=%02x a20=%d", function,
+                          a20_enabled);
             break;
         }
         case QUERY_A20: {
             // Query A20 (Function 07h):
             CPU_AX = a20_enabled; // Success
+            CPU_BL = 0;
+            xms_trace_log("xms: query a20 ax=%04x bl=%02x", CPU_AX, CPU_BL);
             break;
         }
 
@@ -363,10 +383,14 @@ uint8_t __not_in_flash() xms_handler() {
             if (free_kb > 0xffffu) {
                 free_kb = 0xffffu;
             }
-            debug_log("[XMS] Query free\r\n");
             CPU_AX = (uint16_t)free_kb;
             CPU_DX = (uint16_t)free_kb;
             CPU_BL = 0;
+            xms_trace_log(
+                "xms: query emb free_kb=%lu allocated_kb=%lu hma=%d handles=%u",
+                (unsigned long)free_kb,
+                (unsigned long)xms_allocated_kb,
+                hma_allocated, xms_handles);
             break;
         }
         case ALLOCATE_EMB: {
@@ -374,7 +398,8 @@ uint8_t __not_in_flash() xms_handler() {
             uint16_t requested_kb = CPU_DX;
             uint8_t handle = 0;
 
-            debug_log("[XMS] Allocate %dKb\n", CPU_DX);
+            xms_trace_log("xms: allocate emb request_kb=%u free_kb=%lu",
+                          requested_kb, (unsigned long)xms_free_kb());
             for (uint8_t i = 1; i < XMS_HANDLES; i++) {
                 if (xms_handle_kb[i] == 0) {
                     handle = i;
@@ -388,14 +413,21 @@ uint8_t __not_in_flash() xms_handler() {
                 CPU_DX = handle;
                 CPU_AX = 1;
                 CPU_BL = 0;
+                xms_trace_log(
+                    "xms: allocate emb ok handle=%u size_kb=%u free_kb=%lu",
+                    handle, requested_kb, (unsigned long)xms_free_kb());
                 break;
             }
             CPU_AX = 0;
             CPU_BL = handle ? 0xA0 : 0xA1;
+            xms_trace_log("xms: allocate emb fail bl=%02x handle=%u",
+                          CPU_BL, handle);
             break;
         }
         case RELEASE_EMB: {
-            debug_log("[XMS] Free handle %d\n", CPU_DX);
+            xms_trace_log("xms: release emb handle=%u size_kb=%u",
+                          CPU_DX,
+                          CPU_DX < XMS_HANDLES ? xms_handle_kb[CPU_DX] : 0);
             if (CPU_DX > 0 && CPU_DX < XMS_HANDLES &&
                 xms_handle_kb[CPU_DX] != 0) {
                 xms_allocated_kb -= xms_handle_kb[CPU_DX];
@@ -403,10 +435,13 @@ uint8_t __not_in_flash() xms_handler() {
                 xms_handles--;
                 CPU_AX = 1;
                 CPU_BL = 0;
+                xms_trace_log("xms: release emb ok free_kb=%lu",
+                              (unsigned long)xms_free_kb());
                 break;
             }
             CPU_AX = 0;
             CPU_BL = 0xA2;
+            xms_trace_log("xms: release emb fail bl=%02x", CPU_BL);
             break;
         }
 
@@ -421,6 +456,16 @@ uint8_t __not_in_flash() xms_handler() {
                 struct_offset++;
             }
 
+            xms_trace_log(
+                "xms: move emb req struct=%05lx length=%lu src_handle=%u src_off=%08lx dest_handle=%u dest_off=%08lx a20=%d",
+                (unsigned long)(((uint32_t)CPU_DS << 4) + CPU_SI),
+                (unsigned long)move_data.length,
+                move_data.source_handle,
+                (unsigned long)move_data.source_offset,
+                move_data.destination_handle,
+                (unsigned long)move_data.destination_offset,
+                a20_enabled);
+
             // TODO: Add mem<>mem and xms<>xms
             if ((move_data.source_handle != 0 &&
                  !xms_range_valid(move_data.source_offset,
@@ -430,6 +475,7 @@ uint8_t __not_in_flash() xms_handler() {
                                   move_data.length))) {
                 CPU_AX = 0;
                 CPU_BL = 0xA4;
+                xms_trace_log("xms: move emb fail range bl=%02x", CPU_BL);
                 break;
             }
             if (!move_data.source_handle) {
@@ -440,22 +486,19 @@ uint8_t __not_in_flash() xms_handler() {
                 xms_move_from(move_data.source_offset, move_data.destination_offset, move_data.length);
             }
 
-            debug_log(
-                "[XMS] Move EMB 0x%06X\r\n\t length 0x%08X \r\n\t src_handle 0x%04X \r\n\t src_offset 0x%08X \r\n\t dest_handle 0x%04X \r\n\t dest_offset 0x%08X \r\n",
-                struct_offset,
-                move_data.length,
-                move_data.source_handle,
-                move_data.source_offset,
-                move_data.destination_handle,
-                move_data.destination_offset
-            );
             CPU_AX = 1;
             CPU_BL = 0;
+            xms_trace_log(
+                "xms: move emb ok src=%08lx dest=%08lx length=%lu",
+                (unsigned long)move_data.source_offset,
+                (unsigned long)move_data.destination_offset,
+                (unsigned long)move_data.length);
             break;
         }
         case REQUEST_UMB: {
             // Request Upper Memory Block (Function 10h):
-            if (CPU_DX == 0xFFFF) {
+            const uint16_t requested_size = CPU_DX;
+            if (requested_size == 0xFFFF) {
                 // Query largest available block
                 if (umb_blocks_allocated < (int)UMB_BLOCKS_COUNT) {
                     uint16_t sz = 0;
@@ -464,12 +507,13 @@ uint8_t __not_in_flash() xms_handler() {
                         CPU_AX = 1;
                         CPU_BX = umb_block->segment;
                         CPU_DX = sz;
-                        CPU_BL = 0;
+                        xms_trace_log(
+                            "xms: request umb query ok seg=%04x size=%04x",
+                            CPU_BX, CPU_DX);
                         break;
                     }
                 }
             } else {
-                const uint16_t requested_size = CPU_DX;
                 umb_t *umb_block = get_free_umb_block(requested_size);
                 if (umb_block != NULL) {
                     int unmarked_size = requested_size;
@@ -486,6 +530,9 @@ uint8_t __not_in_flash() xms_handler() {
                     }
                     ub->allocated_paragraphs = total_allocated;
                     CPU_DX = total_allocated;
+                    xms_trace_log(
+                        "xms: request umb ok request=%04x seg=%04x actual=%04x",
+                        requested_size, CPU_BX, CPU_DX);
                     break;
                 }
             }
@@ -496,14 +543,18 @@ uint8_t __not_in_flash() xms_handler() {
             CPU_DX = sz;
             CPU_BL =
                 umb_blocks_allocated >= (int)UMB_BLOCKS_COUNT ? 0xB1 : 0xB0;
+            xms_trace_log(
+                "xms: request umb fail request=%04x largest=%04x bl=%02x",
+                requested_size, CPU_DX, CPU_BL);
             break;
         }
         case RELEASE_UMB: {
             // Release Upper Memory Block (Function 11h)
-            // Stub: Release Upper Memory Block
+            const uint16_t release_segment = CPU_DX;
             for (int i = 0; i < (int)UMB_BLOCKS_COUNT; ++i)
-                if (umb_blocks[i].segment == CPU_BX && umb_blocks[i].allocated_paragraphs > 0) {
+                if (umb_blocks[i].segment == release_segment && umb_blocks[i].allocated_paragraphs > 0) {
                     int par = umb_blocks[i].allocated_paragraphs;
+                    const int released_paragraphs = par;
                     while (par > 0 && i < (int)UMB_BLOCKS_COUNT) {
                         umb_blocks[i].allocated_paragraphs = 0;
                         par -= umb_blocks[i++].size;
@@ -511,17 +562,22 @@ uint8_t __not_in_flash() xms_handler() {
                     }
                     CPU_AX = 0x0001; // Success
                     CPU_BL = 0;
+                    xms_trace_log(
+                        "xms: release umb ok seg=%04x size=%04x",
+                        release_segment, (uint16_t)released_paragraphs);
                     return 0xCB; // Early return to avoid fall-through
                 }
 
             CPU_AX = 0x0000; // Failure
             CPU_DX = 0x0000;
             CPU_BL = 0xB2; // Error code
+            xms_trace_log("xms: release umb fail seg=%04x bl=%02x",
+                          release_segment, CPU_BL);
             break;
         }
         default: {
             if (CPU_AH > 0x7 && CPU_AH < 0x10) {
-                debug_log("[XMS] %02X\n", CPU_AH);
+                xms_trace_log("xms: unsupported emb fn=%02x", function);
             }
             // Unhandled function
             CPU_AX = 0x0000; // Function not supported

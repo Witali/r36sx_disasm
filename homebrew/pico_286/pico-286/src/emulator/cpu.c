@@ -1276,7 +1276,7 @@ void reset86() {
     if (butter_psram_size) {
         memset(RAM, 0, sizeof(RAM));
         memset(UMB, 0, sizeof(UMB));
-        memset(HMA, 0, sizeof(HMA));
+        memset(XMS, 0, xms_configured_memory_bytes());
     } else {
         memset(SRAM, 0, sizeof(SRAM));
         if (PSRAM_AVAILABLE) {

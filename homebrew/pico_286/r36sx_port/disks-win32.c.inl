@@ -1,12 +1,24 @@
 #pragma once
 
 #include "emulator.h"
+#include "r36sx_bios_rom.h"
+#include "r36sx_debug_config.h"
 #include "r36sx_host_disk_io.h"
+
+#include <string.h>
 
 int hdcount = 0, fdcount = 0;
 
 static uint8_t sectorbuffer[512];
 typedef unsigned long DWORD;
+
+#define R36SX_FLOPPY_IMAGE_MIN_BYTES (360UL * 1024UL)
+#define R36SX_FLOPPY_IMAGE_MAX_BYTES (2880UL * 1024UL)
+#define R36SX_HARD_IMAGE_MAX_BYTES ((size_t)0x7ffffe00UL)
+#define R36SX_BIOS_MAX_CHS_CYLINDERS 1024u
+#define R36SX_BIOS_INT41_VECTOR 0x41u
+#define R36SX_BIOS_INT46_VECTOR 0x46u
+#define R36SX_BIOS_FDPT_BYTES 16u
 
 struct struct_drive {
     FILE *diskfile;
@@ -28,6 +40,171 @@ static inline void update_bios_disk_counts(void) {
     RAM[0x475] = (uint8_t)hdcount;  // BIOS Data Area: fixed disk count.
 }
 
+static inline void disk_write_ivt_pointer(uint8_t vector,
+                                          uint16_t segment,
+                                          uint16_t offset) {
+    uint32_t address = (uint32_t)vector * 4u;
+
+    RAM[address + 0u] = (uint8_t)offset;
+    RAM[address + 1u] = (uint8_t)(offset >> 8);
+    RAM[address + 2u] = (uint8_t)segment;
+    RAM[address + 3u] = (uint8_t)(segment >> 8);
+}
+
+static inline void disk_choose_floppy_geometry(size_t size,
+                                               uint16_t *cyls,
+                                               uint16_t *heads,
+                                               uint16_t *sects) {
+    uint64_t total_sectors = (uint64_t)(size / 512UL);
+
+    *cyls = 80;
+    *heads = 2;
+    *sects = 18;
+
+    if (size <= 360UL * 1024UL) {
+        *cyls = 40;
+        *sects = 9;
+    } else if (size <= 720UL * 1024UL) {
+        *sects = 9;
+    } else if (size <= 1200UL * 1024UL) {
+        *sects = 15;
+    } else if (size > 1440UL * 1024UL) {
+        *sects = 36;
+    }
+
+    if ((uint64_t)*cyls * (uint64_t)*heads * (uint64_t)*sects !=
+        total_sectors &&
+        total_sectors % 160ULL == 0) {
+        uint64_t auto_sects = total_sectors / 160ULL;
+        if (auto_sects >= 1 && auto_sects <= 36) {
+            *cyls = 80;
+            *heads = 2;
+            *sects = (uint16_t)auto_sects;
+        }
+    }
+}
+
+static inline void disk_choose_hdd_geometry(size_t size,
+                                            uint16_t *cyls,
+                                            uint16_t *heads,
+                                            uint16_t *sects) {
+    static const uint16_t preferred_heads[] = {
+        16, 32, 64, 128, 255, 8, 4, 2, 1
+    };
+    static const uint16_t preferred_sects[] = {
+        63, 32, 17, 16, 15, 9, 18, 36
+    };
+    uint64_t total_sectors = (uint64_t)(size / 512UL);
+    uint16_t chosen_heads = 16;
+    uint64_t chosen_cyls;
+
+    for (size_t hi = 0; hi < sizeof(preferred_heads) / sizeof(preferred_heads[0]);
+         hi++) {
+        for (size_t si = 0;
+             si < sizeof(preferred_sects) / sizeof(preferred_sects[0]);
+             si++) {
+            uint64_t track_sectors =
+                (uint64_t)preferred_heads[hi] * (uint64_t)preferred_sects[si];
+            uint64_t exact_cyls;
+
+            if (track_sectors == 0 || total_sectors % track_sectors != 0) {
+                continue;
+            }
+            exact_cyls = total_sectors / track_sectors;
+            if (exact_cyls >= 1 &&
+                exact_cyls <= R36SX_BIOS_MAX_CHS_CYLINDERS) {
+                *cyls = (uint16_t)exact_cyls;
+                *heads = preferred_heads[hi];
+                *sects = preferred_sects[si];
+                return;
+            }
+        }
+    }
+
+    *sects = 63;
+
+    if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 16ULL * 63ULL) {
+        chosen_heads = 16;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 32ULL * 63ULL) {
+        chosen_heads = 32;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 64ULL * 63ULL) {
+        chosen_heads = 64;
+    } else if (total_sectors <= R36SX_BIOS_MAX_CHS_CYLINDERS * 128ULL * 63ULL) {
+        chosen_heads = 128;
+    } else {
+        chosen_heads = 255;
+    }
+
+    chosen_cyls = total_sectors / ((uint64_t)chosen_heads * (uint64_t)*sects);
+    if (chosen_cyls == 0) {
+        chosen_heads = 1;
+        chosen_cyls = total_sectors / (uint64_t)*sects;
+        if (chosen_cyls == 0) {
+            *sects = total_sectors ? (uint16_t)total_sectors : 1;
+            chosen_cyls = 1;
+        }
+    }
+    if (chosen_cyls > R36SX_BIOS_MAX_CHS_CYLINDERS) {
+        chosen_cyls = R36SX_BIOS_MAX_CHS_CYLINDERS;
+    }
+
+    *cyls = (uint16_t)chosen_cyls;
+    *heads = chosen_heads;
+}
+
+static void disk_build_fixed_parameter_table(
+    uint8_t drivenum,
+    uint8_t table[R36SX_BIOS_FDPT_BYTES]) {
+    uint16_t cyls = disk[drivenum].cyls;
+    uint16_t landing_zone = cyls ? cyls : 1u;
+
+    memset(table, 0, R36SX_BIOS_FDPT_BYTES);
+    table[0] = (uint8_t)cyls;
+    table[1] = (uint8_t)(cyls >> 8);
+    table[2] = (uint8_t)disk[drivenum].heads;
+    table[3] = 0xffu;  // Reduced write current cylinder, unused by emulator.
+    table[4] = 0xffu;
+    table[5] = 0xffu;  // Write precomp cylinder, unused by emulator.
+    table[6] = 0xffu;
+    table[7] = 0x0bu;  // Common AT BIOS ECC burst length.
+    table[8] = disk[drivenum].heads > 8u ? 0x08u : 0x00u;
+    table[12] = (uint8_t)landing_zone;
+    table[13] = (uint8_t)(landing_zone >> 8);
+    table[14] = (uint8_t)disk[drivenum].sects;
+}
+
+static void disk_update_fixed_parameter_table(uint8_t drivenum) {
+    uint8_t index;
+    uint8_t vector;
+
+    if (drivenum < 2u || drivenum > 3u) {
+        return;
+    }
+
+    index = (uint8_t)(drivenum - 2u);
+    vector = index == 0u ? R36SX_BIOS_INT41_VECTOR : R36SX_BIOS_INT46_VECTOR;
+
+    if (!disk[drivenum].inserted) {
+        r36sx_bios_rom_set_fixed_disk_parameter_table(index, NULL);
+        disk_write_ivt_pointer(vector, 0, 0);
+        return;
+    }
+
+    {
+        uint8_t table[R36SX_BIOS_FDPT_BYTES];
+        uint16_t segment;
+        uint16_t offset;
+
+        disk_build_fixed_parameter_table(drivenum, table);
+        r36sx_bios_rom_set_fixed_disk_parameter_table(index, table);
+        if (r36sx_bios_rom_fixed_disk_parameter_pointer(index,
+                                                        &segment,
+                                                        &offset)) {
+            disk_write_ivt_pointer(vector, segment, offset);
+        }
+    }
+}
+
 static inline void ejectdisk(uint8_t drivenum) {
     if (!normalize_disk_number(&drivenum)) return;
 
@@ -37,6 +214,7 @@ static inline void ejectdisk(uint8_t drivenum) {
         disk[drivenum].inserted = 0;
         if (drivenum >= 2) {
             if (hdcount > 0) hdcount--;
+            disk_update_fixed_parameter_table(drivenum);
         } else {
             if (fdcount > 0) fdcount--;
         }
@@ -53,16 +231,27 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
 
     r36sx_host_disk_cache_t cache;
     size_t size = 0;
+
+    ejectdisk(drivenum);
+
     FILE *file = r36sx_host_disk_open(pathname, &cache, &size);
     if (!file) {
         printf( "DISK: ERROR: cannot open disk file %s for drive %02Xh\n", pathname, drivenum);
         return 0;
     }
 
+    const size_t min_size = R36SX_FLOPPY_IMAGE_MIN_BYTES;
+    const size_t max_size = drivenum >= 2 ?
+        R36SX_HARD_IMAGE_MAX_BYTES : R36SX_FLOPPY_IMAGE_MAX_BYTES;
+
     // Validate size constraints
-    if (size < 360 * 1024 || size > 0x1f782000UL || (size & 511)) {
+    if (size < min_size || size > max_size || (size & 511u)) {
+        r36sx_pico286_debug_log(
+            "disk: reject drive %02xh image '%s' size=%lu min=%lu max=%lu",
+            bios_drive, pathname ? pathname : "<null>",
+            (unsigned long)size, (unsigned long)min_size,
+            (unsigned long)max_size);
         r36sx_host_disk_close(&file, &cache, drivenum);
-//        fprintf(stderr, "DISK: ERROR: invalid disk size for drive %02Xh (%lu bytes)\n", drivenum, (unsigned long) size);
         return 0;
     }
 
@@ -70,58 +259,28 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     uint16_t cyls = 0, heads = 0, sects = 0;
 
     if (drivenum >= 2) {  // Hard disk
-        r36sx_pico286_chs_t configured_geometry;
-
-        if (r36sx_pico286_hdd_geometry(bios_drive, &configured_geometry)) {
-            size_t configured_size =
-                (size_t)configured_geometry.cyls *
-                (size_t)configured_geometry.heads *
-                (size_t)configured_geometry.sects * 512UL;
-            if (configured_size <= size) {
-                cyls = configured_geometry.cyls;
-                heads = configured_geometry.heads;
-                sects = configured_geometry.sects;
-                r36sx_pico286_debug_log(
-                    "disk: drive %02xh using configured CHS=%u,%u,%u",
-                    bios_drive, cyls, heads, sects);
-            } else {
-                r36sx_pico286_debug_log(
-                    "disk: drive %02xh ignores CHS=%u,%u,%u larger than image",
-                    bios_drive, configured_geometry.cyls,
-                    configured_geometry.heads, configured_geometry.sects);
-            }
-        }
-
-        if (!cyls || !heads || !sects) {
-            sects = 63;
-            heads = 16;
-            cyls = size / (sects * heads * 512);
-        }
+        disk_choose_hdd_geometry(size, &cyls, &heads, &sects);
+        r36sx_pico286_debug_log(
+            "disk: drive %02xh auto CHS=%u,%u,%u size=%lu",
+            bios_drive, cyls, heads, sects, (unsigned long)size);
     } else {  // Floppy disk
-        cyls = 80;
-        sects = 18;
-        heads = 2;
-
-        if (size <= 368640) {  // 360 KB or lower
-            cyls = 40;
-            sects = 9;
-            heads = 2;
-        } else if (size <= 737280) {
-            sects = 9;
-        } else if (size <= 1228800) {
-            sects = 15;
-        }
+        disk_choose_floppy_geometry(size, &cyls, &heads, &sects);
+        r36sx_pico286_debug_log(
+            "disk: drive %02xh floppy CHS=%u,%u,%u size=%lu",
+            bios_drive, cyls, heads, sects, (unsigned long)size);
     }
 
-    // Validate geometry
-    if (cyls > 1023 || cyls * heads * sects * 512 != size) {
+    /*
+     * INT 13h AH=08 returns the maximum cylinder index in 10 bits, so a
+     * 1024-cylinder disk is reported as max cylinder 1023.  The fixed disk
+     * parameter table stores the cylinder count, where 1024 is valid.
+     */
+    if (cyls > R36SX_BIOS_MAX_CHS_CYLINDERS ||
+        (size_t)cyls * (size_t)heads * (size_t)sects * 512UL != size) {
 //        fclose(file);
 //        fprintf(stderr, "DISK: ERROR: Cannot determine correct CHS geometry for drive %02Xh\n", drivenum);
 //        return 0;
     }
-
-    // Eject any existing disk and insert the new one
-    ejectdisk(drivenum);
 
     disk[drivenum].diskfile = file;
     disk[drivenum].cache = cache;
@@ -135,6 +294,7 @@ uint8_t insertdisk(uint8_t drivenum, const char *pathname) {
     // Update drive counts
     if (drivenum >= 2) {
         hdcount++;
+        disk_update_fixed_parameter_table(drivenum);
     } else {
         fdcount++;
     }
@@ -170,9 +330,89 @@ static inline int disk_memory_range_is_plain_ram(uint32_t address,
            bytecount <= (size_t)(RAM_SIZE - address);
 }
 
-static inline uint32_t disk_real_mode_linear(uint16_t segment,
-                                             uint16_t offset) {
-    return ((uint32_t)segment << 4) + (uint32_t)offset;
+#if R36SX_DEBUG_DISK_TRACE
+#define R36SX_DISK_TRACE_LOG(...) r36sx_pico286_debug_log(__VA_ARGS__)
+#else
+#define R36SX_DISK_TRACE_LOG(...) ((void)0)
+#endif
+
+static inline int disk_memory_range_inside(uint32_t address,
+                                           uint32_t start,
+                                           uint32_t end,
+                                           size_t bytecount) {
+    return bytecount > 0 &&
+           address >= start &&
+           address < end &&
+           bytecount <= (size_t)(end - address);
+}
+
+static const char *disk_memory_range_name(uint32_t address,
+                                          size_t bytecount) {
+    if (bytecount == 0) {
+        return "empty";
+    }
+    if (!a20_enabled && address >= HMA_START) {
+        return "a20-wrap";
+    }
+    if (disk_memory_range_is_plain_ram(address, bytecount)) {
+        return "ram";
+    }
+    if (disk_memory_range_inside(address,
+                                 VIDEORAM_START,
+                                 VIDEORAM_END,
+                                 bytecount)) {
+        return "video";
+    }
+    if (disk_memory_range_inside(address, UMB_START, UMB_END, bytecount)) {
+        return "umb";
+    }
+    if (disk_memory_range_inside(address, BIOS_START, HMA_START, bytecount)) {
+        return "bios";
+    }
+    if (disk_memory_range_inside(address, HMA_START, HMA_END, bytecount)) {
+        return "hma";
+    }
+    if (disk_memory_range_inside(address,
+                                 EXTENDED_MEMORY_START,
+                                 EXTENDED_MEMORY_START +
+                                     xms_configured_memory_bytes(),
+                                 bytecount)) {
+        return "xms";
+    }
+    return "mapped";
+}
+
+static inline uint32_t disk_guest_real_pointer(uint16_t segment,
+                                               uint16_t offset,
+                                               uint8_t write_access,
+                                               uint8_t *ok) {
+    return r36sx_cpu_translate_guest_real_pointer(segment, offset,
+                                                  write_access, ok);
+}
+
+static inline int disk_should_log_mapped_transfer(uint32_t address,
+                                                  size_t bytecount) {
+    return bytecount > 0 &&
+           !disk_memory_range_is_plain_ram(address, bytecount);
+}
+
+static uint32_t disk_first4_from_memory(uint32_t address, size_t bytecount) {
+    uint32_t value = 0;
+    size_t count = bytecount < 4u ? bytecount : 4u;
+    for (size_t i = 0; i < count; i++) {
+        value |= (uint32_t)read86(address + (uint32_t)i) << (8u * i);
+    }
+    return value;
+}
+
+static uint32_t disk_first4_from_buffer(const uint8_t *buffer,
+                                        size_t bytecount) {
+    uint32_t value = 0;
+    size_t count = bytecount < 4u ? bytecount : 4u;
+    for (size_t i = 0; i < count; i++) {
+        value |= (uint32_t)buffer[i] << (8u * i);
+    }
+    return value;
 }
 
 static inline uint16_t disk_mem_read16(uint32_t address) {
@@ -254,12 +494,565 @@ void r36sx_pico286_disk_flush_all(void) {
     }
 }
 
+/*
+ * Minimal PATA/IDE task-file register emulation.
+ *
+ * This implements the ISA-compatible command block ports documented by the
+ * ATA/T13 family of specifications: data, error/features, sector count,
+ * sector/LBA, cylinder/LBA, drive/head, status/command, and alternate
+ * status/device control.  The first two configured BIOS hard disks are exposed
+ * as primary master/slave.  DMA, IRQ14/15 signalling, and ATAPI are intentionally
+ * outside this first pass; PIO polling software can use IDENTIFY DEVICE and
+ * READ/WRITE SECTOR(S).
+ */
+#define R36SX_ATA_PRIMARY_BASE 0x1f0u
+#define R36SX_ATA_SECONDARY_BASE 0x170u
+#define R36SX_ATA_PRIMARY_CTRL 0x3f6u
+#define R36SX_ATA_SECONDARY_CTRL 0x376u
+
+#define R36SX_ATA_SR_ERR 0x01u
+#define R36SX_ATA_SR_DRQ 0x08u
+#define R36SX_ATA_SR_DF  0x20u
+#define R36SX_ATA_SR_DRDY 0x40u
+#define R36SX_ATA_SR_BSY 0x80u
+
+#define R36SX_ATA_ER_ABRT 0x04u
+#define R36SX_ATA_ER_IDNF 0x10u
+#define R36SX_ATA_ER_WP   0x40u
+
+typedef enum r36sx_ata_phase_e {
+    R36SX_ATA_PHASE_NONE = 0,
+    R36SX_ATA_PHASE_IDENTIFY,
+    R36SX_ATA_PHASE_READ,
+    R36SX_ATA_PHASE_WRITE,
+} r36sx_ata_phase_t;
+
+typedef struct r36sx_ata_channel_s {
+    uint16_t base;
+    uint16_t ctrl;
+    uint8_t selected;
+    uint8_t feature;
+    uint8_t error;
+    uint8_t sector_count;
+    uint8_t lba_low;
+    uint8_t lba_mid;
+    uint8_t lba_high;
+    uint8_t device;
+    uint8_t status;
+    uint8_t device_control;
+    r36sx_ata_phase_t phase;
+    uint64_t transfer_lba;
+    uint16_t sectors_remaining;
+    uint16_t data_index;
+    uint8_t data[512];
+} r36sx_ata_channel_t;
+
+static r36sx_ata_channel_t r36sx_ata_channels[2];
+static uint8_t r36sx_ata_initialized;
+
+static void r36sx_ata_init_once(void)
+{
+    if (r36sx_ata_initialized) {
+        return;
+    }
+    memset(r36sx_ata_channels, 0, sizeof(r36sx_ata_channels));
+    r36sx_ata_channels[0].base = R36SX_ATA_PRIMARY_BASE;
+    r36sx_ata_channels[0].ctrl = R36SX_ATA_PRIMARY_CTRL;
+    r36sx_ata_channels[1].base = R36SX_ATA_SECONDARY_BASE;
+    r36sx_ata_channels[1].ctrl = R36SX_ATA_SECONDARY_CTRL;
+    r36sx_ata_channels[0].device = 0xa0u;
+    r36sx_ata_channels[1].device = 0xa0u;
+    r36sx_ata_initialized = 1;
+}
+
+static int r36sx_ata_decode_port(uint16_t portnum, uint8_t *channel,
+                                 uint8_t *offset, uint8_t *control)
+{
+    r36sx_ata_init_once();
+    for (uint8_t i = 0; i < 2u; i++) {
+        uint16_t base = r36sx_ata_channels[i].base;
+        if (portnum >= base && portnum <= (uint16_t)(base + 7u)) {
+            *channel = i;
+            *offset = (uint8_t)(portnum - base);
+            *control = 0;
+            return 1;
+        }
+        if (portnum == r36sx_ata_channels[i].ctrl) {
+            *channel = i;
+            *offset = 7;
+            *control = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int r36sx_ata_drive_for(const r36sx_ata_channel_t *ch)
+{
+    if (ch == &r36sx_ata_channels[0]) {
+        return 2 + (int)(ch->selected & 1u);
+    }
+    return -1;
+}
+
+static int r36sx_ata_drive_present(const r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    return drivenum >= 2 && drivenum < 4 && disk[drivenum].inserted;
+}
+
+static void r36sx_ata_ready_or_float(r36sx_ata_channel_t *ch)
+{
+    if (r36sx_ata_drive_present(ch)) {
+        if (ch->phase == R36SX_ATA_PHASE_NONE) {
+            ch->status = R36SX_ATA_SR_DRDY;
+        }
+    } else {
+        ch->status = 0xffu;
+        ch->phase = R36SX_ATA_PHASE_NONE;
+    }
+}
+
+static void r36sx_ata_fail(r36sx_ata_channel_t *ch, uint8_t error)
+{
+    ch->error = error;
+    ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_ERR;
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+}
+
+static uint16_t r36sx_ata_sector_count(const r36sx_ata_channel_t *ch)
+{
+    return ch->sector_count ? ch->sector_count : 256u;
+}
+
+static int r36sx_ata_current_lba(r36sx_ata_channel_t *ch, uint64_t *lba)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    if (!r36sx_ata_drive_present(ch)) {
+        return 0;
+    }
+    if (ch->device & 0x40u) {
+        *lba = ((uint64_t)(ch->device & 0x0fu) << 24) |
+               ((uint64_t)ch->lba_high << 16) |
+               ((uint64_t)ch->lba_mid << 8) |
+               (uint64_t)ch->lba_low;
+        return 1;
+    }
+
+    uint16_t sector = ch->lba_low;
+    uint16_t cylinder = (uint16_t)ch->lba_mid |
+                        ((uint16_t)ch->lba_high << 8);
+    uint16_t head = ch->device & 0x0fu;
+    if (sector == 0 || sector > disk[drivenum].sects ||
+        head >= disk[drivenum].heads || cylinder >= disk[drivenum].cyls) {
+        return 0;
+    }
+    *lba = (((uint64_t)cylinder * disk[drivenum].heads) + head) *
+           disk[drivenum].sects + (sector - 1u);
+    return 1;
+}
+
+static void r36sx_ata_update_lba_regs(r36sx_ata_channel_t *ch, uint64_t lba)
+{
+    if (ch->device & 0x40u) {
+        ch->lba_low = (uint8_t)lba;
+        ch->lba_mid = (uint8_t)(lba >> 8);
+        ch->lba_high = (uint8_t)(lba >> 16);
+        ch->device = (uint8_t)((ch->device & 0xf0u) |
+                               ((uint8_t)(lba >> 24) & 0x0fu));
+    }
+}
+
+static void r36sx_ata_put_word(uint8_t *dst, uint16_t word, uint16_t value)
+{
+    dst[(uint16_t)(word * 2u)] = (uint8_t)value;
+    dst[(uint16_t)(word * 2u + 1u)] = (uint8_t)(value >> 8);
+}
+
+static void r36sx_ata_put_string(uint8_t *dst, uint16_t word, uint16_t words,
+                                 const char *text)
+{
+    for (uint16_t i = 0; i < words; i++) {
+        uint8_t a = ' ';
+        uint8_t b = ' ';
+        uint16_t pos = (uint16_t)(i * 2u);
+        if (text[pos]) {
+            a = (uint8_t)text[pos];
+            if (text[(uint16_t)(pos + 1u)]) {
+                b = (uint8_t)text[(uint16_t)(pos + 1u)];
+            }
+        }
+        r36sx_ata_put_word(dst, (uint16_t)(word + i),
+                           (uint16_t)((uint16_t)a << 8) | b);
+    }
+}
+
+static void r36sx_ata_build_identify(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    uint64_t total = disk_total_sectors((uint8_t)drivenum);
+    uint32_t total28 = total > 0x0fffffffULL ? 0x0fffffffUL :
+                       (uint32_t)total;
+    char model[41];
+
+    memset(ch->data, 0, sizeof(ch->data));
+    snprintf(model, sizeof(model), "R36SX PATA HDD %u", (unsigned)(drivenum - 2));
+
+    r36sx_ata_put_word(ch->data, 0, 0x0040u); /* fixed disk */
+    r36sx_ata_put_word(ch->data, 1, disk[drivenum].cyls);
+    r36sx_ata_put_word(ch->data, 3, disk[drivenum].heads);
+    r36sx_ata_put_word(ch->data, 6, disk[drivenum].sects);
+    r36sx_ata_put_string(ch->data, 10, 10, "R36SX00000000000000");
+    r36sx_ata_put_string(ch->data, 23, 4, "1.0 ");
+    r36sx_ata_put_string(ch->data, 27, 20, model);
+    r36sx_ata_put_word(ch->data, 47, 0x8001u);
+    r36sx_ata_put_word(ch->data, 49, 0x0200u); /* LBA supported */
+    r36sx_ata_put_word(ch->data, 53, 0x0007u);
+    r36sx_ata_put_word(ch->data, 54, disk[drivenum].cyls);
+    r36sx_ata_put_word(ch->data, 55, disk[drivenum].heads);
+    r36sx_ata_put_word(ch->data, 56, disk[drivenum].sects);
+    r36sx_ata_put_word(ch->data, 57, (uint16_t)total28);
+    r36sx_ata_put_word(ch->data, 58, (uint16_t)(total28 >> 16));
+    r36sx_ata_put_word(ch->data, 60, (uint16_t)total28);
+    r36sx_ata_put_word(ch->data, 61, (uint16_t)(total28 >> 16));
+}
+
+static int r36sx_ata_read_sector(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t fileoffset = 0;
+    if (drivenum < 2 || !disk_lba_to_fileoffset((uint8_t)drivenum,
+                                                ch->transfer_lba, 1,
+                                                &fileoffset)) {
+        return 0;
+    }
+    return r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
+                                   ch->data, sizeof(ch->data)) == 0;
+}
+
+static int r36sx_ata_write_sector(r36sx_ata_channel_t *ch)
+{
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t fileoffset = 0;
+    if (drivenum < 2 || disk[drivenum].readonly) {
+        ch->error = R36SX_ATA_ER_WP;
+        return 0;
+    }
+    if (!disk_lba_to_fileoffset((uint8_t)drivenum, ch->transfer_lba, 1,
+                                &fileoffset)) {
+        ch->error = R36SX_ATA_ER_IDNF;
+        return 0;
+    }
+    return r36sx_host_disk_write_at(disk[drivenum].diskfile,
+                                    &disk[drivenum].cache,
+                                    (uint8_t)drivenum, fileoffset,
+                                    ch->data, sizeof(ch->data), 1) == 0;
+}
+
+static void r36sx_ata_prepare_next_read(r36sx_ata_channel_t *ch)
+{
+    if (ch->sectors_remaining == 0) {
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        ch->status = R36SX_ATA_SR_DRDY;
+        return;
+    }
+    if (!r36sx_ata_read_sector(ch)) {
+        r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+        return;
+    }
+    ch->data_index = 0;
+    ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+}
+
+static void r36sx_ata_finish_sector(r36sx_ata_channel_t *ch)
+{
+    if (ch->phase == R36SX_ATA_PHASE_IDENTIFY) {
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        ch->status = R36SX_ATA_SR_DRDY;
+        ch->data_index = 0;
+        return;
+    }
+
+    if (ch->phase == R36SX_ATA_PHASE_READ) {
+        if (ch->sectors_remaining > 0) {
+            ch->sectors_remaining--;
+        }
+        ch->transfer_lba++;
+        r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+        r36sx_ata_prepare_next_read(ch);
+        return;
+    }
+
+    if (ch->phase == R36SX_ATA_PHASE_WRITE) {
+        if (!r36sx_ata_write_sector(ch)) {
+            r36sx_ata_fail(ch, ch->error ? ch->error : R36SX_ATA_ER_IDNF);
+            return;
+        }
+        if (ch->sectors_remaining > 0) {
+            ch->sectors_remaining--;
+        }
+        ch->transfer_lba++;
+        r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+        ch->data_index = 0;
+        if (ch->sectors_remaining == 0) {
+            ch->phase = R36SX_ATA_PHASE_NONE;
+            ch->status = R36SX_ATA_SR_DRDY;
+        } else {
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+        }
+    }
+}
+
+static uint8_t r36sx_ata_data_read8(r36sx_ata_channel_t *ch)
+{
+    uint8_t value = 0xffu;
+    if ((ch->status & R36SX_ATA_SR_DRQ) &&
+        (ch->phase == R36SX_ATA_PHASE_IDENTIFY ||
+         ch->phase == R36SX_ATA_PHASE_READ)) {
+        value = ch->data[ch->data_index++];
+        if (ch->data_index >= sizeof(ch->data)) {
+            r36sx_ata_finish_sector(ch);
+        }
+    }
+    return value;
+}
+
+static void r36sx_ata_data_write8(r36sx_ata_channel_t *ch, uint8_t value)
+{
+    if ((ch->status & R36SX_ATA_SR_DRQ) &&
+        ch->phase == R36SX_ATA_PHASE_WRITE) {
+        ch->data[ch->data_index++] = value;
+        if (ch->data_index >= sizeof(ch->data)) {
+            r36sx_ata_finish_sector(ch);
+        }
+    }
+}
+
+static void r36sx_ata_soft_reset(r36sx_ata_channel_t *ch)
+{
+    ch->feature = 0;
+    ch->error = 1;
+    ch->sector_count = 1;
+    ch->lba_low = 1;
+    ch->lba_mid = 0;
+    ch->lba_high = 0;
+    ch->device = (uint8_t)(0xa0u | (ch->selected ? 0x10u : 0u));
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+    ch->sectors_remaining = 0;
+    ch->status = r36sx_ata_drive_present(ch) ? R36SX_ATA_SR_DRDY : 0xffu;
+}
+
+void r36sx_ata_reset_all(void)
+{
+    memset(r36sx_ata_channels, 0, sizeof(r36sx_ata_channels));
+    r36sx_ata_channels[0].base = R36SX_ATA_PRIMARY_BASE;
+    r36sx_ata_channels[0].ctrl = R36SX_ATA_PRIMARY_CTRL;
+    r36sx_ata_channels[1].base = R36SX_ATA_SECONDARY_BASE;
+    r36sx_ata_channels[1].ctrl = R36SX_ATA_SECONDARY_CTRL;
+    r36sx_ata_channels[0].device = 0xa0u;
+    r36sx_ata_channels[1].device = 0xa0u;
+    r36sx_ata_initialized = 1;
+    r36sx_ata_soft_reset(&r36sx_ata_channels[0]);
+    r36sx_ata_soft_reset(&r36sx_ata_channels[1]);
+    r36sx_pico286_debug_log("ata: reset all primary=%02x secondary=%02x",
+                            r36sx_ata_channels[0].status,
+                            r36sx_ata_channels[1].status);
+}
+
+static void r36sx_ata_execute(r36sx_ata_channel_t *ch, uint8_t command)
+{
+    uint64_t lba = 0;
+    uint16_t count = r36sx_ata_sector_count(ch);
+    int drivenum = r36sx_ata_drive_for(ch);
+    size_t ignored_offset = 0;
+
+    if (!r36sx_ata_drive_present(ch)) {
+        ch->status = 0xffu;
+        ch->phase = R36SX_ATA_PHASE_NONE;
+        return;
+    }
+
+    ch->error = 0;
+    ch->status = R36SX_ATA_SR_DRDY;
+    ch->phase = R36SX_ATA_PHASE_NONE;
+    ch->data_index = 0;
+
+    switch (command) {
+        case 0xec: /* IDENTIFY DEVICE */
+            r36sx_ata_build_identify(ch);
+            ch->phase = R36SX_ATA_PHASE_IDENTIFY;
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+            return;
+
+        case 0x20: /* READ SECTORS */
+        case 0x21: /* READ SECTORS without retry */
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            ch->phase = R36SX_ATA_PHASE_READ;
+            ch->transfer_lba = lba;
+            ch->sectors_remaining = count;
+            r36sx_ata_prepare_next_read(ch);
+            return;
+
+        case 0x30: /* WRITE SECTORS */
+        case 0x31: /* WRITE SECTORS without retry */
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            if (disk[drivenum].readonly) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_WP);
+                return;
+            }
+            ch->phase = R36SX_ATA_PHASE_WRITE;
+            ch->transfer_lba = lba;
+            ch->sectors_remaining = count;
+            ch->data_index = 0;
+            ch->status = R36SX_ATA_SR_DRDY | R36SX_ATA_SR_DRQ;
+            return;
+
+        case 0x40: /* VERIFY SECTORS */
+        case 0x41:
+            if (!r36sx_ata_current_lba(ch, &lba) ||
+                !disk_lba_to_fileoffset((uint8_t)drivenum, lba, count,
+                                        &ignored_offset)) {
+                r36sx_ata_fail(ch, R36SX_ATA_ER_IDNF);
+                return;
+            }
+            ch->transfer_lba = lba + count;
+            r36sx_ata_update_lba_regs(ch, ch->transfer_lba);
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        case 0x10: /* RECALIBRATE */
+        case 0x70: /* SEEK */
+        case 0x91: /* INITIALIZE DEVICE PARAMETERS */
+        case 0xe3: /* IDLE */
+        case 0xe7: /* FLUSH CACHE */
+        case 0xef: /* SET FEATURES */
+            if (command == 0xe7) {
+                disk_flush_drive((uint8_t)drivenum, "ata-flush-cache");
+            }
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        case 0x90: /* EXECUTE DEVICE DIAGNOSTIC */
+            ch->error = 0x01u;
+            ch->status = R36SX_ATA_SR_DRDY;
+            return;
+
+        default:
+            r36sx_pico286_debug_log("ata: unsupported command=%02x drive=%d",
+                                    command, drivenum);
+            r36sx_ata_fail(ch, R36SX_ATA_ER_ABRT);
+            return;
+    }
+}
+
+uint8_t r36sx_ata_portin8(uint16_t portnum)
+{
+    uint8_t channel, offset, control;
+    r36sx_ata_channel_t *ch;
+    if (!r36sx_ata_decode_port(portnum, &channel, &offset, &control)) {
+        return 0xffu;
+    }
+    ch = &r36sx_ata_channels[channel];
+    r36sx_ata_ready_or_float(ch);
+    if (control) {
+        return ch->status;
+    }
+    switch (offset) {
+        case 0: return r36sx_ata_data_read8(ch);
+        case 1: return ch->error;
+        case 2: return ch->sector_count;
+        case 3: return ch->lba_low;
+        case 4: return ch->lba_mid;
+        case 5: return ch->lba_high;
+        case 6: return ch->device;
+        case 7: return ch->status;
+        default: return 0xffu;
+    }
+}
+
+uint16_t r36sx_ata_portin16(uint16_t portnum)
+{
+    uint16_t low = r36sx_ata_portin8(portnum);
+    uint16_t high = r36sx_ata_portin8(portnum);
+    return low | (uint16_t)(high << 8);
+}
+
+void r36sx_ata_portout8(uint16_t portnum, uint8_t value)
+{
+    uint8_t channel, offset, control;
+    r36sx_ata_channel_t *ch;
+    if (!r36sx_ata_decode_port(portnum, &channel, &offset, &control)) {
+        return;
+    }
+    ch = &r36sx_ata_channels[channel];
+    if (control) {
+        ch->device_control = value;
+        if (value & 0x04u) {
+            r36sx_ata_soft_reset(ch);
+        }
+        return;
+    }
+    switch (offset) {
+        case 0:
+            r36sx_ata_data_write8(ch, value);
+            return;
+        case 1:
+            ch->feature = value;
+            return;
+        case 2:
+            ch->sector_count = value;
+            return;
+        case 3:
+            ch->lba_low = value;
+            return;
+        case 4:
+            ch->lba_mid = value;
+            return;
+        case 5:
+            ch->lba_high = value;
+            return;
+        case 6:
+            ch->selected = (value & 0x10u) ? 1u : 0u;
+            ch->device = value;
+            r36sx_ata_ready_or_float(ch);
+            return;
+        case 7:
+            r36sx_ata_execute(ch, value);
+            return;
+    }
+}
+
+void r36sx_ata_portout16(uint16_t portnum, uint16_t value)
+{
+    r36sx_ata_portout8(portnum, (uint8_t)value);
+    r36sx_ata_portout8(portnum, (uint8_t)(value >> 8));
+}
+
 static void readdisk(uint8_t drivenum,
               uint16_t dstseg, uint16_t dstoff,
               uint16_t cyl, uint16_t sect, uint16_t head,
               uint16_t sectcount, int is_verify
 ) {
-    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
+    uint8_t memdest_ok;
+    uint32_t memdest = disk_guest_real_pointer(dstseg, dstoff, 1u,
+                                               &memdest_ok);
+    if (!memdest_ok) {
+        CPU_AH = 0x09;
+        CPU_FL_CF = 1;
+        return;
+    }
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -288,6 +1081,9 @@ static void readdisk(uint8_t drivenum,
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
+    const uint32_t memstart = memdest;
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_disk_word = 0;
 
     // Check if fileoffset is valid
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
@@ -302,7 +1098,25 @@ static void readdisk(uint8_t drivenum,
         return;
     }
 
-    if (!is_verify && disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    int use_bulk = !is_verify &&
+                   disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: read drive=%u chs=%u/%u/%u count=%u verify=%d es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, cyl, head, sect, sectcount, is_verify,
+        dstseg, dstoff, (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs read start drive=%u chs=%u/%u/%u count=%u verify=%d es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, cyl, head, sect, sectcount, is_verify, dstseg, dstoff,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount), a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
+
+    if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -334,6 +1148,10 @@ static void readdisk(uint8_t drivenum,
             CPU_AL = cursect;
             CPU_FL_CF = 1;
             return;
+        }
+        if (cursect == 0) {
+            first_disk_word = disk_first4_from_buffer(sectorbuffer,
+                                                      sizeof(sectorbuffer));
         }
 
         if (is_verify) {
@@ -373,6 +1191,15 @@ static void readdisk(uint8_t drivenum,
     CPU_AL = cursect;
     CPU_FL_CF = 0;
     CPU_AH = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs read done drive=%u count=%u linear=%05lx mem=%s first_disk=%08lx first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_disk_word,
+            (unsigned long)disk_first4_from_memory(memstart, bytecount),
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
 }
 
 static void writedisk(uint8_t drivenum,
@@ -380,7 +1207,14 @@ static void writedisk(uint8_t drivenum,
                uint16_t cyl, uint16_t sect, uint16_t head,
                uint16_t sectcount
 ) {
-    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
+    uint8_t memdest_ok;
+    uint32_t memdest = disk_guest_real_pointer(dstseg, dstoff, 0u,
+                                               &memdest_ok);
+    if (!memdest_ok) {
+        CPU_AH = 0x09;
+        CPU_FL_CF = 1;
+        return;
+    }
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -407,6 +1241,9 @@ static void writedisk(uint8_t drivenum,
     // Convert CHS to file offset
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
+    const uint32_t memstart = memdest;
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_mem_word = 0;
 
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
         r36sx_pico286_debug_log(
@@ -428,7 +1265,26 @@ static void writedisk(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    R36SX_DISK_TRACE_LOG(
+        "disk: write drive=%u chs=%u/%u/%u count=%u es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, cyl, head, sect, sectcount,
+        dstseg, dstoff, (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        first_mem_word = disk_first4_from_memory(memstart, bytecount);
+        r36sx_pico286_debug_log(
+            "diskdbg: chs write start drive=%u chs=%u/%u/%u count=%u es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, cyl, head, sect, sectcount, dstseg, dstoff,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
+
+    if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -484,6 +1340,14 @@ static void writedisk(uint8_t drivenum,
     CPU_AL = cursect;
     CPU_FL_CF = 0;
     CPU_AH = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs write done drive=%u count=%u linear=%05lx mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP);
+    }
 }
 
 static void readdisk_lba(uint8_t drivenum,
@@ -521,7 +1385,27 @@ static void readdisk_lba(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    const uint32_t memstart = memdest;
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_disk_word = 0;
+    R36SX_DISK_TRACE_LOG(
+        "disk: lba read drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, (unsigned long)lba, sectcount,
+        (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba read start drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount), a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
+
+    if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
                                     &RAM[memdest], bytecount) != 0) {
             r36sx_pico286_debug_log(
@@ -551,6 +1435,10 @@ static void readdisk_lba(uint8_t drivenum,
             return;
         }
 
+        if (cursect == 0) {
+            first_disk_word = disk_first4_from_buffer(sectorbuffer,
+                                                      sizeof(sectorbuffer));
+        }
         for (int sectoffset = 0; sectoffset < 512; sectoffset++) {
             write86(memdest++, sectorbuffer[sectoffset]);
         }
@@ -559,6 +1447,15 @@ static void readdisk_lba(uint8_t drivenum,
     CPU_AH = 0;
     CPU_AL = (uint8_t)cursect;
     CPU_FL_CF = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba read done drive=%u count=%u linear=%05lx mem=%s first_disk=%08lx first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_disk_word,
+            (unsigned long)disk_first4_from_memory(memstart, bytecount),
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
 }
 
 static void writedisk_lba(uint8_t drivenum,
@@ -605,7 +1502,29 @@ static void writedisk_lba(uint8_t drivenum,
         return;
     }
 
-    if (disk_memory_range_is_plain_ram(memdest, bytecount)) {
+    const uint32_t memstart = memdest;
+    int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_mem_word = 0;
+    R36SX_DISK_TRACE_LOG(
+        "disk: lba write drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
+        drivenum, (unsigned long)lba, sectcount,
+        (unsigned long)memstart, (unsigned long)bytecount,
+        disk_memory_range_name(memstart, bytecount),
+        use_bulk ? "bulk" : "mapped",
+        a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        first_mem_word = disk_first4_from_memory(memstart, bytecount);
+        r36sx_pico286_debug_log(
+            "diskdbg: lba write start drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
+
+    if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
                                      &disk[drivenum].cache, drivenum,
                                      fileoffset, &RAM[memdest], bytecount,
@@ -646,6 +1565,14 @@ static void writedisk_lba(uint8_t drivenum,
     CPU_AH = 0;
     CPU_AL = (uint8_t)cursect;
     CPU_FL_CF = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba write done drive=%u count=%u linear=%05lx mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP);
+    }
 }
 
 typedef struct disk_address_packet_s {
@@ -655,6 +1582,7 @@ typedef struct disk_address_packet_s {
 } disk_address_packet_t;
 
 static int disk_read_address_packet(uint32_t dap,
+                                    uint8_t buffer_write_access,
                                     disk_address_packet_t *packet) {
     uint8_t packet_size = read86(dap);
     uint8_t reserved = read86(dap + 1u);
@@ -664,25 +1592,61 @@ static int disk_read_address_packet(uint32_t dap,
     uint64_t lba = disk_mem_read64(dap + 8u);
 
     if (packet_size < 0x10u || reserved != 0 || sector_count > 127u) {
+        R36SX_DISK_TRACE_LOG(
+            "disk: dap invalid addr=%05lx size=%u reserved=%u count=%u buffer=%04x:%04x lba=%lu",
+            (unsigned long)dap, packet_size, reserved, sector_count,
+            buffer_segment, buffer_offset, (unsigned long)lba);
         return 0;
     }
 
     if (buffer_offset == 0xffffu && buffer_segment == 0xffffu) {
         uint64_t flat_buffer;
         if (packet_size < 0x18u) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid flat addr=%05lx size=%u lba=%lu",
+                (unsigned long)dap, packet_size, (unsigned long)lba);
             return 0;
         }
         flat_buffer = disk_mem_read64(dap + 16u);
         if (flat_buffer > 0xffffffffULL) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid flat buffer=%lu addr=%05lx",
+                (unsigned long)flat_buffer, (unsigned long)dap);
             return 0;
         }
         packet->buffer = (uint32_t)flat_buffer;
     } else {
-        packet->buffer = disk_real_mode_linear(buffer_segment, buffer_offset);
+        uint8_t buffer_ok;
+        packet->buffer = disk_guest_real_pointer(buffer_segment, buffer_offset,
+                                                 buffer_write_access,
+                                                 &buffer_ok);
+        if (!buffer_ok) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid translated buffer=%04x:%04x addr=%05lx",
+                buffer_segment, buffer_offset, (unsigned long)dap);
+            return 0;
+        }
     }
 
     packet->sector_count = sector_count;
     packet->lba = lba;
+    R36SX_DISK_TRACE_LOG(
+        "disk: dap addr=%05lx count=%u buffer=%05lx mem=%s lba=%lu",
+        (unsigned long)dap, sector_count, (unsigned long)packet->buffer,
+        disk_memory_range_name(packet->buffer, (size_t)sector_count * 512UL),
+        (unsigned long)lba);
+    if (disk_should_log_mapped_transfer(
+            packet->buffer, (size_t)sector_count * 512UL) ||
+        disk_should_log_mapped_transfer(dap, packet_size)) {
+        r36sx_pico286_debug_log(
+            "diskdbg: dap addr=%05lx size=%u count=%u buffer=%05lx mem=%s dapmem=%s lba=%lu a20=%d caller=%04x:%08lx",
+            (unsigned long)dap, packet_size, sector_count,
+            (unsigned long)packet->buffer,
+            disk_memory_range_name(packet->buffer,
+                                   (size_t)sector_count * 512UL),
+            disk_memory_range_name(dap, packet_size), (unsigned long)lba,
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
     return 1;
 }
 
@@ -691,16 +1655,19 @@ static inline void disk_set_extended_count(uint32_t dap, uint16_t count) {
 }
 
 static void disk_get_extended_parameters(uint8_t drivenum) {
-    uint32_t result = disk_real_mode_linear(CPU_DS, CPU_SI);
-    uint16_t requested_size = disk_mem_read16(result);
+    uint8_t result_ok;
+    uint32_t result = disk_guest_real_pointer(CPU_DS, CPU_SI, 1u,
+                                              &result_ok);
+    uint16_t requested_size;
     uint16_t returned_size;
     uint64_t total_sectors;
 
-    if (!disk[drivenum].inserted || drivenum < 2) {
+    if (!result_ok || !disk[drivenum].inserted || drivenum < 2) {
         CPU_AH = 0x31;    // no media in drive
         CPU_FL_CF = 1;
         return;
     }
+    requested_size = disk_mem_read16(result);
     if (requested_size < 26u) {
         CPU_AH = 0x01;    // invalid command or parameter
         CPU_FL_CF = 1;
@@ -794,10 +1761,12 @@ static INLINE void diskhandler() {
 
         case 0x08:  // Get drive parameters
             if (disk[drivenum].inserted) {
+                uint16_t max_cyl = disk[drivenum].cyls - 1u;
                 CPU_FL_CF = 0;
                 CPU_AH = 0;
-                CPU_CH = disk[drivenum].cyls - 1;
-                CPU_CL = (disk[drivenum].sects & 63) + ((disk[drivenum].cyls / 256) * 64);
+                CPU_CH = (uint8_t)max_cyl;
+                CPU_CL = (disk[drivenum].sects & 63) |
+                         (uint8_t)((max_cyl >> 2) & 0xC0);
                 CPU_DH = disk[drivenum].heads - 1;
 
                 // Set DL and BL for floppy or hard drive
@@ -828,10 +1797,9 @@ static INLINE void diskhandler() {
             if (disk[drivenum].inserted) {
                 CPU_FL_CF = 0;
                 if (drivenum >= 2) {
-                    uint32_t total_sectors =
-                        (uint32_t)disk[drivenum].cyls *
-                        (uint32_t)disk[drivenum].heads *
-                        (uint32_t)disk[drivenum].sects;
+                    uint64_t total_sectors64 = disk_total_sectors(drivenum);
+                    uint32_t total_sectors = total_sectors64 > 0xffffffffULL ?
+                        0xffffffffUL : (uint32_t)total_sectors64;
                     CPU_AH = 0x03;  // Fixed disk.
                     CPU_CX = (uint16_t)(total_sectors >> 16);
                     CPU_DX = (uint16_t)(total_sectors & 0xFFFF);
@@ -859,9 +1827,12 @@ static INLINE void diskhandler() {
 
         case 0x42:  // Extended read using a Disk Address Packet at DS:SI
         {
-            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            uint8_t dap_ok;
+            uint32_t dap = disk_guest_real_pointer(CPU_DS, CPU_SI, 0u,
+                                                   &dap_ok);
             disk_address_packet_t packet;
-            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+            if (drivenum < 2 || !dap_ok ||
+                !disk_read_address_packet(dap, 1u, &packet)) {
                 CPU_AH = 0x01;      // Invalid command or parameter.
                 CPU_AL = 0;
                 CPU_FL_CF = 1;
@@ -876,9 +1847,12 @@ static INLINE void diskhandler() {
 
         case 0x43:  // Extended write using a Disk Address Packet at DS:SI
         {
-            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            uint8_t dap_ok;
+            uint32_t dap = disk_guest_real_pointer(CPU_DS, CPU_SI, 0u,
+                                                   &dap_ok);
             disk_address_packet_t packet;
-            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+            if (drivenum < 2 || !dap_ok ||
+                !disk_read_address_packet(dap, 0u, &packet)) {
                 CPU_AH = 0x01;      // Invalid command or parameter.
                 CPU_AL = 0;
                 CPU_FL_CF = 1;

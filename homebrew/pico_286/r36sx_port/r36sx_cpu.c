@@ -5,15 +5,24 @@
 #include <unistd.h>
 #endif
 #include "emulator.h"
+#include "r36sx_cpu.h"
 #include "r36sx_cpu_internal.h"
 #include "r36sx_debug_config.h"
 #include "r36sx_disk_config.h"
+
+#if !PICO_ON_DEVICE
+extern void r36sx_emergency_dump_request(uint8_t code, const char *reason);
+#endif
 
 #define CPU_ALLOW_ILLEGAL_OP_EXCEPTION
 #define CPU_LIMIT_SHIFT_COUNT
 #define CPU_NO_SALC
 #define CPU_286_STYLE_PUSH_SP
 #define R36SX_REP_BATCH_MAX 1024u
+static uint32_t r36sx_cpu_translate_guest_real_pointer(uint16_t segment,
+                                                       uint16_t offset,
+                                                       uint8_t write_access,
+                                                       uint8_t *ok);
 #ifndef R36SX_CPU_COMPUTED_GOTO
 #if defined(__GNUC__) || defined(__clang__)
 #define R36SX_CPU_COMPUTED_GOTO 1
@@ -370,6 +379,7 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_EXCEPTION_INVALID_OPCODE 6u
 #define R36SX_EXCEPTION_BOUND 5u
 #define R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE 7u
+#define R36SX_EXCEPTION_DOUBLE_FAULT 8u
 #define R36SX_EXCEPTION_INVALID_TSS 10u
 #define R36SX_EXCEPTION_NOT_PRESENT 11u
 #define R36SX_EXCEPTION_STACK 12u
@@ -415,6 +425,10 @@ static uint32_t r36sx_cpu_fault_ip_context;
  * the handler.
  */
 static uint8_t r36sx_cpu_exception_pending;
+static uint8_t r36sx_cpu_exception_delivery_depth;
+static uint8_t r36sx_cpu_exception_delivery_vector;
+static uint8_t r36sx_cpu_exception_abort_delivery_depth;
+static uint8_t r36sx_cpu_triple_fault_latched;
 static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint16_t r36sx_debug_resume_cs;
@@ -422,6 +436,19 @@ static uint32_t r36sx_debug_resume_ip;
 static uint32_t r36sx_debug_pending_dr6_hits;
 static uint8_t r36sx_debug_resume_valid;
 static uint8_t r36sx_debug_suppress_watchpoints;
+static r36sx_cpu_debug_host_breakpoint_t
+    r36sx_cpu_debug_host_breakpoints[R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS];
+static volatile uint8_t r36sx_cpu_debug_host_breakpoints_active;
+static volatile uint8_t r36sx_cpu_debug_host_breakpoint_pause;
+static uint8_t r36sx_cpu_debug_host_breakpoint_resume_valid;
+static uint8_t r36sx_cpu_debug_host_breakpoint_hit_linear;
+static int32_t r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+static uint16_t r36sx_cpu_debug_host_breakpoint_resume_cs;
+static uint16_t r36sx_cpu_debug_host_breakpoint_hit_cs;
+static uint32_t r36sx_cpu_debug_host_breakpoint_resume_ip;
+static uint32_t r36sx_cpu_debug_host_breakpoint_hit_ip;
+static uint32_t r36sx_cpu_debug_host_breakpoint_hit_linear_address;
+static uint64_t r36sx_cpu_debug_host_breakpoint_hit_count;
 static uint32_t r36sx_gdtr_base;
 static uint32_t r36sx_idtr_base;
 static uint16_t r36sx_gdtr_limit;
@@ -517,12 +544,57 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint8_t has_error_code,
                                       uint32_t fault_ip);
 static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy);
+static inline uint8_t r36sx_cpu_system_read_linear8(uint32_t linear);
+static inline uint16_t r36sx_cpu_system_read_linear16(uint32_t linear);
+static inline uint32_t r36sx_cpu_system_read_linear32(uint32_t linear);
+static inline void r36sx_cpu_system_write_linear8(uint32_t linear,
+                                                  uint8_t value);
+static inline void r36sx_cpu_system_write_linear16(uint32_t linear,
+                                                   uint16_t value);
+static inline void r36sx_cpu_system_write_linear32(uint32_t linear,
+                                                   uint32_t value);
 void intcall86(uint8_t intnum);
 static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip);
 
 static inline uint8_t r36sx_cpu_exception_is_pending(void)
 {
     return r36sx_cpu_exception_pending;
+}
+
+static inline uint8_t r36sx_cpu_exception_delivery_should_abort(void)
+{
+    return r36sx_cpu_exception_abort_delivery_depth != 0u &&
+           r36sx_cpu_exception_delivery_depth <=
+               r36sx_cpu_exception_abort_delivery_depth;
+}
+
+static void r36sx_cpu_latch_triple_fault(uint8_t intnum,
+                                         uint32_t error_code,
+                                         uint8_t has_error_code,
+                                         uint32_t fault_ip)
+{
+    if (r36sx_cpu_triple_fault_latched) {
+        r36sx_cpu_exception_pending = 1u;
+        return;
+    }
+
+    r36sx_cpu_triple_fault_latched = 1u;
+    r36sx_cpu_exception_pending = 1u;
+    if (r36sx_cpu_exception_delivery_depth != 0u) {
+        r36sx_cpu_exception_abort_delivery_depth =
+            r36sx_cpu_exception_delivery_depth;
+    }
+
+    r36sx_pico286_debug_log(
+        "[PM] triple fault int=%02X err=%08lX has_err=%u "
+        "active=%02X depth=%u cs:eip=%04X:%08lX",
+        intnum, (unsigned long)error_code, has_error_code,
+        r36sx_cpu_exception_delivery_vector,
+        r36sx_cpu_exception_delivery_depth, CPU_CS,
+        (unsigned long)fault_ip);
+#if !PICO_ON_DEVICE
+    r36sx_emergency_dump_request(0xdfu, "cpu-triple-fault");
+#endif
 }
 
 /* 80286 protected-mode state, descriptors, and selector loading. */
@@ -851,6 +923,207 @@ static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
     r36sx_debug_resume_valid = 1;
     r36sx_cpu_raise_debug_exception(fault_ip, hits);
     return 1;
+}
+
+static void r36sx_cpu_debug_host_breakpoint_refresh_active(void)
+{
+    uint8_t count = 0;
+
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        if (r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+            count++;
+        }
+    }
+    r36sx_cpu_debug_host_breakpoints_active = count;
+}
+
+static uint8_t r36sx_cpu_debug_host_breakpoint_current_linear(
+    uint32_t fault_ip,
+    uint32_t *linear)
+{
+    return r36sx_cpu_segment_linear_checked(CPU_CS, fault_ip, 1u, 0, 1,
+                                            linear);
+}
+
+static uint8_t r36sx_cpu_debug_host_breakpoint_check(uint32_t fault_ip)
+{
+    uint32_t linear = 0;
+    uint8_t linear_valid = 0;
+
+    if (r36sx_cpu_debug_host_breakpoint_pause) {
+        return 1;
+    }
+    if (!r36sx_cpu_debug_host_breakpoints_active) {
+        return 0;
+    }
+    if (r36sx_cpu_debug_host_breakpoint_resume_valid &&
+        r36sx_cpu_debug_host_breakpoint_resume_cs == CPU_CS &&
+        r36sx_cpu_debug_host_breakpoint_resume_ip == fault_ip) {
+        r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+        return 0;
+    }
+
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        r36sx_cpu_debug_host_breakpoint_t *bp =
+            &r36sx_cpu_debug_host_breakpoints[slot];
+        uint8_t matched = 0;
+
+        if (!bp->enabled) {
+            continue;
+        }
+        if (bp->linear) {
+            if (!linear_valid) {
+                if (!r36sx_cpu_debug_host_breakpoint_current_linear(fault_ip,
+                                                                    &linear)) {
+                    return 1;
+                }
+                linear_valid = 1;
+            }
+            matched = linear == bp->linear_address;
+        } else {
+            matched = bp->cs == CPU_CS && bp->eip == fault_ip;
+        }
+        if (!matched) {
+            continue;
+        }
+
+        bp->hit_count++;
+        r36sx_cpu_debug_host_breakpoint_pause = 1;
+        r36sx_cpu_debug_host_breakpoint_hit_slot = (int32_t)slot;
+        r36sx_cpu_debug_host_breakpoint_hit_linear = bp->linear;
+        r36sx_cpu_debug_host_breakpoint_hit_cs = CPU_CS;
+        r36sx_cpu_debug_host_breakpoint_hit_ip = fault_ip;
+        if (bp->linear && linear_valid) {
+            r36sx_cpu_debug_host_breakpoint_hit_linear_address = linear;
+        } else {
+            r36sx_cpu_debug_host_breakpoint_hit_linear_address =
+                ((uint32_t)CPU_CS << 4) + fault_ip;
+        }
+        r36sx_cpu_debug_host_breakpoint_hit_count = bp->hit_count;
+        r36sx_pico286_debug_log(
+            "debugctl: breakpoint hit slot=%lu cs:eip=%04X:%08lX linear=%08lX hits=%llu",
+            (unsigned long)slot, CPU_CS, (unsigned long)fault_ip,
+            (unsigned long)r36sx_cpu_debug_host_breakpoint_hit_linear_address,
+            (unsigned long long)bp->hit_count);
+        return 1;
+    }
+    return 0;
+}
+
+int r36sx_cpu_debug_host_breakpoint_add(uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t ip_value,
+                                        uint32_t linear_address,
+                                        uint32_t *slot_out)
+{
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        if (!r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+            int rc = r36sx_cpu_debug_host_breakpoint_set(
+                slot, linear, cs, ip_value, linear_address);
+            if (rc == 0 && slot_out) {
+                *slot_out = slot;
+            }
+            return rc;
+        }
+    }
+    return -1;
+}
+
+int r36sx_cpu_debug_host_breakpoint_set(uint32_t slot,
+                                        uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t ip_value,
+                                        uint32_t linear_address)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS) {
+        return -1;
+    }
+
+    r36sx_cpu_debug_host_breakpoints[slot].enabled = 1;
+    r36sx_cpu_debug_host_breakpoints[slot].linear = linear ? 1u : 0u;
+    r36sx_cpu_debug_host_breakpoints[slot].cs = cs;
+    r36sx_cpu_debug_host_breakpoints[slot].eip = ip_value;
+    r36sx_cpu_debug_host_breakpoints[slot].linear_address = linear_address;
+    r36sx_cpu_debug_host_breakpoints[slot].hit_count = 0;
+    r36sx_cpu_debug_host_breakpoint_refresh_active();
+    return 0;
+}
+
+int r36sx_cpu_debug_host_breakpoint_remove(uint32_t slot)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS ||
+        !r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+        return -1;
+    }
+    memset(&r36sx_cpu_debug_host_breakpoints[slot], 0,
+           sizeof(r36sx_cpu_debug_host_breakpoints[slot]));
+    r36sx_cpu_debug_host_breakpoint_refresh_active();
+    if (r36sx_cpu_debug_host_breakpoint_hit_slot == (int32_t)slot) {
+        r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+    }
+    return 0;
+}
+
+void r36sx_cpu_debug_host_breakpoint_clear_all(void)
+{
+    memset(r36sx_cpu_debug_host_breakpoints, 0,
+           sizeof(r36sx_cpu_debug_host_breakpoints));
+    r36sx_cpu_debug_host_breakpoints_active = 0;
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+    r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+    r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+}
+
+void r36sx_cpu_debug_host_breakpoint_continue(void)
+{
+    if (r36sx_cpu_debug_host_breakpoint_pause) {
+        r36sx_cpu_debug_host_breakpoint_resume_cs =
+            r36sx_cpu_debug_host_breakpoint_hit_cs;
+        r36sx_cpu_debug_host_breakpoint_resume_ip =
+            r36sx_cpu_debug_host_breakpoint_hit_ip;
+        r36sx_cpu_debug_host_breakpoint_resume_valid = 1;
+    }
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+}
+
+uint8_t r36sx_cpu_debug_host_breakpoint_paused(void)
+{
+    return r36sx_cpu_debug_host_breakpoint_pause != 0;
+}
+
+void r36sx_cpu_debug_host_breakpoint_status(
+    r36sx_cpu_debug_host_breakpoint_status_t *status)
+{
+    if (!status) {
+        return;
+    }
+    memset(status, 0, sizeof(*status));
+    status->paused = r36sx_cpu_debug_host_breakpoint_pause != 0;
+    status->active_count = r36sx_cpu_debug_host_breakpoints_active;
+    status->hit_slot = r36sx_cpu_debug_host_breakpoint_hit_slot;
+    status->hit_linear = r36sx_cpu_debug_host_breakpoint_hit_linear;
+    status->hit_cs = r36sx_cpu_debug_host_breakpoint_hit_cs;
+    status->hit_ip = r36sx_cpu_debug_host_breakpoint_hit_ip;
+    status->hit_linear_address =
+        r36sx_cpu_debug_host_breakpoint_hit_linear_address;
+    status->hit_count = r36sx_cpu_debug_host_breakpoint_hit_count;
+}
+
+int r36sx_cpu_debug_host_breakpoint_get(
+    uint32_t slot,
+    r36sx_cpu_debug_host_breakpoint_t *breakpoint)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS || !breakpoint) {
+        return -1;
+    }
+    *breakpoint = r36sx_cpu_debug_host_breakpoints[slot];
+    return r36sx_cpu_debug_host_breakpoints[slot].enabled ? 0 : -1;
 }
 
 static inline void r36sx_cpu_debug_note_data_write(uint32_t linear,
@@ -1790,9 +2063,10 @@ static inline void r36sx_cpu_phys_write32(uint32_t address, uint32_t value)
 #endif
 }
 
-static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
-                                          uint8_t write_access,
-                                          uint32_t *physical)
+static uint8_t r36sx_cpu_translate_linear_access(uint32_t linear,
+                                                 uint8_t write_access,
+                                                 uint8_t user_access,
+                                                 uint32_t *physical)
 {
     if ((r36sx_cr0 & R36SX_CR0_PG) == 0) {
         *physical = linear;
@@ -1802,7 +2076,6 @@ static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
     uint32_t pde_addr = (r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK) |
                         (((linear >> 22) & 0x3ffu) << 2);
     uint32_t pde = r36sx_cpu_phys_read32(pde_addr);
-    uint8_t user_access = r36sx_cpu_cpl() == 3u;
     uint32_t error_code = (write_access ? 0x02u : 0u) |
                           (user_access ? 0x04u : 0u);
 
@@ -1850,6 +2123,107 @@ static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
 
     *physical = (pte & R36SX_PAGE_FRAME_MASK) | (linear & 0x0fffu);
     return 1;
+}
+
+uint8_t r36sx_cpu_debug_translate_linear(uint32_t linear,
+                                         uint8_t write_access,
+                                         uint8_t user_access,
+                                         uint32_t *physical,
+                                         uint32_t *pde,
+                                         uint32_t *pte)
+{
+    if (physical) {
+        *physical = linear;
+    }
+    if (pde) {
+        *pde = 0;
+    }
+    if (pte) {
+        *pte = 0;
+    }
+
+    if ((r36sx_cr0 & R36SX_CR0_PG) == 0) {
+        return 1;
+    }
+
+    uint32_t pde_addr = (r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK) |
+                        (((linear >> 22) & 0x3ffu) << 2);
+    uint32_t pde_value = r36sx_cpu_phys_read32(pde_addr);
+    if (pde) {
+        *pde = pde_value;
+    }
+    if ((pde_value & R36SX_PAGE_PRESENT) == 0) {
+        return 0;
+    }
+
+    uint32_t pte_addr = (pde_value & R36SX_PAGE_FRAME_MASK) |
+                        (((linear >> 12) & 0x3ffu) << 2);
+    uint32_t pte_value = r36sx_cpu_phys_read32(pte_addr);
+    if (pte) {
+        *pte = pte_value;
+    }
+    if ((pte_value & R36SX_PAGE_PRESENT) == 0) {
+        return 0;
+    }
+
+    if (user_access) {
+        if (((pde_value & R36SX_PAGE_USER) == 0) ||
+            ((pte_value & R36SX_PAGE_USER) == 0) ||
+            (write_access &&
+             (((pde_value & R36SX_PAGE_WRITABLE) == 0) ||
+              ((pte_value & R36SX_PAGE_WRITABLE) == 0)))) {
+            return 0;
+        }
+    }
+
+    if (physical) {
+        *physical = (pte_value & R36SX_PAGE_FRAME_MASK) |
+                    (linear & 0x0fffu);
+    }
+    return 1;
+}
+
+static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
+                                          uint8_t write_access,
+                                          uint32_t *physical)
+{
+    return r36sx_cpu_translate_linear_access(
+        linear, write_access, r36sx_cpu_cpl() == 3u, physical);
+}
+
+static uint8_t r36sx_cpu_translate_system_linear(uint32_t linear,
+                                                 uint8_t write_access,
+                                                 uint32_t *physical)
+{
+    return r36sx_cpu_translate_linear_access(linear, write_access, 0, physical);
+}
+
+static uint32_t r36sx_cpu_translate_guest_real_pointer(uint16_t segment,
+                                                       uint16_t offset,
+                                                       uint8_t write_access,
+                                                       uint8_t *ok)
+{
+    uint32_t linear = ((uint32_t)segment << 4) + (uint32_t)offset;
+    if (ok) {
+        *ok = 1u;
+    }
+
+#if R36SX_ENABLE_PROTECTED_MODE
+    if ((r36sx_cr0 & R36SX_CR0_PG) != 0u) {
+        uint32_t physical;
+        if (!r36sx_cpu_translate_linear_access(
+                linear, write_access, r36sx_cpu_cpl() == 3u, &physical)) {
+            if (ok) {
+                *ok = 0u;
+            }
+            return linear;
+        }
+        return physical;
+    }
+#else
+    (void)write_access;
+#endif
+    return linear;
 }
 
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear)
@@ -1928,6 +2302,85 @@ static inline void r36sx_cpu_write_linear32(uint32_t linear, uint32_t value)
         return;
     }
     r36sx_cpu_debug_note_data_write(linear, 4u);
+    r36sx_cpu_phys_write32(physical, value);
+}
+
+static inline uint8_t r36sx_cpu_system_read_linear8(uint32_t linear)
+{
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 0, &physical)) {
+        return 0xffu;
+    }
+    return read86_ob(physical);
+}
+
+static inline uint16_t r36sx_cpu_system_read_linear16(uint32_t linear)
+{
+    if ((linear & 0x0fffu) == 0x0fffu) {
+        return (uint16_t)r36sx_cpu_system_read_linear8(linear) |
+               ((uint16_t)r36sx_cpu_system_read_linear8(linear + 1u) << 8);
+    }
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 0, &physical)) {
+        return 0xffffu;
+    }
+    return r36sx_cpu_phys_read16(physical);
+}
+
+static inline uint32_t r36sx_cpu_system_read_linear32(uint32_t linear)
+{
+    if ((linear & 0x0fffu) > 0x0ffcu) {
+        return (uint32_t)r36sx_cpu_system_read_linear8(linear) |
+               ((uint32_t)r36sx_cpu_system_read_linear8(linear + 1u) << 8) |
+               ((uint32_t)r36sx_cpu_system_read_linear8(linear + 2u) << 16) |
+               ((uint32_t)r36sx_cpu_system_read_linear8(linear + 3u) << 24);
+    }
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 0, &physical)) {
+        return 0xffffffffu;
+    }
+    return r36sx_cpu_phys_read32(physical);
+}
+
+static inline void r36sx_cpu_system_write_linear8(uint32_t linear,
+                                                  uint8_t value)
+{
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 1, &physical)) {
+        return;
+    }
+    write86_ob(physical, value);
+}
+
+static inline void r36sx_cpu_system_write_linear16(uint32_t linear,
+                                                   uint16_t value)
+{
+    if ((linear & 0x0fffu) == 0x0fffu) {
+        r36sx_cpu_system_write_linear8(linear, (uint8_t)value);
+        r36sx_cpu_system_write_linear8(linear + 1u, (uint8_t)(value >> 8));
+        return;
+    }
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 1, &physical)) {
+        return;
+    }
+    r36sx_cpu_phys_write16(physical, value);
+}
+
+static inline void r36sx_cpu_system_write_linear32(uint32_t linear,
+                                                   uint32_t value)
+{
+    if ((linear & 0x0fffu) > 0x0ffcu) {
+        r36sx_cpu_system_write_linear8(linear, (uint8_t)value);
+        r36sx_cpu_system_write_linear8(linear + 1u, (uint8_t)(value >> 8));
+        r36sx_cpu_system_write_linear8(linear + 2u, (uint8_t)(value >> 16));
+        r36sx_cpu_system_write_linear8(linear + 3u, (uint8_t)(value >> 24));
+        return;
+    }
+    uint32_t physical;
+    if (!r36sx_cpu_translate_system_linear(linear, 1, &physical)) {
+        return;
+    }
     r36sx_cpu_phys_write32(physical, value);
 }
 
@@ -2390,8 +2843,8 @@ static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy)
         return 0;
     }
 
-    uint32_t lo = readdw86(descriptor_address);
-    uint32_t hi = readdw86(descriptor_address + 4u);
+    uint32_t lo = r36sx_cpu_system_read_linear32(descriptor_address);
+    uint32_t hi = r36sx_cpu_system_read_linear32(descriptor_address + 4u);
     r36sx_segment_cache_t cache;
     r36sx_cpu_fill_descriptor_cache(selector, lo, hi, &cache);
     uint8_t type = r36sx_descriptor_type(&cache);
@@ -2418,7 +2871,7 @@ static uint8_t r36sx_cpu_set_tss_busy(uint16_t selector, uint8_t busy)
     uint8_t new_access =
         (cache.access & (uint8_t)~R36SX_DESCRIPTOR_SYSTEM_TYPE_MASK) |
         new_type;
-    write86(descriptor_address + 5u, new_access);
+    r36sx_cpu_system_write_linear8(descriptor_address + 5u, new_access);
 
     if ((r36sx_tr_selector & 0xfffcu) == (selector & 0xfffcu)) {
         r36sx_tr_cache.access = new_access;
@@ -2454,8 +2907,8 @@ static uint8_t r36sx_cpu_decode_descriptor_raw(uint16_t selector,
     }
 
     uint32_t addr = table_base + descriptor_offset;
-    *lo = readdw86(addr);
-    *hi = readdw86(addr + 4u);
+    *lo = r36sx_cpu_system_read_linear32(addr);
+    *hi = r36sx_cpu_system_read_linear32(addr + 4u);
     r36sx_cpu_fill_descriptor_cache(selector, *lo, *hi, cache);
     return 1;
 }
@@ -2672,8 +3125,10 @@ static uint8_t r36sx_cpu_tss_stack_for_level(uint8_t cpl,
                                       r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
             return 0;
         }
-        *new_sp = readdw86(r36sx_tr_cache.base + offset);
-        *new_ss = readw86(r36sx_tr_cache.base + offset + 4u);
+        *new_sp = r36sx_cpu_system_read_linear32(
+            r36sx_tr_cache.base + offset);
+        *new_ss = r36sx_cpu_system_read_linear16(
+            r36sx_tr_cache.base + offset + 4u);
         return 1;
     }
 
@@ -2686,8 +3141,10 @@ static uint8_t r36sx_cpu_tss_stack_for_level(uint8_t cpl,
                                       r36sx_tr_selector & 0xfffcu, 1, CPU_IP);
             return 0;
         }
-        *new_sp = readw86(r36sx_tr_cache.base + offset);
-        *new_ss = readw86(r36sx_tr_cache.base + offset + 2u);
+        *new_sp = r36sx_cpu_system_read_linear16(
+            r36sx_tr_cache.base + offset);
+        *new_ss = r36sx_cpu_system_read_linear16(
+            r36sx_tr_cache.base + offset + 2u);
         return 1;
     }
 
@@ -2750,8 +3207,8 @@ static uint8_t r36sx_cpu_require_io_permission(uint16_t port,
         return 0;
     }
 
-    uint32_t bitmap_base = readw86(r36sx_tr_cache.base +
-                                   R36SX_TSS32_IOMAP_BASE);
+    uint32_t bitmap_base = r36sx_cpu_system_read_linear16(
+        r36sx_tr_cache.base + R36SX_TSS32_IOMAP_BASE);
     for (uint32_t checked_port = port; checked_port < end_port;
          checked_port++) {
         uint32_t bitmap_byte_offset =
@@ -2761,8 +3218,8 @@ static uint8_t r36sx_cpu_require_io_permission(uint16_t port,
             r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
             return 0;
         }
-        uint8_t bitmap =
-            read86(r36sx_tr_cache.base + bitmap_byte_offset);
+        uint8_t bitmap = r36sx_cpu_system_read_linear8(
+            r36sx_tr_cache.base + bitmap_byte_offset);
         uint8_t bit =
             (uint8_t)(checked_port % R36SX_IO_PERMISSION_BITS_PER_BYTE);
         if (bitmap & (uint8_t)(1u << bit)) {
@@ -2840,43 +3297,47 @@ static void r36sx_cpu_save_tss_state(const r36sx_segment_cache_t *cache,
 {
     uint32_t base = cache->base;
     if (is_32) {
-        writedw86(base + R36SX_TSS32_CR3,
-                  r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK);
-        writedw86(base + R36SX_TSS32_EIP, CPU_IP);
-        writedw86(base + R36SX_TSS32_EFLAGS, makeflagsdword());
-        writedw86(base + R36SX_TSS32_EAX, CPU_EAX);
-        writedw86(base + R36SX_TSS32_ECX, CPU_ECX);
-        writedw86(base + R36SX_TSS32_EDX, CPU_EDX);
-        writedw86(base + R36SX_TSS32_EBX, CPU_EBX);
-        writedw86(base + R36SX_TSS32_ESP, CPU_ESP);
-        writedw86(base + R36SX_TSS32_EBP, CPU_EBP);
-        writedw86(base + R36SX_TSS32_ESI, CPU_ESI);
-        writedw86(base + R36SX_TSS32_EDI, CPU_EDI);
-        writew86(base + R36SX_TSS32_ES, CPU_ES);
-        writew86(base + R36SX_TSS32_CS, CPU_CS);
-        writew86(base + R36SX_TSS32_SS, CPU_SS);
-        writew86(base + R36SX_TSS32_DS, CPU_DS);
-        writew86(base + R36SX_TSS32_FS, CPU_FS);
-        writew86(base + R36SX_TSS32_GS, CPU_GS);
-        writew86(base + R36SX_TSS32_LDTR, r36sx_ldtr_selector);
+        r36sx_cpu_system_write_linear32(
+            base + R36SX_TSS32_CR3,
+            r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EIP, CPU_IP);
+        r36sx_cpu_system_write_linear32(
+            base + R36SX_TSS32_EFLAGS, makeflagsdword());
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EAX, CPU_EAX);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_ECX, CPU_ECX);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EDX, CPU_EDX);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EBX, CPU_EBX);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_ESP, CPU_ESP);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EBP, CPU_EBP);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_ESI, CPU_ESI);
+        r36sx_cpu_system_write_linear32(base + R36SX_TSS32_EDI, CPU_EDI);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_ES, CPU_ES);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_CS, CPU_CS);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_SS, CPU_SS);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_DS, CPU_DS);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_FS, CPU_FS);
+        r36sx_cpu_system_write_linear16(base + R36SX_TSS32_GS, CPU_GS);
+        r36sx_cpu_system_write_linear16(
+            base + R36SX_TSS32_LDTR, r36sx_ldtr_selector);
         return;
     }
 
-    writew86(base + R36SX_TSS16_IP, (uint16_t)CPU_IP);
-    writew86(base + R36SX_TSS16_FLAGS, makeflagsword());
-    writew86(base + R36SX_TSS16_AX, CPU_AX);
-    writew86(base + R36SX_TSS16_CX, CPU_CX);
-    writew86(base + R36SX_TSS16_DX, CPU_DX);
-    writew86(base + R36SX_TSS16_BX, CPU_BX);
-    writew86(base + R36SX_TSS16_SP, CPU_SP);
-    writew86(base + R36SX_TSS16_BP, CPU_BP);
-    writew86(base + R36SX_TSS16_SI, CPU_SI);
-    writew86(base + R36SX_TSS16_DI, CPU_DI);
-    writew86(base + R36SX_TSS16_ES, CPU_ES);
-    writew86(base + R36SX_TSS16_CS, CPU_CS);
-    writew86(base + R36SX_TSS16_SS, CPU_SS);
-    writew86(base + R36SX_TSS16_DS, CPU_DS);
-    writew86(base + R36SX_TSS16_LDTR, r36sx_ldtr_selector);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_IP, (uint16_t)CPU_IP);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_FLAGS, makeflagsword());
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_AX, CPU_AX);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_CX, CPU_CX);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_DX, CPU_DX);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_BX, CPU_BX);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_SP, CPU_SP);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_BP, CPU_BP);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_SI, CPU_SI);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_DI, CPU_DI);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_ES, CPU_ES);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_CS, CPU_CS);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_SS, CPU_SS);
+    r36sx_cpu_system_write_linear16(base + R36SX_TSS16_DS, CPU_DS);
+    r36sx_cpu_system_write_linear16(
+        base + R36SX_TSS16_LDTR, r36sx_ldtr_selector);
 }
 
 static void r36sx_cpu_load_task_flags(uint32_t flags, uint8_t is_32)
@@ -2911,42 +3372,42 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
     uint16_t new_ldtr;
 
     if (is_32) {
-        r36sx_cr3 = readdw86(base + R36SX_TSS32_CR3) &
+        r36sx_cr3 = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_CR3) &
                     R36SX_CR3_PAGE_DIRECTORY_MASK;
-        new_ip = readdw86(base + R36SX_TSS32_EIP);
-        new_flags = readdw86(base + R36SX_TSS32_EFLAGS);
-        CPU_EAX = readdw86(base + R36SX_TSS32_EAX);
-        CPU_ECX = readdw86(base + R36SX_TSS32_ECX);
-        CPU_EDX = readdw86(base + R36SX_TSS32_EDX);
-        CPU_EBX = readdw86(base + R36SX_TSS32_EBX);
-        CPU_ESP = readdw86(base + R36SX_TSS32_ESP);
-        CPU_EBP = readdw86(base + R36SX_TSS32_EBP);
-        CPU_ESI = readdw86(base + R36SX_TSS32_ESI);
-        CPU_EDI = readdw86(base + R36SX_TSS32_EDI);
-        new_es = readw86(base + R36SX_TSS32_ES);
-        new_cs = readw86(base + R36SX_TSS32_CS);
-        new_ss = readw86(base + R36SX_TSS32_SS);
-        new_ds = readw86(base + R36SX_TSS32_DS);
-        new_fs = readw86(base + R36SX_TSS32_FS);
-        new_gs = readw86(base + R36SX_TSS32_GS);
-        new_ldtr = readw86(base + R36SX_TSS32_LDTR);
+        new_ip = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EIP);
+        new_flags = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EFLAGS);
+        CPU_EAX = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EAX);
+        CPU_ECX = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_ECX);
+        CPU_EDX = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EDX);
+        CPU_EBX = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EBX);
+        CPU_ESP = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_ESP);
+        CPU_EBP = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EBP);
+        CPU_ESI = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_ESI);
+        CPU_EDI = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EDI);
+        new_es = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_ES);
+        new_cs = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_CS);
+        new_ss = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_SS);
+        new_ds = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_DS);
+        new_fs = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_FS);
+        new_gs = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_GS);
+        new_ldtr = r36sx_cpu_system_read_linear16(base + R36SX_TSS32_LDTR);
         new_sp = CPU_ESP;
     } else {
-        new_ip = readw86(base + R36SX_TSS16_IP);
-        new_flags = readw86(base + R36SX_TSS16_FLAGS);
-        CPU_EAX = readw86(base + R36SX_TSS16_AX);
-        CPU_ECX = readw86(base + R36SX_TSS16_CX);
-        CPU_EDX = readw86(base + R36SX_TSS16_DX);
-        CPU_EBX = readw86(base + R36SX_TSS16_BX);
-        CPU_ESP = readw86(base + R36SX_TSS16_SP);
-        CPU_EBP = readw86(base + R36SX_TSS16_BP);
-        CPU_ESI = readw86(base + R36SX_TSS16_SI);
-        CPU_EDI = readw86(base + R36SX_TSS16_DI);
-        new_es = readw86(base + R36SX_TSS16_ES);
-        new_cs = readw86(base + R36SX_TSS16_CS);
-        new_ss = readw86(base + R36SX_TSS16_SS);
-        new_ds = readw86(base + R36SX_TSS16_DS);
-        new_ldtr = readw86(base + R36SX_TSS16_LDTR);
+        new_ip = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_IP);
+        new_flags = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_FLAGS);
+        CPU_EAX = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_AX);
+        CPU_ECX = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_CX);
+        CPU_EDX = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_DX);
+        CPU_EBX = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_BX);
+        CPU_ESP = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_SP);
+        CPU_EBP = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_BP);
+        CPU_ESI = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_SI);
+        CPU_EDI = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_DI);
+        new_es = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_ES);
+        new_cs = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_CS);
+        new_ss = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_SS);
+        new_ds = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_DS);
+        new_ldtr = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_LDTR);
         new_sp = CPU_ESP;
     }
 
@@ -3029,11 +3490,12 @@ static uint8_t r36sx_cpu_task_switch(uint16_t selector,
                                       CPU_IP);
             return 0;
         }
-        target_selector = readw86(r36sx_tr_cache.base +
-                                  (r36sx_descriptor_type(&r36sx_tr_cache) ==
-                                           R36SX_DESCRIPTOR_TYPE_TSS32_BUSY
-                                       ? R36SX_TSS32_BACKLINK
-                                       : R36SX_TSS16_BACKLINK)) &
+        target_selector = r36sx_cpu_system_read_linear16(
+                              r36sx_tr_cache.base +
+                              (r36sx_descriptor_type(&r36sx_tr_cache) ==
+                                       R36SX_DESCRIPTOR_TYPE_TSS32_BUSY
+                                   ? R36SX_TSS32_BACKLINK
+                                   : R36SX_TSS16_BACKLINK)) &
                           0xfffcu;
     }
 
@@ -3059,7 +3521,8 @@ static uint8_t r36sx_cpu_task_switch(uint16_t selector,
 
     if (reason == R36SX_TASK_SWITCH_CALL ||
         reason == R36SX_TASK_SWITCH_INTERRUPT) {
-        writew86(target_cache.base + R36SX_TSS32_BACKLINK, old_selector);
+        r36sx_cpu_system_write_linear16(
+            target_cache.base + R36SX_TSS32_BACKLINK, old_selector);
     } else if (old_selector != 0 &&
                (reason == R36SX_TASK_SWITCH_JMP ||
                 reason == R36SX_TASK_SWITCH_IRET)) {
@@ -3471,6 +3934,114 @@ static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide,
     return 1;
 }
 
+#if R36SX_DEBUG_PM_DIAG
+static void r36sx_pm_diag_log_iret_frame(uint8_t wide,
+                                         uint8_t old_cpl,
+                                         uint16_t from_cs,
+                                         uint32_t from_ip,
+                                         uint32_t from_sp,
+                                         uint16_t target_cs,
+                                         uint32_t target_ip,
+                                         uint32_t target_flags)
+{
+    static uint32_t logged;
+    static uint32_t critical_logged;
+    uint8_t new_cpl = r36sx_selector_rpl(target_cs);
+    uint8_t critical = target_cs == 0x02AAu && target_ip <= 0x20u;
+    uint8_t interesting = critical ||
+                          target_ip < 0x100u ||
+                          (target_flags & R36SX_EFLAGS_VM_MASK) != 0u ||
+                          old_cpl != new_cpl;
+
+    if (!interesting) {
+        return;
+    }
+    if (critical) {
+        if (critical_logged >= 128u) {
+            return;
+        }
+        critical_logged++;
+    } else {
+        if (logged >= 512u) {
+            if (logged == 512u) {
+                r36sx_pico286_debug_log("[PM] IRET diag suppressed");
+            }
+            logged++;
+            return;
+        }
+        logged++;
+    }
+    r36sx_pico286_debug_log(
+        "[PM] IRET%s from=%04X:%08lX sp=%08lX old_cpl=%u "
+        "target=%04X:%08lX flags=%08lX new_cpl=%u default32=%u vm=%u",
+        wide ? "D" : "", from_cs, (unsigned long)from_ip,
+        (unsigned long)from_sp, old_cpl, target_cs,
+        (unsigned long)target_ip, (unsigned long)target_flags, new_cpl,
+        r36sx_cpu_code_default32(), (target_flags & R36SX_EFLAGS_VM_MASK) != 0u);
+}
+
+static uint8_t r36sx_pm_diag_int21_return_watch_active;
+static uint8_t r36sx_pm_diag_int21_return_watch_ah;
+static uint8_t r36sx_pm_diag_int21_return_watch_al;
+static uint16_t r36sx_pm_diag_int21_return_watch_cs;
+static uint32_t r36sx_pm_diag_int21_return_watch_ip;
+static uint32_t r36sx_pm_diag_int21_return_watch_seen;
+static char r36sx_pm_diag_int21_return_watch_path[128];
+
+static void r36sx_pm_diag_watch_int21_return(uint8_t ah,
+                                             uint8_t al,
+                                             uint16_t return_cs,
+                                             uint32_t return_ip,
+                                             const char *path)
+{
+    r36sx_pm_diag_int21_return_watch_active = 1u;
+    r36sx_pm_diag_int21_return_watch_ah = ah;
+    r36sx_pm_diag_int21_return_watch_al = al;
+    r36sx_pm_diag_int21_return_watch_cs = return_cs;
+    r36sx_pm_diag_int21_return_watch_ip = return_ip;
+    r36sx_pm_diag_int21_return_watch_seen = 0u;
+    snprintf(r36sx_pm_diag_int21_return_watch_path,
+             sizeof(r36sx_pm_diag_int21_return_watch_path),
+             "%s", path ? path : "");
+}
+
+static void r36sx_pm_diag_log_int21_return_if_watched(uint16_t target_cs,
+                                                      uint32_t target_ip,
+                                                      uint32_t target_flags)
+{
+    if (!r36sx_pm_diag_int21_return_watch_active) {
+        return;
+    }
+    if (!(target_flags & R36SX_EFLAGS_VM_MASK)) {
+        return;
+    }
+
+    uint8_t matched =
+        target_cs == r36sx_pm_diag_int21_return_watch_cs &&
+        target_ip == r36sx_pm_diag_int21_return_watch_ip;
+    if (r36sx_pm_diag_int21_return_watch_seen < 64u || matched) {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 watch ah=%02X al=%02X iret=%lu "
+            "expected=%04X:%08lX to=%04X:%08lX "
+            "ax=%04X bx=%04X cx=%04X dx=%04X flags=%08lX cf=%u "
+            "matched=%u path='%s'",
+            r36sx_pm_diag_int21_return_watch_ah,
+            r36sx_pm_diag_int21_return_watch_al,
+            (unsigned long)r36sx_pm_diag_int21_return_watch_seen,
+            r36sx_pm_diag_int21_return_watch_cs,
+            (unsigned long)r36sx_pm_diag_int21_return_watch_ip,
+            target_cs, (unsigned long)target_ip,
+            CPU_AX, CPU_BX, CPU_CX, CPU_DX, (unsigned long)target_flags,
+            (target_flags & 1u) != 0u, matched,
+            r36sx_pm_diag_int21_return_watch_path);
+    }
+    r36sx_pm_diag_int21_return_watch_seen++;
+    if (matched || r36sx_pm_diag_int21_return_watch_seen >= 64u) {
+        r36sx_pm_diag_int21_return_watch_active = 0u;
+    }
+}
+#endif
+
 static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
 {
     if (x86_flags.value & R36SX_FLAGS_NT_MASK) {
@@ -3478,11 +4049,19 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
     }
 
     uint8_t old_cpl = r36sx_cpu_cpl();
+    uint16_t from_cs = CPU_CS;
+    uint32_t from_ip = CPU_IP;
+    uint32_t from_sp = r36sx_cpu_stack_pointer_value();
     uint32_t target_ip = r36sx_cpu_pop_frame_value(wide);
     uint16_t target_cs = (uint16_t)r36sx_cpu_pop_frame_value(wide);
     uint32_t target_flags = r36sx_cpu_pop_frame_value(wide);
     uint8_t new_cpl = r36sx_selector_rpl(target_cs);
     r36sx_segment_cache_t target_cache;
+
+#if R36SX_DEBUG_PM_DIAG
+    r36sx_pm_diag_log_iret_frame(wide, old_cpl, from_cs, from_ip, from_sp,
+                                 target_cs, target_ip, target_flags);
+#endif
 
     if (target_flags & 0x00004000u) {
         r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
@@ -3524,6 +4103,10 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
         r36sx_cpu_real_cache_segment(regfs);
         putsegreg(reggs, new_gs);
         r36sx_cpu_real_cache_segment(reggs);
+#if R36SX_DEBUG_PM_DIAG
+        r36sx_pm_diag_log_int21_return_if_watched(target_cs, target_ip,
+                                                  target_flags);
+#endif
         return 1;
     }
 
@@ -4534,10 +5117,31 @@ static void r36sx_bios_attach_configured_disks(void)
     const char *fdd1_path = r36sx_pico286_disk_path(1, "fdd1.img");
     const char *hdd0_path = r36sx_pico286_disk_path(128, "hdd.img");
     const char *hdd1_path = r36sx_pico286_disk_path(129, "hdd2.img");
-    uint8_t fdd0_ok = fdd0_path[0] ? insertdisk(0, fdd0_path) : 0;
-    uint8_t fdd1_ok = fdd1_path[0] ? insertdisk(1, fdd1_path) : 0;
-    uint8_t hdd0_ok = hdd0_path[0] ? insertdisk(128, hdd0_path) : 0;
-    uint8_t hdd1_ok = hdd1_path[0] ? insertdisk(129, hdd1_path) : 0;
+    uint8_t fdd0_ok = 0;
+    uint8_t fdd1_ok = 0;
+    uint8_t hdd0_ok = 0;
+    uint8_t hdd1_ok = 0;
+
+    if (fdd0_path[0]) {
+        fdd0_ok = insertdisk(0, fdd0_path);
+    } else {
+        ejectdisk(0);
+    }
+    if (fdd1_path[0]) {
+        fdd1_ok = insertdisk(1, fdd1_path);
+    } else {
+        ejectdisk(1);
+    }
+    if (hdd0_path[0]) {
+        hdd0_ok = insertdisk(128, hdd0_path);
+    } else {
+        ejectdisk(128);
+    }
+    if (hdd1_path[0]) {
+        hdd1_ok = insertdisk(129, hdd1_path);
+    } else {
+        ejectdisk(129);
+    }
 
     r36sx_pico286_debug_log(
         "cpu: int19 disk attach fdd0=%u '%s' fdd1=%u '%s' hdd0=%u '%s' hdd1=%u '%s'",
@@ -5444,7 +6048,117 @@ void intcall86(uint8_t intnum) {
 
     r36sx_cpu_intcall86_real(intnum);
 }
+
 #if R36SX_DEBUG_PM_DIAG
+static uint8_t r36sx_pm_diag_read_guest_linear8(uint32_t linear,
+                                                uint8_t *value)
+{
+    uint32_t physical;
+    if (!r36sx_cpu_debug_translate_linear(linear, 0,
+                                          r36sx_cpu_cpl() == 3u,
+                                          &physical, NULL, NULL)) {
+        return 0;
+    }
+    *value = read86_ob(physical);
+    return 1;
+}
+
+static void r36sx_pm_diag_read_guest_real_string(uint16_t segment,
+                                                 uint16_t offset,
+                                                 char *buffer,
+                                                 size_t buffer_size)
+{
+    size_t i;
+
+    if (buffer_size == 0) {
+        return;
+    }
+    for (i = 0; i + 1u < buffer_size; i++) {
+        uint8_t ch;
+        uint32_t linear = ((uint32_t)segment << 4) +
+                          (uint32_t)((offset + i) & 0xffffu);
+        if (!r36sx_pm_diag_read_guest_linear8(linear, &ch)) {
+            snprintf(buffer, buffer_size, "<unmapped %04X:%04X>",
+                     segment, (uint16_t)(offset + i));
+            return;
+        }
+        if (ch == '\0') {
+            break;
+        }
+        buffer[i] = (ch >= 0x20u && ch <= 0x7eu) ? (char)ch : '.';
+    }
+    buffer[i] = '\0';
+}
+
+static void r36sx_pm_diag_log_int21_request(uint32_t fault_ip)
+{
+    static uint32_t logged;
+    char path[128];
+    char path2[128];
+    uint8_t ah = CPU_AH;
+    uint8_t path_dx = 0;
+    uint8_t path_esdi = 0;
+
+    switch (ah) {
+        case 0x09: /* print string, useful around FreeDOS errors */
+        case 0x39: /* mkdir */
+        case 0x3A: /* rmdir */
+        case 0x3B: /* chdir */
+        case 0x3C: /* create */
+        case 0x3D: /* open */
+        case 0x41: /* unlink */
+        case 0x43: /* get/set attributes */
+        case 0x4B: /* exec */
+        case 0x4E: /* find first */
+            path_dx = 1;
+            break;
+        case 0x56: /* rename */
+            path_dx = 1;
+            path_esdi = 1;
+            break;
+        default:
+            break;
+    }
+    if (!path_dx) {
+        return;
+    }
+    if (logged >= 256u) {
+        if (logged == 256u) {
+            r36sx_pico286_debug_log("[PM] INT21 path diagnostics suppressed");
+        }
+        logged++;
+        return;
+    }
+    logged++;
+
+    r36sx_pm_diag_read_guest_real_string(CPU_DS, CPU_DX,
+                                         path, sizeof(path));
+    if (path_esdi) {
+        r36sx_pm_diag_read_guest_real_string(CPU_ES, CPU_DI,
+                                             path2, sizeof(path2));
+    } else {
+        path2[0] = '\0';
+    }
+
+    if (path_esdi) {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 request ah=%02X al=%02X from=%04X:%08lX "
+            "ds:dx=%04X:%04X path='%s' es:di=%04X:%04X path2='%s'",
+            ah, CPU_AL, CPU_CS, (unsigned long)fault_ip,
+            CPU_DS, CPU_DX, path, CPU_ES, CPU_DI, path2);
+    } else {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 request ah=%02X al=%02X from=%04X:%08lX "
+            "ds:dx=%04X:%04X path='%s'",
+            ah, CPU_AL, CPU_CS, (unsigned long)fault_ip,
+            CPU_DS, CPU_DX, path);
+    }
+    if (ah == 0x4Bu) {
+        r36sx_pm_diag_watch_int21_return(ah, CPU_AL, CPU_CS,
+                                         fault_ip + 2u, path);
+    }
+}
+
 static void r36sx_pm_diag_log_software_interrupt_result(
     uint8_t intnum,
     uint32_t fault_ip,
@@ -5557,6 +6271,11 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
             pm_int10_mode = CPU_AL;
         }
         r36sx_pm_diag_log_interrupt(intnum);
+#if R36SX_DEBUG_PM_DIAG
+        if (intnum == 0x21u) {
+            r36sx_pm_diag_log_int21_request(fault_ip);
+        }
+#endif
         handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip, 1);
 #if R36SX_DEBUG_PM_DIAG
         r36sx_pm_diag_log_software_interrupt_result(
@@ -5676,6 +6395,45 @@ static inline uint8_t r36sx_cpu_lock_prefix_allowed(uint8_t opcode)
 
 
 
+static void r36sx_cpu_reset_interpreter_state(void)
+{
+    memset(dwordregs, 0, sizeof(dwordregs));
+    memset(segregs32, 0, sizeof(segregs32));
+    memset(segselector16, 0, sizeof(segselector16));
+    memset(segbase32, 0, sizeof(segbase32));
+    memset(r36sx_seg_cache, 0, sizeof(r36sx_seg_cache));
+    memset(&r36sx_ldtr_cache, 0, sizeof(r36sx_ldtr_cache));
+    memset(&r36sx_tr_cache, 0, sizeof(r36sx_tr_cache));
+
+    x86_flags.value = R36SX_FLAGS_ALWAYS_ONE;
+    segoverride = 0;
+    reptype = 0;
+    lockPrefix = 0;
+    useseg = 0;
+    oldsp = 0;
+    useseg_base = 0;
+    ip32 = 0;
+    tempcf = 0;
+    oldcf = 0;
+    mode = 0;
+    reg = 0;
+    rm = 0;
+    sib = 0;
+    nestlev = 0;
+    saveip = 0;
+    savecs = 0;
+    oper1 = 0;
+    oper2 = 0;
+    res16 = 0;
+    temp16 = 0;
+    dummy = 0;
+    stacksize = 0;
+    disp32 = 0;
+    ea = 0;
+    operandSizeOverride = false;
+    addressSizeOverride = false;
+}
+
 void reset86() {
     r36sx_pico286_cpu_model_t cpu_model = r36sx_pico286_cpu_model();
     r36sx_cpu_strict_8086_mode =
@@ -5684,12 +6442,24 @@ void reset86() {
         cpu_model >= R36SX_PICO286_CPU_80286;
     r36sx_cpu_model_at_least_80386 =
         cpu_model >= R36SX_PICO286_CPU_80386;
+    r36sx_cpu_reset_interpreter_state();
     CPU_CS = 0xFFFF;
     CPU_SS = 0x0000;
+    CPU_DS = 0x0000;
+    CPU_ES = 0x0000;
+    CPU_FS = 0x0000;
+    CPU_GS = 0x0000;
     CPU_SP = 0x0000;
     hltstate = 0;
     r36sx_cpu_maskable_interrupt_shadow = 0;
     r36sx_cpu_current_cpl = 0;
+    r36sx_cpu_fault_ip_context = 0;
+    r36sx_cpu_exception_pending = 0;
+    r36sx_cpu_exception_delivery_depth = 0;
+    r36sx_cpu_exception_delivery_vector = 0;
+    r36sx_cpu_exception_abort_delivery_depth = 0;
+    r36sx_cpu_triple_fault_latched = 0;
+    r36sx_cpu_interpreter_protected = 0;
     r36sx_cr0 = R36SX_CR0_ET;
     r36sx_cr2 = 0;
     r36sx_cr3 = 0;
@@ -5702,6 +6472,9 @@ void reset86() {
     r36sx_debug_resume_ip = 0;
     r36sx_debug_pending_dr6_hits = 0;
     r36sx_debug_suppress_watchpoints = 0;
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+    r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+    r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
     r36sx_gdtr_base = 0;
     r36sx_gdtr_limit = 0;
     r36sx_idtr_base = 0;
@@ -5712,13 +6485,14 @@ void reset86() {
     r36sx_pm_diag_first_fault_logged = 0;
 #endif
     r36sx_cpu_real_cache_all_segments();
+    r36sx_cpu_use_segment(regds);
 
     memset(VIDEORAM, 0x00, sizeof(VIDEORAM));
     r36sx_pico286_video_mark_dirty();
     if (butter_psram_size) {
         memset(RAM, 0, sizeof(RAM));
         memset(UMB, 0, sizeof(UMB));
-        memset(HMA, 0, sizeof(HMA));
+        memset(XMS, 0, xms_configured_memory_bytes());
     } else {
         memset(SRAM, 0, sizeof(SRAM));
         if (PSRAM_AVAILABLE) {
@@ -5729,6 +6503,7 @@ void reset86() {
     }
     init_umb();
     ip = 0x0000;
+    OpFinit();
     i8237_reset();
     vga_init();
 }
@@ -6993,7 +7768,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
             }
             oper1 = r36sx_cpu_read_linear16_286(ea);
             oper2 = r36sx_cpu_read_linear16_286(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_call(oper2, oper1, 0, fault_ip);
                 break;
             }
@@ -7015,7 +7790,7 @@ static __not_in_flash() void r36sx_cpu_op_grp5_286(uint32_t fault_ip)
             }
             oper1 = r36sx_cpu_read_linear16_286(ea);
             oper2 = r36sx_cpu_read_linear16_286(ea + 2u);
-            if (r36sx_cpu_protected_enabled()) {
+            if (r36sx_cpu_native_protected_enabled()) {
                 r36sx_cpu_protected_far_jump(oper2, oper1, fault_ip);
                 break;
             }
@@ -7387,4 +8162,69 @@ void __not_in_flash() r36sx_cpu_exec_protected(uint32_t execloops)
 {
     r36sx_cpu_interpreter_protected = 1;
     r36sx_cpu_exec86_core(execloops);
+}
+
+static void r36sx_cpu_debug_copy_segment_cache(
+    r36sx_cpu_debug_segment_cache_t *dst,
+    const r36sx_segment_cache_t *src)
+{
+    dst->selector = src->selector;
+    dst->base = src->base;
+    dst->limit = src->limit;
+    dst->access = src->access;
+    dst->flags = src->flags;
+    dst->valid = src->valid;
+}
+
+void r36sx_cpu_debug_snapshot(r36sx_cpu_debug_snapshot_t *snapshot)
+{
+    if (!snapshot) {
+        return;
+    }
+
+    snapshot->eax = CPU_EAX;
+    snapshot->ebx = CPU_EBX;
+    snapshot->ecx = CPU_ECX;
+    snapshot->edx = CPU_EDX;
+    snapshot->esi = CPU_ESI;
+    snapshot->edi = CPU_EDI;
+    snapshot->ebp = CPU_EBP;
+    snapshot->esp = CPU_ESP;
+    snapshot->eip = CPU_IP;
+    snapshot->eflags = x86_flags.value;
+    snapshot->es = CPU_ES;
+    snapshot->cs = CPU_CS;
+    snapshot->ss = CPU_SS;
+    snapshot->ds = CPU_DS;
+    snapshot->fs = CPU_FS;
+    snapshot->gs = CPU_GS;
+    snapshot->cr0 = r36sx_cr0;
+    snapshot->cr2 = r36sx_cr2;
+    snapshot->cr3 = r36sx_cr3;
+    for (uint8_t i = 0; i < R36SX_CPU_DEBUG_REGISTER_COUNT; i++) {
+        snapshot->debug_regs[i] = r36sx_dr[i];
+        snapshot->test_regs[i] = r36sx_tr[i];
+    }
+    snapshot->gdtr_base = r36sx_gdtr_base;
+    snapshot->idtr_base = r36sx_idtr_base;
+    snapshot->gdtr_limit = r36sx_gdtr_limit;
+    snapshot->idtr_limit = r36sx_idtr_limit;
+    snapshot->ldtr_selector = r36sx_ldtr_selector;
+    snapshot->tr_selector = r36sx_tr_selector;
+    for (uint8_t i = 0; i < R36SX_CPU_DEBUG_SEGMENT_COUNT; i++) {
+        snapshot->segment_values[i] = segregs32[i];
+        snapshot->segment_selectors[i] = segselector16[i];
+        snapshot->segment_bases[i] = segbase32[i];
+        r36sx_cpu_debug_copy_segment_cache(&snapshot->segment_cache[i],
+                                           &r36sx_seg_cache[i]);
+    }
+    r36sx_cpu_debug_copy_segment_cache(&snapshot->ldtr_cache,
+                                       &r36sx_ldtr_cache);
+    r36sx_cpu_debug_copy_segment_cache(&snapshot->tr_cache,
+                                       &r36sx_tr_cache);
+    snapshot->protected_mode = r36sx_cpu_protected_enabled();
+    snapshot->native_protected_mode = r36sx_cpu_native_protected_enabled();
+    snapshot->vm86_mode = r36sx_cpu_v86_enabled();
+    snapshot->cpl = r36sx_cpu_cpl();
+    snapshot->iopl = r36sx_cpu_iopl();
 }

@@ -60,6 +60,17 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         if (unlikely(hltstate)) {
             if (unlikely(ifl && !maskable_irq_shadowed &&
                          r36sx_cpu_pending_maskable_irq())) {
+#if R36SX_DEBUG_PM_DIAG
+                static uint32_t hlt_wake_logs;
+                if (hlt_wake_logs < 16u) {
+                    hlt_wake_logs++;
+                    r36sx_pico286_debug_log(
+                        "[CPU] HLT wake cs:eip=%04X:%08lX ss:sp=%04X:%08lX flags=%08lX",
+                        CPU_CS, (unsigned long)CPU_IP, CPU_SS,
+                        (unsigned long)r36sx_cpu_stack_pointer_value(),
+                        (unsigned long)makeflagsdword());
+                }
+#endif
                 hltstate = 0;
                 intcall86(nextintr());
             } else {
@@ -94,12 +105,16 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         r36sx_cpu_exception_pending = 0u;
         register uint8_t opcode;
 
+        if (unlikely(r36sx_cpu_debug_host_breakpoints_active &&
+                     r36sx_cpu_debug_host_breakpoint_check(firstip))) {
+            r36sx_app_stats_record_x86(loopcount);
+            return;
+        }
 #if R36SX_CPU_CORE_HAS_386_DEBUG_REGS
         if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {
             continue;
         }
 #endif
-
         while (!docontinue) {
             ///         CPU_CS &= 0xFFFF;
             ///         CPU_IP &= 0xFFFF;
@@ -2377,7 +2392,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_far_call(oper2, oper1, 0, firstip);
                     break;
                 }
@@ -3541,7 +3556,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 StepIP(2);
                 oper2 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
-                if (r36sx_cpu_protected_enabled()) {
+                if (r36sx_cpu_native_protected_enabled()) {
                     r36sx_cpu_protected_far_jump(oper2, oper1, firstip);
                     break;
                 }
@@ -3626,6 +3641,20 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 if (!r36sx_cpu_require_cpl0(firstip)) {
                     break;
                 }
+                /* HLT returns before the common epilogue; finish STI's one-instruction IRQ shadow here. */
+                r36sx_cpu_maskable_interrupt_shadow = 0u;
+#if R36SX_DEBUG_PM_DIAG
+                static uint32_t hlt_enter_logs;
+                if (hlt_enter_logs < 16u) {
+                    hlt_enter_logs++;
+                    r36sx_pico286_debug_log(
+                        "[CPU] HLT enter from=%04X:%08lX next=%04X:%08lX ss:sp=%04X:%08lX flags=%08lX",
+                        CPU_CS, (unsigned long)firstip, CPU_CS,
+                        (unsigned long)CPU_IP, CPU_SS,
+                        (unsigned long)r36sx_cpu_stack_pointer_value(),
+                        (unsigned long)makeflagsdword());
+                }
+#endif
                 hltstate = 1;
                 return;
 

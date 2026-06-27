@@ -9,12 +9,6 @@
 extern "C" {
 #endif
 
-typedef struct {
-    uint16_t cyls;
-    uint16_t heads;
-    uint16_t sects;
-} r36sx_pico286_chs_t;
-
 typedef enum {
     R36SX_PICO286_SCREENSHOT_FORMAT_PNG = 0,
     R36SX_PICO286_SCREENSHOT_FORMAT_BMP = 1,
@@ -29,6 +23,11 @@ typedef enum {
     R36SX_PICO286_KEYBOARD_NORMAL = 0,
     R36SX_PICO286_KEYBOARD_OVERLAY = 1,
 } r36sx_pico286_keyboard_mode_t;
+
+typedef enum {
+    R36SX_PICO286_MOUSE_SERIAL = 0,
+    R36SX_PICO286_MOUSE_PS2 = 1,
+} r36sx_pico286_mouse_type_t;
 
 typedef enum {
     R36SX_PICO286_CPU_8086 = 0,
@@ -75,6 +74,9 @@ const char *r36sx_pico286_host_drive_value(void);
 
 // Write the current Pico-286 configuration back to pico_286.conf.
 int r36sx_pico286_save_config(void);
+
+// Force the next config access to reread pico_286.conf from disk.
+void r36sx_pico286_reload_config(void);
 
 // Return the configured CPU execution quantum derived from cpu_mhz.
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops);
@@ -154,10 +156,6 @@ uint8_t r36sx_pico286_boot_order(uint8_t *drives, uint8_t max_drives);
 // Update the configured boot order text in memory. Call save_config to persist.
 int r36sx_pico286_set_boot_order_value(const char *value);
 
-// Return non-zero when a configured hard-disk CHS geometry exists.
-int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
-                               r36sx_pico286_chs_t *geometry);
-
 // Return the stdio buffer size to use for each host disk image file.
 uint32_t r36sx_pico286_disk_cache_buffer_bytes(void);
 
@@ -184,6 +182,18 @@ int r36sx_pico286_log_truncate_on_start(void);
 
 // Return the maximum pico_286.log size in bytes; 0 means no size cap.
 uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes);
+
+// Return non-zero when the live debug-control mailbox is enabled.
+int r36sx_pico286_debug_control_enabled(void);
+
+// Return the command mailbox path used by the live debug-control interface.
+const char *r36sx_pico286_debug_control_command_path(void);
+
+// Return the response mailbox path used by the live debug-control interface.
+const char *r36sx_pico286_debug_control_response_path(void);
+
+// Return the directory used for live debug-control binary artifacts.
+const char *r36sx_pico286_debug_control_artifact_dir(void);
 
 // Return non-zero when AdLib/OPL2 audio is mixed into the output stream.
 int r36sx_pico286_audio_adlib_enabled(void);
@@ -244,6 +254,12 @@ r36sx_pico286_keyboard_mode_t r36sx_pico286_keyboard_mode(void);
 
 // Return the configured keyboard mode text used when rewriting config.
 const char *r36sx_pico286_keyboard_mode_name(void);
+
+// Return which emulated mouse interface receives host mouse movement.
+r36sx_pico286_mouse_type_t r36sx_pico286_mouse_type(void);
+
+// Return the configured mouse type text used when rewriting config.
+const char *r36sx_pico286_mouse_type_name(void);
 
 #ifdef __cplusplus
 }

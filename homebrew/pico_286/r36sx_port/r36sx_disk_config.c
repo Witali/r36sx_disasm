@@ -14,6 +14,13 @@
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
 #define R36SX_PICO286_DEFAULT_RTC_START_TIME "2026-06-03 00:00:00"
+#if defined(_WIN32)
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME 1
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT "1"
+#else
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME 0
+#define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT "0"
+#endif
 #define R36SX_PICO286_MIN_CPU_MHZ 0.100
 #define R36SX_PICO286_MAX_CPU_MHZ 50.000
 /* Round historical throughput estimates used to turn MHz into exec86 IPS. */
@@ -30,6 +37,13 @@
 #define R36SX_PICO286_MAX_PROFILE_LOG_MS 60000UL
 #define R36SX_PICO286_DEFAULT_LOG_MAX_BYTES (2UL * 1024UL * 1024UL)
 #define R36SX_PICO286_MAX_LOG_MAX_BYTES (64UL * 1024UL * 1024UL)
+#if defined(DEBUG)
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED 1
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT "1"
+#else
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED 0
+#define R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT "0"
+#endif
 #define R36SX_PICO286_MIN_TARGET_FPS 1UL
 #define R36SX_PICO286_MAX_TARGET_FPS 240UL
 #define R36SX_PICO286_MIN_CONVENTIONAL_KB 64UL
@@ -88,7 +102,6 @@ static char boot_mode_text[32] = "normal";
 static char boot_order_text[64] = "fdd0,hdd0";
 static char host_drive_value[R36SX_PICO286_MAX_DISK_PATH] = "host";
 static char host_drive_path[R36SX_PICO286_MAX_DISK_PATH] = "host";
-static char hdd_geometry_text[2][32] = { "65,16,63", "65,16,63" };
 static char disk_cache_buffer_kb_text[16] = "64";
 static char disk_cache_flush_sectors_text[16] = "4";
 static char disk_cache_flush_ms_text[16] = "2000";
@@ -96,18 +109,28 @@ static char profiling_enabled_text[8] = "0";
 static char profiling_log_ms_text[16] = "5000";
 static char log_truncate_on_start_text[8] = "0";
 static char log_max_bytes_text[16] = "2097152";
+static char debug_control_enabled_text[8] =
+    R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED_TEXT;
+static char debug_control_command_path[R36SX_PICO286_MAX_DISK_PATH] =
+    "pico_286_debug.cmd";
+static char debug_control_response_path[R36SX_PICO286_MAX_DISK_PATH] =
+    "pico_286_debug.out";
+static char debug_control_artifact_dir[R36SX_PICO286_MAX_DISK_PATH] = ".";
 static char app_stats_enabled_text[8] = "1";
 static char int2f_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
 static char rtc_enabled_text[8] = "1";
 static char rtc_at_enabled_text[8] = "1";
 static char rtc_xt_enabled_text[8] = "1";
+static char rtc_use_system_time_text[8] =
+    R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME_TEXT;
 static char rtc_start_time_text[32] =
     R36SX_PICO286_DEFAULT_RTC_START_TIME;
 static char screenshot_format_text[8] = "png";
 static char screenshot_build_hash_text[8] = "1";
 static char scaling_filter_text[16] = "nearest";
 static char keyboard_mode_text[16] = "normal";
+static char mouse_type_text[16] = "serial";
 static char audio_adlib_enabled_text[8] = "1";
 static char audio_sound_blaster_enabled_text[8] = "1";
 static char audio_cms_enabled_text[8] = "1";
@@ -134,12 +157,15 @@ static int profiling_enabled = 0;
 static uint32_t profiling_log_ms = 5000u;
 static int log_truncate_on_start = 0;
 static uint32_t log_max_bytes = (uint32_t)R36SX_PICO286_DEFAULT_LOG_MAX_BYTES;
+static int debug_control_enabled =
+    R36SX_PICO286_DEFAULT_DEBUG_CONTROL_ENABLED;
 static int app_stats_enabled = 1;
 static int int2f_enabled = 1;
 static uint32_t target_fps = 60u;
 static int rtc_enabled = 1;
 static int rtc_at_enabled = 1;
 static int rtc_xt_enabled = 1;
+static int rtc_use_system_time = R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME;
 static int64_t rtc_start_time_unix = 0;
 static int rtc_start_time_valid = 0;
 static int screenshot_build_hash_enabled = 1;
@@ -167,11 +193,11 @@ static r36sx_pico286_scaling_filter_t scaling_filter =
     R36SX_PICO286_SCALING_NEAREST;
 static r36sx_pico286_keyboard_mode_t keyboard_mode =
     R36SX_PICO286_KEYBOARD_NORMAL;
+static r36sx_pico286_mouse_type_t mouse_type =
+    R36SX_PICO286_MOUSE_SERIAL;
 static uint8_t boot_order[4] = { 0, 128, 0, 0 };
 static uint8_t boot_order_count = 0;
 static int boot_order_configured = 0;
-static r36sx_pico286_chs_t hdd_geometries[2];
-static int hdd_geometry_configured[2] = { 0, 0 };
 
 static char *trim_space(char *text)
 {
@@ -268,18 +294,16 @@ static int drive_token_to_bios_drive(const char *token, uint8_t *bios_drive)
     return 0;
 }
 
-static int geometry_key_to_index(const char *key, int *index)
+static int is_legacy_hdd_geometry_key(const char *key)
 {
     if (key_equals(key, "hdd0_geometry") ||
         key_equals(key, "drive80h_geometry") ||
         key_equals(key, "0x80_geometry")) {
-        *index = 0;
         return 1;
     }
     if (key_equals(key, "hdd1_geometry") ||
         key_equals(key, "drive81h_geometry") ||
         key_equals(key, "0x81_geometry")) {
-        *index = 1;
         return 1;
     }
 
@@ -854,6 +878,65 @@ static int set_debug_uint_value(const char *key, const char *value,
     return 0;
 }
 
+static int set_debug_control_value(const char *key, const char *value,
+                                   int line_no)
+{
+    int enabled;
+
+    if (key_equals(key, "debug_control_enabled") ||
+        key_equals(key, "debug_control") ||
+        key_equals(key, "debug_mailbox_enabled")) {
+        if (!parse_bool_value(value, &enabled)) {
+            r36sx_pico286_debug_log(
+                "diskcfg: ignoring invalid %s '%s' at line %d",
+                key, value, line_no);
+            return 1;
+        }
+
+        debug_control_enabled = enabled;
+        snprintf(debug_control_enabled_text,
+                 sizeof(debug_control_enabled_text),
+                 "%d", enabled ? 1 : 0);
+        r36sx_pico286_debug_log("diskcfg: debug_control_enabled=%d",
+                                debug_control_enabled);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_command_path") ||
+        key_equals(key, "debug_control_cmd") ||
+        key_equals(key, "debug_command_path")) {
+        snprintf(debug_control_command_path,
+                 sizeof(debug_control_command_path),
+                 "%s", value ? value : "");
+        r36sx_pico286_debug_log("diskcfg: debug_control_command_path='%s'",
+                                debug_control_command_path);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_response_path") ||
+        key_equals(key, "debug_control_out") ||
+        key_equals(key, "debug_response_path")) {
+        snprintf(debug_control_response_path,
+                 sizeof(debug_control_response_path),
+                 "%s", value ? value : "");
+        r36sx_pico286_debug_log("diskcfg: debug_control_response_path='%s'",
+                                debug_control_response_path);
+        return 1;
+    }
+
+    if (key_equals(key, "debug_control_artifact_dir") ||
+        key_equals(key, "debug_artifact_dir")) {
+        snprintf(debug_control_artifact_dir,
+                 sizeof(debug_control_artifact_dir),
+                 "%s", value && value[0] ? value : ".");
+        r36sx_pico286_debug_log("diskcfg: debug_control_artifact_dir='%s'",
+                                debug_control_artifact_dir);
+        return 1;
+    }
+
+    return 0;
+}
+
 static int set_screenshot_format(const char *key, const char *value,
                                  int line_no)
 {
@@ -976,6 +1059,41 @@ static int set_keyboard_mode(const char *key, const char *value,
         keyboard_mode = R36SX_PICO286_KEYBOARD_OVERLAY;
         snprintf(keyboard_mode_text, sizeof(keyboard_mode_text), "overlay");
         r36sx_pico286_debug_log("diskcfg: keyboard_mode=overlay");
+        return 1;
+    }
+
+    r36sx_pico286_debug_log(
+        "diskcfg: ignoring invalid %s '%s' at line %d",
+        key, value, line_no);
+    return 1;
+}
+
+static int set_mouse_type(const char *key, const char *value, int line_no)
+{
+    if (!(key_equals(key, "mouse_type") ||
+          key_equals(key, "mouse") ||
+          key_equals(key, "mouse_interface") ||
+          key_equals(key, "pointing_device"))) {
+        return 0;
+    }
+
+    if (key_equals(value, "serial") ||
+        key_equals(value, "com") ||
+        key_equals(value, "rs232") ||
+        key_equals(value, "rs-232")) {
+        mouse_type = R36SX_PICO286_MOUSE_SERIAL;
+        snprintf(mouse_type_text, sizeof(mouse_type_text), "serial");
+        r36sx_pico286_debug_log("diskcfg: mouse_type=serial");
+        return 1;
+    }
+
+    if (key_equals(value, "ps2") ||
+        key_equals(value, "ps/2") ||
+        key_equals(value, "aux") ||
+        key_equals(value, "8042")) {
+        mouse_type = R36SX_PICO286_MOUSE_PS2;
+        snprintf(mouse_type_text, sizeof(mouse_type_text), "ps2");
+        r36sx_pico286_debug_log("diskcfg: mouse_type=ps2");
         return 1;
     }
 
@@ -1358,6 +1476,16 @@ static int set_rtc_value(const char *key, const char *value, int line_no)
             sizeof(rtc_xt_enabled_text));
     }
 
+    if (key_equals(key, "rtc_use_system_time") ||
+        key_equals(key, "rtc_use_host_time") ||
+        key_equals(key, "rtc_system_time") ||
+        key_equals(key, "rtc_host_time")) {
+        return set_rtc_bool_value(
+            key, value, line_no, "rtc_use_system_time",
+            &rtc_use_system_time, rtc_use_system_time_text,
+            sizeof(rtc_use_system_time_text));
+    }
+
     return 0;
 }
 
@@ -1592,68 +1720,6 @@ static int set_boot_order(char *value, int line_no)
     return 1;
 }
 
-static int set_hdd_geometry(const char *key, const char *value, int line_no)
-{
-    const char *cursor = value;
-    unsigned long parsed[3];
-    r36sx_pico286_chs_t geometry;
-    int index;
-
-    if (!geometry_key_to_index(key, &index)) {
-        return 0;
-    }
-
-    for (int i = 0; i < 3; i++) {
-        char *end = NULL;
-
-        while (*cursor == ',' || *cursor == ';' || *cursor == ':' ||
-               *cursor == '/' || *cursor == 'x' || *cursor == 'X' ||
-               isspace((unsigned char)*cursor)) {
-            cursor++;
-        }
-        if (!isdigit((unsigned char)*cursor)) {
-            r36sx_pico286_debug_log(
-                "diskcfg: ignoring invalid %s '%s' at line %d",
-                key, value, line_no);
-            return 1;
-        }
-
-        parsed[i] = strtoul(cursor, &end, 10);
-        cursor = end;
-    }
-
-    while (*cursor && isspace((unsigned char)*cursor)) {
-        cursor++;
-    }
-    if (*cursor) {
-        r36sx_pico286_debug_log(
-            "diskcfg: ignoring invalid %s '%s' at line %d",
-            key, value, line_no);
-        return 1;
-    }
-
-    if (parsed[0] < 1 || parsed[0] > 1023 ||
-        parsed[1] < 1 || parsed[1] > 255 ||
-        parsed[2] < 1 || parsed[2] > 63) {
-        r36sx_pico286_debug_log(
-            "diskcfg: ignoring out-of-range %s '%s' at line %d",
-            key, value, line_no);
-        return 1;
-    }
-
-    geometry.cyls = (uint16_t)parsed[0];
-    geometry.heads = (uint16_t)parsed[1];
-    geometry.sects = (uint16_t)parsed[2];
-    hdd_geometries[index] = geometry;
-    hdd_geometry_configured[index] = 1;
-    snprintf(hdd_geometry_text[index], sizeof(hdd_geometry_text[index]),
-             "%u,%u,%u", geometry.cyls, geometry.heads, geometry.sects);
-    r36sx_pico286_debug_log("diskcfg: %s=%u,%u,%u",
-                            key, geometry.cyls, geometry.heads,
-                            geometry.sects);
-    return 1;
-}
-
 static int set_config_value(const char *key, const char *value, int line_no)
 {
     r36sx_pico286_disk_entry_t *entry = find_disk_entry(key);
@@ -1731,6 +1797,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_debug_uint_value(key, value, line_no)) {
         return 1;
     }
+    if (set_debug_control_value(key, value, line_no)) {
+        return 1;
+    }
     if (set_app_stats_value(key, value, line_no)) {
         return 1;
     }
@@ -1758,6 +1827,9 @@ static int set_config_value(const char *key, const char *value, int line_no)
     if (set_keyboard_mode(key, value, line_no)) {
         return 1;
     }
+    if (set_mouse_type(key, value, line_no)) {
+        return 1;
+    }
     if (key_equals(key, "osk_cursor_keys") ||
         key_equals(key, "keyboard_cursor_keys") ||
         key_equals(key, "screen_keyboard_cursor_keys")) {
@@ -1770,7 +1842,7 @@ static int set_config_value(const char *key, const char *value, int line_no)
         snprintf(mutable_value, sizeof(mutable_value), "%s", value);
         return set_boot_order(mutable_value, line_no);
     }
-    if (set_hdd_geometry(key, value, line_no)) {
+    if (is_legacy_hdd_geometry_key(key)) {
         return 1;
     }
 
@@ -1979,6 +2051,8 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# rtc_enabled disables both AT and XT RTC interfaces when 0.\n");
     fprintf(fp, "# rtc_at_enabled controls AT CMOS ports 70h/71h.\n");
     fprintf(fp, "# rtc_xt_enabled controls XT-compatible ports 240h..257h.\n");
+    fprintf(fp, "# rtc_use_system_time=1 starts from host local time; when 0,\n");
+    fprintf(fp, "# rtc_start_time below is used. Windows defaults to 1, MIPS to 0.\n");
     fprintf(fp, "# RTC start time is local time.\n");
     fprintf(fp, "# Format: YYYY-MM-DD HH:MM:SS.  If omitted, the built-in\n");
     fprintf(fp, "# default is %s.\n", R36SX_PICO286_DEFAULT_RTC_START_TIME);
@@ -1986,6 +2060,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "rtc_enabled=%s\n", rtc_enabled_text);
     fprintf(fp, "rtc_at_enabled=%s\n", rtc_at_enabled_text);
     fprintf(fp, "rtc_xt_enabled=%s\n", rtc_xt_enabled_text);
+    fprintf(fp, "rtc_use_system_time=%s\n", rtc_use_system_time_text);
     fprintf(fp, "rtc_start_time=%s\n\n", rtc_start_time_text);
 
     fprintf(fp, "# Scaling filter used when the DOS image is resized.\n");
@@ -1995,6 +2070,12 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "[video]\n");
     fprintf(fp, "scaling_filter=%s\n", scaling_filter_text);
     fprintf(fp, "keyboard_mode=%s\n\n", keyboard_mode_text);
+
+    fprintf(fp, "# Host mouse input target.\n");
+    fprintf(fp, "# mouse_type=serial uses the COM1 Microsoft serial mouse.\n");
+    fprintf(fp, "# mouse_type=ps2 uses the 8042 auxiliary PS/2 mouse port.\n");
+    fprintf(fp, "[input]\n");
+    fprintf(fp, "mouse_type=%s\n\n", mouse_type_text);
 
     fprintf(fp, "# Emulated audio devices mixed into the output stream.\n");
     fprintf(fp, "# The built-in PC speaker/beeper is always enabled.\n");
@@ -2071,10 +2152,21 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# log_truncate_on_start=1 clears pico_286.log before writing\n");
     fprintf(fp, "# the new run's log start marker. 0 keeps append-only logs.\n");
     fprintf(fp, "# log_max_bytes limits pico_286.log growth; 0 disables the cap.\n");
+    fprintf(fp, "# debug_control_* enables a file-mailbox live debug interface.\n");
+    fprintf(fp, "# The emulator consumes debug_control_command_path and writes\n");
+    fprintf(fp, "# debug_control_response_path; binary dumps go to artifact_dir.\n");
     fprintf(fp, "[debug]\n");
     fprintf(fp, "log_truncate_on_start=%s\n",
             log_truncate_on_start_text);
-    fprintf(fp, "log_max_bytes=%s\n\n", log_max_bytes_text);
+    fprintf(fp, "log_max_bytes=%s\n", log_max_bytes_text);
+    fprintf(fp, "debug_control_enabled=%s\n",
+            debug_control_enabled_text);
+    fprintf(fp, "debug_control_command_path=%s\n",
+            debug_control_command_path);
+    fprintf(fp, "debug_control_response_path=%s\n",
+            debug_control_response_path);
+    fprintf(fp, "debug_control_artifact_dir=%s\n\n",
+            debug_control_artifact_dir);
 
     fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
     fprintf(fp, "[stats]\n");
@@ -2106,9 +2198,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "# BIOS hard drives 80h and 81h, DOS C: and D:.\n");
     fprintf(fp, "[hard_drives]\n");
     fprintf(fp, "hdd0=%s\n", disk_entries[2].value);
-    fprintf(fp, "hdd0_geometry=%s\n", hdd_geometry_text[0]);
     fprintf(fp, "hdd1=%s\n", disk_entries[3].value);
-    fprintf(fp, "hdd1_geometry=%s\n", hdd_geometry_text[1]);
 
     if (fclose(fp) != 0) {
         r36sx_pico286_debug_log("diskcfg: save close failed path='%s'",
@@ -2118,6 +2208,13 @@ int r36sx_pico286_save_config(void)
 
     r36sx_pico286_debug_log("diskcfg: saved %s", disk_config_path);
     return 1;
+}
+
+void r36sx_pico286_reload_config(void)
+{
+    r36sx_pico286_debug_log("diskcfg: reload requested");
+    disk_config_loaded = 0;
+    load_disk_config();
 }
 
 uint32_t r36sx_pico286_cpu_exec_loops(uint32_t fallback_loops)
@@ -2136,7 +2233,13 @@ uint32_t r36sx_pico286_target_fps(uint32_t fallback_fps)
 
 int64_t r36sx_pico286_rtc_start_time_unix(void)
 {
+    time_t host_time;
+
     load_disk_config();
+
+    if (rtc_use_system_time && time(&host_time) != (time_t)-1) {
+        return (int64_t)host_time;
+    }
 
     if (!rtc_start_time_valid &&
         !parse_rtc_start_time_text(rtc_start_time_text,
@@ -2342,29 +2445,6 @@ int r36sx_pico286_set_boot_order_value(const char *value)
     return set_boot_order(mutable_value, 0);
 }
 
-int r36sx_pico286_hdd_geometry(uint8_t bios_drive,
-                               r36sx_pico286_chs_t *geometry)
-{
-    int index;
-
-    load_disk_config();
-
-    if (bios_drive == 128) {
-        index = 0;
-    } else if (bios_drive == 129) {
-        index = 1;
-    } else {
-        return 0;
-    }
-
-    if (!hdd_geometry_configured[index]) {
-        return 0;
-    }
-
-    *geometry = hdd_geometries[index];
-    return 1;
-}
-
 uint32_t r36sx_pico286_disk_cache_buffer_bytes(void)
 {
     load_disk_config();
@@ -2427,6 +2507,34 @@ uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes)
     load_disk_config();
 
     return log_max_bytes;
+}
+
+int r36sx_pico286_debug_control_enabled(void)
+{
+    load_disk_config();
+
+    return debug_control_enabled;
+}
+
+const char *r36sx_pico286_debug_control_command_path(void)
+{
+    load_disk_config();
+
+    return debug_control_command_path;
+}
+
+const char *r36sx_pico286_debug_control_response_path(void)
+{
+    load_disk_config();
+
+    return debug_control_response_path;
+}
+
+const char *r36sx_pico286_debug_control_artifact_dir(void)
+{
+    load_disk_config();
+
+    return debug_control_artifact_dir;
 }
 
 int r36sx_pico286_audio_adlib_enabled(void)
@@ -2567,4 +2675,18 @@ const char *r36sx_pico286_keyboard_mode_name(void)
     load_disk_config();
 
     return keyboard_mode_text;
+}
+
+r36sx_pico286_mouse_type_t r36sx_pico286_mouse_type(void)
+{
+    load_disk_config();
+
+    return mouse_type;
+}
+
+const char *r36sx_pico286_mouse_type_name(void)
+{
+    load_disk_config();
+
+    return mouse_type_text;
 }

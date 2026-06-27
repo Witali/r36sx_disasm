@@ -134,7 +134,10 @@ The host image I/O layer reads and writes contiguous BIOS sector transfers in
 bulk when the DOS DMA buffer is ordinary RAM.  Each opened image also gets a
 stdio buffer; the relevant config values are below.
 
-Hard disks expose basic Enhanced Disk Drive / LBA services through `INT 13h`.
+Hard-disk CHS geometry is derived automatically from the mounted image size
+and exposed through the BIOS Data Area fixed-disk count, `INT 13h AH=08h`,
+and fixed-disk parameter table vectors `INT 41h` / `INT 46h`.  Hard disks also
+expose basic Enhanced Disk Drive / LBA services through `INT 13h`.
 `AH=41h` reports packet access, `AH=42h` reads from a Disk Address Packet,
 `AH=43h` writes from a Disk Address Packet, and `AH=48h` returns extended drive
 parameters.  Legacy CHS calls remain supported for older DOS software.
@@ -206,9 +209,7 @@ fdd1=sopwith.img
 
 [hard_drives]
 hdd0=hdd.hdd
-hdd0_geometry=65,16,63
 hdd1=hdd2.hdd
-hdd1_geometry=800,16,32
 ```
 
 `cpu_model` can be `8086`, `80286`, or `80386`.  The default is `80386`.

@@ -148,7 +148,7 @@ double FpuPop();
 int FpuGetTag(unsigned);
 void FpuPush(double);
 void FpuSetTag(unsigned, unsigned);
-void OpFinit();
+void OpFinit(void);
 void OpFpu(u8 opcode);
 int OpFwait(void);
 
