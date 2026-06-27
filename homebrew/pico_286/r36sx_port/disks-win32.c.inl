@@ -382,9 +382,37 @@ static const char *disk_memory_range_name(uint32_t address,
     return "mapped";
 }
 
-static inline uint32_t disk_real_mode_linear(uint16_t segment,
-                                             uint16_t offset) {
-    return ((uint32_t)segment << 4) + (uint32_t)offset;
+static inline uint32_t disk_guest_real_pointer(uint16_t segment,
+                                               uint16_t offset,
+                                               uint8_t write_access,
+                                               uint8_t *ok) {
+    return r36sx_cpu_translate_guest_real_pointer(segment, offset,
+                                                  write_access, ok);
+}
+
+static inline int disk_should_log_mapped_transfer(uint32_t address,
+                                                  size_t bytecount) {
+    return bytecount > 0 &&
+           !disk_memory_range_is_plain_ram(address, bytecount);
+}
+
+static uint32_t disk_first4_from_memory(uint32_t address, size_t bytecount) {
+    uint32_t value = 0;
+    size_t count = bytecount < 4u ? bytecount : 4u;
+    for (size_t i = 0; i < count; i++) {
+        value |= (uint32_t)read86(address + (uint32_t)i) << (8u * i);
+    }
+    return value;
+}
+
+static uint32_t disk_first4_from_buffer(const uint8_t *buffer,
+                                        size_t bytecount) {
+    uint32_t value = 0;
+    size_t count = bytecount < 4u ? bytecount : 4u;
+    for (size_t i = 0; i < count; i++) {
+        value |= (uint32_t)buffer[i] << (8u * i);
+    }
+    return value;
 }
 
 static inline uint16_t disk_mem_read16(uint32_t address) {
@@ -1017,7 +1045,14 @@ static void readdisk(uint8_t drivenum,
               uint16_t cyl, uint16_t sect, uint16_t head,
               uint16_t sectcount, int is_verify
 ) {
-    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
+    uint8_t memdest_ok;
+    uint32_t memdest = disk_guest_real_pointer(dstseg, dstoff, 1u,
+                                               &memdest_ok);
+    if (!memdest_ok) {
+        CPU_AH = 0x09;
+        CPU_FL_CF = 1;
+        return;
+    }
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -1047,6 +1082,8 @@ static void readdisk(uint8_t drivenum,
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
     const uint32_t memstart = memdest;
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_disk_word = 0;
 
     // Check if fileoffset is valid
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
@@ -1070,6 +1107,14 @@ static void readdisk(uint8_t drivenum,
         disk_memory_range_name(memstart, bytecount),
         use_bulk ? "bulk" : "mapped",
         a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs read start drive=%u chs=%u/%u/%u count=%u verify=%d es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, cyl, head, sect, sectcount, is_verify, dstseg, dstoff,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount), a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
 
     if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
@@ -1103,6 +1148,10 @@ static void readdisk(uint8_t drivenum,
             CPU_AL = cursect;
             CPU_FL_CF = 1;
             return;
+        }
+        if (cursect == 0) {
+            first_disk_word = disk_first4_from_buffer(sectorbuffer,
+                                                      sizeof(sectorbuffer));
         }
 
         if (is_verify) {
@@ -1142,6 +1191,15 @@ static void readdisk(uint8_t drivenum,
     CPU_AL = cursect;
     CPU_FL_CF = 0;
     CPU_AH = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs read done drive=%u count=%u linear=%05lx mem=%s first_disk=%08lx first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_disk_word,
+            (unsigned long)disk_first4_from_memory(memstart, bytecount),
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
 }
 
 static void writedisk(uint8_t drivenum,
@@ -1149,7 +1207,14 @@ static void writedisk(uint8_t drivenum,
                uint16_t cyl, uint16_t sect, uint16_t head,
                uint16_t sectcount
 ) {
-    uint32_t memdest = disk_real_mode_linear(dstseg, dstoff);
+    uint8_t memdest_ok;
+    uint32_t memdest = disk_guest_real_pointer(dstseg, dstoff, 0u,
+                                               &memdest_ok);
+    if (!memdest_ok) {
+        CPU_AH = 0x09;
+        CPU_FL_CF = 1;
+        return;
+    }
     uint32_t cursect = 0;
 
     // Check if disk is inserted
@@ -1177,6 +1242,8 @@ static void writedisk(uint8_t drivenum,
     size_t fileoffset = chs2ofs(drivenum, cyl, head, sect);
     size_t bytecount = (size_t)sectcount * 512UL;
     const uint32_t memstart = memdest;
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_mem_word = 0;
 
     if (!disk_transfer_is_inside_image(drivenum, fileoffset, sectcount)) {
         r36sx_pico286_debug_log(
@@ -1206,6 +1273,16 @@ static void writedisk(uint8_t drivenum,
         disk_memory_range_name(memstart, bytecount),
         use_bulk ? "bulk" : "mapped",
         a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        first_mem_word = disk_first4_from_memory(memstart, bytecount);
+        r36sx_pico286_debug_log(
+            "diskdbg: chs write start drive=%u chs=%u/%u/%u count=%u es:bx=%04x:%04x linear=%05lx bytes=%lu mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, cyl, head, sect, sectcount, dstseg, dstoff,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
 
     if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
@@ -1263,6 +1340,14 @@ static void writedisk(uint8_t drivenum,
     CPU_AL = cursect;
     CPU_FL_CF = 0;
     CPU_AH = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: chs write done drive=%u count=%u linear=%05lx mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP);
+    }
 }
 
 static void readdisk_lba(uint8_t drivenum,
@@ -1302,6 +1387,8 @@ static void readdisk_lba(uint8_t drivenum,
 
     const uint32_t memstart = memdest;
     int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_disk_word = 0;
     R36SX_DISK_TRACE_LOG(
         "disk: lba read drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
         drivenum, (unsigned long)lba, sectcount,
@@ -1309,6 +1396,14 @@ static void readdisk_lba(uint8_t drivenum,
         disk_memory_range_name(memstart, bytecount),
         use_bulk ? "bulk" : "mapped",
         a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba read start drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount), a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
 
     if (use_bulk) {
         if (r36sx_host_disk_read_at(disk[drivenum].diskfile, fileoffset,
@@ -1340,6 +1435,10 @@ static void readdisk_lba(uint8_t drivenum,
             return;
         }
 
+        if (cursect == 0) {
+            first_disk_word = disk_first4_from_buffer(sectorbuffer,
+                                                      sizeof(sectorbuffer));
+        }
         for (int sectoffset = 0; sectoffset < 512; sectoffset++) {
             write86(memdest++, sectorbuffer[sectoffset]);
         }
@@ -1348,6 +1447,15 @@ static void readdisk_lba(uint8_t drivenum,
     CPU_AH = 0;
     CPU_AL = (uint8_t)cursect;
     CPU_FL_CF = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba read done drive=%u count=%u linear=%05lx mem=%s first_disk=%08lx first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_disk_word,
+            (unsigned long)disk_first4_from_memory(memstart, bytecount),
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
 }
 
 static void writedisk_lba(uint8_t drivenum,
@@ -1396,6 +1504,8 @@ static void writedisk_lba(uint8_t drivenum,
 
     const uint32_t memstart = memdest;
     int use_bulk = disk_memory_range_is_plain_ram(memstart, bytecount);
+    int log_mapped = disk_should_log_mapped_transfer(memstart, bytecount);
+    uint32_t first_mem_word = 0;
     R36SX_DISK_TRACE_LOG(
         "disk: lba write drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s path=%s a20=%d offset=%lu",
         drivenum, (unsigned long)lba, sectcount,
@@ -1403,6 +1513,16 @@ static void writedisk_lba(uint8_t drivenum,
         disk_memory_range_name(memstart, bytecount),
         use_bulk ? "bulk" : "mapped",
         a20_enabled, (unsigned long)fileoffset);
+    if (log_mapped) {
+        first_mem_word = disk_first4_from_memory(memstart, bytecount);
+        r36sx_pico286_debug_log(
+            "diskdbg: lba write start drive=%u lba=%lu count=%u linear=%05lx bytes=%lu mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx offset=%lu",
+            drivenum, (unsigned long)lba, sectcount,
+            (unsigned long)memstart, (unsigned long)bytecount,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP, (unsigned long)fileoffset);
+    }
 
     if (use_bulk) {
         if (r36sx_host_disk_write_at(disk[drivenum].diskfile,
@@ -1445,6 +1565,14 @@ static void writedisk_lba(uint8_t drivenum,
     CPU_AH = 0;
     CPU_AL = (uint8_t)cursect;
     CPU_FL_CF = 0;
+    if (log_mapped) {
+        r36sx_pico286_debug_log(
+            "diskdbg: lba write done drive=%u count=%u linear=%05lx mem=%s first_mem=%08lx a20=%d caller=%04x:%08lx",
+            drivenum, (unsigned)cursect, (unsigned long)memstart,
+            disk_memory_range_name(memstart, bytecount),
+            (unsigned long)first_mem_word, a20_enabled, CPU_CS,
+            (unsigned long)CPU_IP);
+    }
 }
 
 typedef struct disk_address_packet_s {
@@ -1454,6 +1582,7 @@ typedef struct disk_address_packet_s {
 } disk_address_packet_t;
 
 static int disk_read_address_packet(uint32_t dap,
+                                    uint8_t buffer_write_access,
                                     disk_address_packet_t *packet) {
     uint8_t packet_size = read86(dap);
     uint8_t reserved = read86(dap + 1u);
@@ -1487,7 +1616,16 @@ static int disk_read_address_packet(uint32_t dap,
         }
         packet->buffer = (uint32_t)flat_buffer;
     } else {
-        packet->buffer = disk_real_mode_linear(buffer_segment, buffer_offset);
+        uint8_t buffer_ok;
+        packet->buffer = disk_guest_real_pointer(buffer_segment, buffer_offset,
+                                                 buffer_write_access,
+                                                 &buffer_ok);
+        if (!buffer_ok) {
+            R36SX_DISK_TRACE_LOG(
+                "disk: dap invalid translated buffer=%04x:%04x addr=%05lx",
+                buffer_segment, buffer_offset, (unsigned long)dap);
+            return 0;
+        }
     }
 
     packet->sector_count = sector_count;
@@ -1497,6 +1635,18 @@ static int disk_read_address_packet(uint32_t dap,
         (unsigned long)dap, sector_count, (unsigned long)packet->buffer,
         disk_memory_range_name(packet->buffer, (size_t)sector_count * 512UL),
         (unsigned long)lba);
+    if (disk_should_log_mapped_transfer(
+            packet->buffer, (size_t)sector_count * 512UL) ||
+        disk_should_log_mapped_transfer(dap, packet_size)) {
+        r36sx_pico286_debug_log(
+            "diskdbg: dap addr=%05lx size=%u count=%u buffer=%05lx mem=%s dapmem=%s lba=%lu a20=%d caller=%04x:%08lx",
+            (unsigned long)dap, packet_size, sector_count,
+            (unsigned long)packet->buffer,
+            disk_memory_range_name(packet->buffer,
+                                   (size_t)sector_count * 512UL),
+            disk_memory_range_name(dap, packet_size), (unsigned long)lba,
+            a20_enabled, CPU_CS, (unsigned long)CPU_IP);
+    }
     return 1;
 }
 
@@ -1505,16 +1655,19 @@ static inline void disk_set_extended_count(uint32_t dap, uint16_t count) {
 }
 
 static void disk_get_extended_parameters(uint8_t drivenum) {
-    uint32_t result = disk_real_mode_linear(CPU_DS, CPU_SI);
-    uint16_t requested_size = disk_mem_read16(result);
+    uint8_t result_ok;
+    uint32_t result = disk_guest_real_pointer(CPU_DS, CPU_SI, 1u,
+                                              &result_ok);
+    uint16_t requested_size;
     uint16_t returned_size;
     uint64_t total_sectors;
 
-    if (!disk[drivenum].inserted || drivenum < 2) {
+    if (!result_ok || !disk[drivenum].inserted || drivenum < 2) {
         CPU_AH = 0x31;    // no media in drive
         CPU_FL_CF = 1;
         return;
     }
+    requested_size = disk_mem_read16(result);
     if (requested_size < 26u) {
         CPU_AH = 0x01;    // invalid command or parameter
         CPU_FL_CF = 1;
@@ -1674,9 +1827,12 @@ static INLINE void diskhandler() {
 
         case 0x42:  // Extended read using a Disk Address Packet at DS:SI
         {
-            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            uint8_t dap_ok;
+            uint32_t dap = disk_guest_real_pointer(CPU_DS, CPU_SI, 0u,
+                                                   &dap_ok);
             disk_address_packet_t packet;
-            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+            if (drivenum < 2 || !dap_ok ||
+                !disk_read_address_packet(dap, 1u, &packet)) {
                 CPU_AH = 0x01;      // Invalid command or parameter.
                 CPU_AL = 0;
                 CPU_FL_CF = 1;
@@ -1691,9 +1847,12 @@ static INLINE void diskhandler() {
 
         case 0x43:  // Extended write using a Disk Address Packet at DS:SI
         {
-            uint32_t dap = disk_real_mode_linear(CPU_DS, CPU_SI);
+            uint8_t dap_ok;
+            uint32_t dap = disk_guest_real_pointer(CPU_DS, CPU_SI, 0u,
+                                                   &dap_ok);
             disk_address_packet_t packet;
-            if (drivenum < 2 || !disk_read_address_packet(dap, &packet)) {
+            if (drivenum < 2 || !dap_ok ||
+                !disk_read_address_packet(dap, 0u, &packet)) {
                 CPU_AH = 0x01;      // Invalid command or parameter.
                 CPU_AL = 0;
                 CPU_FL_CF = 1;

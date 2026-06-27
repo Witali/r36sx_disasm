@@ -11,6 +11,7 @@ typedef void (*r36sx_cpu_exec_fn)(uint32_t execloops);
 
 #define R36SX_CPU_DEBUG_SEGMENT_COUNT 6u
 #define R36SX_CPU_DEBUG_REGISTER_COUNT 8u
+#define R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS 16u
 
 typedef struct r36sx_cpu_debug_segment_cache_s {
     uint16_t selector;
@@ -62,9 +63,54 @@ typedef struct r36sx_cpu_debug_snapshot_s {
     uint8_t iopl;
 } r36sx_cpu_debug_snapshot_t;
 
+typedef struct r36sx_cpu_debug_host_breakpoint_s {
+    uint8_t enabled;
+    uint8_t linear;
+    uint16_t cs;
+    uint32_t eip;
+    uint32_t linear_address;
+    uint64_t hit_count;
+} r36sx_cpu_debug_host_breakpoint_t;
+
+typedef struct r36sx_cpu_debug_host_breakpoint_status_s {
+    uint8_t paused;
+    uint8_t active_count;
+    int32_t hit_slot;
+    uint8_t hit_linear;
+    uint16_t hit_cs;
+    uint32_t hit_ip;
+    uint32_t hit_linear_address;
+    uint64_t hit_count;
+} r36sx_cpu_debug_host_breakpoint_status_t;
+
 r36sx_cpu_exec_fn r36sx_cpu_select_exec(void);
 const char *r36sx_cpu_selected_exec_name(void);
 void r36sx_cpu_debug_snapshot(r36sx_cpu_debug_snapshot_t *snapshot);
+uint8_t r36sx_cpu_debug_translate_linear(uint32_t linear,
+                                         uint8_t write_access,
+                                         uint8_t user_access,
+                                         uint32_t *physical,
+                                         uint32_t *pde,
+                                         uint32_t *pte);
+int r36sx_cpu_debug_host_breakpoint_add(uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t eip,
+                                        uint32_t linear_address,
+                                        uint32_t *slot_out);
+int r36sx_cpu_debug_host_breakpoint_set(uint32_t slot,
+                                        uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t eip,
+                                        uint32_t linear_address);
+int r36sx_cpu_debug_host_breakpoint_remove(uint32_t slot);
+void r36sx_cpu_debug_host_breakpoint_clear_all(void);
+void r36sx_cpu_debug_host_breakpoint_continue(void);
+uint8_t r36sx_cpu_debug_host_breakpoint_paused(void);
+void r36sx_cpu_debug_host_breakpoint_status(
+    r36sx_cpu_debug_host_breakpoint_status_t *status);
+int r36sx_cpu_debug_host_breakpoint_get(
+    uint32_t slot,
+    r36sx_cpu_debug_host_breakpoint_t *breakpoint);
 
 #ifdef __cplusplus
 }

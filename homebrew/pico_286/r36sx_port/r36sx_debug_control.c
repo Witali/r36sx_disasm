@@ -126,14 +126,15 @@ static void debug_artifact_path(char *dest, size_t dest_size,
     snprintf(dest, dest_size, "%s%c%s", g_artifact_dir, R36SX_PATH_SEP, name);
 }
 
-static int debug_parse_u32(const char *text, uint32_t *value)
+static int debug_parse_u32_default(const char *text, uint32_t *value,
+                                   int default_base)
 {
     char *end = NULL;
     char buffer[32];
     size_t len;
     size_t i;
     unsigned long parsed;
-    int base = 10;
+    int base = default_base;
 
     if (!text || text[0] == '\0') {
         return 0;
@@ -171,6 +172,11 @@ static int debug_parse_u32(const char *text, uint32_t *value)
     return 1;
 }
 
+static int debug_parse_u32(const char *text, uint32_t *value)
+{
+    return debug_parse_u32_default(text, value, 10);
+}
+
 static int debug_parse_address(const char *text, uint32_t *address)
 {
     const char *colon;
@@ -195,14 +201,64 @@ static int debug_parse_address(const char *text, uint32_t *address)
         memcpy(left, text, left_len);
         left[left_len] = '\0';
         snprintf(right, sizeof(right), "%s", colon + 1);
-        if (!debug_parse_u32(left, &segment) ||
-            !debug_parse_u32(right, &offset) ||
+        if (!debug_parse_u32_default(left, &segment, 16) ||
+            !debug_parse_u32_default(right, &offset, 16) ||
             segment > 0xffffu || offset > 0xffffu) {
             return 0;
         }
     }
     *address = ((segment << 4) + offset) & 0xffffffffu;
     return 1;
+}
+
+static int debug_parse_breakpoint_address(const char *text,
+                                          uint8_t *linear,
+                                          uint16_t *cs,
+                                          uint32_t *eip,
+                                          uint32_t *linear_address)
+{
+    const char *colon;
+
+    if (!text || !linear || !cs || !eip || !linear_address) {
+        return 0;
+    }
+    colon = strchr(text, ':');
+    if (!colon) {
+        uint32_t parsed;
+        if (!debug_parse_u32(text, &parsed)) {
+            return 0;
+        }
+        *linear = 1u;
+        *cs = 0;
+        *eip = 0;
+        *linear_address = parsed;
+        return 1;
+    }
+
+    {
+        char left[32];
+        char right[32];
+        uint32_t segment;
+        uint32_t offset;
+        size_t left_len = (size_t)(colon - text);
+        if (left_len >= sizeof(left) ||
+            strlen(colon + 1) >= sizeof(right)) {
+            return 0;
+        }
+        memcpy(left, text, left_len);
+        left[left_len] = '\0';
+        snprintf(right, sizeof(right), "%s", colon + 1);
+        if (!debug_parse_u32_default(left, &segment, 16) ||
+            !debug_parse_u32_default(right, &offset, 16) ||
+            segment > 0xffffu) {
+            return 0;
+        }
+        *linear = 0u;
+        *cs = (uint16_t)segment;
+        *eip = offset;
+        *linear_address = ((segment << 4) + offset) & 0xffffffffu;
+        return 1;
+    }
 }
 
 static int debug_parse_scan_byte(const char *text, uint8_t *value)
@@ -250,6 +306,50 @@ static void debug_write_hex(FILE *out, uint32_t address, uint32_t length,
     }
 }
 
+static uint8_t debug_current_user_access(void)
+{
+    r36sx_cpu_debug_snapshot_t s;
+    r36sx_cpu_debug_snapshot(&s);
+    return s.cpl == 3u;
+}
+
+static int debug_translate_linear_as(uint32_t linear,
+                                     uint8_t write_access,
+                                     uint8_t user_access,
+                                     uint32_t *physical,
+                                     uint32_t *pde,
+                                     uint32_t *pte)
+{
+    return r36sx_cpu_debug_translate_linear(
+        linear, write_access, user_access, physical, pde, pte);
+}
+
+static void debug_write_virtual_hex(FILE *out, uint32_t linear,
+                                    uint32_t length,
+                                    uint8_t user_access)
+{
+    uint32_t i;
+
+    fprintf(out, "linear=%08lX length=%lu\n",
+            (unsigned long)linear, (unsigned long)length);
+    for (i = 0; i < length; i++) {
+        uint32_t physical;
+        if (!debug_translate_linear_as(linear + i, 0, user_access,
+                                       &physical, NULL, NULL)) {
+            fprintf(out, "\ntranslation_failed linear=%08lX\n",
+                    (unsigned long)(linear + i));
+            return;
+        }
+        if ((i & 15u) == 0) {
+            fprintf(out, "%08lX:", (unsigned long)(linear + i));
+        }
+        fprintf(out, " %02X", (unsigned)read86_ob(physical));
+        if ((i & 15u) == 15u || i + 1u == length) {
+            fputc('\n', out);
+        }
+    }
+}
+
 static int debug_dump_memory_file(uint32_t address, uint32_t length,
                                   const char *file_name,
                                   FILE *out)
@@ -273,6 +373,41 @@ static int debug_dump_memory_file(uint32_t address, uint32_t length,
     }
     debug_write_header(out);
     fprintf(out, "file=%s bytes=%lu\n", path, (unsigned long)length);
+    return 1;
+}
+
+static int debug_dump_virtual_memory_file(uint32_t linear, uint32_t length,
+                                          const char *file_name,
+                                          FILE *out)
+{
+    char path[512];
+    FILE *fp;
+    uint32_t i;
+    uint8_t user_access = debug_current_user_access();
+
+    debug_artifact_path(path, sizeof(path), file_name);
+    fp = fopen(path, "wb");
+    if (!fp) {
+        debug_write_errno_error(out, "write file failed", path);
+        return 0;
+    }
+    for (i = 0; i < length; i++) {
+        uint32_t physical;
+        if (!debug_translate_linear_as(linear + i, 0, user_access,
+                                       &physical, NULL, NULL)) {
+            fclose(fp);
+            debug_write_error(out, "linear address not mapped");
+            return 0;
+        }
+        fputc(read86_ob(physical), fp);
+    }
+    if (fclose(fp) != 0) {
+        debug_write_errno_error(out, "close file failed", path);
+        return 0;
+    }
+    debug_write_header(out);
+    fprintf(out, "file=%s bytes=%lu linear=%08lX\n",
+            path, (unsigned long)length, (unsigned long)linear);
     return 1;
 }
 
@@ -382,6 +517,64 @@ static void debug_command_mem(char *cursor, FILE *out)
     debug_write_hex(out, address, length, address);
 }
 
+static void debug_command_vmem(char *cursor, FILE *out)
+{
+    char *addr_token = debug_next_token(&cursor);
+    char *len_token = debug_next_token(&cursor);
+    char *file_token = debug_next_token(&cursor);
+    uint32_t linear;
+    uint32_t length;
+    uint8_t user_access;
+
+    if (!addr_token || !len_token ||
+        !debug_parse_address(addr_token, &linear) ||
+        !debug_parse_u32(len_token, &length)) {
+        debug_write_error(out, "usage: vmem <linear|seg:off> <length> [file]");
+        return;
+    }
+    if (file_token) {
+        debug_dump_virtual_memory_file(linear, length, file_token, out);
+        return;
+    }
+    if (length > R36SX_DEBUG_CONTROL_MAX_INLINE_BYTES) {
+        debug_write_error(out, "inline virtual memory response too large; pass file name");
+        return;
+    }
+    user_access = debug_current_user_access();
+    debug_write_header(out);
+    debug_write_virtual_hex(out, linear, length, user_access);
+}
+
+static void debug_command_pagemap(char *cursor, FILE *out)
+{
+    char *addr_token = debug_next_token(&cursor);
+    uint32_t linear;
+    uint32_t physical;
+    uint32_t pde;
+    uint32_t pte;
+    uint8_t user_access;
+
+    if (!addr_token || !debug_parse_address(addr_token, &linear)) {
+        debug_write_error(out, "usage: pagemap <linear|seg:off>");
+        return;
+    }
+
+    debug_write_header(out);
+    user_access = debug_current_user_access();
+    if (!debug_translate_linear_as(linear, 0, user_access,
+                                   &physical, &pde, &pte)) {
+        fprintf(out,
+                "linear=%08lX mapped=0 pde=%08lX pte=%08lX\n",
+                (unsigned long)linear, (unsigned long)pde,
+                (unsigned long)pte);
+        return;
+    }
+    fprintf(out,
+            "linear=%08lX physical=%08lX pde=%08lX pte=%08lX\n",
+            (unsigned long)linear, (unsigned long)physical,
+            (unsigned long)pde, (unsigned long)pte);
+}
+
 static void debug_command_vram(char *cursor, FILE *out)
 {
     char *offset_token = debug_next_token(&cursor);
@@ -472,13 +665,154 @@ static void debug_command_key(char *cursor, const char *command, FILE *out)
     fprintf(out, "queued=%lu\n", (unsigned long)count);
 }
 
+static void debug_write_breakpoint(FILE *out,
+                                   uint32_t slot,
+                                   const r36sx_cpu_debug_host_breakpoint_t *bp)
+{
+    if (bp->linear) {
+        fprintf(out,
+                "slot=%lu enabled=1 type=linear linear=%08lX hits=%llu\n",
+                (unsigned long)slot,
+                (unsigned long)bp->linear_address,
+                (unsigned long long)bp->hit_count);
+    } else {
+        fprintf(out,
+                "slot=%lu enabled=1 type=csip cs:eip=%04X:%08lX linear_hint=%08lX hits=%llu\n",
+                (unsigned long)slot, (unsigned)bp->cs,
+                (unsigned long)bp->eip,
+                (unsigned long)(((uint32_t)bp->cs << 4) + bp->eip),
+                (unsigned long long)bp->hit_count);
+    }
+}
+
+static void debug_command_bp(char *cursor, FILE *out)
+{
+    char *addr_token = debug_next_token(&cursor);
+    uint8_t linear;
+    uint16_t cs;
+    uint32_t eip;
+    uint32_t linear_address;
+    uint32_t slot;
+
+    if (!addr_token ||
+        !debug_parse_breakpoint_address(addr_token, &linear, &cs, &eip,
+                                        &linear_address)) {
+        debug_write_error(out, "usage: bp <linear|cs:eip>");
+        return;
+    }
+    if (r36sx_cpu_debug_host_breakpoint_add(linear, cs, eip, linear_address,
+                                           &slot) != 0) {
+        debug_write_error(out, "no free breakpoint slot");
+        return;
+    }
+    debug_write_header(out);
+    fprintf(out, "breakpoint_added=%lu\n", (unsigned long)slot);
+}
+
+static void debug_command_bpset(char *cursor, FILE *out)
+{
+    char *slot_token = debug_next_token(&cursor);
+    char *addr_token = debug_next_token(&cursor);
+    uint32_t slot;
+    uint8_t linear;
+    uint16_t cs;
+    uint32_t eip;
+    uint32_t linear_address;
+
+    if (!slot_token || !addr_token ||
+        !debug_parse_u32(slot_token, &slot) ||
+        !debug_parse_breakpoint_address(addr_token, &linear, &cs, &eip,
+                                        &linear_address)) {
+        debug_write_error(out, "usage: bpset <slot> <linear|cs:eip>");
+        return;
+    }
+    if (r36sx_cpu_debug_host_breakpoint_set(slot, linear, cs, eip,
+                                           linear_address) != 0) {
+        debug_write_error(out, "invalid breakpoint slot");
+        return;
+    }
+    debug_write_header(out);
+    fprintf(out, "breakpoint_set=%lu\n", (unsigned long)slot);
+}
+
+static void debug_command_bpdel(char *cursor, FILE *out)
+{
+    char *slot_token = debug_next_token(&cursor);
+    uint32_t slot;
+
+    if (!slot_token || !debug_parse_u32(slot_token, &slot)) {
+        debug_write_error(out, "usage: bpdel <slot>");
+        return;
+    }
+    if (r36sx_cpu_debug_host_breakpoint_remove(slot) != 0) {
+        debug_write_error(out, "breakpoint slot is empty or invalid");
+        return;
+    }
+    debug_write_header(out);
+    fprintf(out, "breakpoint_deleted=%lu\n", (unsigned long)slot);
+}
+
+static void debug_command_bplist(FILE *out)
+{
+    debug_write_header(out);
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        r36sx_cpu_debug_host_breakpoint_t bp;
+        if (r36sx_cpu_debug_host_breakpoint_get(slot, &bp) == 0) {
+            debug_write_breakpoint(out, slot, &bp);
+        }
+    }
+}
+
+static void debug_command_bpstatus(FILE *out)
+{
+    r36sx_cpu_debug_host_breakpoint_status_t status;
+
+    r36sx_cpu_debug_host_breakpoint_status(&status);
+    debug_write_header(out);
+    fprintf(out,
+            "paused=%u active=%u hit_slot=%ld hit_type=%s hit_cs:eip=%04X:%08lX hit_linear=%08lX hit_count=%llu\n",
+            (unsigned)status.paused,
+            (unsigned)status.active_count,
+            (long)status.hit_slot,
+            status.hit_linear ? "linear" : "csip",
+            (unsigned)status.hit_cs,
+            (unsigned long)status.hit_ip,
+            (unsigned long)status.hit_linear_address,
+            (unsigned long long)status.hit_count);
+}
+
+static void debug_command_bpclear(FILE *out)
+{
+    r36sx_cpu_debug_host_breakpoint_clear_all();
+    debug_write_header(out);
+    fprintf(out, "breakpoints_cleared=1\n");
+}
+
+static void debug_command_continue(FILE *out)
+{
+    r36sx_cpu_debug_host_breakpoint_continue();
+    debug_write_header(out);
+    fprintf(out, "continued=1\n");
+}
+
 static void debug_command_help(FILE *out)
 {
     fprintf(out,
             "commands:\n"
             "  ping\n"
             "  regs\n"
+            "  bp <linear|cs:eip>\n"
+            "  bpset <slot> <linear|cs:eip>\n"
+            "  bplist\n"
+            "  bpdel <slot>\n"
+            "  bpclear\n"
+            "  bpstatus\n"
+            "  cont\n"
             "  mem <address|seg:off> <length> [file]\n"
+            "  vmem <linear|seg:off> <length> [file]\n"
+            "  pagemap <linear|seg:off>\n"
             "  vram [offset] [length] [file]\n"
             "  screen [file]\n"
             "  key <scan byte> [scan byte...]\n"
@@ -504,8 +838,28 @@ static void debug_execute_command(char *command_text, FILE *out)
     } else if (debug_str_eq(command, "regs")) {
         debug_write_header(out);
         debug_command_regs(out);
+    } else if (debug_str_eq(command, "bp") ||
+               debug_str_eq(command, "break")) {
+        debug_command_bp(cursor, out);
+    } else if (debug_str_eq(command, "bpset")) {
+        debug_command_bpset(cursor, out);
+    } else if (debug_str_eq(command, "bplist")) {
+        debug_command_bplist(out);
+    } else if (debug_str_eq(command, "bpdel")) {
+        debug_command_bpdel(cursor, out);
+    } else if (debug_str_eq(command, "bpclear")) {
+        debug_command_bpclear(out);
+    } else if (debug_str_eq(command, "bpstatus")) {
+        debug_command_bpstatus(out);
+    } else if (debug_str_eq(command, "cont") ||
+               debug_str_eq(command, "continue")) {
+        debug_command_continue(out);
     } else if (debug_str_eq(command, "mem")) {
         debug_command_mem(cursor, out);
+    } else if (debug_str_eq(command, "vmem")) {
+        debug_command_vmem(cursor, out);
+    } else if (debug_str_eq(command, "pagemap")) {
+        debug_command_pagemap(cursor, out);
     } else if (debug_str_eq(command, "vram")) {
         debug_command_vram(cursor, out);
     } else if (debug_str_eq(command, "screen")) {

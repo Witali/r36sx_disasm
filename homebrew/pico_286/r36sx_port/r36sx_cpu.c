@@ -19,6 +19,10 @@ extern void r36sx_emergency_dump_request(uint8_t code, const char *reason);
 #define CPU_NO_SALC
 #define CPU_286_STYLE_PUSH_SP
 #define R36SX_REP_BATCH_MAX 1024u
+static uint32_t r36sx_cpu_translate_guest_real_pointer(uint16_t segment,
+                                                       uint16_t offset,
+                                                       uint8_t write_access,
+                                                       uint8_t *ok);
 #ifndef R36SX_CPU_COMPUTED_GOTO
 #if defined(__GNUC__) || defined(__clang__)
 #define R36SX_CPU_COMPUTED_GOTO 1
@@ -432,6 +436,19 @@ static uint32_t r36sx_debug_resume_ip;
 static uint32_t r36sx_debug_pending_dr6_hits;
 static uint8_t r36sx_debug_resume_valid;
 static uint8_t r36sx_debug_suppress_watchpoints;
+static r36sx_cpu_debug_host_breakpoint_t
+    r36sx_cpu_debug_host_breakpoints[R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS];
+static volatile uint8_t r36sx_cpu_debug_host_breakpoints_active;
+static volatile uint8_t r36sx_cpu_debug_host_breakpoint_pause;
+static uint8_t r36sx_cpu_debug_host_breakpoint_resume_valid;
+static uint8_t r36sx_cpu_debug_host_breakpoint_hit_linear;
+static int32_t r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+static uint16_t r36sx_cpu_debug_host_breakpoint_resume_cs;
+static uint16_t r36sx_cpu_debug_host_breakpoint_hit_cs;
+static uint32_t r36sx_cpu_debug_host_breakpoint_resume_ip;
+static uint32_t r36sx_cpu_debug_host_breakpoint_hit_ip;
+static uint32_t r36sx_cpu_debug_host_breakpoint_hit_linear_address;
+static uint64_t r36sx_cpu_debug_host_breakpoint_hit_count;
 static uint32_t r36sx_gdtr_base;
 static uint32_t r36sx_idtr_base;
 static uint16_t r36sx_gdtr_limit;
@@ -906,6 +923,207 @@ static uint8_t r36sx_cpu_debug_check_execute_breakpoint(uint32_t fault_ip)
     r36sx_debug_resume_valid = 1;
     r36sx_cpu_raise_debug_exception(fault_ip, hits);
     return 1;
+}
+
+static void r36sx_cpu_debug_host_breakpoint_refresh_active(void)
+{
+    uint8_t count = 0;
+
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        if (r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+            count++;
+        }
+    }
+    r36sx_cpu_debug_host_breakpoints_active = count;
+}
+
+static uint8_t r36sx_cpu_debug_host_breakpoint_current_linear(
+    uint32_t fault_ip,
+    uint32_t *linear)
+{
+    return r36sx_cpu_segment_linear_checked(CPU_CS, fault_ip, 1u, 0, 1,
+                                            linear);
+}
+
+static uint8_t r36sx_cpu_debug_host_breakpoint_check(uint32_t fault_ip)
+{
+    uint32_t linear = 0;
+    uint8_t linear_valid = 0;
+
+    if (r36sx_cpu_debug_host_breakpoint_pause) {
+        return 1;
+    }
+    if (!r36sx_cpu_debug_host_breakpoints_active) {
+        return 0;
+    }
+    if (r36sx_cpu_debug_host_breakpoint_resume_valid &&
+        r36sx_cpu_debug_host_breakpoint_resume_cs == CPU_CS &&
+        r36sx_cpu_debug_host_breakpoint_resume_ip == fault_ip) {
+        r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+        return 0;
+    }
+
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        r36sx_cpu_debug_host_breakpoint_t *bp =
+            &r36sx_cpu_debug_host_breakpoints[slot];
+        uint8_t matched = 0;
+
+        if (!bp->enabled) {
+            continue;
+        }
+        if (bp->linear) {
+            if (!linear_valid) {
+                if (!r36sx_cpu_debug_host_breakpoint_current_linear(fault_ip,
+                                                                    &linear)) {
+                    return 1;
+                }
+                linear_valid = 1;
+            }
+            matched = linear == bp->linear_address;
+        } else {
+            matched = bp->cs == CPU_CS && bp->eip == fault_ip;
+        }
+        if (!matched) {
+            continue;
+        }
+
+        bp->hit_count++;
+        r36sx_cpu_debug_host_breakpoint_pause = 1;
+        r36sx_cpu_debug_host_breakpoint_hit_slot = (int32_t)slot;
+        r36sx_cpu_debug_host_breakpoint_hit_linear = bp->linear;
+        r36sx_cpu_debug_host_breakpoint_hit_cs = CPU_CS;
+        r36sx_cpu_debug_host_breakpoint_hit_ip = fault_ip;
+        if (bp->linear && linear_valid) {
+            r36sx_cpu_debug_host_breakpoint_hit_linear_address = linear;
+        } else {
+            r36sx_cpu_debug_host_breakpoint_hit_linear_address =
+                ((uint32_t)CPU_CS << 4) + fault_ip;
+        }
+        r36sx_cpu_debug_host_breakpoint_hit_count = bp->hit_count;
+        r36sx_pico286_debug_log(
+            "debugctl: breakpoint hit slot=%lu cs:eip=%04X:%08lX linear=%08lX hits=%llu",
+            (unsigned long)slot, CPU_CS, (unsigned long)fault_ip,
+            (unsigned long)r36sx_cpu_debug_host_breakpoint_hit_linear_address,
+            (unsigned long long)bp->hit_count);
+        return 1;
+    }
+    return 0;
+}
+
+int r36sx_cpu_debug_host_breakpoint_add(uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t ip_value,
+                                        uint32_t linear_address,
+                                        uint32_t *slot_out)
+{
+    for (uint32_t slot = 0;
+         slot < R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS;
+         slot++) {
+        if (!r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+            int rc = r36sx_cpu_debug_host_breakpoint_set(
+                slot, linear, cs, ip_value, linear_address);
+            if (rc == 0 && slot_out) {
+                *slot_out = slot;
+            }
+            return rc;
+        }
+    }
+    return -1;
+}
+
+int r36sx_cpu_debug_host_breakpoint_set(uint32_t slot,
+                                        uint8_t linear,
+                                        uint16_t cs,
+                                        uint32_t ip_value,
+                                        uint32_t linear_address)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS) {
+        return -1;
+    }
+
+    r36sx_cpu_debug_host_breakpoints[slot].enabled = 1;
+    r36sx_cpu_debug_host_breakpoints[slot].linear = linear ? 1u : 0u;
+    r36sx_cpu_debug_host_breakpoints[slot].cs = cs;
+    r36sx_cpu_debug_host_breakpoints[slot].eip = ip_value;
+    r36sx_cpu_debug_host_breakpoints[slot].linear_address = linear_address;
+    r36sx_cpu_debug_host_breakpoints[slot].hit_count = 0;
+    r36sx_cpu_debug_host_breakpoint_refresh_active();
+    return 0;
+}
+
+int r36sx_cpu_debug_host_breakpoint_remove(uint32_t slot)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS ||
+        !r36sx_cpu_debug_host_breakpoints[slot].enabled) {
+        return -1;
+    }
+    memset(&r36sx_cpu_debug_host_breakpoints[slot], 0,
+           sizeof(r36sx_cpu_debug_host_breakpoints[slot]));
+    r36sx_cpu_debug_host_breakpoint_refresh_active();
+    if (r36sx_cpu_debug_host_breakpoint_hit_slot == (int32_t)slot) {
+        r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+    }
+    return 0;
+}
+
+void r36sx_cpu_debug_host_breakpoint_clear_all(void)
+{
+    memset(r36sx_cpu_debug_host_breakpoints, 0,
+           sizeof(r36sx_cpu_debug_host_breakpoints));
+    r36sx_cpu_debug_host_breakpoints_active = 0;
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+    r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+    r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
+}
+
+void r36sx_cpu_debug_host_breakpoint_continue(void)
+{
+    if (r36sx_cpu_debug_host_breakpoint_pause) {
+        r36sx_cpu_debug_host_breakpoint_resume_cs =
+            r36sx_cpu_debug_host_breakpoint_hit_cs;
+        r36sx_cpu_debug_host_breakpoint_resume_ip =
+            r36sx_cpu_debug_host_breakpoint_hit_ip;
+        r36sx_cpu_debug_host_breakpoint_resume_valid = 1;
+    }
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+}
+
+uint8_t r36sx_cpu_debug_host_breakpoint_paused(void)
+{
+    return r36sx_cpu_debug_host_breakpoint_pause != 0;
+}
+
+void r36sx_cpu_debug_host_breakpoint_status(
+    r36sx_cpu_debug_host_breakpoint_status_t *status)
+{
+    if (!status) {
+        return;
+    }
+    memset(status, 0, sizeof(*status));
+    status->paused = r36sx_cpu_debug_host_breakpoint_pause != 0;
+    status->active_count = r36sx_cpu_debug_host_breakpoints_active;
+    status->hit_slot = r36sx_cpu_debug_host_breakpoint_hit_slot;
+    status->hit_linear = r36sx_cpu_debug_host_breakpoint_hit_linear;
+    status->hit_cs = r36sx_cpu_debug_host_breakpoint_hit_cs;
+    status->hit_ip = r36sx_cpu_debug_host_breakpoint_hit_ip;
+    status->hit_linear_address =
+        r36sx_cpu_debug_host_breakpoint_hit_linear_address;
+    status->hit_count = r36sx_cpu_debug_host_breakpoint_hit_count;
+}
+
+int r36sx_cpu_debug_host_breakpoint_get(
+    uint32_t slot,
+    r36sx_cpu_debug_host_breakpoint_t *breakpoint)
+{
+    if (slot >= R36SX_CPU_DEBUG_HOST_BREAKPOINT_SLOTS || !breakpoint) {
+        return -1;
+    }
+    *breakpoint = r36sx_cpu_debug_host_breakpoints[slot];
+    return r36sx_cpu_debug_host_breakpoints[slot].enabled ? 0 : -1;
 }
 
 static inline void r36sx_cpu_debug_note_data_write(uint32_t linear,
@@ -1907,6 +2125,64 @@ static uint8_t r36sx_cpu_translate_linear_access(uint32_t linear,
     return 1;
 }
 
+uint8_t r36sx_cpu_debug_translate_linear(uint32_t linear,
+                                         uint8_t write_access,
+                                         uint8_t user_access,
+                                         uint32_t *physical,
+                                         uint32_t *pde,
+                                         uint32_t *pte)
+{
+    if (physical) {
+        *physical = linear;
+    }
+    if (pde) {
+        *pde = 0;
+    }
+    if (pte) {
+        *pte = 0;
+    }
+
+    if ((r36sx_cr0 & R36SX_CR0_PG) == 0) {
+        return 1;
+    }
+
+    uint32_t pde_addr = (r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK) |
+                        (((linear >> 22) & 0x3ffu) << 2);
+    uint32_t pde_value = r36sx_cpu_phys_read32(pde_addr);
+    if (pde) {
+        *pde = pde_value;
+    }
+    if ((pde_value & R36SX_PAGE_PRESENT) == 0) {
+        return 0;
+    }
+
+    uint32_t pte_addr = (pde_value & R36SX_PAGE_FRAME_MASK) |
+                        (((linear >> 12) & 0x3ffu) << 2);
+    uint32_t pte_value = r36sx_cpu_phys_read32(pte_addr);
+    if (pte) {
+        *pte = pte_value;
+    }
+    if ((pte_value & R36SX_PAGE_PRESENT) == 0) {
+        return 0;
+    }
+
+    if (user_access) {
+        if (((pde_value & R36SX_PAGE_USER) == 0) ||
+            ((pte_value & R36SX_PAGE_USER) == 0) ||
+            (write_access &&
+             (((pde_value & R36SX_PAGE_WRITABLE) == 0) ||
+              ((pte_value & R36SX_PAGE_WRITABLE) == 0)))) {
+            return 0;
+        }
+    }
+
+    if (physical) {
+        *physical = (pte_value & R36SX_PAGE_FRAME_MASK) |
+                    (linear & 0x0fffu);
+    }
+    return 1;
+}
+
 static uint8_t r36sx_cpu_translate_linear(uint32_t linear,
                                           uint8_t write_access,
                                           uint32_t *physical)
@@ -1920,6 +2196,34 @@ static uint8_t r36sx_cpu_translate_system_linear(uint32_t linear,
                                                  uint32_t *physical)
 {
     return r36sx_cpu_translate_linear_access(linear, write_access, 0, physical);
+}
+
+static uint32_t r36sx_cpu_translate_guest_real_pointer(uint16_t segment,
+                                                       uint16_t offset,
+                                                       uint8_t write_access,
+                                                       uint8_t *ok)
+{
+    uint32_t linear = ((uint32_t)segment << 4) + (uint32_t)offset;
+    if (ok) {
+        *ok = 1u;
+    }
+
+#if R36SX_ENABLE_PROTECTED_MODE
+    if ((r36sx_cr0 & R36SX_CR0_PG) != 0u) {
+        uint32_t physical;
+        if (!r36sx_cpu_translate_linear_access(
+                linear, write_access, r36sx_cpu_cpl() == 3u, &physical)) {
+            if (ok) {
+                *ok = 0u;
+            }
+            return linear;
+        }
+        return physical;
+    }
+#else
+    (void)write_access;
+#endif
+    return linear;
 }
 
 static inline uint8_t r36sx_cpu_read_linear8(uint32_t linear)
@@ -3630,6 +3934,114 @@ static uint8_t r36sx_cpu_protected_retf(uint16_t adjust, uint8_t wide,
     return 1;
 }
 
+#if R36SX_DEBUG_PM_DIAG
+static void r36sx_pm_diag_log_iret_frame(uint8_t wide,
+                                         uint8_t old_cpl,
+                                         uint16_t from_cs,
+                                         uint32_t from_ip,
+                                         uint32_t from_sp,
+                                         uint16_t target_cs,
+                                         uint32_t target_ip,
+                                         uint32_t target_flags)
+{
+    static uint32_t logged;
+    static uint32_t critical_logged;
+    uint8_t new_cpl = r36sx_selector_rpl(target_cs);
+    uint8_t critical = target_cs == 0x02AAu && target_ip <= 0x20u;
+    uint8_t interesting = critical ||
+                          target_ip < 0x100u ||
+                          (target_flags & R36SX_EFLAGS_VM_MASK) != 0u ||
+                          old_cpl != new_cpl;
+
+    if (!interesting) {
+        return;
+    }
+    if (critical) {
+        if (critical_logged >= 128u) {
+            return;
+        }
+        critical_logged++;
+    } else {
+        if (logged >= 512u) {
+            if (logged == 512u) {
+                r36sx_pico286_debug_log("[PM] IRET diag suppressed");
+            }
+            logged++;
+            return;
+        }
+        logged++;
+    }
+    r36sx_pico286_debug_log(
+        "[PM] IRET%s from=%04X:%08lX sp=%08lX old_cpl=%u "
+        "target=%04X:%08lX flags=%08lX new_cpl=%u default32=%u vm=%u",
+        wide ? "D" : "", from_cs, (unsigned long)from_ip,
+        (unsigned long)from_sp, old_cpl, target_cs,
+        (unsigned long)target_ip, (unsigned long)target_flags, new_cpl,
+        r36sx_cpu_code_default32(), (target_flags & R36SX_EFLAGS_VM_MASK) != 0u);
+}
+
+static uint8_t r36sx_pm_diag_int21_return_watch_active;
+static uint8_t r36sx_pm_diag_int21_return_watch_ah;
+static uint8_t r36sx_pm_diag_int21_return_watch_al;
+static uint16_t r36sx_pm_diag_int21_return_watch_cs;
+static uint32_t r36sx_pm_diag_int21_return_watch_ip;
+static uint32_t r36sx_pm_diag_int21_return_watch_seen;
+static char r36sx_pm_diag_int21_return_watch_path[128];
+
+static void r36sx_pm_diag_watch_int21_return(uint8_t ah,
+                                             uint8_t al,
+                                             uint16_t return_cs,
+                                             uint32_t return_ip,
+                                             const char *path)
+{
+    r36sx_pm_diag_int21_return_watch_active = 1u;
+    r36sx_pm_diag_int21_return_watch_ah = ah;
+    r36sx_pm_diag_int21_return_watch_al = al;
+    r36sx_pm_diag_int21_return_watch_cs = return_cs;
+    r36sx_pm_diag_int21_return_watch_ip = return_ip;
+    r36sx_pm_diag_int21_return_watch_seen = 0u;
+    snprintf(r36sx_pm_diag_int21_return_watch_path,
+             sizeof(r36sx_pm_diag_int21_return_watch_path),
+             "%s", path ? path : "");
+}
+
+static void r36sx_pm_diag_log_int21_return_if_watched(uint16_t target_cs,
+                                                      uint32_t target_ip,
+                                                      uint32_t target_flags)
+{
+    if (!r36sx_pm_diag_int21_return_watch_active) {
+        return;
+    }
+    if (!(target_flags & R36SX_EFLAGS_VM_MASK)) {
+        return;
+    }
+
+    uint8_t matched =
+        target_cs == r36sx_pm_diag_int21_return_watch_cs &&
+        target_ip == r36sx_pm_diag_int21_return_watch_ip;
+    if (r36sx_pm_diag_int21_return_watch_seen < 64u || matched) {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 watch ah=%02X al=%02X iret=%lu "
+            "expected=%04X:%08lX to=%04X:%08lX "
+            "ax=%04X bx=%04X cx=%04X dx=%04X flags=%08lX cf=%u "
+            "matched=%u path='%s'",
+            r36sx_pm_diag_int21_return_watch_ah,
+            r36sx_pm_diag_int21_return_watch_al,
+            (unsigned long)r36sx_pm_diag_int21_return_watch_seen,
+            r36sx_pm_diag_int21_return_watch_cs,
+            (unsigned long)r36sx_pm_diag_int21_return_watch_ip,
+            target_cs, (unsigned long)target_ip,
+            CPU_AX, CPU_BX, CPU_CX, CPU_DX, (unsigned long)target_flags,
+            (target_flags & 1u) != 0u, matched,
+            r36sx_pm_diag_int21_return_watch_path);
+    }
+    r36sx_pm_diag_int21_return_watch_seen++;
+    if (matched || r36sx_pm_diag_int21_return_watch_seen >= 64u) {
+        r36sx_pm_diag_int21_return_watch_active = 0u;
+    }
+}
+#endif
+
 static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
 {
     if (x86_flags.value & R36SX_FLAGS_NT_MASK) {
@@ -3637,11 +4049,19 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
     }
 
     uint8_t old_cpl = r36sx_cpu_cpl();
+    uint16_t from_cs = CPU_CS;
+    uint32_t from_ip = CPU_IP;
+    uint32_t from_sp = r36sx_cpu_stack_pointer_value();
     uint32_t target_ip = r36sx_cpu_pop_frame_value(wide);
     uint16_t target_cs = (uint16_t)r36sx_cpu_pop_frame_value(wide);
     uint32_t target_flags = r36sx_cpu_pop_frame_value(wide);
     uint8_t new_cpl = r36sx_selector_rpl(target_cs);
     r36sx_segment_cache_t target_cache;
+
+#if R36SX_DEBUG_PM_DIAG
+    r36sx_pm_diag_log_iret_frame(wide, old_cpl, from_cs, from_ip, from_sp,
+                                 target_cs, target_ip, target_flags);
+#endif
 
     if (target_flags & 0x00004000u) {
         r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, CPU_IP);
@@ -3683,6 +4103,10 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
         r36sx_cpu_real_cache_segment(regfs);
         putsegreg(reggs, new_gs);
         r36sx_cpu_real_cache_segment(reggs);
+#if R36SX_DEBUG_PM_DIAG
+        r36sx_pm_diag_log_int21_return_if_watched(target_cs, target_ip,
+                                                  target_flags);
+#endif
         return 1;
     }
 
@@ -5624,7 +6048,117 @@ void intcall86(uint8_t intnum) {
 
     r36sx_cpu_intcall86_real(intnum);
 }
+
 #if R36SX_DEBUG_PM_DIAG
+static uint8_t r36sx_pm_diag_read_guest_linear8(uint32_t linear,
+                                                uint8_t *value)
+{
+    uint32_t physical;
+    if (!r36sx_cpu_debug_translate_linear(linear, 0,
+                                          r36sx_cpu_cpl() == 3u,
+                                          &physical, NULL, NULL)) {
+        return 0;
+    }
+    *value = read86_ob(physical);
+    return 1;
+}
+
+static void r36sx_pm_diag_read_guest_real_string(uint16_t segment,
+                                                 uint16_t offset,
+                                                 char *buffer,
+                                                 size_t buffer_size)
+{
+    size_t i;
+
+    if (buffer_size == 0) {
+        return;
+    }
+    for (i = 0; i + 1u < buffer_size; i++) {
+        uint8_t ch;
+        uint32_t linear = ((uint32_t)segment << 4) +
+                          (uint32_t)((offset + i) & 0xffffu);
+        if (!r36sx_pm_diag_read_guest_linear8(linear, &ch)) {
+            snprintf(buffer, buffer_size, "<unmapped %04X:%04X>",
+                     segment, (uint16_t)(offset + i));
+            return;
+        }
+        if (ch == '\0') {
+            break;
+        }
+        buffer[i] = (ch >= 0x20u && ch <= 0x7eu) ? (char)ch : '.';
+    }
+    buffer[i] = '\0';
+}
+
+static void r36sx_pm_diag_log_int21_request(uint32_t fault_ip)
+{
+    static uint32_t logged;
+    char path[128];
+    char path2[128];
+    uint8_t ah = CPU_AH;
+    uint8_t path_dx = 0;
+    uint8_t path_esdi = 0;
+
+    switch (ah) {
+        case 0x09: /* print string, useful around FreeDOS errors */
+        case 0x39: /* mkdir */
+        case 0x3A: /* rmdir */
+        case 0x3B: /* chdir */
+        case 0x3C: /* create */
+        case 0x3D: /* open */
+        case 0x41: /* unlink */
+        case 0x43: /* get/set attributes */
+        case 0x4B: /* exec */
+        case 0x4E: /* find first */
+            path_dx = 1;
+            break;
+        case 0x56: /* rename */
+            path_dx = 1;
+            path_esdi = 1;
+            break;
+        default:
+            break;
+    }
+    if (!path_dx) {
+        return;
+    }
+    if (logged >= 256u) {
+        if (logged == 256u) {
+            r36sx_pico286_debug_log("[PM] INT21 path diagnostics suppressed");
+        }
+        logged++;
+        return;
+    }
+    logged++;
+
+    r36sx_pm_diag_read_guest_real_string(CPU_DS, CPU_DX,
+                                         path, sizeof(path));
+    if (path_esdi) {
+        r36sx_pm_diag_read_guest_real_string(CPU_ES, CPU_DI,
+                                             path2, sizeof(path2));
+    } else {
+        path2[0] = '\0';
+    }
+
+    if (path_esdi) {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 request ah=%02X al=%02X from=%04X:%08lX "
+            "ds:dx=%04X:%04X path='%s' es:di=%04X:%04X path2='%s'",
+            ah, CPU_AL, CPU_CS, (unsigned long)fault_ip,
+            CPU_DS, CPU_DX, path, CPU_ES, CPU_DI, path2);
+    } else {
+        r36sx_pico286_debug_log(
+            "[PM] INT21 request ah=%02X al=%02X from=%04X:%08lX "
+            "ds:dx=%04X:%04X path='%s'",
+            ah, CPU_AL, CPU_CS, (unsigned long)fault_ip,
+            CPU_DS, CPU_DX, path);
+    }
+    if (ah == 0x4Bu) {
+        r36sx_pm_diag_watch_int21_return(ah, CPU_AL, CPU_CS,
+                                         fault_ip + 2u, path);
+    }
+}
+
 static void r36sx_pm_diag_log_software_interrupt_result(
     uint8_t intnum,
     uint32_t fault_ip,
@@ -5737,6 +6271,11 @@ static void r36sx_cpu_software_interrupt(uint8_t intnum, uint32_t fault_ip)
             pm_int10_mode = CPU_AL;
         }
         r36sx_pm_diag_log_interrupt(intnum);
+#if R36SX_DEBUG_PM_DIAG
+        if (intnum == 0x21u) {
+            r36sx_pm_diag_log_int21_request(fault_ip);
+        }
+#endif
         handled = r36sx_cpu_protected_interrupt(intnum, 0, 0, 1, fault_ip, 1);
 #if R36SX_DEBUG_PM_DIAG
         r36sx_pm_diag_log_software_interrupt_result(
@@ -5933,6 +6472,9 @@ void reset86() {
     r36sx_debug_resume_ip = 0;
     r36sx_debug_pending_dr6_hits = 0;
     r36sx_debug_suppress_watchpoints = 0;
+    r36sx_cpu_debug_host_breakpoint_pause = 0;
+    r36sx_cpu_debug_host_breakpoint_resume_valid = 0;
+    r36sx_cpu_debug_host_breakpoint_hit_slot = -1;
     r36sx_gdtr_base = 0;
     r36sx_gdtr_limit = 0;
     r36sx_idtr_base = 0;

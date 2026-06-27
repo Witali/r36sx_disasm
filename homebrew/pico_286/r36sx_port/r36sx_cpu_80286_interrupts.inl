@@ -409,6 +409,24 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
         }
     }
 
+#if R36SX_DEBUG_PM_DIAG
+    if (old_vm86 && intnum == R36SX_EXCEPTION_GP) {
+        static uint32_t vm86_gp_frames;
+        if (vm86_gp_frames < 16u) {
+            vm86_gp_frames++;
+            r36sx_pico286_debug_log(
+                "[PM] VM86 #GP frame fault=%04X:%08lX old_sp=%04X:%08lX "
+                "old_flags=%08lX oldsegs=%04X/%04X/%04X/%04X "
+                "new_ss=%04X sp_after=%08lX err=%08lX gate32=%u",
+                CPU_CS, (unsigned long)fault_ip, old_ss,
+                (unsigned long)old_sp, (unsigned long)old_flags_dword,
+                old_es, old_ds, old_fs, old_gs, CPU_SS,
+                (unsigned long)r36sx_cpu_stack_pointer_value(),
+                (unsigned long)error_code, gate32);
+        }
+    }
+#endif
+
     r36sx_cpu_commit_code_transfer(selector, &target_cs, new_cpl, offset);
     x86_flags.value &= ~(R36SX_EFLAGS_VM_MASK | R36SX_EFLAGS_RF_MASK);
     if (old_vm86) {
@@ -474,9 +492,11 @@ static void r36sx_pm_diag_log_exception_context(uint8_t intnum,
         intnum, (unsigned long)error_code, CPU_CS, (unsigned long)fault_ip,
         b0, b1, b2, b3, b4, b5, b6, b7);
     r36sx_pico286_debug_log(
-        "[PM] regs ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X flags=%04X cpl=%u",
+        "[PM] regs ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X "
+        "bp=%04X sp=%04X flags=%04X eflags=%08lX cpl=%u vm=%u iopl=%u",
         CPU_AX, CPU_BX, CPU_CX, CPU_DX, CPU_SI, CPU_DI, CPU_BP, CPU_SP,
-        makeflagsword(), r36sx_cpu_cpl());
+        makeflagsword(), (unsigned long)makeflagsdword(), r36sx_cpu_cpl(),
+        r36sx_cpu_v86_enabled(), r36sx_cpu_iopl());
     r36sx_pm_diag_log_segment_cache("cs", &r36sx_seg_cache[regcs]);
     r36sx_pm_diag_log_segment_cache("ss", &r36sx_seg_cache[regss]);
     r36sx_pm_diag_log_segment_cache("ds", &r36sx_seg_cache[regds]);

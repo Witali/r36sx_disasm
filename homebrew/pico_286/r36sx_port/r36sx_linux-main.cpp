@@ -2319,9 +2319,11 @@ void *ticks_thread(void *arg) {
 
     unsigned int ticks_loop_count = 0;
     while (running) {
-        if (soft_reset_in_progress || vm_paused_by_menu) {
+        if (soft_reset_in_progress || vm_paused_by_menu ||
+            r36sx_cpu_debug_host_breakpoint_paused()) {
             clock_gettime(CLOCK_MONOTONIC, &current);
-            if (vm_paused_by_menu) {
+            if (vm_paused_by_menu ||
+                r36sx_cpu_debug_host_breakpoint_paused()) {
                 uint64_t elapsedTime =
                     (current.tv_sec - start.tv_sec) * hostfreq +
                     (uint64_t)(current.tv_nsec - start.tv_nsec);
@@ -2639,7 +2641,7 @@ int main() {
             }
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
-        if (vm_paused_by_menu) {
+        if (vm_paused_by_menu || r36sx_cpu_debug_host_breakpoint_paused()) {
             if (main_loop_count <= 8u) {
                 r36sx_pico286_debug_log("main: paused before mfb_update loop=%u",
                                         main_loop_count);
@@ -2717,7 +2719,7 @@ int main() {
             break;
         }
         r36sx_pico286_set_menu_pause(mfb_vm_paused());
-        if (vm_paused_by_menu) {
+        if (vm_paused_by_menu || r36sx_cpu_debug_host_breakpoint_paused()) {
             if (r36sx_emergency_dump_pending()) {
                 r36sx_emergency_dump_write_and_clear();
                 running = 0;
