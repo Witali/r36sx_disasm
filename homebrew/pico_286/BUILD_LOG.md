@@ -1,5 +1,25 @@
 # pico-286 Build Log
 
+## 2026-06-27 single-loop Windows debug build
+
+Built the current `single-loop` branch after merging recent emulator work into
+that branch.
+
+Build command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Size: 974,336 bytes
+- SHA256: `84C278C3E726C17492D42A65F70CC15C6C40274865DB9BC0078EAA7CEEF9C5B4`
+- Build completed with warnings only; no compiler errors.
+- Defender scan: found no threats in both the build output and patch copy.
+
 ## 2026-06-14 Protected-mode state in emergency dumps
 
 Extended Pico-286 emergency memory dumps so `registers.txt` includes special CPU
