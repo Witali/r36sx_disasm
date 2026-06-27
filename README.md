@@ -30,6 +30,10 @@ Before doing any experiments, writes, repairs, or filesystem operations on a
 stock card, make a full raw backup image first with a tool such as
 Win32DiskImager.  Work on copies of that image whenever possible.
 
+The original device SD-card image used for this research is archived here:
+[original R36SX / SF3000 SD-card image](https://disk.yandex.ru/d/nyGbIndD6j-7gQ).
+Treat it as a reference image and do experiments on copies.
+
 Important platform facts:
 
 - Main userspace architecture: ELF32 little-endian MIPS, O32 ABI.
