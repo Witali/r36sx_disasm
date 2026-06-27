@@ -12,10 +12,10 @@
 #if R36SX_ENABLE_PROFILING
 
 #ifndef R36SX_PICO286_LOG_PATH
-#define R36SX_PICO286_LOG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log"
+#define R36SX_PICO286_LOG_PATH "pico_286.log"
 #endif
 #ifndef R36SX_PICO286_FALLBACK_LOG_PATH
-#define R36SX_PICO286_FALLBACK_LOG_PATH "/mnt/sdcard/pico_286.log"
+#define R36SX_PICO286_FALLBACK_LOG_PATH "pico_286_fallback.log"
 #endif
 
 typedef struct {
@@ -49,10 +49,19 @@ static void r36sx_profile_log(const char *format, ...)
 #if R36SX_PICO286_HAS_LOG_OPEN_HELPER
     FILE *fp = r36sx_pico286_open_log_for_append();
 #else
-    FILE *fp = fopen(R36SX_PICO286_LOG_PATH, "a");
+    char log_path[512];
+    char fallback_log_path[512];
+    FILE *fp;
 
+    r36sx_pico286_ensure_diagnostics_dir();
+    r36sx_pico286_resolve_diagnostics_path(
+        log_path, sizeof(log_path), R36SX_PICO286_LOG_PATH);
+    r36sx_pico286_resolve_diagnostics_path(
+        fallback_log_path, sizeof(fallback_log_path),
+        R36SX_PICO286_FALLBACK_LOG_PATH);
+    fp = fopen(log_path, "a");
     if (!fp) {
-        fp = fopen(R36SX_PICO286_FALLBACK_LOG_PATH, "a");
+        fp = fopen(fallback_log_path, "a");
     }
 #endif
     if (fp) {

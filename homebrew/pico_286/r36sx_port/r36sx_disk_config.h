@@ -1,6 +1,7 @@
 #ifndef R36SX_DISK_CONFIG_H
 #define R36SX_DISK_CONFIG_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define R36SX_PICO286_IMAGES_DIR "images"
@@ -65,6 +66,19 @@ const char *r36sx_pico286_image_dir_value(void);
 
 // Return the directory that contains pico_286.conf, or an empty string.
 const char *r36sx_pico286_config_dir(void);
+
+// Return the directory used for generated diagnostic files.
+const char *r36sx_pico286_diagnostics_dir_path(void);
+
+// Return the diagnostics directory value as written to pico_286.conf.
+const char *r36sx_pico286_diagnostics_dir_value(void);
+
+// Resolve a diagnostics file or subdirectory name against diagnostics_dir.
+void r36sx_pico286_resolve_diagnostics_path(char *dest, size_t dest_size,
+                                            const char *value);
+
+// Create diagnostics_dir when possible; returns non-zero when it exists.
+int r36sx_pico286_ensure_diagnostics_dir(void);
 
 // Return the host filesystem directory exposed through DOS by MAPDRIVE.COM.
 const char *r36sx_pico286_host_drive_path(void);
@@ -177,10 +191,10 @@ int r36sx_pico286_app_stats_enabled(void);
 // Return non-zero when Pico-286 should provide built-in INT 2Fh services.
 int r36sx_pico286_int2f_enabled(void);
 
-// Return non-zero when pico_286.log should be truncated at process start.
+// Return non-zero when diagnostics/pico_286.log should be truncated at start.
 int r36sx_pico286_log_truncate_on_start(void);
 
-// Return the maximum pico_286.log size in bytes; 0 means no size cap.
+// Return the maximum diagnostics/pico_286.log size in bytes; 0 means no cap.
 uint32_t r36sx_pico286_log_max_bytes(uint32_t fallback_bytes);
 
 // Return non-zero when the live debug-control mailbox is enabled.

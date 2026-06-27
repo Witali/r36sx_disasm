@@ -100,16 +100,18 @@ cd patches\disk_image_patch_pico_286\MIPS_NATIVE\pico_286
 .\pico_286_win.exe
 ```
 
-Debug logs are written to `pico_286.log` beside the Windows executable and stop
-growing at the `[debug] log_max_bytes` cap, matching the bounded device-log
-behavior.  By default logs are appended across runs; set
-`log_truncate_on_start=1` in `[debug]` to clear the log at process start.
-Set `log_max_bytes=0` to disable the size cap.
+Debug logs are written to `diagnostics/pico_286.log` under the directory that
+contains `pico_286.conf` and stop growing at the `[debug] log_max_bytes` cap,
+matching the bounded device-log behavior.  By default logs are appended across
+runs; set `log_truncate_on_start=1` in `[debug]` to clear the log at process
+start.  Set `log_max_bytes=0` to disable the size cap.
 
 Debug builds also enable a live debug-control mailbox by default.  The emulator
 polls `pico_286_debug.cmd` beside `pico_286.conf`, deletes it after reading,
-and writes `pico_286_debug.out` with either `ok 1` or `ok 0`.  Use the helper
-client from the repository root while the patch-copy executable is running:
+and writes `diagnostics/pico_286_debug.out` with either `ok 1` or `ok 0`.
+Memory dumps, emergency dumps, and debug-control binary artifacts are written
+under the same `diagnostics` directory.  Use the helper client from the
+repository root while the patch-copy executable is running:
 
 ```powershell
 python homebrew\pico_286\tools\pico286_debug_client.py regs
@@ -458,9 +460,10 @@ The first 64 KB minus 16 bytes above 1 MB is exposed as the XMS High Memory
 Area.  `REQUEST_HMA` reserves that area, enables A20, and reduces reported
 free XMS memory by 64 KB until `RELEASE_HMA`.
 
-`profiling_enabled=1` enables runtime profiling summaries in `pico_286.log`.
-`profiling_log_ms` controls the reporting interval.  Profiling can also be
-compiled out completely with `build_pico_286.ps1 -DisableProfiling`.
+`profiling_enabled=1` enables runtime profiling summaries in
+`diagnostics/pico_286.log`.  `profiling_log_ms` controls the reporting
+interval.  Profiling can also be compiled out completely with
+`build_pico_286.ps1 -DisableProfiling`.
 
 ### CPU Test Floppy
 
@@ -619,19 +622,19 @@ against the old switch-based decoder, pass `-DisableComputedGoto`:
 With `-DebugLog`, the device writes:
 
 ```text
-/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.log
+/mnt/sdcard/MIPS_NATIVE/pico_286/diagnostics/pico_286.log
 ```
 
-If that file cannot be opened, it writes:
+If that file cannot be opened, it tries the diagnostics fallback log:
 
 ```text
-/mnt/sdcard/pico_286.log
+/mnt/sdcard/MIPS_NATIVE/pico_286/diagnostics/pico_286_fallback.log
 ```
 
 The old on-screen debug text area and the `screen_text:*` log dumps are
-disabled.  Runtime diagnostics still go to `pico_286.log`, but the lower part
-of the framebuffer is cleared instead of drawing `DEBUG_VRAM` contents, and the
-emulated screen text is no longer copied into the log.
+disabled.  Runtime diagnostics still go to `diagnostics/pico_286.log`, but the
+lower part of the framebuffer is cleared instead of drawing `DEBUG_VRAM`
+contents, and the emulated screen text is no longer copied into the log.
 
 Primary R36SX Pico-286 builds now use WSL/GCC:
 

@@ -101,10 +101,19 @@ static inline FILE *r36sx_pico286_open_log_for_append(void)
 {
     uint32_t max_log_bytes =
         r36sx_pico286_log_max_bytes(R36SX_PICO286_MAX_LOG_BYTES);
+    char log_path[512];
+    char fallback_log_path[512];
     const char *paths[] = {
-        R36SX_PICO286_LOG_PATH,
-        R36SX_PICO286_FALLBACK_LOG_PATH,
+        log_path,
+        fallback_log_path,
     };
+
+    r36sx_pico286_ensure_diagnostics_dir();
+    r36sx_pico286_resolve_diagnostics_path(
+        log_path, sizeof(log_path), R36SX_PICO286_LOG_PATH);
+    r36sx_pico286_resolve_diagnostics_path(
+        fallback_log_path, sizeof(fallback_log_path),
+        R36SX_PICO286_FALLBACK_LOG_PATH);
 
     for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
         struct stat st;
@@ -157,8 +166,16 @@ static inline void r36sx_pico286_debug_reset(void)
 {
 #if DEBUG
     if (r36sx_pico286_log_truncate_on_start()) {
-        r36sx_pico286_truncate_log_file(R36SX_PICO286_LOG_PATH);
-        r36sx_pico286_truncate_log_file(R36SX_PICO286_FALLBACK_LOG_PATH);
+        char log_path[512];
+        char fallback_log_path[512];
+        r36sx_pico286_ensure_diagnostics_dir();
+        r36sx_pico286_resolve_diagnostics_path(
+            log_path, sizeof(log_path), R36SX_PICO286_LOG_PATH);
+        r36sx_pico286_resolve_diagnostics_path(
+            fallback_log_path, sizeof(fallback_log_path),
+            R36SX_PICO286_FALLBACK_LOG_PATH);
+        r36sx_pico286_truncate_log_file(log_path);
+        r36sx_pico286_truncate_log_file(fallback_log_path);
     }
     r36sx_pico286_debug_log("log start");
 #endif

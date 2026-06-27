@@ -326,8 +326,9 @@ int r36sx_memory_dump_pending(void)
 
 void r36sx_emergency_dump_write_and_clear(void)
 {
-    char dir[96];
-    char path[160];
+    char dir_name[96];
+    char dir[512];
+    char path[640];
     int stop = r36sx_emergency_stop_requested != 0;
     const char *prefix = stop ? "emergency_dump" : "memory_dump";
 
@@ -336,8 +337,10 @@ void r36sx_emergency_dump_write_and_clear(void)
     }
     r36sx_emergency_dump_requested = 0;
     r36sx_emergency_dump_sequence++;
-    snprintf(dir, sizeof(dir), "%s_%03u", prefix,
+    snprintf(dir_name, sizeof(dir_name), "%s_%03u", prefix,
              r36sx_emergency_dump_sequence);
+    r36sx_pico286_ensure_diagnostics_dir();
+    r36sx_pico286_resolve_diagnostics_path(dir, sizeof(dir), dir_name);
     if (!r36sx_emergency_mkdir(dir)) {
         r36sx_pico286_debug_log("memory_dump: mkdir failed path='%s' errno=%d",
                                 dir, errno);
@@ -481,14 +484,18 @@ static void r36sx_test386_ee_output_line(const char *line)
          * capped main debug log.  The file is intentionally overwritten for
          * each emulator run so it can be diffed directly against upstream.
          */
+        char path[512];
         r36sx_test386_ee_output_open_attempted = 1;
-        r36sx_test386_ee_output_fp = fopen("test386-ee-output.txt", "w");
+        r36sx_pico286_ensure_diagnostics_dir();
+        r36sx_pico286_resolve_diagnostics_path(
+            path, sizeof(path), "test386-ee-output.txt");
+        r36sx_test386_ee_output_fp = fopen(path, "w");
         if (r36sx_test386_ee_output_fp) {
             r36sx_pico286_debug_log(
-                "test386: writing POST EE output to test386-ee-output.txt");
+                "test386: writing POST EE output to %s", path);
         } else {
             r36sx_pico286_debug_log(
-                "test386: failed to open test386-ee-output.txt");
+                "test386: failed to open %s", path);
         }
     }
 

@@ -13,6 +13,7 @@
 #define R36SX_PICO286_CONFIG_PATH "pico_286.conf"
 #define R36SX_PICO286_ABS_CONFIG_PATH "/mnt/sdcard/MIPS_NATIVE/pico_286/pico_286.conf"
 #define R36SX_PICO286_MAX_DISK_PATH 192
+#define R36SX_PICO286_DEFAULT_DIAGNOSTICS_DIR "diagnostics"
 #define R36SX_PICO286_DEFAULT_RTC_START_TIME "2026-06-03 00:00:00"
 #if defined(_WIN32)
 #define R36SX_PICO286_DEFAULT_RTC_USE_SYSTEM_TIME 1
@@ -90,6 +91,10 @@ static char image_dir_value[R36SX_PICO286_MAX_DISK_PATH] =
     R36SX_PICO286_IMAGES_DIR;
 static char image_dir_path[R36SX_PICO286_MAX_DISK_PATH] =
     R36SX_PICO286_IMAGES_DIR;
+static char diagnostics_dir_value[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_DEFAULT_DIAGNOSTICS_DIR;
+static char diagnostics_dir_path[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_DEFAULT_DIAGNOSTICS_DIR;
 static char cpu_model_text[16] = "80386";
 static char cpu_mode_text[16] = "real";
 static char cpu_mhz_text[32] = "32.768";
@@ -115,7 +120,10 @@ static char debug_control_command_path[R36SX_PICO286_MAX_DISK_PATH] =
     "pico_286_debug.cmd";
 static char debug_control_response_path[R36SX_PICO286_MAX_DISK_PATH] =
     "pico_286_debug.out";
-static char debug_control_artifact_dir[R36SX_PICO286_MAX_DISK_PATH] = ".";
+static char debug_control_artifact_dir_value[R36SX_PICO286_MAX_DISK_PATH] =
+    ".";
+static char debug_control_artifact_dir_path[R36SX_PICO286_MAX_DISK_PATH] =
+    R36SX_PICO286_DEFAULT_DIAGNOSTICS_DIR;
 static char app_stats_enabled_text[8] = "1";
 static char int2f_enabled_text[8] = "1";
 static char target_fps_text[16] = "60";
@@ -336,6 +344,42 @@ static void resolve_config_relative_path(char *dest, size_t dest_size,
     }
 }
 
+static int is_current_dir_value(const char *value)
+{
+    return !value || value[0] == '\0' ||
+           (value[0] == '.' && value[1] == '\0');
+}
+
+static void join_path(char *dest, size_t dest_size, const char *base,
+                      const char *name)
+{
+    if (!dest || dest_size == 0) {
+        return;
+    }
+    if (!base || base[0] == '\0') {
+        snprintf(dest, dest_size, "%s", name ? name : "");
+        return;
+    }
+    if (!name || name[0] == '\0' || is_current_dir_value(name)) {
+        snprintf(dest, dest_size, "%s", base);
+        return;
+    }
+    snprintf(dest, dest_size, "%s/%s", base, name);
+}
+
+static void resolve_diagnostics_relative_path(char *dest, size_t dest_size,
+                                              const char *value)
+{
+    if (!dest || dest_size == 0) {
+        return;
+    }
+    if (value && value[0] && is_absolute_path(value)) {
+        snprintf(dest, dest_size, "%s", value);
+        return;
+    }
+    join_path(dest, dest_size, diagnostics_dir_path, value);
+}
+
 static void resolve_image_dir_file_path(char *dest, size_t dest_size,
                                         const char *filename)
 {
@@ -351,6 +395,30 @@ static void resolve_image_dir_file_path(char *dest, size_t dest_size,
     } else {
         resolve_config_relative_path(dest, dest_size, filename);
     }
+}
+
+static void set_debug_control_artifact_dir_value(const char *value)
+{
+    snprintf(debug_control_artifact_dir_value,
+             sizeof(debug_control_artifact_dir_value),
+             "%s", value && value[0] ? value : ".");
+    resolve_diagnostics_relative_path(debug_control_artifact_dir_path,
+                                      sizeof(debug_control_artifact_dir_path),
+                                      debug_control_artifact_dir_value);
+}
+
+static void set_diagnostics_dir_value(const char *value)
+{
+    char artifact_dir_value_copy[sizeof(debug_control_artifact_dir_value)];
+
+    snprintf(diagnostics_dir_value, sizeof(diagnostics_dir_value), "%s",
+             value && value[0] ? value : R36SX_PICO286_DEFAULT_DIAGNOSTICS_DIR);
+    resolve_config_relative_path(diagnostics_dir_path,
+                                 sizeof(diagnostics_dir_path),
+                                 diagnostics_dir_value);
+    snprintf(artifact_dir_value_copy, sizeof(artifact_dir_value_copy), "%s",
+             debug_control_artifact_dir_value);
+    set_debug_control_artifact_dir_value(artifact_dir_value_copy);
 }
 
 static void set_disk_entry_value(r36sx_pico286_disk_entry_t *entry,
@@ -442,6 +510,7 @@ static void set_config_dir(const char *config_path)
     set_host_drive_value(host_drive_value);
     set_test_bios_value(test_bios_value);
     set_image_dir_value(image_dir_value);
+    set_diagnostics_dir_value(diagnostics_dir_value);
 }
 
 static uint32_t cpu_model_ips_per_mhz(void)
@@ -883,6 +952,16 @@ static int set_debug_control_value(const char *key, const char *value,
 {
     int enabled;
 
+    if (key_equals(key, "diagnostics_dir") ||
+        key_equals(key, "diagnostic_dir") ||
+        key_equals(key, "debug_diagnostics_dir") ||
+        key_equals(key, "debug_diagnostic_dir")) {
+        set_diagnostics_dir_value(value);
+        r36sx_pico286_debug_log("diskcfg: diagnostics_dir='%s'",
+                                diagnostics_dir_path);
+        return 1;
+    }
+
     if (key_equals(key, "debug_control_enabled") ||
         key_equals(key, "debug_control") ||
         key_equals(key, "debug_mailbox_enabled")) {
@@ -926,11 +1005,9 @@ static int set_debug_control_value(const char *key, const char *value,
 
     if (key_equals(key, "debug_control_artifact_dir") ||
         key_equals(key, "debug_artifact_dir")) {
-        snprintf(debug_control_artifact_dir,
-                 sizeof(debug_control_artifact_dir),
-                 "%s", value && value[0] ? value : ".");
+        set_debug_control_artifact_dir_value(value);
         r36sx_pico286_debug_log("diskcfg: debug_control_artifact_dir='%s'",
-                                debug_control_artifact_dir);
+                                debug_control_artifact_dir_path);
         return 1;
     }
 
@@ -1994,6 +2071,40 @@ const char *r36sx_pico286_config_dir(void)
     return disk_config_dir;
 }
 
+const char *r36sx_pico286_diagnostics_dir_path(void)
+{
+    load_disk_config();
+
+    return diagnostics_dir_path;
+}
+
+const char *r36sx_pico286_diagnostics_dir_value(void)
+{
+    load_disk_config();
+
+    return diagnostics_dir_value;
+}
+
+void r36sx_pico286_resolve_diagnostics_path(char *dest, size_t dest_size,
+                                            const char *value)
+{
+    load_disk_config();
+    resolve_diagnostics_relative_path(dest, dest_size, value);
+}
+
+int r36sx_pico286_ensure_diagnostics_dir(void)
+{
+    load_disk_config();
+
+    if (diagnostics_dir_path[0] == '\0') {
+        return 0;
+    }
+    if (mkdir(diagnostics_dir_path, 0777) == 0 || errno == EEXIST) {
+        return 1;
+    }
+    return 0;
+}
+
 const char *r36sx_pico286_host_drive_path(void)
 {
     load_disk_config();
@@ -2143,22 +2254,27 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "disk_cache_buffer_kb=%s\n", disk_cache_buffer_kb_text);
     fprintf(fp, "disk_cache_flush_sectors=%s\n", disk_cache_flush_sectors_text);
     fprintf(fp, "disk_cache_flush_ms=%s\n\n", disk_cache_flush_ms_text);
-    fprintf(fp, "# Optional runtime profiling written to pico_286.log.\n");
+    fprintf(fp, "# Optional runtime profiling written to diagnostics/pico_286.log.\n");
     fprintf(fp, "[profiling]\n");
     fprintf(fp, "profiling_enabled=%s\n", profiling_enabled_text);
     fprintf(fp, "profiling_log_ms=%s\n\n", profiling_log_ms_text);
 
     fprintf(fp, "# Runtime debug log behavior.\n");
-    fprintf(fp, "# log_truncate_on_start=1 clears pico_286.log before writing\n");
+    fprintf(fp, "# log_truncate_on_start=1 clears diagnostics/pico_286.log before writing\n");
     fprintf(fp, "# the new run's log start marker. 0 keeps append-only logs.\n");
-    fprintf(fp, "# log_max_bytes limits pico_286.log growth; 0 disables the cap.\n");
+    fprintf(fp, "# log_max_bytes limits diagnostics/pico_286.log growth; 0 disables the cap.\n");
+    fprintf(fp, "# diagnostics_dir receives runtime logs, debug responses,\n");
+    fprintf(fp, "# memory dumps, emergency dumps, and debug artifact files.\n");
     fprintf(fp, "# debug_control_* enables a file-mailbox live debug interface.\n");
-    fprintf(fp, "# The emulator consumes debug_control_command_path and writes\n");
-    fprintf(fp, "# debug_control_response_path; binary dumps go to artifact_dir.\n");
+    fprintf(fp, "# The emulator consumes debug_control_command_path next to the\n");
+    fprintf(fp, "# config file. Relative debug responses/artifacts are resolved\n");
+    fprintf(fp, "# under diagnostics_dir; debug_control_artifact_dir=. means the\n");
+    fprintf(fp, "# diagnostics_dir root.\n");
     fprintf(fp, "[debug]\n");
     fprintf(fp, "log_truncate_on_start=%s\n",
             log_truncate_on_start_text);
     fprintf(fp, "log_max_bytes=%s\n", log_max_bytes_text);
+    fprintf(fp, "diagnostics_dir=%s\n", diagnostics_dir_value);
     fprintf(fp, "debug_control_enabled=%s\n",
             debug_control_enabled_text);
     fprintf(fp, "debug_control_command_path=%s\n",
@@ -2166,7 +2282,7 @@ int r36sx_pico286_save_config(void)
     fprintf(fp, "debug_control_response_path=%s\n",
             debug_control_response_path);
     fprintf(fp, "debug_control_artifact_dir=%s\n\n",
-            debug_control_artifact_dir);
+            debug_control_artifact_dir_value);
 
     fprintf(fp, "# On-screen runtime statistics, toggled with Fn+D-pad Down.\n");
     fprintf(fp, "[stats]\n");
@@ -2534,7 +2650,7 @@ const char *r36sx_pico286_debug_control_artifact_dir(void)
 {
     load_disk_config();
 
-    return debug_control_artifact_dir;
+    return debug_control_artifact_dir_path;
 }
 
 int r36sx_pico286_audio_adlib_enabled(void)

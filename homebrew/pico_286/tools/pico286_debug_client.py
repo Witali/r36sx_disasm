@@ -21,14 +21,22 @@ def main() -> int:
     parser.add_argument(
         "--dir",
         default="patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286",
-        help="directory containing pico_286_debug.cmd/out",
+        help="directory containing pico_286.conf and pico_286_debug.cmd",
+    )
+    parser.add_argument(
+        "--diagnostics-dir",
+        default="diagnostics",
+        help="directory containing pico_286_debug.out, relative to --dir",
     )
     parser.add_argument("--timeout", type=float, default=3.0)
     args = parser.parse_args()
 
     base = Path(args.dir)
     cmd_path = base / "pico_286_debug.cmd"
-    out_path = base / "pico_286_debug.out"
+    diagnostics_dir = Path(args.diagnostics_dir)
+    if not diagnostics_dir.is_absolute():
+        diagnostics_dir = base / diagnostics_dir
+    out_path = diagnostics_dir / "pico_286_debug.out"
     command = " ".join(args.command)
 
     try:

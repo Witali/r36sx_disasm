@@ -86,6 +86,10 @@ homebrew/pico_286/tests/test386.asm/test386-EE-reference.txt
 # Pico-286 patch runtime data
 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/host/
 patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/screenshots/
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/memory_dump_*/
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/emergency_dump_*/
+patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_debug.out
 
 # OS/editor noise
 Thumbs.db

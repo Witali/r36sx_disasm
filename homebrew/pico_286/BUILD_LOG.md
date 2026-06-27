@@ -1,5 +1,55 @@
 # pico-286 Build Log
 
+## 2026-06-27 diagnostics directory routing
+
+Moved generated diagnostic files out of the Pico-286 run directory and into a
+single configurable diagnostics directory.  `[debug] diagnostics_dir` defaults
+to `diagnostics`; relative debug-control response paths and artifact paths are
+resolved under that directory.  Existing configs with
+`debug_control_artifact_dir=.` now use the diagnostics root instead of the
+application root.
+
+Covered outputs:
+
+- `diagnostics/pico_286.log`
+- `diagnostics/pico_286_fallback.log`
+- `diagnostics/pico_286_debug.out`
+- `diagnostics/memory_dump_NNN/`
+- `diagnostics/emergency_dump_NNN/`
+- `diagnostics/test386-ee-output.txt`
+- debug-control binary dump files from `mem`, `vmem`, `vram`, and `screen`
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+python homebrew\pico_286\tools\pico286_debug_client.py --timeout 5 ping
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_wsl.ps1 -OptLevel O3 -Strip -Out .\.tmp\pico_286_diagnostics_dir_mips
+```
+
+The Windows debug build completed and copied `pico_286_win.exe` to the active
+patch directory.  A short live smoke test returned `ok 1`/`pong` and produced
+`diagnostics/pico_286.log`, `diagnostics/pico_286_debug.out`, and
+`diagnostics/pico_286_fallback.log` under the patch directory.
+
+The WSL/GCC MIPS release build also completed into `.tmp` to verify the device
+compat header path.  `.gitignore` now ignores the new patch-copy
+`diagnostics/` directory plus legacy root-level `memory_dump_*`,
+`emergency_dump_*`, and `pico_286_debug.out` runtime files.
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Size: 977,920 bytes
+- SHA256: `D14B8C9839C7F75740007CA3D1CCF13C4FF10B0D523CFA1A13A97B5BABBD2B27`
+- Build completed with warnings only; no compiler errors.
+- Defender scan: found no threats in both the build output and patch copy.
+- MIPS verification output: `.tmp/pico_286_diagnostics_dir_mips`
+- MIPS size: 710,204 bytes
+- MIPS SHA256: `990935B9EA207ADB49B5721EEE1C709277872B2E0C3F163F51484C53D338EDFC`
+- MIPS Defender scan: found no threats.
+
 ## 2026-06-27 single-loop Windows debug build
 
 Built the current `single-loop` branch after merging recent emulator work into

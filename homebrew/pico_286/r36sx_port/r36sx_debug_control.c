@@ -5,6 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #include "emulator/emulator.h"
 #include "r36sx_cpu.h"
@@ -124,6 +129,20 @@ static void debug_artifact_path(char *dest, size_t dest_size,
         return;
     }
     snprintf(dest, dest_size, "%s%c%s", g_artifact_dir, R36SX_PATH_SEP, name);
+}
+
+static int debug_mkdir(const char *path)
+{
+#ifdef _WIN32
+    if (_mkdir(path) == 0 || errno == EEXIST) {
+        return 1;
+    }
+#else
+    if (mkdir(path, 0777) == 0 || errno == EEXIST) {
+        return 1;
+    }
+#endif
+    return 0;
 }
 
 static int debug_parse_u32_default(const char *text, uint32_t *value,
@@ -892,14 +911,19 @@ void r36sx_debug_control_init(void)
     debug_resolve_path(g_command_path, sizeof(g_command_path),
                        r36sx_pico286_debug_control_command_path(),
                        "pico_286_debug.cmd");
-    debug_resolve_path(g_response_path, sizeof(g_response_path),
-                       r36sx_pico286_debug_control_response_path(),
-                       "pico_286_debug.out");
-    debug_resolve_path(g_artifact_dir, sizeof(g_artifact_dir),
-                       r36sx_pico286_debug_control_artifact_dir(),
-                       ".");
+    r36sx_pico286_resolve_diagnostics_path(
+        g_response_path, sizeof(g_response_path),
+        r36sx_pico286_debug_control_response_path());
+    snprintf(g_artifact_dir, sizeof(g_artifact_dir), "%s",
+             r36sx_pico286_debug_control_artifact_dir());
 
     if (g_debug_control_enabled) {
+        r36sx_pico286_ensure_diagnostics_dir();
+        if (!debug_mkdir(g_artifact_dir)) {
+            r36sx_pico286_debug_log(
+                "debugctl: artifact mkdir failed path='%s' errno=%d",
+                g_artifact_dir, errno);
+        }
         r36sx_pico286_debug_log(
             "debugctl: enabled cmd='%s' out='%s' artifacts='%s'",
             g_command_path, g_response_path, g_artifact_dir);
@@ -943,6 +967,8 @@ void r36sx_debug_control_poll(void)
     remove(g_command_path);
 
     snprintf(tmp_response, sizeof(tmp_response), "%s.tmp", g_response_path);
+    r36sx_pico286_ensure_diagnostics_dir();
+    debug_mkdir(g_artifact_dir);
     out = fopen(tmp_response, "wb");
     if (!out) {
         r36sx_pico286_debug_log("debugctl: response open failed path='%s' errno=%d",
