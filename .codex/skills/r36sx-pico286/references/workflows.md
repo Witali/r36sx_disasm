@@ -86,6 +86,12 @@ The patch `pico_286.conf` often contains user-local test settings such as CPU
 model, MHz, x87, and selected disk images. Do not stage it unless the user
 explicitly asks or the task specifically changes committed patch defaults.
 
+Generated diagnostic files belong under the active patch copy's `diagnostics/`
+directory, not in the patch root. This includes `debug_*`, `diag_*`,
+`memory_dump_*`, `emergency_dump_*`, logs, debug-control responses, framebuffer
+captures, and ad-hoc memory/register dumps. Emulator code should route such
+paths through `diagnostics_dir` and `r36sx_pico286_resolve_diagnostics_path()`.
+
 Disk CHS should be inferred automatically when images are mounted. Avoid
 reintroducing manual CHS settings in config unless a future compatibility task
 requires an explicit override.

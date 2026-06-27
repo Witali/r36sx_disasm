@@ -95,6 +95,19 @@ This keeps device-test patches from booting DOS with a stale synthetic RTC
 date after the console's Linux environment starts without real-time clock
 hardware.
 
+## Pico-286 Diagnostic Artifact Rule
+
+Rule: generated Pico-286 diagnostic files belong under the active patch copy's
+`diagnostics/` directory, not in the patch root.
+
+This includes files or directories named `debug_*`, `diag_*`,
+`memory_dump_*`, `emergency_dump_*`, `pico_286.log`,
+`pico_286_fallback.log`, `pico_286_debug.out`, crash reports, framebuffer
+captures, and ad-hoc memory/register dumps.  New emulator code should use
+`diagnostics_dir` and `r36sx_pico286_resolve_diagnostics_path()` instead of
+hard-coded root-relative filenames.  One-off debug scripts should write to the
+same diagnostics directory unless a task explicitly asks for another location.
+
 ## Disk Image Editing Rule
 
 Rule: use WSL `mtools` for FAT disk image inspection and edits.

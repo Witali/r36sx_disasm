@@ -40,6 +40,10 @@ and the active Pico-286 emulator port under `homebrew/pico_286`.
   task explicitly needs it and the target/offset has been verified.
 - Keep generated DOS test utilities under
   `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/tools/`.
+- Keep generated Pico-286 diagnostic files under the patch copy's
+  `diagnostics/` directory. This includes `debug_*`, `diag_*`,
+  `memory_dump_*`, `emergency_dump_*`, logs, debug-control responses, and
+  ad-hoc framebuffer/memory dumps; do not place them in the patch root.
 - When copying a rebuilt MIPS `pico_286` into the patch directory, update the
   same patch directory's `pico_286.conf` `[rtc] rtc_start_time` to the current
   local time.
