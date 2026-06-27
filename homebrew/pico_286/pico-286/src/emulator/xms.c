@@ -497,7 +497,8 @@ uint8_t __not_in_flash() xms_handler() {
         }
         case REQUEST_UMB: {
             // Request Upper Memory Block (Function 10h):
-            if (CPU_DX == 0xFFFF) {
+            const uint16_t requested_size = CPU_DX;
+            if (requested_size == 0xFFFF) {
                 // Query largest available block
                 if (umb_blocks_allocated < (int)UMB_BLOCKS_COUNT) {
                     uint16_t sz = 0;
@@ -506,12 +507,13 @@ uint8_t __not_in_flash() xms_handler() {
                         CPU_AX = 1;
                         CPU_BX = umb_block->segment;
                         CPU_DX = sz;
-                        CPU_BL = 0;
+                        xms_trace_log(
+                            "xms: request umb query ok seg=%04x size=%04x",
+                            CPU_BX, CPU_DX);
                         break;
                     }
                 }
             } else {
-                const uint16_t requested_size = CPU_DX;
                 umb_t *umb_block = get_free_umb_block(requested_size);
                 if (umb_block != NULL) {
                     int unmarked_size = requested_size;
@@ -528,6 +530,9 @@ uint8_t __not_in_flash() xms_handler() {
                     }
                     ub->allocated_paragraphs = total_allocated;
                     CPU_DX = total_allocated;
+                    xms_trace_log(
+                        "xms: request umb ok request=%04x seg=%04x actual=%04x",
+                        requested_size, CPU_BX, CPU_DX);
                     break;
                 }
             }
@@ -538,14 +543,18 @@ uint8_t __not_in_flash() xms_handler() {
             CPU_DX = sz;
             CPU_BL =
                 umb_blocks_allocated >= (int)UMB_BLOCKS_COUNT ? 0xB1 : 0xB0;
+            xms_trace_log(
+                "xms: request umb fail request=%04x largest=%04x bl=%02x",
+                requested_size, CPU_DX, CPU_BL);
             break;
         }
         case RELEASE_UMB: {
             // Release Upper Memory Block (Function 11h)
-            // Stub: Release Upper Memory Block
+            const uint16_t release_segment = CPU_DX;
             for (int i = 0; i < (int)UMB_BLOCKS_COUNT; ++i)
-                if (umb_blocks[i].segment == CPU_BX && umb_blocks[i].allocated_paragraphs > 0) {
+                if (umb_blocks[i].segment == release_segment && umb_blocks[i].allocated_paragraphs > 0) {
                     int par = umb_blocks[i].allocated_paragraphs;
+                    const int released_paragraphs = par;
                     while (par > 0 && i < (int)UMB_BLOCKS_COUNT) {
                         umb_blocks[i].allocated_paragraphs = 0;
                         par -= umb_blocks[i++].size;
@@ -553,12 +562,17 @@ uint8_t __not_in_flash() xms_handler() {
                     }
                     CPU_AX = 0x0001; // Success
                     CPU_BL = 0;
+                    xms_trace_log(
+                        "xms: release umb ok seg=%04x size=%04x",
+                        release_segment, (uint16_t)released_paragraphs);
                     return 0xCB; // Early return to avoid fall-through
                 }
 
             CPU_AX = 0x0000; // Failure
             CPU_DX = 0x0000;
             CPU_BL = 0xB2; // Error code
+            xms_trace_log("xms: release umb fail seg=%04x bl=%02x",
+                          release_segment, CPU_BL);
             break;
         }
         default: {
