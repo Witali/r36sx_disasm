@@ -4807,6 +4807,19 @@ static void r36sx_bios_set_video_mode(uint8_t requested_mode,
 #define R36SX_VBE_STATUS_FAIL 0x014Fu
 #define R36SX_VBE_WINDOW_KB 64u
 #define R36SX_VBE_WINDOW_BYTES (R36SX_VBE_WINDOW_KB * 1024u)
+#define R36SX_VBE_MODE_ATTR_SUPPORTED 0x0001u
+#define R36SX_VBE_MODE_ATTR_EXT_INFO 0x0002u
+#define R36SX_VBE_MODE_ATTR_COLOR 0x0008u
+#define R36SX_VBE_MODE_ATTR_GRAPHICS 0x0010u
+#define R36SX_VBE_WINDOW_ATTR_RELOCATABLE 0x01u
+#define R36SX_VBE_WINDOW_ATTR_READABLE 0x02u
+#define R36SX_VBE_WINDOW_ATTR_WRITABLE 0x04u
+#define R36SX_VBE_MODE_ATTR_BANKED_COLOR_GRAPHICS \
+    (R36SX_VBE_MODE_ATTR_SUPPORTED | R36SX_VBE_MODE_ATTR_EXT_INFO | \
+     R36SX_VBE_MODE_ATTR_COLOR | R36SX_VBE_MODE_ATTR_GRAPHICS)
+#define R36SX_VBE_WINDOW_ATTR_READ_WRITE \
+    (R36SX_VBE_WINDOW_ATTR_RELOCATABLE | R36SX_VBE_WINDOW_ATTR_READABLE | \
+     R36SX_VBE_WINDOW_ATTR_WRITABLE)
 
 static uint8_t r36sx_vbe_dac_width = 6;
 
@@ -4920,13 +4933,18 @@ static void r36sx_vbe_write_mode_info(uint16_t mode)
                       (SVGA_VRAM_SIZE / mode_bytes) - 1u : 0u);
 
     r36sx_vbe_clear(base, 256);
-    r36sx_vbe_write16(base, 0x00, 0x005Bu);
-    r36sx_vbe_write8(base, 0x02, 0x07u);
-    r36sx_vbe_write8(base, 0x03, 0x07u);
+    /*
+     * VBE 2.0 ModeInfoBlock: report one relocatable/readable/writable 64 KiB
+     * window at A000h.  Window B and linear-framebuffer mode are intentionally
+     * absent, so callers should use 4F05h bank switching on window A.
+     */
+    r36sx_vbe_write16(base, 0x00, R36SX_VBE_MODE_ATTR_BANKED_COLOR_GRAPHICS);
+    r36sx_vbe_write8(base, 0x02, R36SX_VBE_WINDOW_ATTR_READ_WRITE);
+    r36sx_vbe_write8(base, 0x03, 0x00u);
     r36sx_vbe_write16(base, 0x04, R36SX_VBE_WINDOW_KB);
     r36sx_vbe_write16(base, 0x06, R36SX_VBE_WINDOW_KB);
     r36sx_vbe_write16(base, 0x08, 0xA000u);
-    r36sx_vbe_write16(base, 0x0A, 0xA000u);
+    r36sx_vbe_write16(base, 0x0A, 0x0000u);
     r36sx_vbe_write32(base, 0x0C, 0u);
     r36sx_vbe_write16(base, 0x10, bytes_per_scanline);
     r36sx_vbe_write16(base, 0x12, width);
