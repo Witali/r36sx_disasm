@@ -147,6 +147,38 @@ emulator, a realistic timed `3DAh` is more important than adding a VGA IRQ.
   4. Better CRTC-derived rendering for tweaked modes.
   5. Optional VGA IRQ behavior only if a real program requires it.
 
+## 2026-08-01 Implementation Pass
+
+Implemented in this pass:
+
+- Attribute Controller palette registers now stay separate from DAC RAM.
+  16-color planar rendering maps the 4-bit pixel through the AC palette entry,
+  Color Select register, and DAC pixel mask before indexing the DAC shadow
+  palette.
+- Standard 16-color EGA/VGA mode resets now build EGA-compatible DAC entries
+  for the first 64 DAC colors. This keeps standard AC values such as `14h` and
+  `38h` meaningful after a mode reset, while mode `13h` keeps the normal 256
+  color DAC table.
+- BIOS mode set for modes `00h` and `01h` now resets VGA register state through
+  the normal text-mode template instead of leaving stale tweaked registers.
+- VGA write mode `2` now always follows the documented planar color-expand
+  behavior: CPU data bit `n` fills plane `n`. The chain-4 packed byte path
+  returns before this logic.
+- VBE ModeInfoBlock now reports a single readable/writable/relocatable window A
+  at `A000h`, no window B, and no linear framebuffer. This matches the current
+  `4F05h` bank-switch implementation instead of advertising unsupported window
+  behavior.
+
+Still open after this pass:
+
+- Full font plane 2 support for downloadable text-mode fonts.
+- CRTC-derived text rendering details: 8/9-dot character clock, line compare,
+  double-scan, underline, and exact blink timing.
+- More exhaustive verification of VGA write mode `3` and uncommon raster-op
+  combinations against real VGA test programs.
+- VBE `4F07h` display-start and `4F0Ah` protected-mode interface are still not
+  implemented.
+
 ## References
 
 - Michael Abrash, *Graphics Programming Black Book*, Chapter 47,
@@ -178,3 +210,12 @@ emulator, a realistic timed `3DAh` is more important than adding a VGA IRQ.
 - FreeVGA, "VGA Sequencer Operation":
   https://www.osdever.net/FreeVGA/vga/vgaseq.htm
   - Use for display-side Sequencer behavior and 256-color shift-mode details.
+- FreeVGA, "VGA Graphics Registers":
+  https://www.cs.jhu.edu/~huang/cs318/fall20/project/specs/freevga/vga/graphreg.htm
+  - Use for Set/Reset, Enable Set/Reset, Color Compare, Data Rotate,
+    Read Map Select, Graphics Mode, Color Don't Care, Bit Mask, and write/read
+    mode behavior.
+- VESA BIOS Extension (VBE) Core Functions Standard:
+  https://docslib.org/doc/7558269/vesa-bios-extension-vbe-core-functions-standard-version
+  - Use for VBE `4F00h..4F0Ah` return status, ModeInfoBlock layout, banked
+    window attributes, logical scanline, DAC format, and palette services.

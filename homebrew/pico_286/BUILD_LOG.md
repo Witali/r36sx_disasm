@@ -1,5 +1,34 @@
 # pico-286 Build Log
 
+## 2026-08-01 VGA/VBE conformance pass
+
+Reviewed VGA Attribute Controller, Graphics Controller write modes, and VBE
+ModeInfoBlock behavior against FreeVGA/OSDev-compatible VGA references and the
+VESA VBE Core Functions standard.
+
+Code changes:
+
+- Kept Attribute Controller palette registers separate from DAC RAM and routed
+  16-color planar rendering through AC palette -> DAC index -> RGB565 shadow.
+- Rebuilt the first 64 DAC entries as an EGA-compatible palette for standard
+  16-color VGA/EGA modes.
+- Reset VGA register state for BIOS text modes `00h`/`01h`.
+- Corrected VGA write mode `2` to use documented per-plane color expansion.
+- Made VBE mode info match the implemented banked window model: window A only,
+  no window B, no linear framebuffer.
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Build completed with warnings only; no compiler errors.
+
 ## 2026-08-01 80386 paging conformance pass
 
 Reviewed the paging model against Intel and AMD system-programming references:
