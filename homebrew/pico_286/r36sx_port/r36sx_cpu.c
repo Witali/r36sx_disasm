@@ -312,6 +312,15 @@ static int r36sx_bios_rtc_int1a(void)
 #define R36SX_PAGE_ACCESSED 0x00000020u
 #define R36SX_PAGE_DIRTY 0x00000040u
 #define R36SX_PAGE_FRAME_MASK 0xfffff000u
+/*
+ * Intel names #PF error-code bit 0 P: 0 means not-present, 1 means a
+ * protection violation. 80386 paging reports only P, W/R, and U/S here; the
+ * reserved-bit and instruction-fetch bits belong to later paging formats.
+ */
+#define R36SX_PFERR_PROTECTION 0x00000001u
+#define R36SX_PFERR_WRITE 0x00000002u
+#define R36SX_PFERR_USER 0x00000004u
+#define R36SX_PFERR_RESERVED 0x00000008u
 #define R36SX_DESCRIPTOR_PRESENT 0x80u
 #define R36SX_DESCRIPTOR_CODE_DATA 0x10u
 #define R36SX_DESCRIPTOR_EXECUTABLE 0x08u
@@ -2063,6 +2072,40 @@ static inline void r36sx_cpu_phys_write32(uint32_t address, uint32_t value)
 #endif
 }
 
+static inline uint32_t r36sx_cpu_page_fault_error_code(uint8_t protection,
+                                                       uint8_t write_access,
+                                                       uint8_t user_access)
+{
+    return (protection ? R36SX_PFERR_PROTECTION : 0u) |
+           (write_access ? R36SX_PFERR_WRITE : 0u) |
+           (user_access ? R36SX_PFERR_USER : 0u);
+}
+
+static inline uint8_t r36sx_cpu_386_page_access_allowed(uint32_t pde,
+                                                        uint32_t pte,
+                                                        uint8_t write_access,
+                                                        uint8_t user_access)
+{
+    /*
+     * 80386 page-level protection has no CR0.WP bit. CPL 0..2 accesses are
+     * supervisor references and ignore page R/W, while CPL 3 must pass both
+     * directory and table U/S checks and needs both R/W bits for writes.
+     */
+    if (!user_access) {
+        return 1;
+    }
+    if (((pde & R36SX_PAGE_USER) == 0) ||
+        ((pte & R36SX_PAGE_USER) == 0)) {
+        return 0;
+    }
+    if (write_access &&
+        (((pde & R36SX_PAGE_WRITABLE) == 0) ||
+         ((pte & R36SX_PAGE_WRITABLE) == 0))) {
+        return 0;
+    }
+    return 1;
+}
+
 static uint8_t r36sx_cpu_translate_linear_access(uint32_t linear,
                                                  uint8_t write_access,
                                                  uint8_t user_access,
@@ -2076,12 +2119,12 @@ static uint8_t r36sx_cpu_translate_linear_access(uint32_t linear,
     uint32_t pde_addr = (r36sx_cr3 & R36SX_CR3_PAGE_DIRECTORY_MASK) |
                         (((linear >> 22) & 0x3ffu) << 2);
     uint32_t pde = r36sx_cpu_phys_read32(pde_addr);
-    uint32_t error_code = (write_access ? 0x02u : 0u) |
-                          (user_access ? 0x04u : 0u);
+    uint32_t not_present_error =
+        r36sx_cpu_page_fault_error_code(0, write_access, user_access);
 
     if ((pde & R36SX_PAGE_PRESENT) == 0) {
         r36sx_cr2 = linear;
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1,
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, not_present_error, 1,
                                   r36sx_cpu_fault_ip_context);
         return 0;
     }
@@ -2091,23 +2134,19 @@ static uint8_t r36sx_cpu_translate_linear_access(uint32_t linear,
     uint32_t pte = r36sx_cpu_phys_read32(pte_addr);
     if ((pte & R36SX_PAGE_PRESENT) == 0) {
         r36sx_cr2 = linear;
-        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, error_code, 1,
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, not_present_error, 1,
                                   r36sx_cpu_fault_ip_context);
         return 0;
     }
 
-    if (user_access) {
-        if (((pde & R36SX_PAGE_USER) == 0) ||
-            ((pte & R36SX_PAGE_USER) == 0) ||
-            (write_access &&
-             (((pde & R36SX_PAGE_WRITABLE) == 0) ||
-              ((pte & R36SX_PAGE_WRITABLE) == 0)))) {
-            r36sx_cr2 = linear;
-            r36sx_cpu_raise_exception(
-                R36SX_EXCEPTION_PF, error_code | 0x01u, 1,
-                r36sx_cpu_fault_ip_context);
-            return 0;
-        }
+    if (!r36sx_cpu_386_page_access_allowed(pde, pte, write_access,
+                                           user_access)) {
+        uint32_t protection_error =
+            r36sx_cpu_page_fault_error_code(1, write_access, user_access);
+        r36sx_cr2 = linear;
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_PF, protection_error, 1,
+                                  r36sx_cpu_fault_ip_context);
+        return 0;
     }
 
     if ((pde & R36SX_PAGE_ACCESSED) == 0) {
@@ -2166,14 +2205,9 @@ uint8_t r36sx_cpu_debug_translate_linear(uint32_t linear,
         return 0;
     }
 
-    if (user_access) {
-        if (((pde_value & R36SX_PAGE_USER) == 0) ||
-            ((pte_value & R36SX_PAGE_USER) == 0) ||
-            (write_access &&
-             (((pde_value & R36SX_PAGE_WRITABLE) == 0) ||
-              ((pte_value & R36SX_PAGE_WRITABLE) == 0)))) {
-            return 0;
-        }
+    if (!r36sx_cpu_386_page_access_allowed(pde_value, pte_value, write_access,
+                                           user_access)) {
+        return 0;
     }
 
     if (physical) {
@@ -3370,10 +3404,11 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
     uint16_t new_fs = 0;
     uint16_t new_gs = 0;
     uint16_t new_ldtr;
+    uint32_t new_cr3 = r36sx_cr3;
 
     if (is_32) {
-        r36sx_cr3 = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_CR3) &
-                    R36SX_CR3_PAGE_DIRECTORY_MASK;
+        new_cr3 = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_CR3) &
+                  R36SX_CR3_PAGE_DIRECTORY_MASK;
         new_ip = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EIP);
         new_flags = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EFLAGS);
         CPU_EAX = r36sx_cpu_system_read_linear32(base + R36SX_TSS32_EAX);
@@ -3409,6 +3444,20 @@ static uint8_t r36sx_cpu_load_task_state(uint16_t selector,
         new_ds = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_DS);
         new_ldtr = r36sx_cpu_system_read_linear16(base + R36SX_TSS16_LDTR);
         new_sp = CPU_ESP;
+    }
+
+    if (r36sx_cpu_exception_is_pending()) {
+        return 0;
+    }
+
+    if (is_32) {
+        /*
+         * Intel 80386 task switches load CR3 from the incoming TSS.  Read the
+         * raw TSS image through the old task's page tables first, then make
+         * the new page directory active before descriptor loads for LDTR and
+         * visible segment registers of the incoming task.
+         */
+        r36sx_cr3 = new_cr3;
     }
 
     if (!r36sx_cpu_load_ldtr(new_ldtr, CPU_IP)) {

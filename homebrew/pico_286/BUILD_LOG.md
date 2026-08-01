@@ -1,5 +1,36 @@
 # pico-286 Build Log
 
+## 2026-08-01 80386 paging conformance pass
+
+Reviewed the paging model against Intel and AMD system-programming references:
+
+- Intel 80386 Programmer's Reference Manual, sections 6.4, 9.8.14, and 5.2.
+- Intel 64 and IA-32 Architectures SDM, Volume 3A paging/protection notes.
+- AMD64 Architecture Programmer's Manual Volume 2, system programming.
+
+Code changes:
+
+- Added named #PF error-code bits and a shared 80386 page-access helper.
+- Kept strict 80386 behavior: CPL 0..2 supervisor accesses ignore page R/W, and
+  modern CR0.WP / reserved-bit / instruction-fetch #PF bits are not generated.
+- Matched the debug page translator with the main translator's PDE/PTE
+  permission checks.
+- Fixed 32-bit hardware task-switch CR3 ordering: the incoming TSS image is
+  read through the old task page tables first; the new CR3 becomes active before
+  loading LDTR and visible segment descriptors for the incoming task.
+
+Verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
+```
+
+Result:
+
+- Output: `homebrew/pico_286/build/pico_286_win.exe`
+- Patch copy: `patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe`
+- Build completed with warnings only; no compiler errors.
+
 ## 2026-06-27 diagnostics directory routing
 
 Moved generated diagnostic files out of the Pico-286 run directory and into a

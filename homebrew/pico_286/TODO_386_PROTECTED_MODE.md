@@ -41,10 +41,16 @@ be checked against the relevant specification and committed separately.
 3. Protected-mode paging conformance.
    - Status: partial.
    - Already present: basic 80386 two-level paging, `CR2`, `CR3`, `#PF`,
-     present/user/write checks, and accessed/dirty updates.
-   - Missing: conformance review for supervisor write-protect behavior,
-     reserved-bit behavior for the selected 386 model, exact page-fault error
-     codes, and interactions with task switches/exceptions.
+     present/user/write checks, accessed/dirty updates, 80386-style page-fault
+     error-code bits, supervisor write behavior, and 32-bit task-switch CR3
+     ordering.
+   - Notes: strict 80386 paging has no CR0.WP and does not generate modern
+     reserved-bit/instruction-fetch #PF error-code bits. Supervisor CPL 0..2
+     references can write read-only pages; user CPL 3 references need both
+     PDE/PTE U/S and R/W permissions.
+   - Missing: deeper regression tests for nested exceptions during task
+     switches and page faults raised while loading invalid or non-present TSS
+     pages.
    - Done when: paging behavior matches the 80386 PRM for all supported CR0/CR3
      states used by DOS extenders.
 
