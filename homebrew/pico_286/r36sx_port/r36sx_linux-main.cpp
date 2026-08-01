@@ -511,7 +511,7 @@ static inline void vga_render_planar_4bpp(uint16_t **out_pixels,
                                 | (((plane1 >> bit) & 1) << 1)
                                 | (((plane2 >> bit) & 1) << 2)
                                 | (((plane3 >> bit) & 1) << 3);
-            uint16_t color = vga_palette565[color_index];
+            uint16_t color = vga_palette565[vga_attribute_dac_index(color_index)];
             *pixels++ = color;
             if (x_scale == 2) {
                 *pixels++ = color;

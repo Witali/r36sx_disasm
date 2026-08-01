@@ -316,6 +316,57 @@ void vga_get_dac_color(uint8_t index, uint8_t *red6, uint8_t *green6, uint8_t *b
     *blue6 = vga_dac_8_to_6(blue8);
 }
 
+static uint32_t vga_ega_6bit_rgb(uint8_t value)
+{
+    const uint8_t r = (uint8_t)((((value >> 2) & 1u) << 1) |
+                                ((value >> 5) & 1u));
+    const uint8_t g = (uint8_t)((((value >> 1) & 1u) << 1) |
+                                ((value >> 4) & 1u));
+    const uint8_t b = (uint8_t)((((value >> 0) & 1u) << 1) |
+                                ((value >> 3) & 1u));
+
+    return rgb(r * 85u, g * 85u, b * 85u);
+}
+
+static void vga_reset_ega_dac_palette(void)
+{
+    /*
+     * 16-color EGA/VGA modes feed a 6-bit Attribute Controller palette value
+     * into the DAC.  Keep those first 64 DAC entries in EGA-compatible RGB
+     * order so standard AC tables such as 0x14/0x38 render as intended.
+     */
+    for (uint8_t i = 0; i < 64u; i++) {
+        vga_palette[i] = vga_ega_6bit_rgb(i);
+#if PICO_ON_DEVICE
+        graphics_set_palette(i, vga_palette[i]);
+#endif
+    }
+    r36sx_pico286_vga_palette565_set_all(vga_palette, 256);
+    r36sx_pico286_video_mark_dirty();
+}
+
+uint8_t vga_attribute_dac_index(uint8_t color_index)
+{
+    uint8_t palette;
+    uint8_t color_select;
+
+    /*
+     * VGA Attribute Controller palette registers are not RGB values.  In
+     * 16-color modes they map the 4-bit pixel/attribute value to a DAC palette
+     * index; the DAC itself is still read/written through 3C7h/3C8h/3C9h.
+     * Attribute Mode Control bit 7 lets Color Select provide palette bits 5:4,
+     * while Color Select bits 3:2 extend the DAC index to bits 7:6.
+     */
+    palette = attribute_controller[color_index & 0x0Fu] & 0x3Fu;
+    color_select = attribute_controller[0x14] & 0x0Fu;
+    if ((attribute_controller[0x10] & 0x80u) != 0) {
+        palette = (uint8_t)((palette & 0x0Fu) |
+                            ((color_select & 0x03u) << 4));
+    }
+    palette |= (uint8_t)((color_select & 0x0Cu) << 4);
+    return (uint8_t)(palette & dac_mask);
+}
+
 // Utility: replicate an 8-bit value into all four bytes of a 32-bit word
 inline static uint32_t expand_to_u32(const uint8_t value) {
 #if PICO_ON_DEVICE && !PICO_RP2350
@@ -569,27 +620,35 @@ static void vga_apply_standard_regs(const vga_standard_regs_t *regs)
 void vga_set_standard_mode(uint8_t mode)
 {
     const vga_standard_regs_t *regs = NULL;
+    uint8_t use_ega_dac = 0;
 
     switch (mode) {
+        case 0x00:
+        case 0x01:
         case 0x02:
         case 0x03:
             regs = &vga_mode_80x25_text;
             break;
         case 0x0D:
             regs = &vga_mode_320x200_16;
+            use_ega_dac = 1;
             break;
         case 0x0E:
             regs = &vga_mode_640x200_16;
+            use_ega_dac = 1;
             break;
         case 0x0F:
         case 0x10:
             regs = &vga_mode_640x350_16;
+            use_ega_dac = 1;
             break;
         case 0x11:
             regs = &vga_mode_640x480_2;
+            use_ega_dac = 1;
             break;
         case 0x12:
             regs = &vga_mode_640x480_16;
+            use_ega_dac = 1;
             break;
         case 0x13:
             regs = &vga_mode_320x200_256;
@@ -601,6 +660,9 @@ void vga_set_standard_mode(uint8_t mode)
     if (regs) {
         vga_apply_standard_regs(regs);
         vga_reset_dac_palette();
+        if (use_ega_dac) {
+            vga_reset_ega_dac_palette();
+        }
         r36sx_pico286_video_mark_dirty();
     } else {
         vga_plane_offset = 0;
@@ -931,15 +993,12 @@ void __not_in_flash() vga_mem_write(const uint32_t address, const uint8_t cpu_da
             break;
         }
         case 2: {
-            // Mode 2: Color expands to all planes
-            if (vga.chain4) {
-                // In 256 color modes we write full byte to all masked planes
-                new_data = expand_to_u32(cpu_data);
-            } else {
-                // In 16 color modes we use it as mask
-                new_data = expand_nibble_to_planes(cpu_data);
-            }
-
+            /*
+             * VGA write mode 2 fills plane n with CPU data bit n.  Chain-4
+             * packed mode 13h is handled before this path, so the planar
+             * definition applies here regardless of Sequencer Memory Mode.
+             */
+            new_data = expand_nibble_to_planes(cpu_data);
             break;
         }
 
@@ -1055,16 +1114,13 @@ void __not_in_flash() vga_mem_write16(const uint32_t address, const uint16_t cpu
         new0 = masked_merge_xor(rot0, set_reset32, enable_set_reset32);
         new1 = masked_merge_xor(rot1, set_reset32, enable_set_reset32);
     } else {
-        // Mode 2: color expand
-        if (vga.chain4) {
-            // In 256 color modes we write full byte to all masked planes
-            new0 = expand_to_u32((uint8_t) (cpu_data_x2 & 0xFFu));
-            new1 = expand_to_u32((uint8_t) (cpu_data_x2 >> 8));
-        } else {
-            // In 16 color modes we use it as mask
-            new0 = expand_nibble_to_planes((uint8_t) (cpu_data_x2 & 0xFFu));
-            new1 = expand_nibble_to_planes((uint8_t) (cpu_data_x2 >> 8));
-        }
+        /*
+         * Write mode 2 is a planar color-expand operation: bit 0 feeds plane 0,
+         * bit 1 feeds plane 1, and so on.  The byte-wide chain-4 case already
+         * returned through vga_chain4_write_byte().
+         */
+        new0 = expand_nibble_to_planes((uint8_t) (cpu_data_x2 & 0xFFu));
+        new1 = expand_nibble_to_planes((uint8_t) (cpu_data_x2 >> 8));
     }
 
     // ALU apply (modes 0,2)
@@ -1141,20 +1197,10 @@ void vga_portout(uint16_t portnum, uint16_t value) {
         /* Attribute Address Register */
         case 0x3C0: {
             if (attribute_data_mode) {
-                attribute_controller[vga_register & 0x1Fu] = value;
-                // Palette registers
-                if (vga_register <= 0x0f) {
-                    const uint8_t r = (((value >> 2) & 1) << 1) + ((value >> 5) & 1);
-                    const uint8_t g = (((value >> 1) & 1) << 1) + ((value >> 4) & 1);
-                    const uint8_t b = (((value >> 0) & 1) << 1) + ((value >> 3) & 1);
+                const uint8_t index = vga_register & 0x1Fu;
 
-                    uint32_t color = rgb(r * 85, g * 85, b * 85);
-                    vga_palette[vga_register] = color;
-                    r36sx_pico286_vga_palette565_set(vga_register, color);
-#if PICO_ON_DEVICE
-                    graphics_set_palette(vga_register, vga_palette[vga_register]);
-#endif
-                } else if (vga_register == 0x10) {
+                attribute_controller[index] = value;
+                if (index == 0x10) {
                     // Attribute Mode Control
                     //printf("[VGA] value 0x%02x\r\n", value);
                     cga_blinking = (value >> 5) & 1 ? 0x7F : 0xFF;
