@@ -1,5 +1,25 @@
 # pico-286 Build Log
 
+## 2026-09-05 x86 source audit and component probes
+
+Audited integer opcode handlers and shared CPU helpers at `28c46e23` against
+Intel's 80386 Programmer's Reference Manual. Findings, source locations,
+documentation links, review scope and follow-up tests are recorded separately
+in [TODO_X86_SOURCE_AUDIT.md](TODO_X86_SOURCE_AUDIT.md).
+
+Ran `tests/audit_cpu_helpers.py` using installed WSL Python/GCC with
+`-std=c11 -O2 -fsanitize=undefined -fno-sanitize-recover=undefined`.
+Compilation succeeded. Two groups passed (conditions and ADC/SBB8); six
+probes reproduced five outstanding findings (IDIV16/32 host overflow, signed
+BT memory indexes at two widths, XCHG address aliasing and REP addr16 wrap).
+Exit status 1 is the expected failing regression baseline, not a build error.
+The audit document contains the exact repeatable command.
+
+Only temporary locally generated C/native probe files were built and then
+removed. No emulator binary, ROM, FAT image or patch configuration was changed;
+no new tools were downloaded. Windows/MIPS emulator builds and integrated ROM
+tests were not run in this documentation/review task.
+
 ## 2026-08-01 VGA/VBE conformance pass
 
 Reviewed VGA Attribute Controller, Graphics Controller write modes, and VBE

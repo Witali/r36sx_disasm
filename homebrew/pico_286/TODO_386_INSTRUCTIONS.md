@@ -3,6 +3,10 @@
 This list tracks gaps found while comparing the Pico-286 CPU core with the
 Intel 80386 Programmer's Reference Manual instruction set.
 
+The follow-up [x86 source audit](TODO_X86_SOURCE_AUDIT.md) tracks correctness
+bugs, exception-path gaps and regression probes found on 2026-09-05. Completed
+opcode entries below indicate implementation presence, not full conformance.
+
 ## Missing 80386 opcodes
 
 - [x] `0F A4` / `0F A5`: `SHLD r/m16|32, r16|32, imm8|CL`.
