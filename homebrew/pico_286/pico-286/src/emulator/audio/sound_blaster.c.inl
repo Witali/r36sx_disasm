@@ -377,7 +377,8 @@ static INLINE uint8_t blaster_read(const uint16_t port) {
 }
 
 // TODO: Consider renaming to generate_audio_sample for clarity - this function generates the audio sample for DMA mode
-inline int16_t blaster_sample() { //for DMA mode
+/* The C++ host audio loop needs an external definition, including with MSVC. */
+int16_t blaster_sample() { //for DMA mode
     int16_t generated_sample = 0;
     if (!sound_blaster.dma_transfer_enabled) return sound_blaster.speaker_enabled ? sound_blaster.current_audio_sample : 0;
     if (sound_blaster.silence_mode_active == 0) {

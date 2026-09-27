@@ -48,7 +48,8 @@ static const int16_t sample_lut[256] = {
      7680,  7744,  7808,  7872,  7936,  8000,  8064,  8128
 };
 
-INLINE int16_t dss_sample() {
+/* Called by the host loop in another translation unit; keep an external body. */
+int16_t dss_sample() {
     if (__builtin_expect(fifo_count == 0, 0)) {
         return 0;
     }

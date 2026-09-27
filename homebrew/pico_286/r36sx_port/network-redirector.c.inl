@@ -3,12 +3,14 @@
 #pragma once
 #include <ctype.h>
 #include <errno.h>
+#include <stddef.h>
 #include <sys/stat.h>
 #include "r36sx_debug_config.h"
 #if defined(R36SX_PICO286_HOST_DRIVE_CONFIG)
 #include "r36sx_disk_config.h"
 #endif
-#if WIN32
+#if defined(_WIN32)
+#include <io.h>
 // Host filesystem passthrough base directory
 #define HOST_BASE_DIR "C:\\FASM"
 #else
@@ -160,7 +162,7 @@ static void build_host_path(char *dest, size_t dest_size, const char *tail) {
     const char *base = redirector_host_base_dir();
     size_t base_len;
     char sep =
-#if WIN32
+#if defined(_WIN32)
         '\\';
 #else
         '/';
@@ -290,7 +292,8 @@ typedef struct {
 } foundfilestruct;
 
 /* called 'srchrec' in phantom.c */
-typedef struct __attribute__((packed, aligned)) {
+PICO286_PACKED_BEGIN
+typedef struct PICO286_PACKED_ALIGNED {
     unsigned char drive_letter;
     unsigned char srch_tmpl[11];
     unsigned char srch_attr;
@@ -299,11 +302,13 @@ typedef struct __attribute__((packed, aligned)) {
     unsigned char f1[4];
     foundfilestruct foundfile;
 } sdbstruct;
+PICO286_PACKED_END
 
 /* DOS System File Table entry - ALL DOS VERSIONS
  * Some of the fields below are defined by the redirector, and differ
  * from the SFT normally found under DOS */
-typedef struct __attribute__((packed)) {
+PICO286_PACKED_BEGIN
+typedef struct PICO286_PACKED {
     // DOS 4.0+ System File Table and FCB Table
     uint16_t total_handles;
     uint16_t open_mode;
@@ -321,6 +326,12 @@ typedef struct __attribute__((packed)) {
     uint8_t unk4;
     char file_name[11];
 } sftstruct;
+PICO286_PACKED_END
+
+/* These records are overlays on guest bytes, not host-native DOS structs. */
+_Static_assert(sizeof(sftstruct) == 43, "DOS SFT must be byte-packed");
+_Static_assert(offsetof(sftstruct, file_size) == 17, "DOS SFT file-size offset");
+_Static_assert(offsetof(sdbstruct, foundfile) == 21, "DOS search result offset");
 
 #define FIRST_FILENAME_OFFSET 0x9e
 #define SDA_MIN_SAFE_SIZE 0x300u

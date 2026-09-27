@@ -1,5 +1,106 @@
 # pico-286 Build Log
 
+## 2026-09-27 Selectable Windows compilers: MSVC, Zig, Cygwin MinGW-w64
+
+Added `-Compiler MSVC|Zig|MinGW`, with MSVC as the default. MSVC is discovered
+through Visual Studio's `vswhere` and developer shell; MinGW accepts
+`-CygwinRoot` and otherwise searches `tools/cygwin64` and `C:/cygwin64`.
+Object directories are separated by compiler. The MIPS/WSL build is unchanged.
+
+MSVC portability work preserves the existing guest data layout: scoped packing
+pragmas and alignment macros, static assertions for SFT/XMS offsets and sizes,
+C linkage for CPU/OPL state, externally visible audio sample functions,
+explicit C switch labels instead of GNU case ranges, and Win32 replacements
+for directory scanning, bit scans, atomic exchange and memory fences. MSVC
+uses switch dispatch; Zig/MinGW retain computed goto by default. Debug logs
+now identify the Windows compiler. Guest instruction semantics are unchanged.
+
+Toolchains and references:
+
+- Visual Studio Community 18, MSVC toolset `14.51.36231`, Windows SDK
+  `10.0.26100.0`; `/std:c11`, `/std:c++14`, `/MT /Zi /O2`, linker `/DEBUG`.
+  [Developer shell](https://learn.microsoft.com/en-us/dotnet/framework/tools/developer-command-prompt-for-vs),
+  [C11 mode](https://learn.microsoft.com/en-us/cpp/build/reference/std-specify-language-standard-version),
+  [packing](https://learn.microsoft.com/en-us/cpp/preprocessor/pack),
+  [alignment](https://learn.microsoft.com/en-us/cpp/cpp/align-cpp),
+  [InterlockedExchange](https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-interlockedexchange),
+  [MemoryBarrier](https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-memorybarrier).
+- Existing Zig `0.16.0`, target `x86_64-windows-gnu`, debug `-O2`.
+- Cygwin setup `2.937` installed locally under ignored `tools/cygwin64`, with
+  no administrator elevation, global PATH change, shortcuts, or root-directory
+  registry registration. MinGW-w64 GCC `14.4.0`, binutils `2.47`, headers/runtime
+  `14.0.0`, winpthreads `14.0.0`. Target checked as `x86_64-w64-mingw32`;
+  `-std=gnu11`, `-std=gnu++14`, `-O2 -g`, `-static` at link time.
+  [Cygwin installation](https://cygwin.com/install.html),
+  [native Windows cross-compilers](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin),
+  [GCC response files](https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html).
+  `cygpath` and quoted response files preserve paths and string-valued macros
+  across PowerShell/Win32/Cygwin argument parsing.
+
+Downloads and security:
+
+- Installer: `https://cygwin.com/setup-x86_64.exe`, saved in `tools/downloads`.
+  SHA512 matched `https://cygwin.com/sha512.sum`:
+  `6acea47c59781c9e7f544a18d53935d59df6e44d5d52ac95ee165671b8e388820455eebf30ccc7d254b00c3d0eb694269a0f8dc84b17944c1f355dac9c5aafcc`.
+- Package mirror: `https://mirrors.kernel.org/sourceware/cygwin/`; setup's
+  signature verification was left enabled. Cache: `tools/downloads/cygwin`.
+  Used `--no-admin --no-write-registry --no-shortcuts --quiet-mode hidden`,
+  separate `--download` / `--local-install`, `--root` / `--local-package-dir`,
+  and packages `mingw64-x86_64-gcc-core,mingw64-x86_64-gcc-g++,mingw64-x86_64-binutils,mingw64-x86_64-winpthreads`.
+- `tools/scan-download.ps1` / Defender reported no threats for the installer,
+  package cache, installed tool directory (including the completed install),
+  and the MSVC, Zig and MinGW generated executables.
+- Initial sandboxed network access failed. A download retry succeeded; the
+  first local installation left missing dependencies/postinstall errors, fixed
+  by rerunning local setup with explicit winpthreads. Final setup returned 0.
+  Setup logs remain in `tools/cygwin64/var/log`.
+
+Build and verification commands (from the repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler Zig -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_zig.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_zig.exe -Tag zig
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+```
+
+All three compile/link successfully and run the existing `test386.bin` to
+POST `80:FF`, with protected mode and paging active. Their POST EE result files
+match byte for byte (SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`).
+Debug mailbox register/frame queries work; each nonblank frame contains 614400
+RGB565 bytes (640x480). Tests attach no disk images, temporarily replace only
+the build-directory config, and restore its original bytes in `finally`.
+The active patch config and MIPS executable are untouched. This comparison
+does not certify complete CPU conformance or validate Doom/disk/audio behavior.
+
+Final generated PE32+ x86-64 artifacts (pre-commit verification builds identify
+base `021a021e69c1`, dirty=1):
+
+| Build file | Bytes | SHA256 |
+| --- | ---: | --- |
+| `build/pico_286_win.exe` (MSVC) | 829440 | `cc9bb1d7b5d3aa7cbf49c378efc6019ff3875c8668695131e3ff6513c6728198` |
+| `build/pico_286_win_mingw.exe` | 3335781 | `7cb779692a66fe53df1098ddd32926b17c4fd17c2e5c64ee0b0307c2dd122a8a` |
+| `build/pico_286_win_zig.exe` | 975872 | `534d433cf690074922769fcdf48aeb4eb9e2f7e0a6e0f7402549078d8d9fa88d` |
+
+Deployed MSVC EXE and matching `pico_286_win.pdb` (8159232 bytes) to the active
+patch, plus the MinGW EXE under `pico_286_win_mingw.exe`. EXE copy hashes match.
+MinGW imports only dbghelp, GDI32, KERNEL32, msvcrt, USER32 and WINMM; no Cygwin
+or extra MinGW runtime DLLs. MSVC imports only system Windows DLLs as well.
+
+Build logs are in patch `diagnostics/x86-audit/build-{msvc,msvc-final,zig,mingw}.log`;
+runtime logs, register reports, frames and ROM outputs are in
+`diagnostics/compiler-{msvc,zig,mingw}`. Early MSVC attempts exposed GNU syntax,
+CRT declarations and linkage differences; early MinGW attempts exposed argv
+quoting, include-path and missing winpthreads issues, all resolved for these
+builds. Existing narrowing/unused/format/possible-uninitialized warnings remain;
+this was not a general warning-cleanup task. The smoke harness also needed
+shared log reads and result hashing after process shutdown for MSVC's CRT.
+`git diff --check` and the project skill validator passed. No MIPS rebuild.
+
 ## 2026-09-27 X86-03: preserve XCHG operand addresses
 
 Reordered XCHG byte/word/dword handlers to commit the r/m operand before

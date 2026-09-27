@@ -108,20 +108,22 @@ static INLINE void cms_out(const uint16_t address, const uint16_t value) {
         case 2:
             cms_registers[chip_select][register_addresses[chip_select] & 31] = value;
             switch (register_addresses[chip_select] & 31) {
-                case 0x00 ... 0x05: // Volume control
+                // Volume control for the six voices; standard C case labels.
+                case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05:
                     voice_number = register_addresses[chip_select] & 7;
                     voice_volume[chip_select][voice_number][0] = value & 0xf;
                     voice_volume[chip_select][voice_number][1] = value >> 4;
                     break;
 
-                case 0x08 ... 0x0D: // Frequency control
+                // Frequency control.
+                case 0x08: case 0x09: case 0x0A: case 0x0B: case 0x0C: case 0x0D:
                     voice_number = register_addresses[chip_select] & 7;
                     frequency_latch[chip_select][voice_number] = (frequency_latch[chip_select][voice_number] & 0x700) | value;
                     voice_frequency[chip_select][voice_number] = (MASTER_CLOCK / 512 << (frequency_latch[chip_select][voice_number] >> 8)) / (
                                             511 - (frequency_latch[chip_select][voice_number] & 255));
                     break;
 
-                case 0x10 ... 0x12: // Octave control
+                case 0x10: case 0x11: case 0x12: // Octave control
                     voice_number = (register_addresses[chip_select] & 3) << 1;
                     frequency_latch[chip_select][voice_number] = (frequency_latch[chip_select][voice_number] & 0xFF) | ((value & 7) << 8);
                     frequency_latch[chip_select][voice_number + 1] = (frequency_latch[chip_select][voice_number + 1] & 0xFF) | ((value & 0x70) << 4);

@@ -1,4 +1,7 @@
 param(
+    [ValidateSet("MSVC", "Zig", "MinGW")]
+    [string]$Compiler = "MSVC",
+    [string]$CygwinRoot,
     [switch]$DebugLog,
     [switch]$DisableProfiling,
     [switch]$DisableComputedGoto,
@@ -24,7 +27,8 @@ $PicoRoot = Join-Path $PSScriptRoot "pico-286"
 $PortRoot = Join-Path $PSScriptRoot "r36sx_port"
 $WindowsRoot = Join-Path $PSScriptRoot "windows"
 $BuildDir = Join-Path $PSScriptRoot "build"
-$ObjDir = Join-Path $BuildDir "obj-windows"
+$ObjDirName = "obj-windows-$($Compiler.ToLowerInvariant())"
+$ObjDir = Join-Path $BuildDir $ObjDirName
 $Zig = Join-Path $Root "tools\zig-x86_64-windows-0.16.0\zig.exe"
 $CompatHeader = Join-Path $WindowsRoot "r36sx_pico286_windows_compat.h"
 $PrintfRenameHeader = Join-Path $WindowsRoot "r36sx_windows_printf_rename.h"
@@ -44,7 +48,8 @@ if (($DebugLog -or $RedirectorTrace -or $HostRpcTrace) -and $OptLevel -ne "O2") 
 }
 
 $ProfilingValue = if ($DisableProfiling) { "0" } else { "1" }
-$ComputedGotoValue = if ($DisableComputedGoto) { "0" } else { "1" }
+# MSVC does not implement GNU labels-as-values; use the shared switch core.
+$ComputedGotoValue = if ($Compiler -eq "MSVC" -or $DisableComputedGoto) { "0" } else { "1" }
 $FastMemoryValue = if ($DisableFastMemory) { "0" } else { "1" }
 $ProtectedModeValue = if ($DisableProtectedMode) { "0" } else { "1" }
 $ProtectedModeDebugValue = if ($DisableProtectedModeDebug) { "0" } else { "1" }
@@ -74,8 +79,76 @@ function Invoke-Checked {
     }
 }
 
-if (!(Test-Path $Zig)) {
-    throw "Missing Zig compiler: $Zig"
+$CygwinPaths = @{}
+function Invoke-MinGW {
+    param([string]$Tool, [string[]]$Arguments, [string]$ResponseFile)
+    # Cygwin and Win32 have different argv quote parsing. A GCC response file
+    # preserves paths with spaces and C string macro quotes through both layers.
+    $Lines = foreach ($Argument in $Arguments) {
+        if ($Argument.StartsWith('-D')) {
+            $Argument = $Argument.Replace('\"', '"')
+        } elseif ($Argument -match '^(-I)?([A-Za-z]:[\\/].*)$') {
+            $Prefix = $Matches[1]
+            $NativePath = $Matches[2]
+            if (!$CygwinPaths.ContainsKey($NativePath)) {
+                $Converted = & (Join-Path $CygwinBin 'cygpath.exe') -u $NativePath
+                if ($LASTEXITCODE -ne 0) { throw "cygpath failed: $NativePath" }
+                $CygwinPaths[$NativePath] = $Converted
+            }
+            $Argument = $Prefix + $CygwinPaths[$NativePath]
+        } else {
+            $Argument = $Argument.Replace('\', '/')
+        }
+        '"' + $Argument.Replace('\', '\\').Replace('"', '\"') + '"'
+    }
+    [IO.File]::WriteAllLines($ResponseFile, [string[]]$Lines, (New-Object Text.UTF8Encoding($false)))
+    Invoke-Checked { & $Tool "@$ResponseFile" }
+}
+
+if ($Compiler -eq "MSVC") {
+    $VsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (!(Test-Path $VsWhere)) {
+        throw "Install Visual Studio C++ desktop tools and a Windows SDK (vswhere.exe missing)."
+    }
+    $VsRoot = & $VsWhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    if (!$VsRoot) {
+        throw "No Visual Studio installation with MSVC x64 tools was found."
+    }
+    & (Join-Path $VsRoot "Common7\Tools\Launch-VsDevShell.ps1") -Arch amd64 -HostArch amd64 -SkipAutomaticLocation | Out-Null
+    $Cl = (Get-Command cl.exe -ErrorAction Stop).Source
+    $Linker = (Get-Command link.exe -ErrorAction Stop).Source
+    Write-Host "Using MSVC: $Cl (x64, switch CPU dispatch)"
+} elseif ($Compiler -eq "Zig") {
+    if (!(Test-Path $Zig)) {
+        throw "Missing Zig compiler: $Zig"
+    }
+    # Keep compiler caches writable without changing the user's global cache.
+    if (!$env:ZIG_GLOBAL_CACHE_DIR) {
+        $env:ZIG_GLOBAL_CACHE_DIR = Join-Path $BuildDir "zig-cache"
+    }
+    Write-Host "Using Zig: $Zig (x64, computed goto=$ComputedGotoValue)"
+} else {
+    if (!$CygwinRoot) {
+        $CygwinRoot = @((Join-Path $Root "tools\cygwin64"), "C:\cygwin64") |
+            Where-Object { Test-Path (Join-Path $_ "bin\x86_64-w64-mingw32-gcc.exe") } |
+            Select-Object -First 1
+    }
+    if (!$CygwinRoot) {
+        throw "Install Cygwin packages mingw64-x86_64-gcc-core and mingw64-x86_64-gcc-g++, or pass -CygwinRoot."
+    }
+    $CygwinBin = Join-Path ([IO.Path]::GetFullPath($CygwinRoot)) "bin"
+    $Gcc = Join-Path $CygwinBin "x86_64-w64-mingw32-gcc.exe"
+    $Gxx = Join-Path $CygwinBin "x86_64-w64-mingw32-g++.exe"
+    if (!(Test-Path $Gcc) -or !(Test-Path $Gxx)) {
+        throw "Missing MinGW-w64 GCC/G++ in $CygwinBin"
+    }
+    # Only the compiler runs under Cygwin. The emulator EXE uses the Windows CRT.
+    $env:PATH = "$CygwinBin;$env:PATH"
+    $GccTarget = & $Gcc -dumpmachine
+    if ($LASTEXITCODE -ne 0 -or $GccTarget -ne "x86_64-w64-mingw32") {
+        throw "Unexpected GCC target '$GccTarget'; refusing a Cygwin-dependent EXE."
+    }
+    Write-Host "Using MinGW-w64 GCC: $Gcc (computed goto=$ComputedGotoValue)"
 }
 if (!(Test-Path $PicoRoot)) {
     throw "Missing Pico-286 source tree: $PicoRoot"
@@ -122,7 +195,7 @@ if ($InsideWorkTree -eq "true") {
 }
 
 $ObjDirFull = [IO.Path]::GetFullPath($ObjDir)
-$ExpectedObjDir = [IO.Path]::GetFullPath((Join-Path $BuildDir "obj-windows"))
+$ExpectedObjDir = [IO.Path]::GetFullPath((Join-Path $BuildDir $ObjDirName))
 if ($ObjDirFull -ne $ExpectedObjDir) {
     throw "Refusing to clean unexpected object directory: $ObjDirFull"
 }
@@ -144,8 +217,6 @@ $IncludeArgs = @(
 )
 
 $CommonArgs = @(
-    "-target", "x86_64-windows-gnu",
-    "-D__USE_MINGW_ANSI_STDIO=1",
     "-DPICO_RP2040=0",
     "-DPICO_RP2350=0",
     "-DDEBUG=$DebugValue",
@@ -182,20 +253,35 @@ $CommonArgs = @(
     "-DEMU8950_LINEAR_SKIP=1",
     "-DEMU8950_LINEAR_END_OF_NOTE_OPTIMIZATION",
     "-DEMU8950_NO_PERCUSSION_MODE=1",
-    "-DEMU8950_LINEAR=1",
-    "-include", $CompatHeader,
-    "-$OptLevel",
-    "-fms-extensions",
-    "-fno-strict-aliasing",
-    "-fno-builtin-memset",
-    "-fno-builtin-memcpy",
-    "-Wall",
-    "-Wextra",
-    "-Wno-unused-parameter",
-    "-Wno-unused-function",
-    "-Wno-missing-field-initializers",
-    "-Wno-ignored-attributes"
+    "-DEMU8950_LINEAR=1"
 )
+if ($Compiler -eq "MSVC") {
+    # MSVC has no /O3 or /Og; retain the script's shared optimization vocabulary.
+    $MsvcOpt = switch ($OptLevel) {
+        { $_ -in "O0", "Og" } { "/Od"; break }
+        { $_ -in "O1", "Os" } { "/O1"; break }
+        default { "/O2" }
+    }
+    $CommonArgs += @(
+        "/nologo", "/MT", "/Zi", "/W3", "/utf-8", $MsvcOpt,
+        "/Fd$(Join-Path $ObjDirFull 'compiler.pdb')", "/FI$CompatHeader",
+        "/D_CRT_SECURE_NO_WARNINGS", "/D_CRT_NONSTDC_NO_WARNINGS"
+    )
+    Write-Host "Optimization: $MsvcOpt, static CRT, PDB symbols"
+} else {
+    $CommonArgs += @(
+        "-D__USE_MINGW_ANSI_STDIO=1",
+        "-include", $CompatHeader, "-$OptLevel", "-fms-extensions",
+        "-fno-strict-aliasing", "-fno-builtin-memset", "-fno-builtin-memcpy",
+        "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-unused-function",
+        "-Wno-missing-field-initializers", "-Wno-ignored-attributes"
+    )
+    if ($Compiler -eq "Zig") {
+        $CommonArgs += @("-target", "x86_64-windows-gnu")
+    } else {
+        $CommonArgs += "-g"
+    }
+}
 
 $Objects = New-Object System.Collections.Generic.List[string]
 
@@ -204,24 +290,36 @@ function Get-ObjectPath {
     $Full = [IO.Path]::GetFullPath($Source)
     $Rel = $Full.Substring($Root.Path.Length).TrimStart('\', '/')
     $Name = ($Rel -replace "[:\\/ ]", "_")
-    return (Join-Path $ObjDirFull ([IO.Path]::ChangeExtension($Name, ".o")))
+    return (Join-Path $ObjDirFull ([IO.Path]::ChangeExtension($Name, ".obj")))
 }
 
 function Compile-C {
     param([string]$Source)
     $Obj = Get-ObjectPath -Source $Source
-    $ExtraArgs = @()
+    [string[]]$ExtraArgs = @()
     if ([IO.Path]::GetFileName($Source) -eq "printf.c") {
-        $ExtraArgs = @("-include", $PrintfRenameHeader)
+        $ExtraArgs = if ($Compiler -eq "MSVC") { @("/FI$PrintfRenameHeader") } else { @("-include", $PrintfRenameHeader) }
     }
-    Invoke-Checked { & $Zig cc @CommonArgs @IncludeArgs @ExtraArgs "-std=gnu11" "-c" $Source "-o" $Obj }
+    if ($Compiler -eq "MSVC") {
+        Invoke-Checked { & $Cl @CommonArgs @IncludeArgs @ExtraArgs /std:c11 /TC /c $Source "/Fo$Obj" }
+    } elseif ($Compiler -eq "Zig") {
+        Invoke-Checked { & $Zig cc @CommonArgs @IncludeArgs @ExtraArgs -std=gnu11 -c $Source -o $Obj }
+    } else {
+        Invoke-MinGW $Gcc ($CommonArgs + $IncludeArgs + $ExtraArgs + @('-std=gnu11', '-c', $Source, '-o', $Obj)) "$Obj.rsp"
+    }
     $Objects.Add($Obj) | Out-Null
 }
 
 function Compile-Cpp {
     param([string]$Source)
     $Obj = Get-ObjectPath -Source $Source
-    Invoke-Checked { & $Zig c++ @CommonArgs @IncludeArgs "-std=gnu++14" "-fpermissive" "-fno-exceptions" "-fno-rtti" "-c" $Source "-o" $Obj }
+    if ($Compiler -eq "MSVC") {
+        Invoke-Checked { & $Cl @CommonArgs @IncludeArgs /std:c++14 /TP /GR- /c $Source "/Fo$Obj" }
+    } elseif ($Compiler -eq "Zig") {
+        Invoke-Checked { & $Zig c++ @CommonArgs @IncludeArgs -std=gnu++14 -fpermissive -fno-exceptions -fno-rtti -c $Source -o $Obj }
+    } else {
+        Invoke-MinGW $Gxx ($CommonArgs + $IncludeArgs + @('-std=gnu++14', '-fpermissive', '-fno-exceptions', '-fno-rtti', '-c', $Source, '-o', $Obj)) "$Obj.rsp"
+    }
     $Objects.Add($Obj) | Out-Null
 }
 
@@ -259,7 +357,14 @@ Compile-Cpp (Join-Path $PicoRoot "src\emu8950\slot_render.cpp")
 Compile-Cpp (Join-Path $PortRoot "r36sx_linux-main.cpp")
 
 $PdbOut = [IO.Path]::ChangeExtension([IO.Path]::GetFullPath($Out), ".pdb")
-Invoke-Checked { & $Zig c++ -target x86_64-windows-gnu @Objects "-o" $Out "-luser32" "-lgdi32" "-lshell32" "-lwinmm" "-ldbghelp" }
+if ($Compiler -eq "MSVC") {
+    Invoke-Checked { & $Linker /NOLOGO @Objects "/OUT:$Out" "/PDB:$PdbOut" /DEBUG /INCREMENTAL:NO /OPT:REF /OPT:ICF /SUBSYSTEM:CONSOLE user32.lib gdi32.lib shell32.lib winmm.lib dbghelp.lib }
+} elseif ($Compiler -eq "Zig") {
+    Invoke-Checked { & $Zig c++ -target x86_64-windows-gnu @Objects -o $Out -luser32 -lgdi32 -lshell32 -lwinmm -ldbghelp }
+} else {
+    # Include GCC/C++ support statically so the patch needs no MinGW DLLs.
+    Invoke-MinGW $Gxx ($Objects.ToArray() + @('-static', '-o', $Out, '-luser32', '-lgdi32', '-lshell32', '-lwinmm', '-ldbghelp')) (Join-Path $ObjDirFull 'link.rsp')
+}
 
 foreach ($Asset in @("pico_286.conf", "keypresets.conf", "test386.bin", "test286.bin")) {
     $Source = Join-Path $PSScriptRoot $Asset
@@ -277,12 +382,12 @@ if (!$NoPatchCopy) {
         New-Item -ItemType Directory -Force $PatchDir | Out-Null
     }
     Copy-Item -LiteralPath $Out -Destination (Join-Path $PatchDir ([IO.Path]::GetFileName($Out))) -Force
-    foreach ($Artifact in @($PdbOut)) {
+    foreach ($Artifact in $(if ($Compiler -eq "MSVC") { @($PdbOut) } else { @() })) {
         if (Test-Path $Artifact) {
             Copy-Item -LiteralPath $Artifact -Destination (Join-Path $PatchDir ([IO.Path]::GetFileName($Artifact))) -Force
         }
     }
-    Write-Host "Copied Windows debug executable to $PatchDir"
+    Write-Host "Copied Windows $Compiler executable to $PatchDir"
 }
 
 Write-Host "Built $Out"

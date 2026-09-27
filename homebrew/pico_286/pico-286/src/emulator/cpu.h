@@ -2,6 +2,11 @@
 #include <string.h>
 #include <inttypes.h>
 
+/* CPU state is defined in C and shared with the C++ host loop. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern int a20_enabled;
 void init_umb();
 
@@ -128,3 +133,6 @@ extern uint32_t ip32;
 
 void modregrm();
 void getea(uint8_t rmval);
+#ifdef __cplusplus
+}
+#endif

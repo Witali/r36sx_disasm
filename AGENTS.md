@@ -52,7 +52,7 @@ and the active Pico-286 emulator port under `homebrew/pico_286`.
 
 ## Build Shortcuts
 
-Windows debug build:
+Windows debug build (MSVC by default; optional `-Compiler Zig` or `-Compiler MinGW`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog

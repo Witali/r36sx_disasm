@@ -2,6 +2,7 @@
 #include "emulator.h"
 #include "r36sx_debug_config.h"
 #include <string.h>
+#include <stddef.h>
 #if !PICO_ON_DEVICE
 #include "r36sx_disk_config.h"
 #endif
@@ -50,14 +51,20 @@
 #define XMS_ERR_HMA_NOT_ALLOCATED 0x93
 
 // FIXME: Calculate with EMS offset
-//typedef struct __attribute__((packed, aligned)) {
-typedef struct __attribute__((packed, aligned)) {
+PICO286_PACKED_BEGIN
+typedef struct PICO286_PACKED_ALIGNED {
     uint32_t length;
     uint16_t source_handle;
     uint32_t source_offset;
     uint16_t destination_handle;
     uint32_t destination_offset;
 } move_data_t;
+PICO286_PACKED_END
+
+/* The XMS move descriptor is read directly from guest memory. */
+_Static_assert(sizeof(move_data_t) == 16, "XMS move descriptor size");
+_Static_assert(offsetof(move_data_t, source_offset) == 6, "XMS source offset");
+_Static_assert(offsetof(move_data_t, destination_offset) == 12, "XMS destination offset");
 
 typedef struct umb {
     uint16_t segment;

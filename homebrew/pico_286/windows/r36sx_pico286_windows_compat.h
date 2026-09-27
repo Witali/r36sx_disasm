@@ -26,6 +26,43 @@
 #include <time.h>
 #include <windows.h>
 
+#if defined(_MSC_VER)
+#define R36SX_WINDOWS_COMPILER "MSVC"
+#elif defined(__clang__)
+#define R36SX_WINDOWS_COMPILER "Zig/Clang"
+#else
+#define R36SX_WINDOWS_COMPILER "MinGW-w64 GCC"
+#endif
+
+#if defined(_MSC_VER)
+#include <intrin.h>
+/* Audio hot paths use GCC hints and ctz on nonzero 32-bit voice masks. */
+#define __builtin_expect(value, expected) (value)
+static inline int r36sx_windows_ctz(unsigned int mask)
+{
+    unsigned long index;
+    return _BitScanForward(&index, mask) ? (int)index : 32;
+}
+#define __builtin_ctz(mask) r36sx_windows_ctz(mask)
+/* The shared host loop exchanges a 32-bit video-dirty flag. InterlockedExchange
+ * returns the old value and provides a full fence, at least as strong as GCC's
+ * acquire-only __sync_lock_test_and_set. Keep the standalone fence as well. */
+static inline uint32_t r36sx_windows_exchange32(volatile uint32_t *target,
+                                               uint32_t value)
+{
+    return (uint32_t)InterlockedExchange((volatile LONG *)target, (LONG)value);
+}
+#define __sync_lock_test_and_set(target, value) r36sx_windows_exchange32(target, value)
+#define __sync_synchronize() MemoryBarrier()
+/* UCRT names the owner's write permission _S_IWRITE. */
+#ifndef S_IWUSR
+#define S_IWUSR _S_IWRITE
+#endif
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & _S_IFMT) == _S_IFDIR)
+#endif
+#endif
+
 #define mkdir(path, mode) _mkdir(path)
 
 static inline struct tm *localtime_r(const time_t *timep, struct tm *result)
@@ -48,7 +85,8 @@ static inline struct tm *localtime_r(const time_t *timep, struct tm *result)
 #define CLOCK_REALTIME 0
 #endif
 
-#if !defined(_TIMESPEC_DEFINED) && !defined(_STRUCT_TIMESPEC)
+/* MSVC's UCRT already declares timespec in time.h. */
+#if !defined(_MSC_VER) && !defined(_TIMESPEC_DEFINED) && !defined(_STRUCT_TIMESPEC)
 #define _TIMESPEC_DEFINED
 struct timespec {
     long tv_sec;
@@ -185,11 +223,11 @@ static inline void r36sx_pico286_debug_log_build_info(void)
 {
 #if R36SX_DEBUG_BUILD_INFO
     r36sx_pico286_debug_log(
-        "build: git_commit=%s short=%s commit_object_sha256=%s dirty=%d host=windows",
+        "build: git_commit=%s short=%s commit_object_sha256=%s dirty=%d host=windows compiler=%s",
         R36SX_BUILD_GIT_COMMIT,
         R36SX_BUILD_GIT_COMMIT_SHORT,
         R36SX_BUILD_COMMIT_OBJECT_SHA256,
-        R36SX_BUILD_GIT_DIRTY);
+        R36SX_BUILD_GIT_DIRTY, R36SX_WINDOWS_COMPILER);
 #endif
 }
 

@@ -32,12 +32,14 @@ typedef struct midi_channel_s {
     int32_t pitch;
 } midi_channel_t;
 
-typedef struct __attribute__((packed)) {
+PICO286_PACKED_BEGIN
+typedef struct PICO286_PACKED {
     uint8_t command;
     uint8_t note;
     uint8_t velocity;
     uint8_t other;
 } midi_command_t;
+PICO286_PACKED_END
 
 static midi_voice_t midi_voices[MAX_MIDI_VOICES] = {0};
 static midi_channel_t midi_channels[MIDI_CHANNELS] = {

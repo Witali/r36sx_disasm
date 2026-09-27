@@ -67,7 +67,7 @@ static uint16_t tga_palette565[16];
 static uint16_t vga_palette565[256];
 static int static_palettes565_ready = 0;
 
-extern OPL *emu8950_opl;
+extern "C" OPL *emu8950_opl;
 extern "C" void r36sx_keyboard_enqueue_scancode(uint8_t scancode);
 extern "C" void r36sx_keyboard_tick(void);
 extern "C" void r36sx_mfb_mark_frame_ready(void);

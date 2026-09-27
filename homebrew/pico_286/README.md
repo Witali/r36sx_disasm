@@ -55,7 +55,7 @@ integration pieces:
   a native MIPS executable named `pico_286`.
 - `build_pico_286_windows.ps1` builds a native Windows debug executable named
   `pico_286_win.exe` with the same R36SX CPU/VGA/disk/config sources.  It uses
-  the local Zig toolchain and writes build products under
+  MSVC by default, or selectable Zig / Cygwin MinGW-w64 GCC, and writes products under
   `homebrew/pico_286/build/`.
 - The upstream `.psram` memory arrays are kept as `.psram` only for
   `PICO_ON_DEVICE` builds.  In the Linux/MIPS host build they use normal
@@ -86,6 +86,49 @@ Build it from the repository root:
 ```powershell
 powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
 ```
+
+Choose the compiler with `-Compiler MSVC`, `-Compiler Zig`, or `-Compiler MinGW`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -Compiler MinGW -DebugLog
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -Compiler Zig -DebugLog
+```
+
+- MSVC requires Visual Studio / Build Tools with Desktop development with C++
+  and a Windows SDK. The script discovers it with `vswhere`, selects x64, and
+  produces PDB symbols with a static CRT (`/MT /Zi`; debug builds use `/O2`).
+  `O0`/`Og` map to `/Od`, `O1`/`Os` to `/O1`, and `O2`/`O3` to `/O2`.
+- MinGW uses **Cygwin's `x86_64-w64-mingw32-gcc/g++`**, not Cygwin's plain
+  `gcc`. Install `mingw64-x86_64-gcc-core`, `mingw64-x86_64-gcc-g++`,
+  `mingw64-x86_64-binutils`, and `mingw64-x86_64-winpthreads` using Cygwin setup.
+  Discovery checks `tools/cygwin64` and `C:/cygwin64`; pass
+  `-CygwinRoot D:/cygwin64` for another installation. GCC targets the Windows CRT;
+  `-static` links GCC support libraries so the EXE needs neither `cygwin1.dll`
+  nor additional MinGW runtime DLLs. Debug information is embedded as DWARF.
+- Zig uses the existing local `tools/zig-x86_64-windows-0.16.0` installation.
+- Each compiler has its own `build/obj-windows-*` directory. The output name
+  remains `pico_286_win.exe`; `-Out` selects a different name for comparisons.
+  `-NoPatchCopy` skips deployment; the patch configuration is never overwritten.
+- MSVC uses the switch CPU dispatcher because it has no GNU computed goto.
+  Zig and MinGW keep computed goto enabled unless `-DisableComputedGoto` is set.
+
+A bounded compiler smoke test boots the existing `test386.bin`, waits for
+POST `80:FF`, checks the debug mailbox and a nonblank RGB565 framebuffer, and
+restores the build config:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\tests\smoke_windows_build.ps1 -Exe homebrew\pico_286\build\pico_286_win.exe -Tag mingw
+```
+
+It does not attach disk images or modify the patch config. Diagnostics are kept
+under the patch `diagnostics/compiler-<Tag>` directory. This is not a complete
+instruction-conformance test.
+
+Toolchain references: [Cygwin native Windows cross-compilers](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin),
+[Cygwin installation](https://cygwin.com/install.html),
+[MSVC C11 mode](https://learn.microsoft.com/en-us/cpp/build/reference/std-specify-language-standard-version),
+[MSVC structure packing](https://learn.microsoft.com/en-us/cpp/preprocessor/pack),
+[GCC response files](https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html).
 
 The script writes:
 

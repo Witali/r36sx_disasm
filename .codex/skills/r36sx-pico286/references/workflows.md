@@ -21,6 +21,12 @@ keyboard, Sound Blaster, or host RPC behavior:
 powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog
 ```
 
+Windows defaults to MSVC (Visual Studio C++ x64 with a Windows SDK). Use
+`-Compiler Zig` for the existing Zig path, or `-Compiler MinGW` for Cygwin's
+`x86_64-w64-mingw32-gcc/g++`. The latter produces native Windows executables,
+not Cygwin-dependent applications. Use `-CygwinRoot` for a nonstandard install;
+see the Pico-286 README for required packages and the compiler smoke test.
+
 Use WSL/GCC for the MIPS/device binary:
 
 ```powershell
@@ -42,8 +48,9 @@ patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286
 After copying, update `[rtc] rtc_start_time` in that patch directory's
 `pico_286.conf` to the current local time in `YYYY-MM-DD HH:MM:SS` format.
 
-Computed-goto opcode dispatch is the default. Use `-DisableComputedGoto` only
-when comparing against the switch decoder.
+Computed-goto opcode dispatch is the GCC/Zig default. MSVC always uses the
+switch decoder; GNU labels-as-values are unavailable there. Use
+`-DisableComputedGoto` on GCC/Zig when comparing against the switch decoder.
 
 ## Disk Images and DOS Tools
 

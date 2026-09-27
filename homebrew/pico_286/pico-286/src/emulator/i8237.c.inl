@@ -44,7 +44,8 @@ static INLINE void i8237_writeport(const uint16_t portnum, const uint8_t value) 
     printf("[DMA] Write port 0x%X: %X\n", portnum, value);
 #endif
     switch (portnum & 0xF) {
-        case 0 ... 7: {
+        // Address/count pairs for channels 0..3, without GNU case ranges.
+        case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: {
             const uint8_t channel = (portnum >> 1) & 3;
 
             if (portnum & 0x01) {

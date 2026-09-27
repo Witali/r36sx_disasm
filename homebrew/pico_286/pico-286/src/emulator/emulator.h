@@ -9,8 +9,26 @@
 
 #if PICO_ON_DEVICE
 #define PICO286_PSRAM_ATTR __attribute__((aligned (4), section(".psram")))
+#elif defined(_MSC_VER)
+#define PICO286_PSRAM_ATTR __declspec(align(4))
 #else
 #define PICO286_PSRAM_ATTR __attribute__((aligned (4)))
+#endif
+
+/* Packed guest records must keep their byte offsets on both MSVC and GCC.
+ * Limit MSVC's packing pragma to each record, never the whole translation unit.
+ * The aligned variant matches the existing GNU x64 maximum alignment (16).
+ */
+#if defined(_MSC_VER)
+#define PICO286_PACKED_BEGIN __pragma(pack(push, 1))
+#define PICO286_PACKED_END __pragma(pack(pop))
+#define PICO286_PACKED
+#define PICO286_PACKED_ALIGNED __declspec(align(16))
+#else
+#define PICO286_PACKED_BEGIN
+#define PICO286_PACKED_END
+#define PICO286_PACKED __attribute__((packed))
+#define PICO286_PACKED_ALIGNED __attribute__((packed, aligned))
 #endif
 
 #define SVGA_NATIVE_WIDTH 640
