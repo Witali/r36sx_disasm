@@ -1,5 +1,67 @@
 # pico-286 Build Log
 
+## 2026-09-27 RF in non-debug fault gate frames
+
+The new I/O-string regression exposed a missing RF bit in #GP's saved
+EFLAGS. `r36sx_cpu_protected_interrupt` now sets RF in 32-bit gate images
+for non-debug CPU faults, using exception-delivery provenance so a software
+INT with the same vector is not mistaken for a fault. 286 word frames and
+the live handler flags are unchanged. X86-29 remains open for RF retirement,
+mixed #DB provenance and task-gate saved state.
+
+Expanded `cpu386_faults.asm` to require RF for #UD/#GP/#PF, and added two
+software INT 13 controls with CS.D=0/1 (42 cases total). The runner now scans
+its ROM. Final ROM fails the pre-fix GCC EXE at the first #UD, then passes
+both rebuilt MSVC and GCC interpreters, including both RF-clear INT controls.
+The preceding 40-case development ROM also reproduced and then passed.
+The new I/O test separately exposed #GP saved flags `00000BD7`, expected
+`00010BD7`, before this fix.
+
+Authority: Intel 80386 PRM 9.1 and
+[12.3.1.1](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s12_03.htm);
+cross-checked [AMD APM vol.2 rev.3.25 section 8.2.2](https://kib.kiev.ua/x86docs/AMD/AMD64/24593_APM_v2-r3.25.pdf).
+These are vendor-authored documents hosted on mirrors. Modern AMD #DB RF
+semantics are not substituted for the original Intel 386 behavior.
+
+Commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag fault-rf-controls-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag fault-rf-controls-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/io-strings-before.exe -Tag fault-rf-controls-before
+```
+
+Baseline EXE SHA256 is
+`6A1B67E9CC7B63151C7FCAC0481C258A62B9FD475B8892405AD15D5A277319DF`.
+Both current builds include the separately pending INS/OUTS fixes as well
+as RF, on `bc08dec`, dirty=1. MSVC uses `/O2 /MT /Zi` and switch dispatch;
+GCC 14.4.0 uses `-O2 -g -static` and computed goto. Existing warnings remain.
+Build logs: patch `diagnostics/build-io-strings-rf-{msvc,mingw}.log`.
+Tests: `diagnostics/compiler-fault-rf-controls-{before,msvc,mingw}/`.
+Defender reported no threats for both rebuilt EXEs and the final ROM.
+
+Artifacts under `homebrew/pico_286/build`:
+
+- `cpu386_faults.bin`: 65536-byte raw reset ROM, SHA256
+  `4343D2B6875290F7A3225F24E0719FDBD3A1DF857CD39D761ECED1865858FDA4`.
+- `pico_286_win.exe`: 833024-byte Windows x86-64 PE, SHA256
+  `31B4DB7BD9ACBB3F55564BB2AC65A0306B5D854B403194ABAF08C70E644E2B20`.
+- `pico_286_win_mingw.exe`: 3349314-byte Windows x86-64 PE, SHA256
+  `45E27BBCCB99CAACB6973AC002DD02420CD37BF19B80944C2F879ACED7DE7DC3`.
+
+Also ran `smoke_windows_build.ps1` on each EXE with tags
+`io-rf-general-{msvc,mingw}` (default test386) and `io-rf-286-{msvc,mingw}`
+(`-CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage
+'test386: PASS' -AllowBlankFrame`). All four passed POST 80:FF. test386's
+EE-output SHA256 remains
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+No guest disks or user patch settings were touched. Deployment is deferred
+until the separate I/O-string change is finalized.
+
 ## 2026-09-27 Cygwin MinGW build verified at 61c1973
 
 The requested backend is already present in `build_pico_286_windows.ps1`

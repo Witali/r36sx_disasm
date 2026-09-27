@@ -360,6 +360,12 @@ P2 items are narrower instruction/conformance gaps.
   loses restart suppression. Fault entry also needs the correct saved RF
   image. Test breakpoint suppression across a fault and retry, not merely a
   successful NOP. [Intel debug exceptions][debug].
+  Partial fix 2026-09-27: 32-bit interrupt/trap gate images now set RF for
+  non-debug CPU faults, distinguished from software/hardware interrupts.
+  `cpu386_faults.asm` checks RF on #UD/#GP/#PF plus software INT 13 controls
+  in both CS defaults (42 total cases). RF retirement, execution-breakpoint
+  #DB fault provenance and task-gate state still need independent work;
+  this item remains open.
 
 - [ ] **X86-30 / P2 / Source: debug-register support is still partial.**
   CPU:928 and the existing TODO explicitly omit data-read watchpoints.

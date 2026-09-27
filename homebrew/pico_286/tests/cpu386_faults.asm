@@ -26,6 +26,7 @@ org 0
 %define COUNT STATE+28
 %define EXPECT_FLAGS STATE+32
 %define RESUME_CS STATE+36
+%define EXPECT_RF STATE+40
 %define SENTINEL 0x12345678
 
 %macro DESC 4
@@ -116,6 +117,7 @@ setup:
     mov dword [es:EXPECT_CR2], %5
     mov dword [es:HITS], 0
     mov dword [es:EXPECT_FLAGS], %6 & 0x9d5
+    mov dword [es:EXPECT_RF], 0x10000
     mov al, 0x40
     out 0x80, al
     mov dx, 0x190
@@ -132,6 +134,16 @@ setup:
     cmp dword [es:HITS], 1
     jne fail_current
     inc dword [es:COUNT]
+%endmacro
+
+; A software INT uses the same vector but is not a processor fault: RF must
+; not be forced into its saved flags and it has no hardware error code.
+%macro SOFTWARE_INT_CONTROL 1
+    ARM %%after, %%after, %1, 13, 0
+    mov dword [es:EXPECT_RF], 0
+    int 13
+%%after:
+    CHECK_RETURN
 %endmacro
 
 ; All 8/16/32-bit MOV loads, both address sizes, in D=0 and D=1 code.
@@ -210,6 +222,7 @@ after_short_ud:
     CHECK_RETURN
     UD_BOUNDARY_CASES CODE16
     MEMORY_CASES CODE16
+    SOFTWARE_INT_CONTROL CODE16
     ARM imm8_16, after_imm8_16, CODE16, 14, 0xf3000
     jmp imm8_16
 after_imm8_16:
@@ -231,6 +244,7 @@ bits 32
 tests32:
     UD_BOUNDARY_CASES CODE32
     MEMORY_CASES CODE32
+    SOFTWARE_INT_CONTROL CODE32
     ARM imm8_32, after_imm8_32, CODE32, 14, 0xf9000
     jmp imm8_32
 after_imm8_32:
@@ -292,7 +306,7 @@ final_fault:
     jmp unexpected
 after_final:
     CHECK_RETURN
-    cmp dword [es:COUNT], 40
+    cmp dword [es:COUNT], 42
     jne unexpected
     mov esi, passed
     call print
@@ -303,6 +317,10 @@ after_final:
 ; First instruction must execute at the unmodified handler EIP. Continuing
 ; StepIP() from an interrupted fetch used to skip bytes in this instruction.
 gp_handler:
+    cmp dword [es:EXPECT_RF], 0
+    jne .fault
+    push dword 0 ; Normalize the software INT 13 control's missing error code.
+.fault:
     inc dword [es:HITS]
     pushad
     mov bl, 13
@@ -336,6 +354,15 @@ check_frame:
     cmp eax, [es:EXPECT_IP]
     jne unexpected
 .skip_fault_ip:
+    ; Intel 80386 PRM 12.3.1.1: #UD/#GP/#PF save RF=1 even without a
+    ; hardware breakpoint. #DF is an abort, so it has no such requirement.
+    cmp bl, 8
+    je .saved_cs
+    mov eax, [ss:esp+44]
+    and eax, 0x10000
+    cmp eax, [es:EXPECT_RF]
+    jne unexpected
+.saved_cs:
     mov ax, [ss:esp+40]
     cmp ax, [es:EXPECT_CS]
     jne unexpected
@@ -392,7 +419,7 @@ print:
     jmp print
 .done:
     ret
-passed: db 'CPU386 FAULTS PASS cases=40',10,0
+passed: db 'CPU386 FAULTS PASS cases=42',10,0
 failed: db 'CPU386 FAULTS FAIL',10,0
 short_ud: db 0x8f,0xc8 ; Undefined /1 encoding; descriptor limit is one.
 

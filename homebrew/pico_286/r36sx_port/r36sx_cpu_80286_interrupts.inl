@@ -346,6 +346,30 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint32_t old_flags_dword = makeflagsdword();
     uint16_t old_flags_word = makeflagsword();
 
+    /* Intel 80386 PRM 12.3.1.1: fault frames set RF in the saved image.
+     * Do not infer this from the vector alone: INT n and hardware interrupts
+     * may use the same vector. #DB needs separate fault/trap provenance.
+     * Only the saved 32-bit gate image changes, never a 286 FLAGS frame. */
+    if (gate32 && r36sx_cpu_exception_delivery_depth != 0u &&
+        r36sx_cpu_exception_delivery_vector == intnum) {
+        switch (intnum) {
+            case 0: /* #DE */
+            case R36SX_EXCEPTION_BOUND:
+            case R36SX_EXCEPTION_INVALID_OPCODE:
+            case R36SX_EXCEPTION_DEVICE_NOT_AVAILABLE:
+            case R36SX_EXCEPTION_INVALID_TSS:
+            case R36SX_EXCEPTION_NOT_PRESENT:
+            case R36SX_EXCEPTION_STACK:
+            case R36SX_EXCEPTION_GP:
+            case R36SX_EXCEPTION_PF:
+            case R36SX_EXCEPTION_X87_ERROR:
+                old_flags_dword |= R36SX_EFLAGS_RF_MASK;
+                break;
+            default: /* Traps, aborts and the mixed #DB vector. */
+                break;
+        }
+    }
+
     if (old_vm86 || new_cpl < old_cpl) {
         uint32_t new_sp;
         uint16_t new_ss;

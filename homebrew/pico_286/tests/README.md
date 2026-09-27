@@ -16,7 +16,7 @@ powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_fau
 ```
 
 The runner assembles with the local NASM, temporarily changes only the build
-config, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=40` message,
+config, scans the ROM, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=42` message,
 the debug mailbox and framebuffer, then restores the config. POST `80:FE`
 means failure. ROM/listing artifacts are in `build/`; diagnostics are in the
 patch `diagnostics/compiler-<Tag>/` directory. Do not run multiple instances
@@ -25,7 +25,7 @@ The common `smoke_windows_build.ps1` also accepts `-CpuModel 80286` and
 `-AllowBlankFrame` for port-only ROMs such as `test286`; the latter still
 checks framebuffer dimensions and the requested POST/text completion markers.
 
-Coverage (40 cases):
+Coverage (42 cases):
 
 - 24 memory MOV loads: byte/word/dword operands, 16/32-bit addresses, CS.D=0/1,
   with null DS (#GP) and a non-present data page (#PF).
@@ -42,9 +42,11 @@ Coverage (40 cases):
   The opcode bytes themselves are valid memory; only the diagnostic peek
   would exceed the segment/page boundary. Assert #UD, exact saved CS:EIP,
   no hardware error code, preserved EAX/flags and unchanged CR2.
+- Two software INT 13 controls (CS.D=0/1): unlike a processor #GP, the same
+  vector saves the following EIP without an error code or forcing RF.
 
 Checks include preserved EAX/defined arithmetic flags, handler entry, saved
-CS:EIP, error code and CR2. Data-load CR2 is checked exactly; instruction-fetch
+CS:EIP, error code, RF=1 for #UD/#GP/#PF, and CR2. Data-load CR2 is checked exactly; instruction-fetch
 CR2 is checked at page precision. Intel 9.8.14 specifies the faulting access
 address but not an instruction-fetch granule/order within a split immediate;
 this suite does not establish bus-level fetch precision. Saved fault EIP is
@@ -52,6 +54,8 @@ still exact. #DF restart EIP is deliberately not asserted.
 This covers instruction abortion, not rollback of earlier writes in compound
 instructions, REP progress, task-switch restart state, or every MOV encoding.
 Those remain separate items in `TODO_X86_SOURCE_AUDIT.md`.
+RF lifetime, execution-breakpoint #DB faults and task-gate saved state remain
+separate checks; this ROM only verifies the non-debug fault gate images.
 
 Specifications: [Intel 80386 PRM 9.1](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_01.htm),
 [9.8](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
@@ -59,6 +63,10 @@ Specifications: [Intel 80386 PRM 9.1](https://pdos.csail.mit.edu/6.828/2005/read
 [AMD APM vol. 3 rev. 3.19, MOV pp. 213-215](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 Only legacy behavior is used; original 80386 rules take precedence over later
 CPU extensions.
+For RF, use [Intel 80386 PRM 12.3.1.1](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s12_03.htm)
+and [AMD APM vol.2 rev.3.25 section 8.2.2](https://kib.kiev.ua/x86docs/AMD/AMD64/24593_APM_v2-r3.25.pdf).
+The modern AMD #DB RF wording differs from the original 386 rule; do not use
+it to redefine the target's fault/trap distinction.
 
 ## PUSH/PUSHF regression ROM
 

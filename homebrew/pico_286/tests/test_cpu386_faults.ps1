@@ -17,5 +17,6 @@ New-Item -ItemType Directory -Force $Build | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "NASM failed: $LASTEXITCODE" }
 if ((Get-Item -LiteralPath $Rom).Length -ne 65536) { throw 'Invalid ROM size' }
 Get-FileHash -LiteralPath $Rom | Select-Object Hash
+& (Join-Path $Root 'tools/scan-download.ps1') $Rom
 & (Join-Path $PSScriptRoot 'smoke_windows_build.ps1') -Exe $Exe -Tag $Tag `
-    -Rom $Rom -SuccessMessage 'CPU386 FAULTS PASS cases=40'
+    -Rom $Rom -SuccessMessage 'CPU386 FAULTS PASS cases=42'
