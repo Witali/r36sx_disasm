@@ -1,5 +1,57 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-23: reject undefined operand32 POP encodings
+
+The operand32 dispatcher omitted the ModRM group check already present in
+the word dispatcher. It now rejects `8F /1..7` before reading the stack.
+Intel 80386 PRM POP defines only `/0`; section 9.8.6 specifies #UD without
+an error code for invalid encodings. AMD APM vol.3 rev.3.19 pp.246-247
+confirms the legacy POP encoding. Links are in `tests/README.md`; later XOP
+instruction escapes are not relevant to this 386 target.
+
+Extended the POP ROM from 800 to 1640 cases: all seven invalid groups with
+register, addr16 and addr32 memory forms, both operand/code/stack widths and
+the same five memory states. Valid cases remain as controls. Invalid cases
+require #UD, unchanged architectural data and a faulting-IP/old-ESP frame,
+even when the source stack is unavailable. The old MSVC EXE fails case 3Dh
+(`66 8F C8`) at the vector check: it executes POP and reaches INT 30h with
+ESP=6104h, rather than #UD with ESP=6100h. Both rebuilt compilers pass all
+1640 cases. LEA and far CALL/JMP checks remain open in X86-23.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Tag pop-invalid-before
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Tag pop-invalid-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag pop-invalid-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag pop-invalid-test386-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag pop-invalid-test386-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag pop-invalid-test286-msvc -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+The first command is the expected fail-before check. Original test386 still
+reaches FF on both compilers with EE SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`;
+test286 reaches PASS/FF in CPU80286 mode on MSVC. This is not complete CPU
+conformance: segment POP and the other documented instruction gaps remain.
+
+MSVC `/O2` switch and GCC `-O2 -g` computed-goto builds used base `29e0f28`
+plus this fix, dirty=1; existing warnings remain. Build logs are patch
+`diagnostics/x86-audit/build-pop-invalid-{msvc,mingw}.log`. Runtime artifacts
+are under `diagnostics/compiler-pop-invalid-*`.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 830976 | `0c595d567a4eccac2156b0adb665ea37e26ffcaa76d44f46231385ea1bf30c4d` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3336317 | `0b474c49e6b5f355750d1491bd6c8e0253e17bb063c4e9097c9c986de97934ca` |
+| `cpu386_pop.bin` | Raw 80386 ROM at F0000h | 65536 | `54c6463d1166b5b2a1b8b3e0305dfb3df924e313c320cd1ea2181fc52133c6d3` |
+
+Defender (`tools/scan-download.ps1`) found no threats in all three files.
+Copied both EXEs and the matching MSVC PDB to the active patch and verified
+the EXE hashes. Build config was restored by each test; patch config remains
+unchanged (SHA256 `36d271c0...`) and unstaged. No disk-image changes, default
+test BIOS replacement, downloads or MIPS build.
+
 ## 2026-09-27 X86-05: restartable 386 POP memory destinations
 
 POP r/m16/r/m32 previously advanced SP/ESP before attempting the destination

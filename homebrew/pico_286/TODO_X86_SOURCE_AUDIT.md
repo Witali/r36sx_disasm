@@ -243,6 +243,11 @@ P2 items are narrower instruction/conformance gaps.
   Test `66 8D C0`, `66 8F C8`, `66 FF D8`, `66 FF E8` in a 16-bit code
   segment. These must not execute as valid forms. [Intel LEA][lea],
   [Intel POP][pop], [Intel CALL][call], [Intel JMP][jmp].
+  Partial fix 2026-09-27: operand32 POP rejects 8F /1..7 before stack reads
+  or register/memory writes. The POP ROM now checks 840 invalid-encoding cases
+  alongside 800 valid ones, varying CS.D/SS.B/operand/address width and
+  inaccessible source/destination conditions. LEA and far CALL/JMP invalid
+  ModRM cases remain open; do not close the entire item for the POP fix.
 
 - [ ] **X86-24 / P2 / Source: descriptor-table operands bypass segment checks.**
   I386:1279 and following pass a linear EA to I286:795/803 table helpers

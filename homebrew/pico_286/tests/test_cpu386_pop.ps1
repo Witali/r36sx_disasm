@@ -18,4 +18,4 @@ if ($LASTEXITCODE -ne 0) { throw "NASM failed: $LASTEXITCODE" }
 if ((Get-Item -LiteralPath $Rom).Length -ne 65536) { throw 'Invalid ROM size' }
 Get-FileHash -LiteralPath $Rom | Select-Object Hash
 & (Join-Path $PSScriptRoot 'smoke_windows_build.ps1') -Exe $Exe -Tag $Tag `
-    -Rom $Rom -SuccessMessage 'CPU386 POP PASS cases=800'
+    -Rom $Rom -SuccessMessage 'CPU386 POP PASS cases=1640'

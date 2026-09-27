@@ -1,6 +1,7 @@
 ; Standalone 64 KiB ROM: Intel 80386 POP, PRM 9.1/9.8, AMD APM v3
 ; rev.3.19 pp.246-247. Intel SDM POP clarifies non-wrapping ESP-based EA.
 ; Test POP r16/r32 and r/m16/r/m32 through real paging/segmentation at CPL3.
+; PRM 9.8.6: unused 8F /1../7 encodings must #UD before operand accesses.
 ; Segment POP and POPF have different commit rules and need separate coverage.
 cpu 386
 bits 16
@@ -46,7 +47,8 @@ org 0
 %define ROW_REG 16
 %define ROW_DEST 20
 %define ROW_VALUE 24
-%define ROW_BYTES 28
+%define ROW_INVALID 28
+%define ROW_BYTES 32
 %define MEMORY_DEST -1
 %define CONTEXT_COUNT 10
 
@@ -116,6 +118,7 @@ setup:
     stosd
     xchg eax, edx
     loop .gate
+    mov word [IDT+6*8], ud_handler
     mov word [IDT+12*8], ss_handler
     mov word [IDT+14*8], pf_handler
     mov word [IDT+0x30*8], success_handler
@@ -213,6 +216,14 @@ case_begin:
 .fault:
     mov dword [EXPECT_ESP], USTACK_TOP
 .ready:
+    ; The same inaccessible-source/destination setups must not turn an invalid
+    ; opcode into #SS/#PF or a completed POP. No user memory may be touched.
+    cmp dword [cs:esi+ROW_INVALID], 0
+    je .enter_user
+    mov dword [EXPECT_VEC], 6
+    mov dword [EXPECT_ERR], 0
+    mov dword [EXPECT_ESP], USTACK_TOP
+.enter_user:
     mov eax, cr3
     mov cr3, eax
     push dword [EXPECT_SS]
@@ -237,6 +248,10 @@ case_begin:
 success_handler:
     push dword 0 ; Normalize the error-code layout for a successful INT.
     mov dword [es:GOT_VEC], 0x30
+    jmp check_frame
+ud_handler:
+    push dword 0 ; #UD has no hardware error code.
+    mov dword [es:GOT_VEC], 6
     jmp check_frame
 ss_handler:
     mov dword [es:GOT_VEC], 12
@@ -432,7 +447,7 @@ hex32:
     loop .digit
     ret
 hex_digits: db '0123456789ABCDEF'
-passed: db 'CPU386 POP PASS cases=800',10,0
+passed: db 'CPU386 POP PASS cases=1640',10,0
 failed: db 'CPU386 POP FAIL case=',0
 check_text: db ' check=',0
 esp_text: db ' esp=',0
@@ -447,6 +462,7 @@ original_regs:
 %if EMIT_TABLE
     dd code%+codebits%+_%1_%+opbits, done%+codebits%+_%1_%+opbits
     dd user_cs, opbits/8, %2, %3, %4
+    dd encoding_bad
 %else
 code%+codebits%+_%1_%+opbits:
 %if opbits != codebits
@@ -469,6 +485,7 @@ done%+codebits%+_%1_%+opbits:
 bits codebits
 %assign opbits 16
 %rep 2
+%assign encoding_bad 0
 %assign r 0
 %rep 8
 %assign val 0x89abcdef
@@ -490,6 +507,21 @@ bits codebits
     CASE esp, MEMORY_DEST, USTACK_TOP+opbits/8, 0x89abcdef, 0x8f, 0x04,0x24
     CASE espdisp, MEMORY_DEST, 0xa020+opbits/8, 0x89abcdef, 0x8f, 0x84,0x24,0x20,0x3f,0,0
 %endif
+    ; All seven undefined group selectors: register, addr16 and addr32 memory.
+    ; The group index is not a destination register, even when mod=11b.
+%assign encoding_bad 1
+%assign subop 1
+%rep 7
+    CASE badreg%+subop, 0, 0, 0x89abcdef, 0x8f, 0xc0+(subop<<3)
+%if codebits = 16
+    CASE badmem16_%+subop, MEMORY_DEST, 0xa020, 0x89abcdef, 0x8f, (subop<<3)|7
+    CASE badmem32_%+subop, MEMORY_DEST, 0xa040, 0x89abcdef, 0x67, 0x8f,(subop<<3)|6
+%else
+    CASE badmem16_%+subop, MEMORY_DEST, 0xa020, 0x89abcdef, 0x67, 0x8f,(subop<<3)|7
+    CASE badmem32_%+subop, MEMORY_DEST, 0xa040, 0x89abcdef, 0x8f, (subop<<3)|6
+%endif
+%assign subop subop+1
+%endrep
 %assign opbits 32
 %endrep
 %assign codebits 32
@@ -503,7 +535,7 @@ align 4
 cases:
 VARIANTS
 cases_end:
-%if (cases_end-cases)/ROW_BYTES != 80
+%if (cases_end-cases)/ROW_BYTES != 164
 %error "Update runner/pass count when adding POP cases"
 %endif
 
