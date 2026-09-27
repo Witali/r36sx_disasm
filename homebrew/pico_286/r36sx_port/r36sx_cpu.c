@@ -2680,7 +2680,15 @@ static void r36sx_cpu_debug_trace_test386_instruction(uint32_t firstip,
 
     uint8_t bytes[8];
     for (uint8_t i = 0; i < sizeof(bytes); ++i) {
-        bytes[i] = getmem8(CPU_CS, r36sx_cpu_mask_ip(firstip + i));
+        uint32_t physical;
+        uint32_t linear = segbase32[regcs] + r36sx_cpu_mask_ip(firstip + i);
+        /* A diagnostic lookahead is not a CPU fetch. In particular, peeking
+         * into the next unmapped page must not raise #PF or set page A/D bits.
+         * Use the read-only page walker; FF denotes an unavailable byte. */
+        bytes[i] = r36sx_cpu_debug_translate_linear(
+                       linear, 0, r36sx_cpu_cpl() == 3u,
+                       &physical, NULL, NULL)
+                       ? read86_ob(physical) : 0xffu;
     }
 
     uint32_t index = R36SX_DEBUG_TEST386_CPU_TRACE_LIMIT -

@@ -16,7 +16,7 @@ powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_fau
 ```
 
 The runner assembles with the local NASM, temporarily changes only the build
-config, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=34` message,
+config, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=35` message,
 the debug mailbox and framebuffer, then restores the config. POST `80:FE`
 means failure. ROM/listing artifacts are in `build/`; diagnostics are in the
 patch `diagnostics/compiler-<Tag>/` directory. Do not run multiple instances
@@ -25,19 +25,25 @@ The common `smoke_windows_build.ps1` also accepts `-CpuModel 80286` and
 `-AllowBlankFrame` for port-only ROMs such as `test286`; the latter still
 checks framebuffer dimensions and the requested POST/text completion markers.
 
-Coverage (34 cases):
+Coverage (35 cases):
 
 - 24 memory MOV loads: byte/word/dword operands, 16/32-bit addresses, CS.D=0/1,
   with null DS (#GP) and a non-present data page (#PF).
 - Six immediate MOV fetches crossing a page boundary, covering byte/word/
   dword immediates in both code sizes, including operand-size prefixes.
 - One opcode fetch from a non-present page.
+- One valid INC at the last byte of a mapped page. It must complete before
+  the next opcode fetch faults; diagnostic lookahead must not cause #PF.
 - One fault while TF is set: no stale single-step trap over the fault handler.
 - One #GP followed by a not-present #GP gate, producing #DF(0), followed by
   another ordinary #GP to check delivery-state cleanup.
 
 Checks include preserved EAX/defined arithmetic flags, handler entry, saved
-CS:EIP, error code and CR2. #DF restart EIP is deliberately not asserted.
+CS:EIP, error code and CR2. Data-load CR2 is checked exactly; instruction-fetch
+CR2 is checked at page precision. Intel 9.8.14 specifies the faulting access
+address but not an instruction-fetch granule/order within a split immediate;
+this suite does not establish bus-level fetch precision. Saved fault EIP is
+still exact. #DF restart EIP is deliberately not asserted.
 This covers instruction abortion, not rollback of earlier writes in compound
 instructions, REP progress, task-switch restart state, or every MOV encoding.
 Those remain separate items in `TODO_X86_SOURCE_AUDIT.md`.

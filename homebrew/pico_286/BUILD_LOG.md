@@ -1,5 +1,43 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-33: non-faulting instruction trace lookahead
+
+Instruction tracing used architectural `getmem8` to display eight bytes.
+Peeking into an absent following page could raise #PF before a valid INC
+completed. The trace now uses the existing read-only page-table walker and
+physical reads; inaccessible bytes display as FF without exception delivery
+or page A/D updates. Other diagnostic readers remain an open X86-33 item.
+
+Added an integrated boundary case to `tests/cpu386_faults.asm` (35 cases).
+The first fixture incorrectly left FE000h unmapped from the prior opcode
+fetch case; restored that PTE and reload CR3 before testing INC at FEFFFh.
+With the corrected fixture, the older patch MSVC EXE fails at saved EIP
+EFFFh. Both current MSVC and GCC builds pass, execute INC EDI to 3334h and
+save EIP F000h for the next fetch fault. Instruction-fetch CR2 is asserted
+at page precision, not a guessed byte-fetch ordering; data-load CR2 and
+saved instruction EIP remain exact. See Intel 80386 PRM 9.8.14 and the scope
+notes/source links in `tests/README.md`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe -Tag trace-fixed-fixture-before
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag trace-fixed-fixture-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag trace-fixed-fixture-mingw
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/cpu386_faults.bin
+```
+
+The 65536-byte ROM SHA256 is
+`c6c39fc674396bdae6d1ac1b7932e2d0bf84efe5785eed93638e629e6d21365e`;
+Defender found no threats. MSVC EXE SHA256 is
+`f39c9a7515691eab338ebf3924af7bf11e812dda71133d13a5adca0d86560541`;
+GCC EXE is the `b37679e6...` artifact documented below. MSVC `/O2` build
+logs are `diagnostics/x86-audit/build-trace-msvc*.log`: the first attempt
+referenced a nonexistent physical-read helper and failed to link; replacing
+it with the existing physical backend made the final build succeed. GCC
+`-O2` was rebuilt and old test386/test286 smoke-checked in the preceding
+compiler verification entry. Diagnostics for this regression are under
+`diagnostics/compiler-trace-fixed-fixture-*`. No disk image or patch config
+changes. This commit completes the trace regression, not all CPU tests.
+
 ## 2026-09-27 Cygwin MinGW request: rebuild and 286/386 smoke checks
 
 Confirmed that the requested compiler option is already implemented by

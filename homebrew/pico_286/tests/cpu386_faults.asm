@@ -76,6 +76,7 @@ setup:
 %assign page page+2
 %endrep
     mov dword [PT+0xfe*4], 0 ; Opcode fetch fault at FE000h.
+    mov dword [PT+0xff*4], 0 ; Next fetch after a valid instruction at FEFFFh.
 
     ; All unexpected exceptions fail. Expected #GP/#PF use 32-bit gates,
     ; including when the interrupted code segment has D=0.
@@ -210,6 +211,22 @@ after_imm32_32:
 after_opcode:
     CHECK_RETURN
 
+    ; The preceding case deliberately unmapped FE000h. Restore that page and
+    ; flush the TLB before testing its last byte; only FF000h stays absent.
+    mov dword [es:PT+0xfe*4], 0xfe003
+    mov eax, cr3
+    mov cr3, eax
+    ; Logging must not manufacture #PF while peeking past a valid instruction.
+    ; INC EDI at EFFFh completes; only the following fetch at F000h faults.
+    ARM 0xf000, after_trace_boundary, CODE32, 14, 0xff000
+    mov dword [es:EXPECT_FLAGS], 0
+    mov edi, 0x3333
+    jmp trace_boundary
+after_trace_boundary:
+    CHECK_RETURN
+    cmp edi, 0x3334
+    jne unexpected
+
     ; A faulting instruction must not run the stale single-step epilogue and
     ; deliver #DB over the #GP handler. The handler checks and then clears TF.
     xor eax, eax
@@ -238,7 +255,7 @@ final_fault:
     jmp unexpected
 after_final:
     CHECK_RETURN
-    cmp dword [es:COUNT], 34
+    cmp dword [es:COUNT], 35
     jne unexpected
     mov esi, passed
     call print
@@ -286,7 +303,16 @@ check_frame:
     cmp bl, 14
     jne .resume
     mov eax, cr2
-    cmp eax, [es:EXPECT_CR2]
+    mov edx, [es:EXPECT_CR2]
+    cmp edx, ROM_BASE
+    jb .data_address
+    ; Intel 9.8.14 specifies the faulting linear address, not a fetch granule
+    ; or byte order inside a multi-byte immediate. Require the missing fetch
+    ; page plus exact saved EIP; data loads below still require exact CR2.
+    and eax, 0xfffff000
+    and edx, 0xfffff000
+.data_address:
+    cmp eax, edx
     jne unexpected
 .resume:
     and dword [ss:esp+44], ~0x100 ; Only the faulting instruction is stepped.
@@ -315,7 +341,7 @@ print:
     jmp print
 .done:
     ret
-passed: db 'CPU386 FAULTS PASS cases=34',10,0
+passed: db 'CPU386 FAULTS PASS cases=35',10,0
 failed: db 'CPU386 FAULTS FAIL',10,0
 
 align 8
@@ -347,6 +373,8 @@ times 0xaffe-($-$$) db 0x90
 imm16_32: mov ax, 0x55aa
 times 0xcffc-($-$$) db 0x90
 imm32_32: mov eax, 0x55aa55aa
+times 0xefff-($-$$) db 0x90
+trace_boundary: inc edi
 
 bits 16
 times 0xfff0-($-$$) db 0xff

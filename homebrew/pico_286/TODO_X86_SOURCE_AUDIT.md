@@ -298,6 +298,12 @@ P2 items are narrower instruction/conformance gaps.
   fault can mutate CPU state or cause another exception. Use side-effect-free
   diagnostic reads with explicit unreadable-byte markers; compare debug on/off.
   This is an emulator instrumentation defect, not a new guest instruction.
+  Partial fix 2026-09-27: test386 instruction tracing now uses the read-only
+  paging walker rather than architectural getmem. A new integrated INC/page-
+  end test fails before the fix (premature #PF at EFFFh) and passes afterward
+  (#PF at F000h after INC). This also removes diagnostic interference with
+  the immediate-fetch cases in `cpu386_faults.asm`. Other diagnostic/context
+  dump readers still need conversion, so this item remains open.
 
 ## Investigations not yet established as conformance bugs
 
