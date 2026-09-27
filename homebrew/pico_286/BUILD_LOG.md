@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW build verified at d829204
+
+Rebuilt the requested Windows variant using the existing `-Compiler MinGW`
+backend, introduced in `08acb110`. MSVC remains the default. No duplicate
+compiler backend or CPU changes were necessary. The untracked comparison
+and IRET test sources and the local patch configuration were left untouched.
+Build metadata is `d829204`, dirty=1 because of the local patch configuration.
+
+Commands from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+& tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-d829204-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-d829204-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+Cygwin MinGW-w64 GCC 14.4.0 compiled successfully with `-O2 -g -static` and
+computed goto enabled. Existing warnings remain, including FPU missing-return
+and uninitialized-value diagnostics, VGA uninitialized-value diagnostics,
+format truncation, and unused variables. Full compiler output is under the
+active patch's `diagnostics/x86-audit/build-cygwin-d829204.log`.
+
+The resulting PE x86-64 EXE is 3,336,998 bytes; SHA256:
+`7AA8D002D6D6E13C3ABC91A7CCF0480DE93A2DB0269296C595D0A984E5109E22`.
+Defender reported no threats. Imports are dbghelp, GDI32, KERNEL32, msvcrt,
+USER32 and WINMM only, with no Cygwin or additional MinGW runtime DLLs.
+The native cross-compiler distinction was rechecked against
+[Cygwin FAQ 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both test386 and test286 reached POST `80:FF`; the debug mailbox responded,
+and the framebuffer was 614,400 bytes (test386 nonblank). Test386 EE output
+SHA256 remains `F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+These are compiler/startup smoke checks, not complete CPU conformance tests.
+Run diagnostics are in `diagnostics/compiler-cygwin-d829204-{386,286}/`.
+
+Copied the EXE to the active patch as `pico_286_win_mingw.exe`; its hash matches
+the build output. The primary MSVC EXE was not replaced, no user disk images
+were attached, and patch config SHA256 is unchanged:
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 MOVS overlapping word/dword element ordering
 
 Fixed `r36sx_rep_movs_ram_forward`: overlapping copies now read all bytes
