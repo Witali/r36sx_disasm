@@ -1,5 +1,33 @@
 # pico-286 Build Log
 
+## 2026-09-27 Wait for compiler-smoke process shutdown
+
+Fixed `tests/smoke_windows_build.ps1` cleanup independently of the Jcc CPU
+change. After the graceful-close timeout, `Stop-Process` could return before
+the emulator released `test386-ee-output.txt`; the immediate `Get-FileHash`
+then failed with a sharing violation even though POST FF and the framebuffer
+checks had passed. Observed with both MSVC and GCC, tags
+`jcc-general-msvc` / `jcc-general-mingw`; delayed reads returned the expected
+SHA256 `f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+
+The runner now performs a bounded `WaitForExit(5000)` after termination,
+before reading results or launching another ROM. It still closes only the
+process it created. Config restoration is in a nested `finally` so a cleanup
+exception cannot skip it. No arbitrary sleep or sharing-error suppression
+was added. Microsoft documents asynchronous termination and the need to wait:
+[Process.Kill](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.kill),
+[Process.WaitForExit](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.waitforexit).
+
+Verification used the already scanned Jcc EXEs/ROMs listed below; no rebuild
+or binary change was needed. `smoke_windows_build.ps1 -Exe <each EXE>` passes
+with tags `jcc-general-msvc-wait` / `jcc-general-mingw-wait`, and both final
+hashes match the above value. GCC test286 passes with tag `jcc-286-mingw`.
+`test_cpu386_jcc.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe
+-Tag jcc-cleanup -Phase 0 -VerifyOracle` passes all 8192 cases and rejects
+the exact negative oracle, exercising failure cleanup too. Build config hash
+is restored to `240420870457d4f65f4eaa29cb8031e56228ea721824dec54f76615cf430dd3e`;
+the patch config is unchanged. A deliberately stuck shutdown was not injected.
+
 ## 2026-09-27 Jcc operand-size targets and conditional limit checks
 
 Further partial X86-11/12 fix: all sixteen short/near Jcc forms now use

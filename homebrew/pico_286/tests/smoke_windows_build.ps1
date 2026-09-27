@@ -98,12 +98,21 @@ debug_control_artifact_dir=.
         throw 'Blank framebuffer'
     }
 } finally {
-    if ($Process -and !$Process.HasExited) {
-        # Close only the process created here and allow the normal flush path.
-        $null = $Process.CloseMainWindow()
-        if (!$Process.WaitForExit(5000)) { Stop-Process -Id $Process.Id }
+    try {
+        if ($Process) {
+            if (!$Process.HasExited) {
+                # Close only the process created here; allow normal log flushing.
+                $null = $Process.CloseMainWindow()
+                if (!$Process.WaitForExit(5000)) { Stop-Process -Id $Process.Id }
+            }
+            # Stop-Process does not wait. Do not hash outputs or start the next
+            # ROM until this process has released its CRT file handles.
+            if (!$Process.WaitForExit(5000)) { throw 'Emulator shutdown timed out' }
+        }
+    } finally {
+        # Even a cleanup failure must not leave the temporary ROM config behind.
+        [IO.File]::WriteAllBytes($Config, $SavedConfig)
     }
-    [IO.File]::WriteAllBytes($Config, $SavedConfig)
 }
 # MSVC's CRT can keep the result file open until shutdown.
 if ($SuccessMessage) {
