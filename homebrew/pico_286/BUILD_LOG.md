@@ -1,5 +1,40 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW build at 4566ad92
+
+Verified the requested compiler path already present in `08acb110`: use
+`-Compiler MinGW` for Cygwin's MinGW-w64 GCC; MSVC remains the default.
+No duplicate backend or CPU changes were needed. Rebuilt base `4566ad92`,
+dirty=1 (pre-existing patch config); unrelated untracked string tests were
+not compiled, edited or staged.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-4566ad92-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-4566ad92-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+Copy-Item -LiteralPath homebrew/pico_286/build/pico_286_win_mingw.exe -Destination patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+GCC/G++ 14.4.0, target `x86_64-w64-mingw32`, `-O2 -g`, computed goto,
+static GCC support libraries. Compilation/linking succeeded with 45 warning
+messages. Build log: patch `diagnostics/x86-audit/build-cygwin-4566ad92.log`.
+PE32+ x86-64 EXE: 3,332,237 bytes, SHA256
+`5b842ae83ea8b28f0cadccfb8ccd1a3b738043e74c46d51a38f52bc4fed442f4`.
+Defender found no threats. Imports: dbghelp, GDI32, KERNEL32, msvcrt,
+USER32, WINMM. No Cygwin or additional MinGW runtime DLL imports, consistent
+with [Cygwin FAQ 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both BIOS smoke tests reached POST 80:FF and responded to the debug mailbox.
+test386 returned a nonblank 640x480 RGB565 frame; EE output SHA256:
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+Runtime artifacts: patch `diagnostics/compiler-cygwin-4566ad92-{386,286}/`.
+These are build/startup regression checks, not exhaustive CPU conformance.
+Deployed EXE hash matches; existing MSVC EXE was not replaced. No disk images
+were attached. The runner restored the build config. Patch config unchanged,
+SHA256 `36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`.
+
 ## 2026-09-27 X86-23: reject register-form far CALL/JMP
 
 The operand32 FF group now rejects register-form /3 (far CALL) and /5 (far
