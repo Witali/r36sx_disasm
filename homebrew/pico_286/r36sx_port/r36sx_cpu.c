@@ -2526,12 +2526,17 @@ static inline void r36sx_cpu_delay_maskable_interrupts_one_instruction(void)
 }
 
 static INLINE void push(uint16_t pushval) {
+    /* Intel 80386 PUSH/#SS/#PF: a fault is restartable. Do not expose the
+     * decremented SP to exception delivery until the stack store succeeds.
+     * The instruction escape unwinds a failed putmem before this commit. */
     if (r36sx_cpu_stack_default32()) {
-        CPU_ESP -= 2u;
-        putmem16(CPU_SS, CPU_ESP, pushval);
+        uint32_t next_sp = CPU_ESP - 2u;
+        putmem16(CPU_SS, next_sp, pushval);
+        CPU_ESP = next_sp;
     } else {
-        CPU_SP = (uint16_t)(CPU_SP - 2u);
-        putmem16(CPU_SS, CPU_SP, pushval);
+        uint16_t next_sp = (uint16_t)(CPU_SP - 2u);
+        putmem16(CPU_SS, next_sp, pushval);
+        CPU_SP = next_sp;
     }
 }
 
@@ -2547,12 +2552,15 @@ static INLINE uint16_t pop() {
 }
 
 static INLINE void push32(uint32_t pushval) {
+    /* Operand width selects the decrement, SS.B selects SP versus ESP. */
     if (r36sx_cpu_stack_default32()) {
-        CPU_ESP -= 4u;
-        putmem32(CPU_SS, CPU_ESP, pushval);
+        uint32_t next_sp = CPU_ESP - 4u;
+        putmem32(CPU_SS, next_sp, pushval);
+        CPU_ESP = next_sp;
     } else {
-        CPU_SP = (uint16_t)(CPU_SP - 4u);
-        putmem32(CPU_SS, CPU_SP, pushval);
+        uint16_t next_sp = (uint16_t)(CPU_SP - 4u);
+        putmem32(CPU_SS, next_sp, pushval);
+        CPU_SP = next_sp;
     }
 }
 

@@ -55,6 +55,47 @@ Specifications: [Intel 80386 PRM 9.1](https://pdos.csail.mit.edu/6.828/2005/read
 Only legacy behavior is used; original 80386 rules take precedence over later
 CPU extensions.
 
+## PUSH/PUSHF regression ROM
+
+`cpu386_push.asm` runs 864 checked cases through the production interpreter:
+27 instruction forms x two operand widths x two code widths x two stack
+widths x four stack conditions. The 27 forms are all eight general registers
+in both `50+r` and `FF /6` encodings, signed imm8, full-width immediate,
+16/32-bit memory addresses, six segment registers and PUSHF/PUSHFD.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-push-mingw
+```
+
+The four stack conditions are a successful writable stack, expand-down #SS,
+non-present #PF and read-only user-page #PF. Snippets run at CPL3; the handlers
+use a supervisor-only CPL0 stack from a 32-bit TSS. Checks include saved
+CS:EIP/SS:ESP, error code, exact data CR2, all general/data-segment registers,
+arithmetic flags, the pushed value and adjacent memory canaries. Rejected
+writes must not change the stack contents or SP/ESP. The successful PUSH SP/
+ESP cases require the original pointer value, unlike the 8086 behavior.
+Only the low selector word is asserted for 32-bit PUSH Sreg; the slot width
+and pointer movement are checked independently.
+
+POST `80:FF` plus `CPU386 PUSH PASS cases=864` means success; failure prints
+the zero-based case and check IDs before POST `80:FE`. The case is
+`context * 108 + row`, with table order recorded in `build/cpu386_push.lst`.
+Contexts 0/1 are successful SS.B=0/1, 2/3 expand-down, 4/5 absent page, 6/7
+read-only page. Checks 1..7 are vector/error, GPRs, selectors/flags, saved
+EIP/ESP, CR2, memory, and final case count respectively. The runner uses the
+same no-disk/restored-config workflow as the fault ROM above.
+
+Coverage is not yet complete PUSH conformance: split-page stores, source
+faults/aliasing, high ESP bits with SS.B=0, pointer wrap, real/v86 mode and
+every immediate value are not established by these cases. Compound stack
+operations and the specialized 286 PUSH helper remain separate audit items.
+Specifications: [Intel 80386 PUSH](https://pdos.csail.mit.edu/6.828/2005/readings/i386/PUSH.htm),
+[PUSHF](https://pdos.csail.mit.edu/6.828/2005/readings/i386/PUSHF.htm),
+[fault/restart rules](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
+and [AMD APM vol. 3 rev. 3.19, PUSH/PUSHF pp. 258-262](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+The primary target is original 80386; later AMD64/VME behavior is excluded.
+
 ## test386.asm
 
 `test386.asm` is vendored from:

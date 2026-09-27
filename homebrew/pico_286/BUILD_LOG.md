@@ -1,5 +1,67 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-05: preserve SP/ESP on faulting 386 PUSH
+
+The shared 386 word/dword push helpers decremented SP/ESP before attempting
+the stack store. A restartable #SS/#PF therefore saved the already-decremented
+pointer in the ring-transition frame. Stage the new pointer locally and commit
+it only after putmem succeeds; the existing instruction escape handles the
+failure path. SS.B still chooses pointer width independently of operand size.
+The specialized 8086/286 helpers are unchanged. Compound stack rollback and
+split-page partial writes remain open, as recorded in the source audit.
+
+Added `tests/cpu386_push.asm` and `tests/test_cpu386_push.ps1`: 864 integrated
+cases (27 PUSH/PUSHF forms, two operand/code/stack widths, four stack states).
+Each case executes at CPL3 with exception/completion delivery onto a
+supervisor-only CPL0 TSS stack. Assertions cover the written value, register
+and arithmetic-flag preservation, saved CS:EIP/SS:ESP, error code, exact
+data CR2 and adjacent canaries. See `tests/README.md` for the exact matrix,
+failure identifiers and remaining coverage gaps. References checked: original
+Intel 80386 PRM PUSH, PUSHF, 9.1 and 9.8.12/14; AMD APM vol.3 rev.3.19
+PUSH/PUSHF pp.258-262. Legacy semantics only; links are in that README.
+
+Before the fix, the ROM passes 216 successful-write cases and fails case D8h,
+check 4: PUSH AX raises #SS but the frame contains SP=60FEh instead of 6100h.
+This failure was repeated with the final ROM against the older patch EXE.
+Both rebuilt MSVC and GCC executables pass all 864 cases. The existing
+35-case fault ROM also passes both. Original test386 reaches POST FF on both
+and retains EE output SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+test286 reaches its PASS/FF marker in CPU 80286 mode on MSVC. These results
+do not establish complete instruction conformance; existing unrelated audit
+failures and untested stack scenarios are not closed by this commit.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Tag push-msvc-final
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag push-mingw-final
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag push-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag push-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag push-test386-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag push-test386-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag push-test286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Exe patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win.exe -Tag push-final-fixture-before
+```
+
+The last command is an expected failure and used the old patch binary before
+deployment. Builds use MSVC `/O2` (switch) and GCC `-O2 -g` (computed goto),
+base commit `8a028d8` plus this change, dirty=1. Existing compiler warnings
+remain. Build logs: patch `diagnostics/x86-audit/build-push-{msvc,mingw}.log`;
+test logs/frames: `diagnostics/compiler-push-*`.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 830464 | `6fe797ae49dbe290b766e3abb744639804709590b6e676e211d1f8f8e347e53b` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3330574 | `dc2c2b52add757cbf94e959b0a3cbf2cd594d00d9adaf7adcccb9bd7d082f211` |
+| `cpu386_push.bin` | Raw 80386 ROM at F0000h | 65536 | `d4551668e19235d3625a937b31b38fa1aae5b6d6b7c7f55af7775ba751c449b4` |
+
+`tools/scan-download.ps1` / Defender found no threats in both EXEs and the
+new ROM. Copied both EXEs and the matching MSVC PDB to the active patch;
+no ROM replacement, MIPS build, downloads or disk-image edits. Patch config
+remains unchanged (SHA256 `36d271c0...`) and unstaged. Full 386 test coverage
+remains the active goal, not a completion claim for these two ROMs.
+
 ## 2026-09-27 X86-33: non-faulting instruction trace lookahead
 
 Instruction tracing used architectural `getmem8` to display eight bytes.

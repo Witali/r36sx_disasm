@@ -103,6 +103,12 @@ P2 items are narrower instruction/conformance gaps.
   Stage architectural updates and validate the required frame; test #SS/#PF
   on first and later frame slots, including expand-down stacks and SS.B=0/1.
   [Intel PUSH][push], [Intel POP][pop], [Intel ENTER][enter].
+  Partial fix 2026-09-27: the 386 word/dword push helpers now stage the new
+  SP/ESP until the store succeeds, so exception delivery sees the original
+  pointer. `tests/cpu386_push.asm` covers successful and #SS/#PF PUSH/PUSHF
+  forms across both operand, code and stack widths (864 integrated cases).
+  Split-page stores, specialized 286 pushes, POP destinations/segments and
+  compound stack operations remain open; this is not a full stack rollback.
 
 - [ ] **X86-06 / P1 / Probe: the generic REP batch does not wrap 16-bit indexes per element.**
   CPU:1666, `r36sx_rep_movsb` and adjacent MOVSW/STOS helpers keep SI/DI in
