@@ -551,8 +551,9 @@ static inline void op_div16(uint32_t valdiv, uint16_t divisor, uint32_t fault_ip
 static inline void op_idiv16(uint32_t valdiv, uint16_t divisor, uint32_t fault_ip) {
     int32_t dividend = (int32_t)valdiv;
     int16_t divisor_signed = (int16_t)divisor;
-    if (divisor_signed == 0) {
-        /* Intel IDIV reports divide-by-zero through #DE, not stdout. */
+    if (divisor_signed == 0 ||
+        (dividend == INT32_MIN && divisor_signed == -1)) {
+        /* IDIV must raise guest #DE before this pair overflows host division. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }

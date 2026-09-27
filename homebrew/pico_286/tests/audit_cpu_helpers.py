@@ -13,6 +13,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PORT = ROOT / "r36sx_port"
+PROBES = ("conditions", "adc_sbb8", "idiv16_overflow", "idiv16_boundaries",
+          "idiv32_overflow", "bit_negative16", "bit_negative32",
+          "xchg_address_alias", "rep16_index_wrap")
 
 
 def between(text, start, end):
@@ -24,6 +27,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cc", default="gcc")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--case", action="append", choices=PROBES,
+                        help="Run only this probe (repeatable); default runs all.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     common = (PORT / "r36sx_cpu.c").read_text(encoding="utf-8-sig")
@@ -42,7 +47,10 @@ static uint8_t cf, pf, af, zf, sf, of;
 static uint16_t CPU_AX, CPU_DX;
 static uint32_t CPU_EAX, CPU_EDX;
 static int divide_fault;
-static void r36sx_cpu_divide_error(uint32_t ip) { (void)ip; divide_fault++; }
+static uint32_t divide_fault_ip;
+static void r36sx_cpu_divide_error(uint32_t ip) {
+    divide_fault_ip = ip; divide_fault++;
+}
 static bool parity[256];
 static uint8_t mode, rm, reg, df;
 static bool operandSizeOverride, addressSizeOverride;
@@ -98,6 +106,29 @@ static void putmem8(uint16_t s, uint32_t o, uint8_t v) {
     slices.append("static bool xchg_probe(void) { switch (0x87) {\n" +
                   xchg_case + "} return false; }\n")
     driver = r"""
+static int check_idiv16(int32_t dividend, int32_t divisor) {
+    /* Widen the oracle: even INT32_MIN / -1 is representable here. */
+    int64_t quotient = divisor ? (int64_t)dividend / divisor : 0;
+    int64_t remainder = divisor ? (int64_t)dividend % divisor : 0;
+    bool fault = !divisor || quotient < INT16_MIN || quotient > INT16_MAX;
+    CPU_AX = (uint16_t)dividend;
+    CPU_DX = (uint16_t)((uint32_t)dividend >> 16);
+    uint16_t old_ax = CPU_AX, old_dx = CPU_DX;
+    divide_fault = 0;
+    divide_fault_ip = 0;
+    op_idiv16((uint32_t)dividend, (uint16_t)divisor, 0x12345);
+    if (divide_fault != fault ||
+        (fault && (divide_fault_ip != 0x12345 ||
+                   CPU_AX != old_ax || CPU_DX != old_dx)) ||
+        (!fault && (CPU_AX != (uint16_t)quotient ||
+                    CPU_DX != (uint16_t)remainder))) {
+        printf("IDIV16 mismatch: dividend=%ld divisor=%ld faults=%d\n",
+               (long)dividend, (long)divisor, divide_fault);
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) return 2;
     for (unsigned i = 0; i < 256; i++) parity[i] = !__builtin_parity(i);
@@ -105,6 +136,21 @@ int main(int argc, char **argv) {
         volatile uint32_t dividend = 0x80000000u;
         op_idiv16(dividend, 0xffffu, 0x100);
         return divide_fault != 1;
+    }
+    if (!strcmp(argv[1], "idiv16_boundaries")) {
+        const int32_t dividends[] = {
+            INT32_MIN, INT32_MIN + 1, -1073741824, -65537, -65536,
+            -32769, -32768, -32767, -7, -1, 0, 1, 7, 32766, 32767,
+            32768, 32769, 65535, 65536, 1073741824, INT32_MAX
+        };
+        unsigned cases = 0;
+        for (unsigned i = 0; i < sizeof(dividends) / sizeof(dividends[0]); i++)
+        for (int32_t divisor = INT16_MIN; divisor <= INT16_MAX; divisor++) {
+            if (check_idiv16(dividends[i], divisor)) return 1;
+            cases++;
+        }
+        printf("%u IDIV16 boundary/divisor cases passed\n", cases);
+        return 0;
     }
     if (!strcmp(argv[1], "idiv32_overflow")) {
         volatile int64_t dividend = INT64_MIN;
@@ -172,9 +218,7 @@ int main(int argc, char **argv) {
     return 2;
 }
 """
-    names = ("conditions", "adc_sbb8", "idiv16_overflow", "idiv32_overflow",
-             "bit_negative16", "bit_negative32", "xchg_address_alias",
-             "rep16_index_wrap")
+    names = args.case or PROBES
     failed = 0
     with tempfile.TemporaryDirectory(prefix="cpu-audit-", dir=args.output_dir) as work:
         source = Path(work) / "probe.c"

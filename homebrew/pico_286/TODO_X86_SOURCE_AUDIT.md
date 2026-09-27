@@ -40,11 +40,17 @@ P2 items are narrower instruction/conformance gaps.
 
 ## Confirmed findings
 
-- [ ] **X86-01 / P1 / Probe: IDIV16 can overflow the host division.**
+- [x] **X86-01 / P1 / Probe: IDIV16 can overflow the host division.**
   I86:551, `op_idiv16`: `INT32_MIN / -1` is evaluated before the guest quotient
   range check. GCC UBSan reports undefined behavior instead of a guest #DE.
   Check this case before C division and preserve guest results on failure.
   Test `DX:AX=8000:0000`, divisor `FFFFh`. [Intel IDIV][idiv].
+  Fixed 2026-09-27: guard the host-overflow pair before division/remainder,
+  retaining the existing guest #DE path. `idiv16_overflow` and
+  `idiv16_boundaries` pass under UBSan, including 1,376,256 boundary/divisor
+  combinations and unchanged AX/DX on errors. Cross-checked the legacy
+  word-divisor behavior with [AMD APM volume 3, IDIV pp. 162-164][amd-apm3].
+  Generation-specific #DE return IP remains a separate X86-27 item.
 
 - [ ] **X86-02 / P1 / Probe: IDIV32 has the same host-overflow problem.**
   I386:211, `op_idiv32`: `INT64_MIN / -1` reaches undefined C division.
@@ -397,13 +403,16 @@ chapter 17 plus the architecture chapters linked below, hosted as a transcriptio
 by MIT/other mirrors. These are Intel-authored documents, not emulator folklore.
 The transcription contains apparent inconsistencies; consult an original scan
 and generation-specific manuals/errata before resolving disputed behavior.
-No AMD-specific compatibility claim is made by this pass.
+The initial audit made no AMD-specific compatibility claim. Follow-up fixes
+also consult AMD's APM for shared legacy instruction behavior; original Intel
+286/386 rules retain precedence for generation-specific differences.
 
 - [Intel 80386 instruction index](https://pdos.csail.mit.edu/6.828/2005/readings/i386/c17.htm)
 - [Original Intel manual scan](https://www.bitsavers.org/components/intel/80386/230985-001_80386_Programmers_Reference_Manual_1986.pdf)
 - [Intel LAR, alternate transcription](https://www.ardent-tool.com/CPU/docs/Intel/386/manuals/prref386/LAR.htm)
 
 [idiv]: https://pdos.csail.mit.edu/6.828/2005/readings/i386/IDIV.htm
+[amd-apm3]: https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf
 [xchg]: https://pdos.csail.mit.edu/6.828/2005/readings/i386/XCHG.htm
 [faults]: https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_01.htm
 [mov]: https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOV.htm

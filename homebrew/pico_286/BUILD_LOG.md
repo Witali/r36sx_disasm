@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-01: IDIV16 host-overflow guard
+
+Fixed `op_idiv16` to report guest #DE before evaluating INT32_MIN / -1 in C.
+The quotient range and guest error helper are unchanged. Added selectable
+audit probes and 1,376,256 dividend/divisor checks, including zero divisors,
+signed remainders, quotient limits and unchanged AX/DX on failure.
+
+References: [Intel 80386 PRM, IDIV](https://pdos.csail.mit.edu/6.828/2005/readings/i386/IDIV.htm)
+and [AMD APM vol. 3, revision 3.19, IDIV pp. 162-164](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+AMD was used only for the common legacy operand behavior, not later CPU features.
+The current AMD download URL returned HTTP 404, so the AMD-authored archived
+manual was consulted instead. No executable tools were downloaded.
+
+Commands:
+
+```powershell
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit --case idiv16_overflow --case idiv16_boundaries --case conditions --case adc_sbb8
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+```
+
+The new boundary probe first reproduced the UBSan division error. After the
+fix all four selected groups pass with GCC `-O2 -fsanitize=undefined
+-fno-sanitize-recover=undefined`. WSL initially required sandbox escalation
+(`E_ACCESSDENIED`); the authorized run succeeded. Temporary probes were removed.
+
+Windows debug/O2 build succeeded with pre-existing warnings in FPU, audio,
+redirector and pragma/inline declarations. Output is x86-64 PE executable
+`build/pico_286_win.exe`, 976384 bytes, SHA256
+`1c5871102eb133091b9aafb7760428515e8650acbbf82f1769aa2124dd82239a`.
+No new antivirus scan was performed on this local build. No patch executable,
+configuration or disk image was modified. X86-27 (#DE return IP by CPU model)
+and the remaining audit items are not closed by this fix.
+
 ## 2026-09-05 x86 source audit and component probes
 
 Audited integer opcode handlers and shared CPU helpers at `28c46e23` against
