@@ -109,6 +109,12 @@ P2 items are narrower instruction/conformance gaps.
   forms across both operand, code and stack widths (864 integrated cases).
   Split-page stores, specialized 286 pushes, POP destinations/segments and
   compound stack operations remain open; this is not a full stack rollback.
+  Further fix 2026-09-27: 386 POP r/m16 and r/m32 now defer SP/ESP commit
+  until the destination write succeeds. ESP-based EA still uses the updated
+  pointer, with the old architectural ESP restored before any faultable
+  operation. `tests/cpu386_pop.asm` checks 800 valid-encoding register/memory
+  cases across CS.D/SS.B/operand widths and source/destination #SS/#PF.
+  Segment POP, the fixed-16-bit cores and compound operations remain open.
 
 - [ ] **X86-06 / P1 / Probe: the generic REP batch does not wrap 16-bit indexes per element.**
   CPU:1666, `r36sx_rep_movsb` and adjacent MOVSW/STOS helpers keep SI/DI in

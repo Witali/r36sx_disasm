@@ -2323,8 +2323,11 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                writerm16(rm, pop()
-                );
+#if R36SX_CPU_CORE_FIXED_16BIT
+                writerm16(rm, pop());
+#else
+                r36sx_cpu_pop_rm386(rm, 0);
+#endif
                 break;
 
             case 0x90:

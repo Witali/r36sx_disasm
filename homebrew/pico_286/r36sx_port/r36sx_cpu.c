@@ -4294,6 +4294,45 @@ static INLINE void writerm32(uint8_t rmval, uint32_t value) {
     }
 }
 
+static INLINE void r36sx_cpu_pop_rm386(uint8_t rmval, uint8_t wide)
+{
+    if (mode == R36SX_MODRM_MOD_REGISTER) {
+        /* POP ESP/SP writes the popped value after the implicit increment. */
+        if (wide) {
+            putreg32(rmval, pop32());
+        } else {
+            putreg16(rmval, pop());
+        }
+        return;
+    }
+
+    const uint32_t old_esp = CPU_ESP;
+    const uint32_t bytes = wide ? 4u : 2u;
+    const uint8_t stack32 = r36sx_cpu_stack_default32();
+    const uint32_t stack_offset = stack32 ? old_esp : (uint16_t)old_esp;
+    const uint32_t next_esp = stack32 ? old_esp + bytes :
+        (old_esp & 0xffff0000u) | (uint16_t)(old_esp + bytes);
+    const uint32_t value = wide ? getmem32(CPU_SS, stack_offset) :
+                                  getmem16(CPU_SS, stack_offset);
+
+    /* Intel POP uses post-increment ESP in an ESP-based destination EA, but
+     * #SS/#GP/#PF must expose the original stack pointer for restart. getea
+     * only calculates an address from the decoded ModRM/SIB/displacement; it
+     * performs no faultable accesses. Restore ESP before checking/storing. */
+    CPU_ESP = next_esp;
+    getea(rmval);
+    CPU_ESP = old_esp;
+    if (!r36sx_cpu_check_segment_access(ea - useseg_base, bytes, 1)) {
+        return;
+    }
+    if (wide) {
+        r36sx_cpu_interpreter_write32(ea, value);
+    } else {
+        r36sx_cpu_interpreter_write16(ea, (uint16_t)value);
+    }
+    CPU_ESP = next_esp;
+}
+
 static INLINE void writerm8(uint8_t rmval, uint8_t value) {
     if (mode < 3) {
         getea(rmval);

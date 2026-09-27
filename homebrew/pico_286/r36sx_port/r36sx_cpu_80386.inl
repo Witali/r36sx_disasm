@@ -546,7 +546,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* POP r/m32 */
         case 0x8F:
             modregrm();
-            writerm32(rm, pop32());
+            r36sx_cpu_pop_rm386(rm, 1);
             return true;
 
         /* CALL ptr16:32 */

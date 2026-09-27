@@ -1,5 +1,59 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-05: restartable 386 POP memory destinations
+
+POP r/m16/r/m32 previously advanced SP/ESP before attempting the destination
+write. A destination #PF therefore saved the wrong stack pointer. The new
+386-only helper reads the source, computes the destination using the updated
+ESP, restores the original ESP before faultable checks/writes, and commits
+the pointer only on success. Register POP (including SP/ESP) retains its
+existing ordering. Fixed-16-bit 8086/286 cores are unchanged. Split-page stores,
+segment POP, POPF and compound stack operations still need separate work.
+
+Added `tests/cpu386_pop.asm` and its PowerShell runner: 800 valid-encoding
+cases varying operand size, CS.D, SS.B, register/memory destinations and
+source/destination #SS/#PF. The independent oracle checks the exception frame,
+registers, arithmetic flags, exact data CR2 and byte-level memory canaries.
+See `tests/README.md` for the matrix and Intel/AMD source links. Original
+Intel 80386 PRM POP and 9.1 define the restart contract; Intel SDM POP clarifies
+non-wrapping ESP-based addressing; AMD APM vol.3 rev.3.19 pp.246-247 is the
+legacy-mode cross-check. No newer AMD64 behavior is added.
+
+The unchanged old MSVC binary failed case 1F0h, check 4: a write #PF saved
+ESP=6102h instead of 6100h. Both rebuilt executables pass all 800 cases.
+The 35-case fault ROM and 864-case PUSH ROM pass on both compilers. Original
+test386 reaches FF on both with unchanged EE output hash `f09ab657...`; the
+MinGW test286 smoke passes as documented in the compiler entry below.
+These checks do not establish full instruction conformance.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Tag pop-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag pop-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag pop-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag pop-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Tag pop-push-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_push.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag pop-push-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag pop-test386-msvc
+```
+
+MSVC `/O2` switch and GCC `-O2 -g` computed-goto builds used base `a0be092c`
+plus this change (dirty=1); existing warnings remain. Build logs are patch
+`diagnostics/x86-audit/build-pop-{msvc,mingw}.log`; test logs/frames are
+`diagnostics/compiler-pop-*` and `compiler-cygwin-final-*`.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 830976 | `6c4723fbc1adfde97bd2ba1423227a0641bfd1df6e4b795c9e91c9b906ac480d` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3336317 | `d0de223b94fc5dec2a0edef3a5b829d9af809d0a226f866ad4db5a551f850165` |
+| `cpu386_pop.bin` | Raw 80386 ROM at F0000h | 65536 | `ea25392dd8ba374f7d0f14a60ee63eb72659764e3d76d1b14e49a19170352700` |
+
+Defender through `tools/scan-download.ps1` found no threats in both EXEs and
+the new ROM. MinGW was already copied to the patch during compiler checking;
+the main patch MSVC executable is left unchanged until the next fix is tested.
+No disks, patch config or MIPS binaries were changed by this CPU work.
+
 ## 2026-09-27 Cygwin MinGW final build verification
 
 Completed the pending MinGW build and checked the current executable for the

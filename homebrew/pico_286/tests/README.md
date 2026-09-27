@@ -96,6 +96,51 @@ Specifications: [Intel 80386 PUSH](https://pdos.csail.mit.edu/6.828/2005/reading
 and [AMD APM vol. 3 rev. 3.19, PUSH/PUSHF pp. 258-262](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 The primary target is original 80386; later AMD64/VME behavior is excluded.
 
+## POP register/memory regression ROM
+
+`cpu386_pop.asm` checks 800 cases of POP r16/r32 and r/m16/r/m32 through the
+production decoder. It uses the same ring-3 to supervisor-stack fixture as
+the PUSH ROM, with an independent byte oracle for source/destination memory.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_pop.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-pop-mingw
+```
+
+The 20 forms are eight GPRs in both `58+r` and `8F /0` encodings, `[BX]`,
+`[ESI]`, `[ESP]` and `[ESP+disp32]`. The matrix varies operand size, CS.D,
+SS.B and five memory conditions: success, source segment-limit #SS, absent
+source #PF, read-only destination #PF and absent destination #PF. Register
+rows remain successful controls in destination-fault contexts. For `[ESP]`
+the absent destination shares the source page, so that case correctly expects
+a read fault; its read-only case still isolates a destination write fault.
+
+Checks include all GPRs/data selectors, arithmetic flags, saved CS:EIP/SS:ESP,
+error code, exact CR2, and every byte in 16-byte stack and 80-byte destination
+windows. POP SP/ESP must end with the popped value. ESP-based memory operands
+must use the incremented address, yet a failed write must preserve the old
+architectural SP/ESP. The current 386 helpers stage the source, resolve that
+destination, restore the old pointer before faultable checks/writes, and
+commit the pointer only on success. Lower-model interpreters are unchanged.
+
+Pass requires POST `80:FF` and `CPU386 POP PASS cases=800`. Failure reports
+zero-based `case`, `check`, saved `esp` and `expected` values. The case is
+`context * 80 + row`; contexts 0/1 are success SS.B=0/1, 2/3 source #SS,
+4/5 absent source, 6/7 read-only destination, and 8/9 absent destination.
+Check IDs match the PUSH fixture: vector/error, GPRs, selectors/flags, saved
+EIP/ESP, CR2, memory, final count. See `build/cpu386_pop.lst` for row order.
+
+This does not yet cover segment POP, POPF, invalid 8F group encodings,
+split-page memory accesses, all addressing combinations, high ESP bits on
+16-bit stacks, pointer wrap, or real/v86 mode. Original Intel 80386 PRM
+[POP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/POP.htm) and
+[9.1](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_01.htm) define
+the fault/restart contract. Cross-checks use
+[AMD APM vol. 3 rev. 3.19, POP pp. 246-247](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+and [Intel SDM vol. 2, POP](https://cdrdv2-public.intel.com/835757/325383-sdm-vol-2abcd.pdf)
+for non-wrapping post-increment ESP addressing. The latter explicitly leaves
+16-bit-stack wrap behavior processor-family-specific; no such case is asserted.
+
 ## test386.asm
 
 `test386.asm` is vendored from:
