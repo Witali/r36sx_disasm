@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW final build verification
+
+Completed the pending MinGW build and checked the current executable for the
+requested Windows compiler workflow. Compiler selection already exists in
+`08acb110`: MSVC remains the default; `-Compiler MinGW` uses Cygwin's
+`x86_64-w64-mingw32-gcc/g++`. No additional build-script change was needed.
+This artifact uses base `a0be092c` with the existing uncommitted POP CPU edits
+(dirty=1). Those source/test edits were preserved and are not part of this
+compiler-verification commit.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-final-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-final-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+Copy-Item -LiteralPath homebrew/pico_286/build/pico_286_win_mingw.exe -Destination patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+GCC 14.4.0, target `x86_64-w64-mingw32`, `-O2 -g`, computed goto and
+static GCC support libraries. Build/link succeeded with existing warnings.
+Output: PE32+ x86-64, 3336317 bytes, SHA256
+`d0de223b94fc5dec2a0edef3a5b829d9af809d0a226f866ad4db5a551f850165`.
+The patch copy is byte-identical; the main MSVC executable was not replaced.
+Defender found no threats. Imports are dbghelp, GDI32, KERNEL32, msvcrt,
+USER32 and WINMM; no Cygwin or extra MinGW runtime DLL is required.
+
+Both ROM smoke checks reached POST `80:FF` and answered register/framebuffer
+queries. test386 produced a nonblank 640x480 RGB565 frame and EE output SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+test286 printed PASS in CPU 80286 mode (its frame may be blank). These checks
+confirm build/runtime operation, not full instruction or DOS compatibility.
+Logs are in patch `diagnostics/x86-audit/build-pop-mingw.log` and
+`diagnostics/compiler-cygwin-final-{386,286}/`.
+
+The build config was restored by the runner. Patch config remains unchanged
+(SHA256 `36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`)
+and unstaged. No disks were attached or edited, no packages downloaded, and
+no MIPS build performed.
+
 ## 2026-09-27 X86-05: preserve SP/ESP on faulting 386 PUSH
 
 The shared 386 word/dword push helpers decremented SP/ESP before attempting
