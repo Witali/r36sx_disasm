@@ -377,6 +377,43 @@ string operation per iteration); [AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x8
 MOVS pp.228-229 and section 1.2.6. These are vendor-authored manuals on
 mirrors; only 386-applicable legacy rules are used.
 
+## IRET privilege and flags regression ROM
+
+`cpu386_iret_flags.asm` checks 1280 normal protected-mode IRET/IRETD returns:
+all ten source/destination CPL pairs with destination CPL >= source CPL,
+16/32-bit operands, old/new IOPL 0..3, and all old/new IF combinations.
+The code and stack descriptors have D/B=1; the word form uses prefix 66h.
+RETF enters the source level after CPL0 sets the initial flags, so setup
+does not depend on the IRET behavior being tested.
+
+The target captures flags and all eight GPRs before entering the checker.
+Checks include CF/PF/AF/ZF/SF/OF/DF, IF/IOPL, CS, SS and ESP, covering both
+same-level stack consumption and outer-level stack replacement. IF write
+permission depends on the executing CPL and old IOPL, and IOPL is writable
+only from CPL0. Independent loops vary both the old and requested values.
+The pre-fix EXE fails case 129 (`81h`), CPL0 -> CPL1 IRET with old IOPL=0:
+flags check 1 reports `4D5h` instead of `6D5h` because IF is lost.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag iret-flags-mingw
+```
+
+The runner assembles a 64 KiB F0000h ROM and requires POST `80:FF` plus
+`CPU386 IRET FLAGS PASS cases=1280`. Failure prints case/check/got/want;
+checks 1/2/3/4 identify flags, GPRs, selectors and final case count.
+It attaches no disk images and restores the build config in `finally`.
+This does not cover fault rollback, invalid return selectors, task return,
+NT/TF/RF/VM, v86, paging, or 16-bit code/stack defaults. Those remain separate
+conformance work rather than being certified by this flags matrix.
+
+References: [Intel 80386 PRM IRET](https://pdos.csail.mit.edu/6.828/2005/readings/i386/IRET.htm),
+[Intel SDM 325383-060US vol.2A p.3-479](https://kib.kiev.ua/x86docs/Intel/SDMs/325383-060.pdf)
+RETURN-TO-OUTER-PRIVILEGE-LEVEL (IF/IOPL before CPL update), and
+[AMD APM vol.3 rev.3.19 p.339](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+IRETx (`old_CPL`/`old_RFLAGS.IOPL`). These are vendor-authored manuals hosted
+on mirrors; later-generation flags and modes are not applied to the 386.
+
 ## test386.asm
 
 `test386.asm` is vendored from:

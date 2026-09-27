@@ -4264,16 +4264,19 @@ static uint8_t r36sx_cpu_protected_iret(uint8_t wide)
         return 0;
     }
 
-    r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
-                                   target_ip);
-    r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
-    r36sx_cpu_set_stack_pointer(new_sp);
-    r36sx_cpu_invalidate_data_segments_for_cpl(new_cpl);
+    /* Intel IRET's outer-level return uses the executing CPL and old IOPL
+     * for IF/IOPL write permission, not the destination privilege. All frame
+     * reads and selector validation must finish before committing FLAGS. */
     if (wide) {
         decodeflagsdword(target_flags);
     } else {
         decodeflagsword((uint16_t)target_flags);
     }
+    r36sx_cpu_commit_code_transfer(target_cs, &target_cache, new_cpl,
+                                   target_ip);
+    r36sx_cpu_commit_stack_segment(new_ss, &new_ss_cache);
+    r36sx_cpu_set_stack_pointer(new_sp);
+    r36sx_cpu_invalidate_data_segments_for_cpl(new_cpl);
     return 1;
 }
 

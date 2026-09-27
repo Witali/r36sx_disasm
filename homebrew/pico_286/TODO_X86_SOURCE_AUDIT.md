@@ -230,11 +230,20 @@ P2 items are narrower instruction/conformance gaps.
   selects task-return behavior; a popped NT bit is not this blanket rejection
   condition. Test current NT=0 with stacked NT=1. [Intel IRET][iret].
 
-- [ ] **X86-18 / P2 / Source: outer-level IRET restores flags using the new CPL.**
+- [x] **X86-18 / P2 / Source: outer-level IRET restores flags using the new CPL.**
   CPU:4187 commits the code transfer before `decodeflagsword/dword`, whose
   privilege tests use current CPL. Preserve the executing CPL for IF/IOPL
   restoration. Test a ring-0 return to ring 3 with changed IF/IOPL.
   [Intel IRET][iret].
+  Fixed 2026-09-27: restore flags after frame/selector validation but before
+  committing the new CS/CPL. The shared flags decoder now sees the executing
+  CPL and old IOPL. `tests/cpu386_iret_flags.asm` checks 1280 combinations of
+  source/destination CPL, operand width and old/new IF/IOPL, entering through
+  RETF to avoid using IRET in its own setup. The old EXE fails case 129 on
+  CPL0 -> CPL1 IF restoration; MSVC and GCC pass the full matrix after the
+  fix. Intel SDM vol.2A p.3-479 and AMD APM vol.3 rev.3.19 p.339 agree on
+  the old privilege context. Fault rollback, NT/task return, v86 and other
+  IRET requirements remain open in their respective items.
 
 - [ ] **X86-19 / P1 / Source: protected IDT gate validation is incomplete and misordered.**
   IRQ:218 uses only the low type nibble, without rejecting S=1. Presence

@@ -1,5 +1,72 @@
 # pico-286 Build Log
 
+## 2026-09-27 IRET flags use the executing privilege (X86-18)
+
+Fixed protected outer-level IRET/IRETD in `r36sx_port/r36sx_cpu.c`: restore
+FLAGS after all frame/selector validation but before committing the new CPL.
+The existing flags decoders now check IF permission against old CPL/IOPL and
+IOPL permission against old CPL. Same-level, task-return and v86 paths are
+unchanged. The post-validation commit helpers perform no guest memory access.
+
+Added `tests/cpu386_iret_flags.asm` and its runner: 1280 combinations of all
+ten same/outward CPL pairs, operand16/32, old/new IOPL and old/new IF. RETF
+constructs the source context independently of IRET. The target saves all
+GPRs, flags and selectors before entering the checker. This tests normal
+completion, not exception rollback, task switching, or v86.
+
+Baseline MSVC failed at case 129 (`81h`), check 1: CPL0 -> CPL1 word IRET,
+old IOPL=0, old IF=0, requested IF=1. Observed flags were `4D5h`, expected
+`6D5h`. The baseline log is `diagnostics/compiler-iret-flags-before/pico_286.log`.
+Its EXE metadata was `d77bc96` plus the since-committed MOVS fix, dirty=1.
+Both fixed builds report `09cf5d0` plus this IRET fix, dirty=1.
+
+References consulted before changing behavior: Intel 80386 PRM chapter 17
+[IRET](https://pdos.csail.mit.edu/6.828/2005/readings/i386/IRET.htm),
+[Intel SDM 325383-060US vol.2A p.3-479](https://kib.kiev.ua/x86docs/Intel/SDMs/325383-060.pdf)
+RETURN-TO-OUTER-PRIVILEGE-LEVEL, and
+[AMD APM vol.3 rev.3.19 p.339](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+IRETx. Intel updates IF/IOPL before CPL; AMD explicitly names old CPL/IOPL.
+These vendor-authored manuals are hosted on mirrors. Later-generation
+EFLAGS bits and long-mode behavior are not applied to the 386.
+
+Commands (repository root, executed serially):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1 -Tag iret-flags-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag iret-flags-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Tag iret-rep-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag iret-rep-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag iret-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag iret-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag iret-286-msvc -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag iret-286-mingw -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+Both compilers pass the 1280 new cases, 1080 REP fault/restart cases and
+standard test386/test286. Test386 EE output remains
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+MSVC 14.51 uses `/O2 /MT /Zi` with switch dispatch; Cygwin MinGW GCC 14.4.0
+uses `-O2 -g -static` with computed goto. Existing compiler warnings remain.
+Build output is under the patch `diagnostics/x86-audit/build-iret-flags-{msvc,mingw}.log`;
+individual runs use `diagnostics/compiler-<Tag>/`.
+
+Artifacts under `homebrew/pico_286/build` (SHA256):
+
+| Artifact | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `cpu386_iret_flags.bin` | NASM 3.01 raw F0000h ROM / 65536 | `18F8BA5CEFE85BD123F8E08E8B954C76ECC79ADE458956C788A634E6616D00E6` |
+| `pico_286_win.exe` | PE x86-64 / 831488 | `B288FB4D08B94AD47DB4CF2F4213D87C06A1E2CF1074AE34B2E35C568D353B44` |
+| `pico_286_win_mingw.exe` | PE x86-64 / 3337510 | `062A2700FA91B8DBEDEF08862E6F58E7AEBA3FC13C1B0265654AA99E9F7BA0F1` |
+
+`tools/scan-download.ps1` scanned the new ROM and both EXEs successfully;
+Defender reported no threats. Copied both EXEs and the MSVC PDB to the active
+patch; EXE hashes match. Patch config SHA256 remains unchanged:
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+No user disk images were attached. X86-18 is closed; other IRET/REP audit
+items and the full per-instruction conformance goal remain open.
+
 ## 2026-09-27 Cygwin MinGW build verified at d829204
 
 Rebuilt the requested Windows variant using the existing `-Compiler MinGW`
