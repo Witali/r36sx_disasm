@@ -657,7 +657,8 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if ((reptype == 2) && zf) {
                 return true;
             }
-            if (reptype) {
+            /* The final iteration traps at the next instruction, not REP. */
+            if (reptype && r36sx_rep_get_count() != 0) {
                 r36sx_cpu_set_ip(fault_ip);
             }
             return true;
@@ -700,7 +701,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if (reptype) {
                 r36sx_rep_set_count(r36sx_rep_get_count() - 1);
             }
-            if (reptype) {
+            if (reptype && r36sx_rep_get_count() != 0) {
                 r36sx_cpu_set_ip(fault_ip);
             }
             return true;
@@ -723,7 +724,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
             if ((reptype == 2) && zf) {
                 return true;
             }
-            if (reptype) {
+            if (reptype && r36sx_rep_get_count() != 0) {
                 r36sx_cpu_set_ip(fault_ip);
             }
             return true;

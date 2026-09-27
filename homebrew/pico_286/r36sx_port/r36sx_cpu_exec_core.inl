@@ -2636,7 +2636,9 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                if (!reptype) {
+                /* Count exhaustion retires REP here: a final #DB trap must
+                 * save the following IP, not restart an empty iteration. */
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -2675,7 +2677,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -2783,7 +2785,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
-                if (!reptype) {
+                /* Match MOVS/STOS: only an unfinished REP rewinds IP. */
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -2810,7 +2813,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_rep_set_count(r36sx_rep_get_count() - 1);
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -2845,7 +2848,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -2881,7 +2884,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     break;
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 

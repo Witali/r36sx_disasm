@@ -168,8 +168,16 @@ P2 items are narrower instruction/conformance gaps.
   The runner verifies a micro-exec budget below the 1025-iteration count to
   require flag preservation across CPU calls (current runtime budget: 100).
   The pre-fix GCC EXE fails case 0 with saved flags 244h instead of AD5h.
+  Additional fix 2026-09-27: CMPS/SCAS/LODS no longer rewind IP after REP
+  count exhaustion. The old LODSB path saved EIP=0 instead of 2 after its
+  last element. `tests/cpu386_string_traps.asm` checks 1128 CPL3 cases / 4440
+  TF traps for all five memory-string families, CS.D/address/operand sizes,
+  DF, count and ZF termination, non-REP and null-selector zero-count controls.
+  Each step checks registers, flags, frame, DR6 and memory; MSVC/GCC pass
+  and both reject a deliberately wrong final-EIP oracle. This closes the
+  final-iteration TF boundary in these PM cases, not all interrupt behavior.
   Open: fixed-16-bit 286 progress, split-element faults, SS/segment overrides,
-  real/v86 limit behavior, last-iteration #DB and IRQ/NMI interruption,
+  real/v86 limit/debug behavior, data breakpoints and IRQ/NMI interruption,
   other string families. The real-mode
   raw-copy path still needs watchpoint
   tests; protected bulk optimization would require
@@ -455,7 +463,7 @@ Memory forms also inherit X86-04/08/09/10 even if their arithmetic is correct.
 | MOV, XCHG, LEA, XLAT, MOVSX, MOVZX, CBW/CWDE, CWD/CDQ | X86-03/23/26; checked memory/fault propagation remains a shared blocker |
 | PUSH, POP, PUSHA/PUSHAD, POPA/POPAD, ENTER, LEAVE | Stack restartability X86-05; bad POP encoding X86-23 |
 | PUSHF/PUSHFD, POPF/POPFD, LAHF, SAHF | Flag masks/privilege paths inspected; fault handling and IRET restore context still open |
-| MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | MOVS/STOS wrap/fault/overlap matrices, 10752 normal CMPS/SCAS cases and a 2592-case CMPS/SCAS fault/TF matrix; X86-07 remains open for further fault, prefix, mode and interrupt coverage |
+| MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | MOVS/STOS wrap/fault/overlap matrices, 10752 normal CMPS/SCAS cases, 2592 comparison fault cases and 1128 per-iteration TF cases; X86-07 remains open for further fault, prefix, mode and interrupt coverage |
 | IN, OUT, INS, OUTS | I/O permission paths inspected; byte/word string address-size gap X86-22 |
 | Jcc, SETcc | All 512 condition/flag combinations pass; transfer target size/limit and memory-fault issues remain |
 | LOOP, LOOPE/LOOPZ, LOOPNE/LOOPNZ, JCXZ/JECXZ | Counter-selection handlers inspected; target/fetch boundaries need integrated tests |

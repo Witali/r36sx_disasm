@@ -470,11 +470,11 @@ must retain the latest comparison result. The 8086/286 hot loops do not
 capture this context. The runner requires the live binary's logged
 `micro_exec` budget to be below 1025 (currently 100), so the long REP must
 span CPU calls and retain its entry image across those boundaries.
-Remaining work includes real/v86,
-SS-override faults, split operands, IRQ/NMI and the last-iteration #DB boundary.
+Remaining work includes real/v86, SS-override faults, split operands and
+IRQ/NMI. The per-iteration and final #DB boundaries are tested below.
 
 References: [Intel 80386 PRM REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm),
-[PRM 9.3 restart](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_03.htm),
+[PRM 9.1 exception classes](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_01.htm),
 [PRM 12.3 debug exceptions](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s12_03.htm),
 and [Intel SDM 325383-060US vol.2B p.4-551](https://kib.kiev.ua/x86docs/Intel/SDMs/325383-060.pdf).
 The explicit REPE/REPNE CMPS/SCAS fault-time EFLAGS restoration rule comes
@@ -484,6 +484,57 @@ section 1.2.6 and CMPS/SCAS entries corroborate count, ZF termination and
 operand/flag rules; that text does not explicitly specify the fault-time
 flags rollback. These are vendor-authored manuals hosted on mirrors, not
 physical Intel/AMD 386 validation results.
+
+## String single-step and final-iteration regression ROM
+
+`cpu386_string_traps.asm` checks 1128 CPL3 cases (4440 single-step traps):
+MOVS/STOS/LODS/CMPS/SCAS byte/word/dword forms, CS.D=0/1, address16/32,
+both DF directions, REP and comparison REPE/REPNE. Counts are 0/1/3/17,
+with non-REP controls that preserve a count sentinel. CMPS/SCAS additionally
+stop on ZF at the first, middle or last of three elements. Zero-count REP
+uses null DS/ES/FS/GS selectors: any attempted operand access must fail.
+Addr32 operands lie above offset 64 KiB; addr16 has nonzero high-half
+sentinels that must be preserved but ignored for addressing/count selection.
+
+An interrupt-gate #DB handler checks every completed element before IRETD:
+GPRs (including untouched high halves), count, indexes, partial AL/AX loads,
+defined 386 flags, DR6.BS, CS/EIP/SS/ESP, data selectors, source contents,
+destination progress and guard elements. The expected state comes from the
+case table and an independent trap counter, not observed guest registers.
+The last trap clears TF and returns to INT 30h, which verifies completion
+and the exact trap count. Intermediate traps must return to the first prefix;
+the last trap must return past the instruction on either count or ZF exit.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Tag string-traps-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-mingw -VerifyOracle
+```
+
+The baseline GCC build at `abe8eda` fails case 12/check 2/step 1: REP LODSB
+with count 1 saves EIP=0 instead of 2. The byte/word and dword CMPS/SCAS/LODS
+handlers now rewind only when a REP iteration remains. Both switch/MSVC and
+computed-goto/GCC builds pass the matrix. `-VerifyOracle` demands a specific
+failure at case 2/check 2 when a control ROM incorrectly expects EIP=0 after
+the last MOVSB; crashes, timeouts and other failures do not count as success.
+The runner assembles/scans a 64 KiB ROM, attaches no disks and restores the
+build config. Check IDs: 1 trap count, 2 EIP, 3 CS, 4 saved flags, 5 live
+handler TF/IF, 6 SS, 7 GPRs, 8 data selectors, 9 DR6, 10 memory, 11 case count.
+
+References are vendor-authored manuals on mirrors:
+[Intel 80386 PRM 12.3.1.4](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s12_03.htm),
+[9.1](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_01.htm),
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm) and
+[LODS](https://www.scs.stanford.edu/05au-cs240c/lab/i386/LODS.htm).
+[Intel B1 stepping information, 1987-09-01](https://docs.pcjs.org/manuals/intel/80386/80386_B1-1987-09-01.pdf),
+erratum 5, explicitly distinguishes intended per-element stepping from the
+early chip's two-element REP MOVS behavior; this test targets architectural
+behavior, not that erratum. [AMD APM vol.2 rev.3.25](https://kib.kiev.ua/x86docs/AMD/AMD64/24593_APM_v2-r3.25.pdf)
+sections 3.1 (TF), 13.1.3.2 and 13.1.4 corroborate trap frames, partial REP
+resumption and BS/TF handling. The old 13.1.4 sentence excluding the following
+instruction contradicts its own section 3.1; Intel's generation-specific TF
+rule is authoritative here. No modern RF, BTF or fast-string rules are imported.
+This does not certify real/v86 stepping, SS-override/split-operand faults,
+hardware data breakpoints, INS/OUTS, IRQ/NMI or a physical Intel/AMD chip.
 
 ## IRET privilege and flags regression ROM
 

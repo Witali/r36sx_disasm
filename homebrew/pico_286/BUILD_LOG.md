@@ -1,5 +1,90 @@
 # pico-286 Build Log
 
+## 2026-09-27 REP last-iteration single-step instruction pointer
+
+Fixed count exhaustion in CMPSB/W/D, SCASB/W/D and LODSB/W/D. The handlers
+previously rewound IP even after CX/ECX reached zero, causing the final #DB
+trap to report REP again and exposing an extra empty iteration. Only an
+unfinished repetition now rewinds; ZF exits and zero-count entry are retained.
+Comments explain the retirement boundary in the shared and operand32 paths.
+
+Added `tests/cpu386_string_traps.asm` and its bounded Windows runner. The
+1128-case CPL3 matrix checks 4440 TF traps across five memory-string families,
+CS.D/operand/address sizes, DF, count and comparison-ZF termination. Addr32
+operands exceed 64 KiB, addr16 uses nonzero upper-half sentinels, and zero
+REP uses null data selectors. Every trap checks independent expected GPRs,
+flags, frame, selectors, DR6 and source/destination memory with guard elements.
+The final IRETD disables TF, then INT 30h verifies exact completion/trap count.
+
+The final ROM fails the old GCC EXE built at `abe8eda` (SHA256
+`8A38B36F3092513F20A5659AA0D781FFC74EFB9A1CB304704C42AA42A6F03A5A`)
+at case 12/check 2/step 1: REP LODSB saves EIP=0, expected 2. Both rebuilt
+MSVC and GCC EXEs pass. Both reject a deliberately wrong final-EIP oracle
+at case 2/check 2/step 1, got 2, wanted 0. The earlier development ROM
+produced the same baseline failure; final evidence is in
+`diagnostics/compiler-string-traps-final-before/`.
+
+Checked vendor-authored Intel 80386 PRM 9.1, 12.3.1.4, REP and LODS,
+Intel 80386 B1 erratum 5 (1987-09-01), and AMD APM vol.2 rev.3.25 sections
+3.1/13.1.3.2/13.1.4. Sources, the early stepping distinction and the AMD TF
+wording inconsistency are recorded in `tests/README.md`. Corrected its old
+"PRM 9.3 restart" link to 9.1: 9.3 describes interrupt priority, not exception
+classes. Also consulted Intel 286 PRM section 3.7.2's CX-zero termination
+rule via [manual transcription](https://dokumen.pub/80286-and-80287-programmers-reference-manual-p-7869156.html).
+The shared byte/word paths still compile for 8086/286; test286 was rerun,
+but this matrix does not establish full earlier-generation TF compatibility.
+X86-07 stays open for other fault, mode, watchpoint and interrupt cases.
+
+Commands (repository root; test runners attach no disks):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Tag string-traps-msvc-final -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-mingw-final -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Tag string-traps-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-faults-mingw-retry
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Tag string-traps-normal-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-normal-mingw -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag string-traps-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag string-traps-286-msvc -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag string-traps-286-mingw -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+All listed final runs passed: 2592 comparison-fault and 10752 normal-comparison
+cases per compiler, including wrong-CF oracle rejection; test386 and test286
+reach POST `80:FF`. test386 EE-output hash remains
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+An earlier GCC fault run was interrupted without completion; after confirming
+its process/session were gone, restored the generated build config from the
+source default and reran as `string-traps-faults-mingw-retry`. Final build
+config matches its source byte-for-byte. User patch config was never changed.
+
+Provenance: `971ce59` plus this CPU change, dirty=1. NASM 3.01 raw reset ROMs;
+MSVC 14.51 `/O2 /MT /Zi` switch dispatch; GCC 14.4.0 `-O2 -g -static` computed
+goto. Both builds succeeded with existing warnings, recorded in active patch
+`diagnostics/build-string-traps-{msvc,mingw}.log`. Test diagnostics use
+`diagnostics/compiler-<Tag>/`. Defender / `tools/scan-download.ps1` reported
+no threats for both EXEs and the positive/negative ROMs before execution.
+
+Artifacts in `homebrew/pico_286/build`, size and SHA256:
+
+- `cpu386_string_traps.bin`: 65536 bytes, raw F0000h reset ROM,
+  `9E0EF9559EDA87FB9DACED806793DD1AFCAD08FC12E8E142F2DB485A82FE6388`.
+- `cpu386_string_traps_bad_oracle.bin`: 65536 bytes, deliberately wrong oracle,
+  `87A91EB49D6A9F5774D2F9A8FB406FE8C83F32D313CE6CCAA122F86F2EA1D092`.
+- `pico_286_win.exe`: 833024 bytes, Windows x86-64 PE,
+  `220FFA0BE8D65AACDDF5E79DF69000194536E20445D9C61259D96B2B49AAF2D9`.
+- `pico_286_win_mingw.exe`: 3345177 bytes, Windows x86-64 PE,
+  `1B7E264EF75D49F6FC4361F318A8DD7C14CB7057A8D437C0F523D4B43C1ADBB1`.
+
+Copied both EXEs and the MSVC PDB to the active patch folder; EXE hashes
+match. The user's patch config stayed at SHA256
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`
+and is excluded from this commit. This is a regression milestone, not a claim
+that every 386 instruction or operating mode is fully tested.
+
 ## 2026-09-27 Requested Cygwin MinGW build at abe8eda
 
 Verified the existing `-Compiler MinGW` backend from `08acb110`; it already
