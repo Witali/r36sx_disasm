@@ -153,6 +153,13 @@ P2 items are narrower instruction/conformance gaps.
   sizes, DF, unaligned operands, segment aliases, disjoint controls and REP
   counts above the batch cap. Subsequent elements still see prior writes;
   whole-range memmove would be incorrect. Nonoverlapping memcpy is retained.
+  Coverage added 2026-09-27: `tests/cpu386_compare_strings.asm` checks 10752
+  normal-completion CMPS/SCAS cases across CS.D, address/element sizes, DF,
+  no/FS/GS/SS override, zero/short/1025 counts, both initial ZF values and
+  REPE/REPNE stop conditions. NASM calculates expected arithmetic flags;
+  both MSVC and GCC also reject a deliberately wrong CF oracle at case 0.
+  This exposed the separate IRET IF/IOPL restoration bug X86-18, now fixed.
+  It does not test exception-time flag restoration or close REP restart.
   Open: fixed-16-bit 286 progress, split-element faults, SS/segment overrides,
   real/v86 limit behavior, debug/IRQ interruption, CMPS/SCAS flag restart and
   other string families. The real-mode raw-copy path still needs watchpoint
@@ -439,7 +446,7 @@ Memory forms also inherit X86-04/08/09/10 even if their arithmetic is correct.
 | MOV, XCHG, LEA, XLAT, MOVSX, MOVZX, CBW/CWDE, CWD/CDQ | X86-03/23/26; checked memory/fault propagation remains a shared blocker |
 | PUSH, POP, PUSHA/PUSHAD, POPA/POPAD, ENTER, LEAVE | Stack restartability X86-05; bad POP encoding X86-23 |
 | PUSHF/PUSHFD, POPF/POPFD, LAHF, SAHF | Flag masks/privilege paths inspected; fault handling and IRET restore context still open |
-| MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | X86-06/07; test all operand/address-size combinations after abort logic is fixed |
+| MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | MOVS/STOS wrap/fault/overlap matrices and 10752 normal CMPS/SCAS cases pass on MSVC/GCC; X86-07 remains open for further fault, prefix, mode and interrupt coverage |
 | IN, OUT, INS, OUTS | I/O permission paths inspected; byte/word string address-size gap X86-22 |
 | Jcc, SETcc | All 512 condition/flag combinations pass; transfer target size/limit and memory-fault issues remain |
 | LOOP, LOOPE/LOOPZ, LOOPNE/LOOPNZ, JCXZ/JECXZ | Counter-selection handlers inspected; target/fetch boundaries need integrated tests |

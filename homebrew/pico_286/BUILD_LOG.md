@@ -1,5 +1,58 @@
 # pico-286 Build Log
 
+## 2026-09-27 CMPS/SCAS comparison and repetition matrix
+
+Added `tests/cpu386_compare_strings.asm` and its PowerShell runner. The ROM
+executes 10752 CPL3 cases for CMPSB/W/D and SCASB/W/D, CS.D=0/1,
+address16/32, both directions and no/FS/GS/SS overrides. Scenarios cover
+single comparisons, REPE/REPNE, zero/short/1025 counts, early/late matches,
+initial ZF=0/1 and IF preservation. Checks include all GPRs, six arithmetic
+flags, frame/selectors and unchanged source/destination buffers with guards.
+The README describes the exact matrix and uncovered fault/mode requirements.
+
+Expected subtraction flags come from NASM bit formulas, not the emulator's
+CMP helper. `-VerifyOracle` additionally compiles a ROM with the expected CF
+inverted, and requires a precise failure at case 0/check 2 (`44h` vs `45h`).
+The pre-fix positive matrix exposed IF loss during the CPL0 -> CPL3 setup
+IRETD. That was independently reproduced and fixed in `8af3cd4`; no CMPS or
+SCAS implementation change was needed for the normal-completion matrix.
+
+References checked: Intel 80386 PRM chapter 17
+[CMPS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/CMPS.htm),
+[SCAS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/SCAS.htm) and
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm), plus
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+CMPS pp.144-145, SCAS pp.285-286, table 1-4 and section 1.2.6. Manuals are
+vendor-authored, hosted on mirrors. The REP HTML pseudocode's ZF polarity
+conflicts with its prose; the test uses the prose/AMD termination rules.
+
+Commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Tag compare-strings-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-strings-mingw -VerifyOracle
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/cpu386_compare_strings.bin
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/cpu386_compare_strings_bad_oracle.bin
+```
+
+Both compilers passed all 10752 cases and rejected the corrupted oracle as
+expected. They use the same `09cf5d0` + IRET-fix EXEs documented in the IRET
+entry below; no additional executable rebuild was necessary. Diagnostics:
+`diagnostics/compiler-compare-strings-{msvc,mingw}/` and the corresponding
+`-oracle/` directories under the active patch. No user disks were attached.
+
+Both artifacts are NASM 3.01 raw F0000h ROMs, 65536 bytes, under
+`homebrew/pico_286/build`; Defender reported no threats. SHA256:
+
+| Artifact | SHA256 |
+| --- | --- |
+| `cpu386_compare_strings.bin` | `C33C40D3709315A4F535E91DF0EB3397A8DEEE5F372823A6CB849D85F045F562` |
+| `cpu386_compare_strings_bad_oracle.bin` | `7FF627DC5C14F5F9A2123953439FD1767CCA41FB8F6C59D0D95821C74C99D71D` |
+
+X86-07 remains open, especially REPE/REPNE fault-time EFLAGS restoration,
+split-element faults and asynchronous interruption. Full 386 conformance
+is not established by these successful normal-completion tests.
+
 ## 2026-09-27 IRET flags use the executing privilege (X86-18)
 
 Fixed protected outer-level IRET/IRETD in `r36sx_port/r36sx_cpu.c`: restore

@@ -275,7 +275,9 @@ The pre-fix MSVC binary fails case 0's memory comparison after MOVSB reads
 The runner restores its temporary build config and never attaches user disks.
 This matrix covers index wrapping, not all string semantics: segment/page
 fault restart, overlap, debug traps, segment overrides, real/v86 limits,
-and the remaining LODS/CMPS/SCAS/INS/OUTS families need separate tests.
+and the remaining LODS/INS/OUTS families need separate tests. Normal
+CMPS/SCAS completion is covered by the comparison ROM below; its fault
+restart behavior is not yet covered.
 
 Specifications: Intel 80386 PRM chapter 17
 [MOVS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOVS.htm),
@@ -376,6 +378,58 @@ word or dword assignment before index changes) and
 string operation per iteration); [AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf),
 MOVS pp.228-229 and section 1.2.6. These are vendor-authored manuals on
 mirrors; only 386-applicable legacy rules are used.
+
+## CMPS/SCAS normal-completion regression ROM
+
+`cpu386_compare_strings.asm` checks 10752 CPL3 protected-mode cases through
+the actual decoder. The matrix combines CS.D=0/1, address16/32, byte/word/dword
+CMPS and SCAS, both DF values, and no/FS/GS/SS override. Each combination has
+56 scenarios: two opposite initial arithmetic-flag patterns (including both
+ZF and IF values), twelve single-comparison operand pairs, and eight repeat
+profiles for each of REPE and REPNE. Counts are 0, 1, 5 and 1025, with stops
+at the first, middle or last comparison, or by exhausting the count.
+
+The NASM `PAIR` macro computes CF/PF/AF/ZF/SF/OF from scalar bit formulas,
+independently of guest CMP/SUB. Operand pairs include zero/equality, unsigned
+borrow, signed overflow, auxiliary carry and low-byte parity boundaries.
+REP cases use equal/unequal patterns and verify the flags of the final
+comparison, not the entry ZF. A zero count preserves flags and performs no
+operand read even with null data selectors. SCAS uses null DS/FS/GS selectors
+to detect an erroneous source access and must ignore source overrides.
+
+Indexes cross the 64 KiB boundary without splitting individual elements.
+The checker verifies SI/DI wrapping and high-half preservation for addr16,
+full ESI/EDI progress for addr32, CX/ECX consumption, all other GPRs, IF/DF,
+CS:EIP, SS:ESP and data selectors. Source regions, the ES region and two guard
+elements at each end must remain unchanged. SCAS must leave ESI unchanged.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-strings-mingw -VerifyOracle
+```
+
+The runner assembles a 64 KiB F0000h ROM and requires POST `80:FF` plus
+`CPU386 COMPARE STRINGS PASS cases=10752`. Checks 1/2/3/4 identify GPRs,
+flags/frame/selectors, memory and final count. `-VerifyOracle` also builds a
+negative-control ROM with deliberately inverted expected CF; it must fail
+at case 0, check 2, observed `44h` versus expected `45h`. A crash, timeout,
+wrong failure or unexpected success does not pass that control.
+
+No disk images are attached; the runner restores the build config. MSVC and
+GCC pass both the normal and negative-control runs after the separate IRET
+flags fix. This is not complete CMPS/SCAS or REP coverage: real/v86 modes,
+split elements, all segment-prefix encodings, asynchronous interrupts/debug
+traps, and #GP/#SS/#PF restart with EFLAGS restoration remain separate work.
+
+References: Intel 80386 PRM chapter 17
+[CMPS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/CMPS.htm),
+[SCAS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/SCAS.htm),
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm), and
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+CMPS pp.144-145, SCAS pp.285-286, table 1-4 and section 1.2.6. These are
+vendor-authored manuals on mirrors. The Intel REP HTML pseudocode has
+transposed ZF stop conditions; its prose and AMD agree that REPE stops on
+ZF=0 and REPNE on ZF=1, after executing a comparison when count is nonzero.
 
 ## IRET privilege and flags regression ROM
 
