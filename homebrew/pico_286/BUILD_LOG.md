@@ -1,5 +1,48 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW verification at a912040
+
+Rebuilt the requested native Windows GCC variant from `a912040` using the
+existing `-Compiler MinGW` backend (introduced in `08acb110`). No duplicate
+backend or CPU changes were needed; MSVC remains the default. The local patch
+configuration and untracked MOVS overlap tests were left untouched. Build
+metadata reports dirty=1 because the patch configuration differs from Git.
+
+Commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+& tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-a912040-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-a912040-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+Cygwin MinGW-w64 GCC 14.4.0, `-O2 -g -static`, computed goto enabled.
+Build succeeded with existing warnings, including FPU/VGA uninitialized-value,
+CPU longjmp-clobber, format-truncation and unused-variable diagnostics; this
+verification does not resolve or suppress them. Full output is in the patch
+`diagnostics/x86-audit/build-cygwin-a912040.log`.
+
+The PE x86-64 executable is 3,338,485 bytes, SHA256
+`534C0C3DC7B1E3E5C1F3A3465AA139ADE230F32AB761A7B24696392B8D288F49`.
+Defender scan completed successfully with no threats. Imports are dbghelp,
+GDI32, KERNEL32, msvcrt, USER32 and WINMM only: no Cygwin or additional MinGW
+runtime DLL, consistent with [Cygwin FAQ 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both BIOS tests reached POST `80:FF`, with a responsive debug mailbox and
+614,400-byte RGB565 framebuffer (test386 nonblank; test286 blank allowed).
+Test386 EE output SHA256 is unchanged:
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+Diagnostics are under `diagnostics/compiler-cygwin-a912040-{386,286}/`.
+These are compiler/startup smoke tests, not complete CPU conformance coverage.
+
+Copied the EXE to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe`;
+source and destination hashes match. The primary MSVC EXE was not replaced.
+Patch config SHA256 remained
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 X86-07: preserve 386 REP progress across memory faults
 
 Generic MOVS/STOS now commit SI/DI (or ESI/EDI) and CX/ECX after each
