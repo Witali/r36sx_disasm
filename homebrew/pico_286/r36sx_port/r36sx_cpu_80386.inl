@@ -923,6 +923,13 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* INC/DEC/CALL/JMP/PUSH r/m32 */
         case 0xFF:
             modregrm();
+            /* Far CALL/JMP take a selector:offset pair from memory only.
+             * Reject mod=register before any operand read or stack update. */
+            if ((reg == 3u || reg == 5u) &&
+                mode == R36SX_MODRM_MOD_REGISTER) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return true;
+            }
             switch (reg) {
                 case 0: { /* INC Ev */
                     uint8_t saved_cf = cf;

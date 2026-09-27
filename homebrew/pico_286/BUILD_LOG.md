@@ -1,5 +1,54 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-23: reject register-form far CALL/JMP
+
+The operand32 FF group now rejects register-form /3 (far CALL) and /5 (far
+JMP) immediately after ModRM decode, before any pointer access or stack
+update. The word path already did so. Intel 80386 PRM CALL/JMP encode only
+memory far pointers; PRM 9.8.6 explicitly requires #UD for invalid operand
+types. AMD APM vol.3 rev.3.19 CALL (Far) p.129 and JMP (Far) p.190 confirm
+the same legacy rule. Full source links are in `tests/README.md`.
+
+Added `tests/cpu386_far.asm` and `test_cpu386_far.ps1`. The independent ROM
+checks 1,152 cases over code, operand, address and stack widths: 768 #UD,
+64 #GP(0), 96 read #PF and 224 successful same-ring transfers. It verifies
+CS:EIP, SS:ESP, all GPRs, flags, error frames, CR2, unchanged pointer memory
+and the exact return frame/canaries on the user stack. Target CS.D differs
+from the caller. Real/v86, gate/task transitions and further target/stack
+fault scenarios are explicitly not claimed covered by this matrix.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_far.ps1 -Tag far-before
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_far.ps1 -Tag far-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_far.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag far-mingw
+```
+
+The first command is the expected baseline failure: case 48 (`66 FF D8`)
+delivers #GP instead of #UD. Both rebuilt executables pass all 1,152 cases,
+40 fault cases, 26,528 LEA cases, and original test386. Its EE output remains
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+MSVC test286 also passes (POST FF). Existing build warnings remain.
+
+Source base `c9c35780` plus this change, dirty=1; MSVC `/O2` switch and
+GCC 14.4.0 `-O2 -g` computed goto. Build logs are in patch
+`diagnostics/x86-audit/build-far-{msvc,mingw}.log`; runtime artifacts are
+in `diagnostics/compiler-far-*`. Regression commands use the corresponding
+`test_cpu386_faults.ps1`, `test_cpu386_lea.ps1` and `smoke_windows_build.ps1`
+runners with the `far-` tags, without attaching disks or changing patch config.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 829952 | `3e124a4a5a93f000bdd0e5f4696ad595e2ff9f3acfc86660bfe52145c355db70` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3332237 | `6e39caa33dd41fe617f2b12eff311c94a5e304ce32a80c279fc9a6ed0f2798b1` |
+| `cpu386_far.bin` | Raw ROM at F0000h | 65536 | `d0aef12d64fe8835651017cb48de55f0f305fde79206887d40bcef768df4850f` |
+
+Defender via `tools/scan-download.ps1` found no threats in all three artifacts.
+Both Windows EXEs and MSVC PDB were copied to the active patch directory.
+No MIPS build, disk-image edits or config changes. X86-23's missing encoding
+checks are now closed; other far-transfer correctness findings remain open.
+
 ## 2026-09-27 X86-23: LEA encoding and effective-address matrix
 
 Completed the pending LEA decoder correction and standalone regression ROM.

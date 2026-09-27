@@ -236,7 +236,7 @@ P2 items are narrower instruction/conformance gaps.
   Test 67h with indexes above FFFFh and ECX=10000h, both REP and single forms.
   [Intel INS][ins], [Intel OUTS][outs].
 
-- [ ] **X86-23 / P2 / Source: operand32 dispatch omits invalid-ModRM checks.**
+- [x] **X86-23 / P2 / Source: operand32 dispatch omits invalid-ModRM checks.**
   I386:527 accepts register-source LEA; line 534 accepts non-/0 POP; line 926
   and the FF /5 path accept register-mode far indirect CALL/JMP. The word
   dispatch has checks which the earlier operand32 path bypasses.
@@ -254,6 +254,13 @@ P2 items are narrower instruction/conformance gaps.
   widths, all GPR destinations, offset truncation/zero extension and no
   operand access through null/short/unmapped segments. Far indirect CALL/JMP
   register forms still need fixing; the whole item remains open.
+  Final encoding fix 2026-09-27: operand32 FF /3 and /5 now reject mod=11
+  before pointer reads or stack writes. `cpu386_far.asm` adds 1,152 cases
+  across code/operand/address/stack sizes, invalid register encodings, valid
+  direct/indirect transfers and null-segment/missing-page pointer faults.
+  This closes the three missing decoder checks, not full CALL/JMP/POP/LEA
+  conformance. Real/v86 and other far-transfer paths remain test gaps; stack,
+  gate, target-width and restart issues retain their separate open entries.
 
 - [ ] **X86-24 / P2 / Source: descriptor-table operands bypass segment checks.**
   I386:1279 and following pass a linear EA to I286:795/803 table helpers

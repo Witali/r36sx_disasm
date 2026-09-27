@@ -202,6 +202,46 @@ Specifications: [Intel 80386 LEA](https://pdos.csail.mit.edu/6.828/2005/readings
 and [AMD APM vol.3 rev.3.19, LEA pp.195-196](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 Only original 386/legacy rules are used, not 64-bit addressing extensions.
 
+## Far CALL/JMP encoding and pointer regression ROM
+
+`cpu386_far.asm` runs 1,152 cases at CPL3 with paging. A table of 192 rows
+varies CS.D, operand size, address size, CALL/JMP and twelve operand forms:
+all eight invalid register sources, absolute memory through DS/FS/SS, and
+an immediate far pointer. Each row runs with SS.B=0/1 in three environments:
+accessible data, null data selectors, and a missing pointer page. Valid
+transfers enter a different code segment with the opposite CS.D; operands
+and return stack slots retain the calling instruction's operand size.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_far.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_far.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-far-mingw
+```
+
+Expected outcomes: 768 #UD, 64 #GP(0), 96 #PF(user read, non-present), and
+224 successful transfers. The test checks all GPRs, arithmetic flags/IF/DF,
+selectors, saved CS:EIP/SS:ESP, error-code layout and CR2. The user stack is
+checked byte-by-byte for exactly the CALL return frame or unchanged canaries;
+the high half of a dword CS slot is not asserted. Pointer memory must remain
+unchanged even when an access fails. Fall-through cannot count as success.
+No user disks are attached, and the build config is restored after execution.
+
+The pre-fix binary fails case 48 (`66 FF D8`) with #GP rather than #UD.
+Pass requires POST `80:FF` plus `CPU386 FAR PASS cases=1152`. A failure prints
+case/check/value. Case = context * 192 + row; context = data scenario * 2 +
+SS.B. Row ordering is CS.D, operand width, address width, CALL/JMP, operand
+form. Check IDs are vector/error frame, GPRs/ESP, selectors/flags, EIP,
+CR2, stack bytes, pointer bytes and total case count.
+
+This is not full far-transfer conformance: real/v86, call/task gates, target
+descriptor faults, split pointer reads, call-stack faults and targets above
+FFFFh require additional matrices. Those remain separate audit work.
+
+Specifications: [Intel 80386 CALL](https://pdos.csail.mit.edu/6.828/2005/readings/i386/CALL.htm),
+[JMP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/JMP.htm),
+[PRM 9.8.6, invalid operand type and #UD](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
+and [AMD APM vol.3 rev.3.19, CALL (Far) pp.124-130 / JMP (Far) pp.187-191](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+AMD64-only exceptions and instructions are not imported into 386 behavior.
+
 ## test386.asm
 
 `test386.asm` is vendored from:
@@ -254,8 +294,8 @@ the native executable.
 ## test286.asm
 
 `test286.asm` is a small R36SX-specific NASM BIOS replacement ROM for 80286
-smoke testing.  It is not a full instruction conformance suite like
-`test386.asm`; it focuses on compact POST-driven coverage for 286 behavior:
+smoke testing. Like `test386.asm`, it does not prove complete instruction
+conformance; it focuses on compact POST-driven coverage for 286 behavior:
 
 - real-mode `PUSH SP`, `PUSHA`/`POPA`, 5-bit shift-count masking, `IMUL`,
   `BOUND`, `SGDT`, `SIDT`, and `SMSW`;
