@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW request: rebuild and 286/386 smoke checks
+
+Confirmed that the requested compiler option is already implemented by
+`08acb110`: `-Compiler MinGW` selects Cygwin's MinGW-w64 cross-compiler,
+while MSVC remains the default. No further compiler-selection code change
+was necessary. Rebuilt the current working tree at `1a3b1f80` (dirty=1),
+preserving the pre-existing CPU/test edits and patch configuration. This
+binary includes the existing uncommitted CPU trace change; the unrelated
+in-progress fault-test ROM was neither modified nor used for this check.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag mingw-recheck-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag mingw-recheck-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+Copy-Item -LiteralPath homebrew/pico_286/build/pico_286_win_mingw.exe -Destination patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+GCC 14.4.0, target `x86_64-w64-mingw32`, `-O2 -g`, computed goto and
+static GCC support libraries. Compilation/linking succeeded with 45 existing
+warning diagnostics; this was not a warning-cleanup task. Output is PE32+
+x86-64, 3328014 bytes, SHA256
+`b37679e6b7daa39513c37a13885ca0459ed903d6ecb515ccb43629b7db7cfc54`.
+The patch copy has the same hash. Defender found no threats. Imports are
+dbghelp, GDI32, KERNEL32, msvcrt, USER32 and WINMM only: no `cygwin1.dll`
+or extra MinGW runtime DLLs. Rechecked the distinction between the Cygwin
+compiler host and native Windows target against the
+[official Cygwin FAQ, section 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both smoke tests reached POST `80:FF` and answered register/framebuffer
+queries. test386 produced a nonblank 640x480 RGB565 frame and the same EE
+output SHA256 as the earlier compiler checks:
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+test286 emitted its PASS message in CPU 80286 mode; its port-only output
+permits a blank frame. These are build/runtime smoke checks, not complete
+instruction conformance or DOS application tests.
+
+Diagnostics are under the active patch's `diagnostics/`:
+`x86-audit/build-mingw-recheck.log` and `compiler-mingw-recheck-{386,286}/`.
+The test runner restored the build configuration. Patch configuration hash
+remained `36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`;
+no disk images were attached or edited. The MSVC executable was not replaced.
+No downloads, package installation, MIPS build or guest-code changes.
+
 ## 2026-09-27 X86-04: stop opcodes after exception delivery
 
 Added an instruction escape boundary to the 286/386 interpreter. `setjmp`
