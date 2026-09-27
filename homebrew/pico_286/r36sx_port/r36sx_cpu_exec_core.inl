@@ -276,6 +276,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         register uint8_t oper1b;
         register uint8_t oper2b;
 #if R36SX_CPU_CORE_HAS_386_EXTENDED_OPS
+        r36sx_cpu_rep_compare_begin(opcode, firstip);
         if (R36SX_CPU_CORE_OPERAND_SIZE_OVERRIDE &&
             r36sx_cpu_exec_operand32_opcode(opcode, firstip, execloops,
                                             &loopcount, tf || was_TF)) {
@@ -3949,6 +3950,10 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
         }
 #if R36SX_CPU_CORE_HAS_386_EXTENDED_OPS
 r36sx_opcode_done:
+        if (r36sx_rep_compare.active &&
+            (CPU_IP != firstip || !r36sx_rep_get_count())) {
+            r36sx_rep_compare.active = 0u;
+        }
 #endif
         if (unlikely(r36sx_cpu_maskable_interrupt_shadow != 0u)) {
             r36sx_cpu_maskable_interrupt_shadow--;

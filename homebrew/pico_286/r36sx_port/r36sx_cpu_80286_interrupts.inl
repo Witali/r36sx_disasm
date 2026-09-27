@@ -179,6 +179,9 @@ static uint8_t r36sx_cpu_protected_interrupt(uint8_t intnum,
     uint32_t gate_offset = (uint32_t)intnum * 8u;
     /* IDT selector-style error code: vector index plus the IDT source bit. */
     uint32_t gate_error = ((uint32_t)intnum << 3) | 0x02u;
+    /* A fault has already restored REP comparison flags in raise_exception.
+     * Interrupt/task-gate entry must discard its context even if delivery faults. */
+    r36sx_rep_compare.active = 0u;
     r36sx_pm_diag_log_idt_gate_if_interesting(
         intnum, software_int, fault_ip);
     if (r36sx_cpu_exception_delivery_should_abort()) {
@@ -529,6 +532,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
                                       uint8_t has_error_code,
                                       uint32_t fault_ip)
 {
+    r36sx_cpu_rep_compare_exception(intnum, fault_ip);
     if (r36sx_cpu_triple_fault_latched) {
         r36sx_cpu_exception_pending = 1u;
         r36sx_cpu_abort_instruction();

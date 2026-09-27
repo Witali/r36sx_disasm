@@ -1431,6 +1431,47 @@ static inline uint32_t r36sx_rep_get_count(void)
     return addressSizeOverride ? CPU_ECX : CPU_CX;
 }
 
+static struct {
+    uint32_t instruction_ip;
+    uint32_t flags;
+    uint16_t cs;
+    uint8_t active;
+} r36sx_rep_compare;
+
+static inline void r36sx_cpu_rep_compare_begin(uint8_t opcode, uint32_t firstip)
+{
+    /* CMPS/SCAS run one element per decode, possibly across host quanta.
+     * Keep the entry EFLAGS until this REP finishes or an event interrupts it.
+     * Intel SDM, REP: a fault restores entry flags, not the last comparison. */
+    if (reptype && r36sx_rep_get_count() &&
+        (opcode == 0xa6u || opcode == 0xa7u ||
+         opcode == 0xaeu || opcode == 0xafu)) {
+        if (!r36sx_rep_compare.active || r36sx_rep_compare.cs != CPU_CS ||
+            r36sx_rep_compare.instruction_ip != firstip) {
+            r36sx_rep_compare.flags = x86_flags.value;
+            r36sx_rep_compare.cs = CPU_CS;
+            r36sx_rep_compare.instruction_ip = firstip;
+            r36sx_rep_compare.active = 1u;
+        }
+    } else {
+        r36sx_rep_compare.active = 0u;
+    }
+}
+
+static inline void r36sx_cpu_rep_compare_exception(uint8_t vector,
+                                                  uint32_t fault_ip)
+{
+    if (r36sx_rep_compare.active && r36sx_rep_compare.cs == CPU_CS &&
+        r36sx_rep_compare.instruction_ip == fault_ip &&
+        (vector == R36SX_EXCEPTION_GP || vector == R36SX_EXCEPTION_STACK ||
+         vector == R36SX_EXCEPTION_PF)) {
+        x86_flags.value = r36sx_rep_compare.flags;
+    }
+    /* #DB traps retain comparison flags. After any handler/IRET the resumed
+     * REP has a new entry image; never reuse pre-handler flags for a re-fault. */
+    r36sx_rep_compare.active = 0u;
+}
+
 static inline void r36sx_rep_set_count(uint32_t count)
 {
     if (addressSizeOverride) {
@@ -6222,6 +6263,8 @@ static void r36sx_cpu_intcall86_real(uint8_t intnum) {
 
 
 void intcall86(uint8_t intnum) {
+    /* Hardware interrupts preserve flags from completed REP comparisons. */
+    r36sx_rep_compare.active = 0u;
     r36sx_pm_diag_log_interrupt(intnum);
 
     if (r36sx_cpu_protected_enabled()) {
@@ -6595,6 +6638,7 @@ static void r36sx_cpu_reset_interpreter_state(void)
     memset(&r36sx_tr_cache, 0, sizeof(r36sx_tr_cache));
 
     x86_flags.value = R36SX_FLAGS_ALWAYS_ONE;
+    r36sx_rep_compare.active = 0u;
     segoverride = 0;
     reptype = 0;
     lockPrefix = 0;

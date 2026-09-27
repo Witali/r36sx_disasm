@@ -1,5 +1,86 @@
 # pico-286 Build Log
 
+## 2026-09-27 REP CMPS/SCAS fault-time EFLAGS restoration
+
+Completed `tests/cpu386_compare_faults.asm` and its runner: 2592 CPL3
+cases covering CS16/32, operand/address widths, DF, REPE/REPNE, source or
+destination #GP/#PF after 0/2/1025 successful comparisons, zero-count and
+non-REP controls, and a TF trap after the first comparison. The fault
+handler changes stacked flags, deliberately re-faults before repair, then
+retries through IRETD. Buffers, guards, registers, progress, exception
+frames, CR2 and DR6.BS are checked. The live `micro_exec=100` budget is
+checked by the runner, proving that the long case spans interpreter calls.
+
+Baseline GCC EXE from `02a5c13` failed the new ROM at case 0/check 3:
+saved EFLAGS `244h` instead of masked entry EFLAGS `AD5h`. Earlier MSVC
+baseline evidence is in `diagnostics/compiler-compare-faults-before/`.
+The final expanded-ROM baseline is in
+`diagnostics/compiler-compare-faults-before-2592/`.
+
+The 386 decoder now retains a private REP comparison flag image across
+element redecodes and host quanta, restores it before operand-fault
+delivery, and discards it on completion, reset and exception/interrupt
+entry. #DB traps retain the completed comparison result. The new hot-loop
+capture/retirement code is excluded from the dedicated 8086/286 decoders.
+No arithmetic, count or index update is rolled back for completed elements.
+
+Checked Intel 80386 PRM REP, 9.3 and 12.3, Intel SDM 325383-060US vol.2B
+p.4-551 (explicit comparison-fault EFLAGS rule), and AMD APM vol.3 rev.3.19
+section 1.2.6/CMPS/SCAS for count, condition and flag behavior. Exact links
+and the distinction between Intel's explicit rollback rule and AMD's
+operand/repetition documentation are in `tests/README.md`. No later-generation
+instruction or feature was added. X86-07 remains open for SS overrides,
+split operands, real/v86 and further interrupt/string-family coverage.
+
+Builds and representative test commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Tag compare-faults-msvc-budget
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Tag compare-flags-normal-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-flags-normal-mingw -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Tag compare-flags-rep-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-flags-rep-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1 -Tag compare-flags-iret-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_iret_flags.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-flags-iret-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag compare-flags-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-flags-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag compare-flags-286-msvc -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-flags-286-mingw -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+All listed runs passed. Normal comparison matrices ran 10752 cases per
+compiler and rejected a deliberately wrong CF oracle at case 0. MOVS/STOS
+fault matrices passed 1080 cases and IRET flags matrices passed 1280 cases
+per compiler. test386 and test286 reached POST `80:FF`; test386's EE output
+hash stayed `F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+No disks were attached. This does not establish full instruction conformance.
+
+Build provenance: `8db8f6e` plus this CPU change, `dirty=1`; NASM 3.01 ROM,
+MSVC 14.51 `/O2 /MT /Zi` with switch dispatch, GCC 14.4.0 `-O2 -g -static`
+with computed goto. The first MSVC attempt failed because member `ip`
+collided with the existing `cpu.h` macro; renamed it to `instruction_ip`.
+Both final builds succeeded with existing warnings. Logs are under the
+active patch `diagnostics/build-compare-faults-{msvc,msvc-retry,mingw}.log`;
+test logs use `diagnostics/compiler-<Tag>/`.
+
+Artifacts under `homebrew/pico_286/build`, size and SHA256:
+
+- `cpu386_compare_faults.bin`: 65536 bytes, raw F0000h reset ROM,
+  `E6D62F65E2281D43AEC6774473C9D1563C39808D40F8E4F918DD620159481A63`.
+- `pico_286_win.exe`: 832512 bytes, Windows x86-64 PE,
+  `F5D0EDB94F3D3A13E92F1D4D741EC94778DADE9DE704B882BF6560F5E7C115B5`.
+- `pico_286_win_mingw.exe`: 3340106 bytes, Windows x86-64 PE,
+  `591AB6DA596401F4701728BC1A79D1D5692A9E7276A729A10839A268802B9361`.
+
+`tools/scan-download.ps1` / Defender reported no threats for the new ROM
+and both final EXEs before execution. Copied both EXEs and the MSVC PDB to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286`; EXE hashes match.
+The user's patch config was unchanged and excluded from the commit; SHA256
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 Cygwin MinGW build verified at 02a5c13
 
 The requested compiler backend is already implemented in `08acb110`:

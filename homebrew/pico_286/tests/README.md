@@ -327,9 +327,9 @@ The 386 helpers now commit progress after each completed element. Their raw
 RAM bulk path is reserved for real mode until a non-faulting page-aware probe
 is available. The dedicated 8086/286 helpers retain their existing contract.
 This is not complete REP coverage: split-element faults, SS overrides,
-real/v86 checks, debug/IRQ interruptions, CMPS/SCAS flag restoration
-and the remaining string families still require tests. The separate overlap
-matrix below covers RAM element ordering.
+real/v86 checks, debug/IRQ interruptions and the remaining string families
+still require tests. Separate matrices below cover RAM element ordering and
+CMPS/SCAS fault-time flags.
 
 References: [Intel 80386 REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm),
 [PRM 9.8.13/14, #GP/#PF](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
@@ -418,8 +418,8 @@ wrong failure or unexpected success does not pass that control.
 No disk images are attached; the runner restores the build config. MSVC and
 GCC pass both the normal and negative-control runs after the separate IRET
 flags fix. This is not complete CMPS/SCAS or REP coverage: real/v86 modes,
-split elements, all segment-prefix encodings, asynchronous interrupts/debug
-traps, and #GP/#SS/#PF restart with EFLAGS restoration remain separate work.
+split elements and all segment-prefix encodings remain separate work. The
+following fault matrix covers a subset of restart and debug interruption.
 
 References: Intel 80386 PRM chapter 17
 [CMPS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/CMPS.htm),
@@ -430,6 +430,60 @@ CMPS pp.144-145, SCAS pp.285-286, table 1-4 and section 1.2.6. These are
 vendor-authored manuals on mirrors. The Intel REP HTML pseudocode has
 transposed ZF stop conditions; its prose and AMD agree that REPE stops on
 ZF=0 and REPNE on ZF=1, after executing a comparison when count is nonzero.
+
+## CMPS/SCAS fault flags and debug interruption ROM
+
+`cpu386_compare_faults.asm` is a 64 KiB reset ROM with 2592 CPL3 cases:
+CS.D=0/1, byte/word/dword operands, address16/32, both DF directions,
+CMPS source/destination faults or SCAS destination faults, REPE/REPNE,
+and segment-limit, absent-PTE or supervisor-PTE failures. Source/destination
+pages use nonidentity mappings, with independent physical aliases for checks.
+Descending segment faults use expand-down descriptors.
+
+Each row runs six scenarios: fault after 2, 0 or 1025 completed elements;
+zero-count REP with an inaccessible operand; non-REP fault/retry; and #DB
+after one comparison followed by an operand fault after the second.
+The handler checks independent expected GPRs, CS/EIP/SS/ESP, arithmetic
+flags/IF/DF/TF, vector/error code, CR2, unchanged buffers and guard elements.
+The first fault leaves the operand inaccessible and changes stacked EFLAGS;
+the immediate re-fault must retain this new entry image. Only then does the
+handler repair the descriptor/PTE and resume to full completion via IRETD.
+The TF handler separately verifies comparison flags and DR6.BS, clears TF,
+and supplies another entry image for the resumed REP.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Tag compare-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag compare-faults-mingw
+```
+
+The unmodified GCC EXE at `02a5c13` fails case 0/check 3: saved flags are
+`244h` (last equal comparison) instead of `AD5h` (masked REP entry image).
+Pass requires POST `80:FF` AND `CPU386 COMPARE FAULTS PASS cases=2592`.
+Failure reports case/check/got/want; case = row * 6 + scenario. Check IDs
+1..6 have the same meanings as the MOVS/STOS fault ROM above. No disks are
+attached; the runner restores the build config.
+
+The 386 interpreter saves entry flags across per-element redecodes and host
+quanta, restores them before operand-fault delivery, and discards the context
+on instruction completion, reset, interrupt or exception entry. #DB traps
+must retain the latest comparison result. The 8086/286 hot loops do not
+capture this context. The runner requires the live binary's logged
+`micro_exec` budget to be below 1025 (currently 100), so the long REP must
+span CPU calls and retain its entry image across those boundaries.
+Remaining work includes real/v86,
+SS-override faults, split operands, IRQ/NMI and the last-iteration #DB boundary.
+
+References: [Intel 80386 PRM REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm),
+[PRM 9.3 restart](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_03.htm),
+[PRM 12.3 debug exceptions](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s12_03.htm),
+and [Intel SDM 325383-060US vol.2B p.4-551](https://kib.kiev.ua/x86docs/Intel/SDMs/325383-060.pdf).
+The explicit REPE/REPNE CMPS/SCAS fault-time EFLAGS restoration rule comes
+from the latter Intel manual, not an inferred arithmetic rule.
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+section 1.2.6 and CMPS/SCAS entries corroborate count, ZF termination and
+operand/flag rules; that text does not explicitly specify the fault-time
+flags rollback. These are vendor-authored manuals hosted on mirrors, not
+physical Intel/AMD 386 validation results.
 
 ## IRET privilege and flags regression ROM
 
