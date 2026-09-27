@@ -1,7 +1,11 @@
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
     [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$Tag = 'windows',
-    [ValidateRange(5, 300)][int]$Seconds = 60
+    [ValidateRange(5, 300)][int]$Seconds = 60,
+    [string]$Rom,
+    [string]$SuccessMessage,
+    [ValidateSet('8086', '80286', '80386')][string]$CpuModel = '80386',
+    [switch]$AllowBlankFrame
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,10 +46,11 @@ function Send-DebugCommand([string]$Text) {
 
 try {
     # Never attach user disks or touch the active patch config in a compiler test.
-    $Rom = Join-Path $Build 'test386.bin'
+    if (!$Rom) { $Rom = Join-Path $Build 'test386.bin' }
+    $Rom = (Resolve-Path $Rom).Path
     [IO.File]::WriteAllText($Config, @"
 [cpu]
-cpu_model=80386
+cpu_model=$CpuModel
 cpu_mhz=20
 [bios]
 bios=test386
@@ -71,7 +76,13 @@ debug_control_artifact_dir=.
     do {
         Start-Sleep -Milliseconds 500
         if ($Process.HasExited) { throw "Emulator exited: $($Process.ExitCode)" }
-        try { $Finished = (Read-LiveLog) -match 'post: port=0x080 code=0xff' }
+        try {
+            $CurrentLog = Read-LiveLog
+            if ($SuccessMessage -and $CurrentLog -match 'post: port=0x080 code=0xfe') {
+                throw "Regression ROM reported failure; see $Log"
+            }
+            $Finished = $CurrentLog -match 'post: port=0x080 code=0xff'
+        }
         catch [IO.IOException] { continue } # Retry a transient CRT sharing race.
     } while (!$Finished -and (Get-Date) -lt $Deadline)
     if (!$Finished) { throw "test386 did not reach POST 80:FF within $Seconds seconds" }
@@ -81,7 +92,9 @@ debug_control_artifact_dir=.
     Write-Output (Send-DebugCommand "screen $Frame")
     $Pixels = [IO.File]::ReadAllBytes($Frame)
     if ($Pixels.Length -ne 640 * 480 * 2) { throw 'Unexpected framebuffer size' }
-    if (($Pixels | Where-Object { $_ -ne 0 } | Select-Object -First 1).Count -eq 0) {
+    # Some CPU ROMs (test286) only report through ports and never draw to VGA.
+    if (!$AllowBlankFrame -and
+        ($Pixels | Where-Object { $_ -ne 0 } | Select-Object -First 1).Count -eq 0) {
         throw 'Blank framebuffer'
     }
 } finally {
@@ -93,6 +106,13 @@ debug_control_artifact_dir=.
     [IO.File]::WriteAllBytes($Config, $SavedConfig)
 }
 # MSVC's CRT can keep the result file open until shutdown.
-Get-FileHash (Join-Path $Diag 'test386-ee-output.txt') | Select-Object Hash
-Write-Output "PASS $Tag`: POST 80:FF, debug mailbox responsive, nonblank 640x480 RGB565 frame."
+if ($SuccessMessage) {
+    if ((Get-Content -LiteralPath $Log -Raw) -notmatch [regex]::Escape($SuccessMessage)) {
+        throw "ROM completion message missing: $SuccessMessage"
+    }
+} else {
+    Get-FileHash (Join-Path $Diag 'test386-ee-output.txt') | Select-Object Hash
+}
+$FrameDescription = if ($AllowBlankFrame) { '640x480 RGB565 frame (blank allowed)' } else { 'nonblank 640x480 RGB565 frame' }
+Write-Output "PASS $Tag`: POST 80:FF, debug mailbox responsive, $FrameDescription."
 Write-Output 'This is a compiler smoke test, not a full CPU conformance test.'

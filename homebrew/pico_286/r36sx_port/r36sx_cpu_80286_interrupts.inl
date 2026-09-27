@@ -531,6 +531,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
 {
     if (r36sx_cpu_triple_fault_latched) {
         r36sx_cpu_exception_pending = 1u;
+        r36sx_cpu_abort_instruction();
         return;
     }
 
@@ -541,6 +542,7 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
             intnum == R36SX_EXCEPTION_DOUBLE_FAULT) {
             r36sx_cpu_latch_triple_fault(
                 intnum, error_code, has_error_code, fault_ip);
+            r36sx_cpu_abort_instruction();
             return;
         }
 
@@ -643,9 +645,12 @@ static void r36sx_cpu_raise_exception(uint8_t intnum,
         if (saved_depth == 0u) {
             r36sx_cpu_exception_abort_delivery_depth = 0;
         }
+        /* Intel 80386 PRM 9.1: a fault is not a completed instruction. */
+        r36sx_cpu_abort_instruction();
         return;
     }
 
     intcall86(intnum);
+    r36sx_cpu_abort_instruction();
 }
 

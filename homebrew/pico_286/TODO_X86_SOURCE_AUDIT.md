@@ -85,6 +85,16 @@ P2 items are narrower instruction/conformance gaps.
   Introduce explicit instruction-abort semantics. Test a faulting MOV and an
   immediate-fetch #PF: neither may modify the new handler's registers/IP.
   [Intel exception classification][faults], [Intel MOV][mov].
+  Partial fix 2026-09-27: a quantum-scoped setjmp/longjmp boundary now
+  stops the opcode after exception delivery, including nested delivery and
+  its stale single-step epilogue. No per-access escape check or 8086 escape
+  point was added. The integrated `tests/cpu386_faults.asm` ROM checks 34
+  MOV/fetch/TF/nested-delivery cases on MSVC and GCC, with real segmentation
+  and paging; the old EXE fails its first null-DS MOV. Full restart state is
+  still open: earlier flag/register/memory commits in RMW/compound opcodes,
+  stack rollback (X86-05), REP progress (X86-07), and incoming-task state
+  (X86-15) are not repaired by the escape boundary. Do not close this item
+  solely because the new ROM passes.
 
 - [ ] **X86-05 / P1 / Source: stack operations commit SP and results too early.**
   CPU:2504, `push`, `pop`, `push32`, `pop32`, update SP before a successful

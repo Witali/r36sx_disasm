@@ -1,5 +1,68 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-04: stop opcodes after exception delivery
+
+Added an instruction escape boundary to the 286/386 interpreter. `setjmp`
+runs once per quantum; exception delivery uses `longjmp` to abandon the
+faulting opcode and all older nested-delivery frames. The handler remains
+installed, the stale instruction debug-trap epilogue is skipped, and internal
+delivery/watchpoint-suppression state is restored. The loop counter is copied
+before the jump and reassigned after it, avoiding C's indeterminate-local
+rule. All interpreter exits release the escape context. The 8086 core does
+not install it. A latched triple fault stops further dispatch until reset.
+
+This is a shared abort foundation, not a blanket guest snapshot rollback.
+Stack/REP/RMW/task restart details remain open in `TODO_X86_SOURCE_AUDIT.md`.
+References and exact test scope are recorded in `tests/README.md`: Intel
+80386 PRM 9.1, 9.8 and MOV; AMD APM vol. 3 rev. 3.19 MOV pp. 213-215.
+
+Added `tests/cpu386_faults.asm` and `tests/test_cpu386_faults.ps1`. The
+standalone ROM exercises production decode, segmentation, paging and IDT
+delivery. The old MSVC EXE failed the first null-DS byte MOV: EAX changed
+after #GP delivery. Both rebuilt compilers pass all 34 cases, including
+word/dword and address-size overrides, immediate/opcode fetch #PF, TF and
+nested #DF delivery. POST 190h holds the zero-based case index; success
+requires both POST 80:FF and `CPU386 FAULTS PASS cases=34`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag fault-msvc-final
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag fault-mingw-final
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag fault-test386-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag fault-test386-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag fault-test286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit
+```
+
+MSVC `/O2` (switch) and GCC `-O2` (computed goto) builds succeeded, with
+existing warnings. The old test386 also reaches POST FF on both, and its
+EE output remains SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+test286 reaches PASS/FF with CPU 80286. Its first smoke run correctly reached
+PASS but failed the unrelated nonblank-frame assertion: this ROM only prints
+to ports. Added the explicit `-AllowBlankFrame` option, retaining dimension,
+mailbox, POST and text checks; the subsequent run passed. Other runs still
+require a nonblank frame. UBSan probes retain 9 passing groups and 3 known
+failures (signed BT indexes and REP addr16 wrap), so full conformance is not
+claimed. Initial NASM assembly needed a label-to-scalar expression fix.
+
+Artifacts built from `c6801ce` plus these changes (dirty=1):
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 830464 | `afd89d7cc55e10c6ac16c1b1f1695a3e79e27ba45d6d49cb2bcbf790e6d9358b` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3327037 | `0250075373aaf48b7d6489a11cb5ab35370d4221472f35fce250ba1f620f7f37` |
+| `cpu386_faults.bin` | 80386 raw ROM, F0000h | 65536 | `21a28fe8cbe12c742318f1694c5f2501f2bc107a936f586a845adb0ac7ad506b` |
+
+Defender via `tools/scan-download.ps1` found no threats in both EXEs and the
+ROM. Copied both EXEs and the MSVC PDB to the active patch; did not change
+its config or attach/edit disks. The default ROM was not replaced. Logs and
+frames are under patch `diagnostics/compiler-fault-*`; build logs are
+`diagnostics/x86-audit/build-fault-{msvc,mingw}.log`. No downloads or MIPS
+build. The broad CPU goal remains active; this fixes one shared failure
+mechanism and adds executable coverage, not a test for every instruction.
+
 ## 2026-09-27 Cygwin MinGW rebuild from committed compiler support
 
 Reverified the requested Cygwin MinGW-w64 path from commit `08acb110` with

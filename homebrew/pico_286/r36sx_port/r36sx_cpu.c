@@ -1,6 +1,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <string.h>
+#include <setjmp.h>
 #if !defined(_WIN32)
 #include <unistd.h>
 #endif
@@ -438,6 +439,29 @@ static uint8_t r36sx_cpu_exception_delivery_depth;
 static uint8_t r36sx_cpu_exception_delivery_vector;
 static uint8_t r36sx_cpu_exception_abort_delivery_depth;
 static uint8_t r36sx_cpu_triple_fault_latched;
+/*
+ * One escape point per interpreter quantum, not per memory access. Once an
+ * exception has been delivered, no caller may consume a sentinel read value
+ * or execute the rest of the interrupted opcode. The 8086 core installs no
+ * escape point. Guest state rollback/progress is handled by each instruction;
+ * blindly restoring a snapshot would undo REP progress or a task transition.
+ */
+typedef struct {
+    jmp_buf target;
+    const uint32_t *loopcount;
+} r36sx_cpu_instruction_escape_t;
+static r36sx_cpu_instruction_escape_t *r36sx_cpu_instruction_escape;
+static uint32_t r36sx_cpu_aborted_loopcount;
+
+static void r36sx_cpu_abort_instruction(void)
+{
+    if (r36sx_cpu_instruction_escape) {
+        /* Capture while the source stack frame is still live, before longjmp. */
+        r36sx_cpu_aborted_loopcount = *r36sx_cpu_instruction_escape->loopcount;
+        longjmp(r36sx_cpu_instruction_escape->target, 1);
+    }
+}
+
 static uint32_t r36sx_dr[R36SX_386_REGISTER_COUNT];
 static uint32_t r36sx_tr[R36SX_386_REGISTER_COUNT];
 static uint16_t r36sx_debug_resume_cs;

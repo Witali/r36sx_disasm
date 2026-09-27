@@ -53,9 +53,40 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
     static bool was_TF;
     uint32_t loopcount = 0;
 
+#if !R36SX_CPU_CORE_8086_ONLY
+    r36sx_cpu_instruction_escape_t escape;
+    r36sx_cpu_instruction_escape_t *const previous_escape =
+        r36sx_cpu_instruction_escape;
+    const uint8_t saved_suppression = r36sx_debug_suppress_watchpoints;
+    const uint8_t saved_delivery_depth = r36sx_cpu_exception_delivery_depth;
+    const uint8_t saved_delivery_vector = r36sx_cpu_exception_delivery_vector;
+    const uint8_t saved_abort_depth = r36sx_cpu_exception_abort_delivery_depth;
+    escape.loopcount = &loopcount;
+    r36sx_cpu_instruction_escape = &escape;
+    if (setjmp(escape.target)) {
+        /*
+         * The handler is already installed. Skip the interrupted opcode and
+         * its debug-trap epilogue. A nested delivery must also abandon every
+         * older delivery frame, not resume pushing onto the new handler stack.
+         * Reassign loopcount: non-volatile locals modified since setjmp cannot
+         * be read after longjmp (C11 7.13.2.1).
+         */
+        loopcount = r36sx_cpu_aborted_loopcount + 1u;
+        was_TF = false;
+        r36sx_debug_pending_dr6_hits = 0;
+        r36sx_debug_suppress_watchpoints = saved_suppression;
+        r36sx_cpu_exception_delivery_depth = saved_delivery_depth;
+        r36sx_cpu_exception_delivery_vector = saved_delivery_vector;
+        r36sx_cpu_exception_abort_delivery_depth = saved_abort_depth;
+    }
+    if (r36sx_cpu_triple_fault_latched) {
+        goto r36sx_exec_done;
+    }
+#endif
+
     //counterticks = (uint64_t) ( (double) timerfreq / (double) 65536.0);
     //tickssource();
-    for (loopcount = 0; loopcount < execloops; loopcount++) {
+    for (; loopcount < execloops; loopcount++) {
         uint8_t maskable_irq_shadowed = r36sx_cpu_maskable_interrupt_shadow;
         if (unlikely(hltstate)) {
             if (unlikely(ifl && !maskable_irq_shadowed &&
@@ -74,8 +105,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 hltstate = 0;
                 intcall86(nextintr());
             } else {
-                r36sx_app_stats_record_x86(loopcount);
-                return;
+                goto r36sx_exec_done;
             }
         } else if (unlikely(ifl && !maskable_irq_shadowed &&
                             r36sx_cpu_pending_maskable_irq())) {
@@ -107,8 +137,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
 
         if (unlikely(r36sx_cpu_debug_host_breakpoints_active &&
                      r36sx_cpu_debug_host_breakpoint_check(firstip))) {
-            r36sx_app_stats_record_x86(loopcount);
-            return;
+            goto r36sx_exec_done;
         }
 #if R36SX_CPU_CORE_HAS_386_DEBUG_REGS
         if (unlikely(r36sx_cpu_debug_check_execute_breakpoint(firstip))) {
@@ -3672,7 +3701,8 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 #endif
                 hltstate = 1;
-                return;
+                loopcount++;
+                goto r36sx_exec_done;
 
             case 0xF5:
 #if R36SX_CPU_CORE_COMPUTED_GOTO
@@ -3932,6 +3962,10 @@ r36sx_opcode_done:
         }
 #endif
     }
+r36sx_exec_done:
+#if !R36SX_CPU_CORE_8086_ONLY
+    r36sx_cpu_instruction_escape = previous_escape;
+#endif
     r36sx_app_stats_record_x86(loopcount);
 }
 
