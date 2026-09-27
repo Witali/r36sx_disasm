@@ -2146,12 +2146,20 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
 #endif
                 /* 86 XCHG Gb Eb */
                 modregrm();
-
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
                 oper1b = getreg8(reg);
-                putreg8(reg, readrm8(rm)
-                );
-                writerm8(rm, oper1b
-                );
+                oper2b = readrm8(rm);
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
+                /* Keep address-register bytes unchanged until the memory write. */
+                writerm8(rm, oper1b);
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
+                putreg8(reg, oper2b);
                 break;
 
             case 0x87:
@@ -2160,12 +2168,20 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
 #endif
                 /* 87 XCHG Gv Ev */
                 modregrm();
-
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
                 oper1 = getreg16(reg);
-                putreg16(reg, readrm16(rm)
-                );
-                writerm16(rm, oper1
-                );
+                oper2 = readrm16(rm);
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
+                /* BX/BP/SI/DI may also determine the r/m operand's address. */
+                writerm16(rm, oper1);
+                if (!R36SX_CPU_CORE_8086_ONLY && r36sx_cpu_exception_is_pending()) {
+                    break;
+                }
+                putreg16(reg, oper2);
                 break;
 
             case 0x88:

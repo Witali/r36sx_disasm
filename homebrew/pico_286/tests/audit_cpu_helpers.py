@@ -16,7 +16,7 @@ PORT = ROOT / "r36sx_port"
 PROBES = ("conditions", "adc_sbb8", "idiv16_overflow", "idiv16_boundaries",
           "idiv32_overflow", "idiv32_boundaries", "idiv32_dividend_assembly",
           "bit_negative16", "bit_negative32",
-          "xchg_address_alias", "rep16_index_wrap")
+          "xchg_address_alias", "xchg_widths", "rep16_index_wrap")
 
 
 def between(text, start, end):
@@ -35,6 +35,7 @@ def main():
     common = (PORT / "r36sx_cpu.c").read_text(encoding="utf-8-sig")
     cpu86 = (PORT / "r36sx_cpu_8086.inl").read_text(encoding="utf-8-sig")
     cpu386 = (PORT / "r36sx_cpu_80386.inl").read_text(encoding="utf-8-sig")
+    core = (PORT / "r36sx_cpu_exec_core.inl").read_text(encoding="utf-8-sig")
 
     # Stubs record accesses; they deliberately do not add missing CPU checks.
     preamble = r"""
@@ -58,22 +59,70 @@ static bool operandSizeOverride, addressSizeOverride;
 static uint32_t ea, useseg_base, last_address, source_index, dest_index;
 static uint16_t CPU_ES, useseg;
 static uint32_t registers[8];
+static uint32_t memory_value = 0x2000, last_read_address, last_write_value;
+static unsigned memory_reads, memory_writes;
+static unsigned fault_stage;
+static bool exception_pending;
+#define R36SX_CPU_CORE_COMPUTED_GOTO 0
+#define R36SX_CPU_CORE_8086_ONLY 0
 #define getreg32(i) registers[i]
 #define getreg16(i) ((uint16_t)registers[i])
 #define putreg32(i, v) (registers[i] = (v))
-#define putreg16(i, v) (registers[i] = (uint16_t)(v))
-static void getea(uint8_t i) { ea = registers[i]; }
-static void modregrm(void) { mode = 0; reg = 0; rm = 0; }
+#define putreg16(i, v) (registers[i] = (registers[i] & 0xffff0000u) | (uint16_t)(v))
+static uint8_t getreg8(uint8_t i) {
+    return (uint8_t)(registers[i & 3] >> ((i & 4) ? 8 : 0));
+}
+static void putreg8(uint8_t i, uint8_t v) {
+    unsigned shift = (i & 4) ? 8 : 0;
+    registers[i & 3] = (registers[i & 3] & ~(255u << shift)) | (uint32_t)v << shift;
+}
+/* Model an EA dependent on the selected base register, not a full decoder. */
+static void getea(uint8_t i) {
+    ea = addressSizeOverride ? registers[i] : (uint16_t)registers[i];
+}
+static void modregrm(void) { if (fault_stage == 1) exception_pending = true; }
+static bool r36sx_cpu_exception_is_pending(void) { return exception_pending; }
 static uint8_t r36sx_cpu_check_segment_access(uint32_t a, uint32_t n,
                                              uint8_t w) {
     (void)a; (void)n; (void)w; return 1;
 }
-static uint32_t readdw86(uint32_t a) { last_address = a; return 0x2000; }
-static uint16_t readw86(uint32_t a) { last_address = a; return 0x2000; }
-static void writedw86(uint32_t a, uint32_t v) { (void)v; last_address = a; }
-static void writew86(uint32_t a, uint16_t v) { (void)v; last_address = a; }
-static uint32_t readrm32(uint8_t i) { getea(i); return readdw86(ea); }
-static void writerm32(uint8_t i, uint32_t v) { getea(i); writedw86(ea, v); }
+static uint32_t readdw86(uint32_t a) {
+    last_read_address = last_address = a;
+    memory_reads++;
+    if (fault_stage == 2) { exception_pending = true; return UINT32_MAX; }
+    return memory_value;
+}
+static uint16_t readw86(uint32_t a) { return (uint16_t)readdw86(a); }
+static void writedw86(uint32_t a, uint32_t v) {
+    if (fault_stage == 3) { exception_pending = true; return; }
+    last_address = a; last_write_value = v; memory_value = v;
+    memory_writes++;
+}
+static void writew86(uint32_t a, uint16_t v) { writedw86(a, v); }
+static uint32_t readrm32(uint8_t i) {
+    if (mode == 3) return getreg32(i);
+    getea(i); return readdw86(ea);
+}
+static uint16_t readrm16(uint8_t i) {
+    if (mode == 3) return getreg16(i);
+    getea(i); return readw86(ea);
+}
+static uint8_t readrm8(uint8_t i) {
+    if (mode == 3) return getreg8(i);
+    getea(i); return (uint8_t)readdw86(ea);
+}
+static void writerm32(uint8_t i, uint32_t v) {
+    if (mode == 3) { putreg32(i, v); return; }
+    getea(i); writedw86(ea, v);
+}
+static void writerm16(uint8_t i, uint16_t v) {
+    if (mode == 3) { putreg16(i, v); return; }
+    getea(i); writew86(ea, v);
+}
+static void writerm8(uint8_t i, uint8_t v) {
+    if (mode == 3) { putreg8(i, v); return; }
+    getea(i); writedw86(ea, v);
+}
 static uint32_t r36sx_src_index(void) { return source_index; }
 static uint32_t r36sx_dst_index(void) { return dest_index; }
 static void r36sx_set_src_index(uint32_t v) {
@@ -106,6 +155,12 @@ static void putmem8(uint16_t s, uint32_t o, uint8_t v) {
     xchg_case = between(cpu386, "        /* XCHG r/m32, r32 */", "        /* MOV r/m32, r32 */")
     slices.append("static bool xchg_probe(void) { switch (0x87) {\n" +
                   xchg_case + "} return false; }\n")
+    for opcode, name, locals_ in ((0x86, "byte", "uint8_t oper1b, oper2b;"),
+                                 (0x87, "word", "uint16_t oper1, oper2;")):
+        case = between(core, f"            case 0x{opcode:02X}:",
+                       f"            case 0x{opcode + 1:02X}:")
+        slices.append(f"static void xchg_{name}_probe(void) {{ {locals_} "
+                      f"switch (0x{opcode:02X}) {{\n" + case + "\n} }\n")
     group3 = between(cpu386, "static __not_in_flash() void op_grp3_32(",
                      "static inline uint32_t r36sx_read_moffs(")
     idiv_case = between(group3, "        case 7: { /* IDIV */", "\n    }\n}")
@@ -156,6 +211,83 @@ static int check_idiv32(int64_t dividend, int32_t divisor, bool decoded) {
                (long long)dividend, (long)divisor, decoded, divide_fault);
         return 1;
     }
+    return 0;
+}
+
+static uint32_t operand_reg(unsigned width, unsigned index) {
+    return width == 8 ? getreg8(index) :
+           width == 16 ? getreg16(index) : getreg32(index);
+}
+
+static void run_xchg(unsigned width) {
+    if (width == 8) xchg_byte_probe();
+    else if (width == 16) xchg_word_probe();
+    else xchg_probe();
+}
+
+static int test_xchg_widths(void) {
+    const unsigned widths[] = {8, 16, 32};
+    unsigned cases = 0;
+    for (unsigned w = 0; w < 3; w++)
+    for (unsigned addr32 = 0; addr32 < 2; addr32++)
+    for (unsigned index = 0; index < 8; index++)
+    for (unsigned fault = 0; fault < 4; fault++) {
+        unsigned width = widths[w];
+        reg = index;
+        rm = width == 8 ? (index & 3) : index;
+        mode = 0;
+        addressSizeOverride = addr32;
+        for (unsigned i = 0; i < 8; i++) registers[i] = 0x12341080u + i * 0x100;
+        uint32_t old_regs[8];
+        memcpy(old_regs, registers, sizeof(registers));
+        uint32_t old_value = operand_reg(width, reg);
+        uint32_t mask = width == 32 ? UINT32_MAX : (1u << width) - 1u;
+        uint32_t expected_address = addr32 ? registers[rm] : (uint16_t)registers[rm];
+        memory_value = 0x876520a5;
+        uint32_t expected_regs[8];
+        memcpy(expected_regs, registers, sizeof(registers));
+        unsigned shift = width == 8 && (index & 4) ? 8 : 0;
+        expected_regs[rm] = (expected_regs[rm] & ~(mask << shift)) |
+                            (memory_value & mask) << shift;
+        fault_stage = fault;
+        exception_pending = false;
+        memory_reads = memory_writes = 0;
+        cf = 1; pf = 0; af = 1; zf = 0; sf = 1; of = 1;
+        run_xchg(width);
+        bool bad = exception_pending != (fault != 0) ||
+                   cf != 1 || pf != 0 || af != 1 || zf != 0 || sf != 1 || of != 1;
+        if (fault) {
+            bad |= memcmp(old_regs, registers, sizeof(registers)) != 0 ||
+                   memory_writes != 0 || memory_value != 0x876520a5 ||
+                   memory_reads != (fault == 1 ? 0u : 1u);
+        } else {
+            bad |= memcmp(expected_regs, registers, sizeof(registers)) != 0 ||
+                   last_read_address != expected_address || last_address != expected_address ||
+                   last_write_value != old_value || memory_reads != 1 || memory_writes != 1;
+        }
+        if (bad) {
+            printf("XCHG mismatch: width=%u addr32=%u reg=%u fault=%u\n",
+                   width, addr32, index, fault);
+            return 1;
+        }
+        cases++;
+    }
+    fault_stage = 0;
+    exception_pending = false;
+    mode = 3;
+    for (unsigned w = 0; w < 3; w++)
+    for (unsigned src = 0; src < 8; src++)
+    for (unsigned dst = 0; dst < 8; dst++) {
+        for (unsigned i = 0; i < 8; i++) registers[i] = 0x1020a0b0u + i * 0x1123;
+        reg = src; rm = dst;
+        uint32_t a = operand_reg(widths[w], src), b = operand_reg(widths[w], dst);
+        memory_reads = memory_writes = 0;
+        run_xchg(widths[w]);
+        if (operand_reg(widths[w], src) != b || operand_reg(widths[w], dst) != a ||
+            memory_reads || memory_writes) return 1;
+        cases++;
+    }
+    printf("%u XCHG width/address/alias/fault cases passed\n", cases);
     return 0;
 }
 
@@ -238,6 +370,7 @@ int main(int argc, char **argv) {
         printf("write address=%08x expected=00001000\n", last_address);
         return last_address != 0x1000;
     }
+    if (!strcmp(argv[1], "xchg_widths")) return test_xchg_widths();
     if (!strcmp(argv[1], "rep16_index_wrap")) {
         source_index = 0xffff;
         r36sx_rep_movsb(2);

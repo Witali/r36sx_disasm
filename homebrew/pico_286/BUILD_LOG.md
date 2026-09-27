@@ -1,5 +1,32 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-03: preserve XCHG operand addresses
+
+Reordered XCHG byte/word/dword handlers to commit the r/m operand before
+changing the source register. Both EA evaluations now use the original
+registers. Added local abort checks for decode/read/write failures; those
+checks compile out in the specialized 8086 core.
+
+References: [Intel 80386 PRM XCHG](https://pdos.csail.mit.edu/6.828/2005/readings/i386/XCHG.htm)
+and [AMD APM vol. 3 rev. 3.19, XCHG pp. 316-317](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+
+Expanded the production-source probes to cover 8/16/32-bit operands, both
+address widths, high-byte aliases, all register/register pairings, flag
+preservation and injected decode/read/write faults. The original handlers
+failed both the address regression and the first byte-alias case. Fixed
+handlers pass all 384 added cases and the original address regression.
+
+```powershell
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit
+```
+
+Full suite: 9 groups pass, 3 still fail for the separately tracked signed BT
+index and REP addr16 wrap bugs. GCC/UBSan compiles the verbatim handler slices;
+memory and exception services remain test stubs, not an integrated CPU run.
+Temporary artifacts are deleted. No downloaded tools, new ROMs or image edits.
+The user requested MSVC instead of Zig while this fix was in progress; the
+Windows compiler migration and its integration build are a separate change.
+
 ## 2026-09-27 X86-02: IDIV32 overflow and dividend construction
 
 Added the INT64_MIN/-1 guard before host division, and changed the F7 /7

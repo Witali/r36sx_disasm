@@ -64,12 +64,18 @@ P2 items are narrower instruction/conformance gaps.
   Tests include zero divisors, signed quotient/remainder and preserved results
   on #DE, with a host-only 128-bit reference calculation.
 
-- [ ] **X86-03 / P1 / Probe: XCHG recalculates its memory operand after changing a register.**
+- [x] **X86-03 / P1 / Probe: XCHG recalculates its memory operand after changing a register.**
   CORE:2143/2157 and I386:505 change the register between `readrm*` and
   `writerm*`; CPU:4200 and following recalculate EA on each access.
   With EAX=1000h and [1000h]=2000h, `XCHG EAX,[EAX]` writes at 2000h.
   Resolve the original address once; cover byte/word address-register aliases
   as well as the dword case. [Intel XCHG][xchg].
+  Fixed 2026-09-27: write r/m before changing the register, so both existing
+  EA calculations use the original base/index values. Abort on decode/read/
+  write faults before committing further state; the checks compile out for
+  8086. `xchg_address_alias` and 384 width/address/alias/fault component cases
+  pass. Confirmed against Intel XCHG and [AMD XCHG pp. 316-317][amd-apm3].
+  The general exception-abort problem X86-04 remains open.
 
 - [ ] **X86-04 / P1 / Source: a fault does not reliably stop the current instruction.**
   CPU:1169/4200 checked reads return sentinel values after raising an exception.

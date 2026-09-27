@@ -508,9 +508,19 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* XCHG r/m32, r32 */
         case 0x87: {
             modregrm();
+            if (r36sx_cpu_exception_is_pending()) {
+                return true;
+            }
             uint32_t tmp = getreg32(reg);
-            putreg32(reg, readrm32(rm));
+            uint32_t value = readrm32(rm);
+            if (r36sx_cpu_exception_is_pending()) {
+                return true;
+            }
+            /* The source register may be an EA base/index: update it last. */
             writerm32(rm, tmp);
+            if (!r36sx_cpu_exception_is_pending()) {
+                putreg32(reg, value);
+            }
             return true;
         }
 
