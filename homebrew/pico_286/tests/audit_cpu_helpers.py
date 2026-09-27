@@ -46,15 +46,15 @@ def main():
 #include <string.h>
 #define __not_in_flash()
 static uint8_t cf, pf, af, zf, sf, of;
-static uint16_t CPU_AX, CPU_DX;
-static uint32_t CPU_EAX, CPU_EDX;
+static uint16_t CPU_AX, CPU_DX, CPU_CX;
+static uint32_t CPU_EAX, CPU_EDX, CPU_ECX;
 static int divide_fault;
 static uint32_t divide_fault_ip;
 static void r36sx_cpu_divide_error(uint32_t ip) {
     divide_fault_ip = ip; divide_fault++;
 }
 static bool parity[256];
-static uint8_t mode, rm, reg, df;
+static uint8_t mode, rm, reg, df, reptype;
 static bool operandSizeOverride, addressSizeOverride;
 static uint32_t ea, useseg_base, last_address, source_index, dest_index;
 static uint16_t CPU_ES, useseg;
@@ -150,6 +150,7 @@ static void putmem8(uint16_t s, uint32_t o, uint8_t v) {
         between(cpu386, "static inline void op_idiv32(", "static __not_in_flash() void op_grp3_32("),
         between(cpu386, "static inline uint8_t r36sx_cpu_condition(", "static __not_in_flash() uint32_t op_grp2_32("),
         between(cpu386, "static __not_in_flash() void r36sx_cpu_exec_bit_test(", "static __not_in_flash() void r36sx_cpu_exec_double_shift("),
+        between(common, "static inline uint32_t r36sx_rep_get_count(", "static inline uint32_t r36sx_loop_get_count("),
         between(common, "static inline void r36sx_rep_movsb(", "static inline void r36sx_rep_movsw("),
     ]
     xchg_case = between(cpu386, "        /* XCHG r/m32, r32 */", "        /* MOV r/m32, r32 */")

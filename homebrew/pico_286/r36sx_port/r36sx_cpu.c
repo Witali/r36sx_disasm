@@ -1440,6 +1440,15 @@ static inline void r36sx_rep_set_count(uint32_t count)
     }
 }
 
+static inline void r36sx_rep_commit_count(uint32_t completed)
+{
+    /* A fault in the next element must expose the remaining REP count.
+     * The non-REP forms update indexes but leave CX/ECX unchanged. */
+    if (reptype) {
+        r36sx_rep_set_count(r36sx_rep_get_count() - completed);
+    }
+}
+
 static inline uint32_t r36sx_loop_get_count(void)
 {
     return addressSizeOverride ? CPU_ECX : CPU_CX;
@@ -1505,6 +1514,13 @@ static inline int r36sx_rep_ram_span(uint16_t segment,
 {
     uint32_t address;
 
+    /* A speculative whole-batch segment check can fault before earlier valid
+     * elements run. Raw RAM pointers also bypass paging. Protected/v86 strings
+     * therefore use the checked per-element path until a non-faulting,
+     * page-aware span probe exists. Real-mode RAM block copies stay fast. */
+    if (r36sx_cpu_protected_enabled()) {
+        return 0;
+    }
     if (!r36sx_rep_offset_span_no_wrap(offset, bytes, index32)) {
         return 0;
     }
@@ -1585,6 +1601,7 @@ static inline int r36sx_rep_try_movs_ram(uint32_t count,
         CPU_SI = (uint16_t)(si + bytes);
         CPU_DI = (uint16_t)(di + bytes);
     }
+    r36sx_rep_commit_count(count);
     return 1;
 }
 
@@ -1657,6 +1674,7 @@ static inline int r36sx_rep_try_stos_ram(uint32_t count,
     } else {
         CPU_DI = (uint16_t)(di + bytes);
     }
+    r36sx_rep_commit_count(count);
     return 1;
 }
 #else
@@ -1704,17 +1722,20 @@ static inline void r36sx_rep_movsb(uint32_t count)
             putmem8(CPU_ES, di, getmem8(useseg, si));
             si = (si - 1u) & index_mask;
             di = (di - 1u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem8(CPU_ES, di, getmem8(useseg, si));
             si = (si + 1u) & index_mask;
             di = (di + 1u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_src_index(si);
-    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_movsw(uint32_t count)
@@ -1732,17 +1753,20 @@ static inline void r36sx_rep_movsw(uint32_t count)
             putmem16(CPU_ES, di, getmem16(useseg, si));
             si = (si - 2u) & index_mask;
             di = (di - 2u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem16(CPU_ES, di, getmem16(useseg, si));
             si = (si + 2u) & index_mask;
             di = (di + 2u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_src_index(si);
-    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_movsd(uint32_t count)
@@ -1760,17 +1784,20 @@ static inline void r36sx_rep_movsd(uint32_t count)
             putmem32(CPU_ES, di, getmem32(useseg, si));
             si = (si - 4u) & index_mask;
             di = (di - 4u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem32(CPU_ES, di, getmem32(useseg, si));
             si = (si + 4u) & index_mask;
             di = (di + 4u) & index_mask;
+            r36sx_set_src_index(si);
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_src_index(si);
-    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_stosb(uint32_t count)
@@ -1787,15 +1814,17 @@ static inline void r36sx_rep_stosb(uint32_t count)
         while (count--) {
             putmem8(CPU_ES, di, value);
             di = (di - 1u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem8(CPU_ES, di, value);
             di = (di + 1u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_stosd(uint32_t count)
@@ -1812,15 +1841,17 @@ static inline void r36sx_rep_stosd(uint32_t count)
         while (count--) {
             putmem32(CPU_ES, di, value);
             di = (di - 4u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem32(CPU_ES, di, value);
             di = (di + 4u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_dst_index(di);
 }
 
 static inline void r36sx_rep_stosw(uint32_t count)
@@ -1837,15 +1868,17 @@ static inline void r36sx_rep_stosw(uint32_t count)
         while (count--) {
             putmem16(CPU_ES, di, value);
             di = (di - 2u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     } else {
         while (count--) {
             putmem16(CPU_ES, di, value);
             di = (di + 2u) & index_mask;
+            r36sx_set_dst_index(di);
+            r36sx_rep_commit_count(1u);
         }
     }
-
-    r36sx_set_dst_index(di);
 }
 
 static const bool __not_in_flash("cpu.pf") parity[0x100] = {

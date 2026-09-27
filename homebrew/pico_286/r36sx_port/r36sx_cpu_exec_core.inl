@@ -2562,7 +2562,10 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                             : r36sx_rep_batch_count(r36sx_rep_get_count(),
                                                     loopcount, execloops);
                     r36sx_rep_movsb(batch);
+#if R36SX_CPU_CORE_FIXED_16BIT
+                    /* The generic 386 helper commits count per element. */
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
+#endif
                     loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
@@ -2589,7 +2592,9 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                             : r36sx_rep_batch_count(r36sx_rep_get_count(),
                                                     loopcount, execloops);
                     r36sx_rep_movsw(batch);
+#if R36SX_CPU_CORE_FIXED_16BIT
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
+#endif
                     loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
@@ -2716,7 +2721,9 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                             : r36sx_rep_batch_count(r36sx_rep_get_count(),
                                                     loopcount, execloops);
                     r36sx_rep_stosb(batch);
+#if R36SX_CPU_CORE_FIXED_16BIT
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
+#endif
                     loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);
@@ -2743,7 +2750,9 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                             : r36sx_rep_batch_count(r36sx_rep_get_count(),
                                                     loopcount, execloops);
                     r36sx_rep_stosw(batch);
+#if R36SX_CPU_CORE_FIXED_16BIT
                     r36sx_rep_set_count(r36sx_rep_get_count() - batch);
+#endif
                     loopcount += batch - 1u;
                     if (r36sx_rep_get_count() != 0) {
                         r36sx_cpu_set_ip(firstip);

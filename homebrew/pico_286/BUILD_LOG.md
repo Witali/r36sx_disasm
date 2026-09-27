@@ -1,5 +1,77 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-07: preserve 386 REP progress across memory faults
+
+Generic MOVS/STOS now commit SI/DI (or ESI/EDI) and CX/ECX after each
+successfully written element. A fault abandons the current element through
+the existing instruction escape; prior iterations remain visible to the
+handler. Non-REP forms do not change the count. Updated the common/operand32
+decoder callers to avoid a second batch decrement; dedicated 8086/286 helpers
+retain their previous count ownership and are not claimed fixed here.
+
+The generic raw RAM span path now declines protected/v86 mode before doing a
+speculative full-batch segment check. That check used to raise #GP before
+earlier valid elements could execute, while raw pointers bypassed paging
+entirely. Protected strings now use checked memory access per element;
+real-mode block copies remain enabled. A protected bulk optimization requires
+a non-faulting page-aware probe, not the previous linear-to-RAM assumption.
+
+Added `tests/cpu386_rep_faults.asm` and its runner: 1080 CPL3 cases with
+nonidentity mappings, both CS/address defaults, all element widths, both DF
+directions, source/destination #GP/#PF, normal/expand-down limits and actual
+IRETD restart after repair. Each fault checks the partial registers/memory
+before repair, then final completion. 864 fault/retry cases and 216 zero-count
+controls; see `tests/README.md` for scope and manual references. The unchanged
+baseline (`860e32a`) fails case 0: ECX=55AA0005, expected 55AA0003. Baseline
+log: patch `diagnostics/compiler-rep-faults-before/pico_286.log`.
+
+Primary specifications checked: Intel 80386 PRM REP and 9.8.13/14, Intel SDM
+325383-060US vol.2B p.4-551 (preserved indexes/count and restart EIP), AMD APM
+vol.3 rev.3.19 section 1.2.6, MOVS/STOS exception tables and legacy IRETD.
+Vendor-authored mirrored manuals were used; the current Intel download link
+returned a web-tool fetch error. No 64-bit-only rules were imported.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Tag rep-faults-wrap-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-rep-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag rep-faults-wrap-mingw
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit --case rep16_index_wrap
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag rep-faults-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag rep-faults-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag rep-faults-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag rep-faults-abort
+```
+
+All listed checks passed. MSVC and GCC report `CPU386 REP FAULTS PASS
+cases=1080`, the 576-case index-wrap matrix passes on both, and the 40-case
+instruction-abort ROM and test286 pass on MSVC. General test386 reaches POST
+80:FF on both with unchanged EE SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+The component probe now includes the production REP count helpers and passes.
+This does not close every X86-07 case: split elements, SS overrides,
+real/v86 limits, debug/IRQ interruption, CMPS/SCAS flags and other string
+families remain open. Fixed-16-bit 286 fault progress is also still open.
+
+Build base `860e32a`, dirty=1. MSVC 14.51 x64 `/O2 /Zi /MT`, switch decoder;
+Cygwin MinGW GCC 14.4.0 `-O2 -g -static`, computed goto. Existing warnings
+remain. Logs: patch `diagnostics/x86-audit/build-rep-faults-{msvc,mingw}.log`
+and `diagnostics/compiler-<Tag>/`. NASM 3.01 emits the 64 KiB ROM/listing in
+`build/`; no guest disks are attached.
+
+| File under `build/` | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `pico_286_win.exe` | PE32+ x86-64 / 831488 | `f4874281e441e06a588c99f50aaf1ae2e105c9aa587c5b891d3751920d96ba86` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64 / 3338485 | `1aae3096bbc7095841c03563a9f3ea6c7fcde5e1d34aacb829adcb2c263e5fda` |
+| `cpu386_rep_faults.bin` | raw x86 ROM / 65536 | `d55a1780fc7f4f1d545dfe8a63401b52147fc2bb8ae932dee05207494a8b3877` |
+
+`tools/scan-download.ps1` scanned both EXEs and the new ROM with Defender:
+no threats. Both EXEs and MSVC PDB copied into the active patch; EXE hashes
+match. The runner restored the build config. Patch config was not edited,
+SHA256 `36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`.
+
 ## 2026-09-27 X86-06: wrap string indexes between REP elements
 
 The six generic MOVS/STOS helpers now apply the address-size mask after

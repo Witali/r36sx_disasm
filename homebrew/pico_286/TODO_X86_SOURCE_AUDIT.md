@@ -130,13 +130,27 @@ P2 items are narrower instruction/conformance gaps.
   source/destination boundary patterns, including count 0 and 2049. Paging
   and fault restart are deliberately separate X86-07 work.
 
-- [ ] **X86-07 / P1 / Source: REP batches continue after a fault.**
+- [ ] **X86-07 / P1 / Source: REP fault restart and per-element progress.**
   CPU:1666 and CPU:7574 loops lack per-element abort checks; CORE:2516 and
   neighboring string cases consume the planned batch count, not the number
   actually completed. A fault can therefore corrupt memory, CX/ECX, indexes,
   or the handler IP. Commit progress only for completed iterations and stop
   before the first failed element. Test a page/segment boundary mid-batch.
   [Intel REP restart rules][rep].
+  Partial fix 2026-09-27: the instruction escape from X86-04 already aborts
+  a faulting element. Generic 386 MOVS/STOS now commit indexes and REP count
+  after each successful element; decoder callers no longer subtract the
+  same batch twice. The raw RAM bulk path is excluded when CR0.PE is set:
+  it cannot speculate a faulting segment check or bypass paging. Real-mode
+  block copies still work. `tests/cpu386_rep_faults.asm` tests 1080 CPL3
+  cases, repairing descriptors/PTEs and resuming via IRETD after 0/2/1025
+  successful elements, plus zero-count and non-REP controls. Source and
+  destination are nonidentity mapped; DF=1 uses expand-down limit faults.
+  Open: fixed-16-bit 286 progress, split-element faults, SS/segment overrides,
+  real/v86 limit behavior, debug/IRQ interruption, CMPS/SCAS flag restart and
+  other string families. The real-mode raw-copy path also needs watchpoint
+  and overlapping word/dword tests; protected bulk optimization would require
+  a non-faulting, page-aware eligibility probe.
 
 - [ ] **X86-08 / P1 / Source: segment cache lookup loses segment-register identity.**
   CPU:712, `r36sx_cpu_find_segment_cache`, selects by the visible selector;

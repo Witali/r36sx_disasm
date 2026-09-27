@@ -285,6 +285,56 @@ Specifications: Intel 80386 PRM chapter 17
 table 1-4 (address-size register selection), section 1.2.6 (REP),
 MOVS pp.228-229 and STOS pp.301-302. AMD64-only rules are not used.
 
+## REP exception progress and restart regression ROM
+
+`cpu386_rep_faults.asm` runs 1080 cases at CPL3 with paging enabled. A table
+of 216 rows varies CS.D, address size, element width, DF, fault location
+(MOVS source, MOVS destination, STOS destination) and fault type. Each row
+runs five scenarios: REP faults after 2, 0 and 1025 successful elements,
+count-zero REP with an inaccessible operand, and a non-REP fault/retry.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-rep-faults-mingw
+```
+
+Fault types are #GP(0) for segment limits, #PF for a non-present page, and
+#PF for page access protection (supervisor-only source or read-only
+destination). DF=0 uses a normal segment's upper limit; DF=1 uses the lower
+limit of an expand-down segment. Page-aligned boundaries keep each individual
+word/dword within one page. Source/destination linear ranges map to different
+physical RAM, exposing a raw-copy path that mistakes linear for physical.
+
+The handler checks vector, error code, CR2, saved CS:EIP/SS:ESP, all GPRs,
+data selectors and preserved flags. Scalar byte checks verify completed
+writes, untouched future elements/guards, and an alias to the physical RAM
+that an erroneous untranslated copy would overwrite. It then repairs the
+descriptor/PTE, reloads the data selectors/CR3 and uses IRETD without resetting
+the user's indexes or count. The second check verifies completion and exactly
+one fault, or no fault for count-zero. There are 864 fault/retry cases (288
+per fault type) and 216 zero-count cases.
+
+Baseline `860e32a` fails case 0: ECX is 55AA0005h instead of 55AA0003h after
+two elements should have completed. Pass requires both POST `80:FF` and
+`CPU386 REP FAULTS PASS cases=1080`. Failure reports case/check/got/want;
+case = row * 5 + scenario. Check IDs: 1 vector/error, 2 GPRs, 3 frame/flags/
+selectors/CR2, 4 memory, 5 repair fault count, 6 completion fault/total count.
+No disks are attached, and the build config is restored.
+
+The 386 helpers now commit progress after each completed element. Their raw
+RAM bulk path is reserved for real mode until a non-faulting page-aware probe
+is available. The dedicated 8086/286 helpers retain their existing contract.
+This is not complete REP coverage: split-element faults, SS overrides,
+real/v86 checks, debug/IRQ interruptions, overlap, CMPS/SCAS flag restoration
+and the remaining string families still require tests.
+
+References: [Intel 80386 REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm),
+[PRM 9.8.13/14, #GP/#PF](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
+[Intel SDM 325383-060US vol.2B p.4-551, REP restart](https://kib.kiev.ua/x86docs/Intel/SDMs/325383-060.pdf),
+and [AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf),
+section 1.2.6, MOVS/STOS exception tables and legacy IRETD. These are
+vendor-authored manuals hosted on mirrors; AMD64-only behavior is not used.
+
 ## test386.asm
 
 `test386.asm` is vendored from:
