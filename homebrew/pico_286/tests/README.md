@@ -156,6 +156,52 @@ and [Intel SDM vol. 2, POP](https://cdrdv2-public.intel.com/835757/325383-sdm-vo
 for non-wrapping post-increment ESP addressing. The latter explicitly leaves
 16-bit-stack wrap behavior processor-family-specific; no such case is asserted.
 
+## LEA addressing and encoding regression ROM
+
+`cpu386_lea.asm` executes 26,528 cases through the production 386 decoder:
+829 addressing/encoding rows x four CS.D/operand-size combinations x eight
+destination registers. It is a standalone 64 KiB ROM with paging and CPL3
+execution, using a TSS to deliver completion/#UD onto a supervisor stack.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_lea.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_lea.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-lea-mingw
+```
+
+The table contains 24 legal addr16 forms (all r/m values for mod=00/01/10),
+789 legal addr32 forms (21 non-SIB plus all 256 SIB bytes for each memory
+mod), and 16 invalid register-source rows (all eight r/m values at both
+address sizes). Thus 26,016 cases are valid and 512 require #UD. Nonzero
+displacements include negative disp8 and full-width values; initial register
+values exercise high halves, signed-looking values, aliasing with destinations
+and address overflow. Expected offsets are generated from Intel's addressing
+tables in NASM, not by importing emulator helper code.
+
+The fixture copies a single instruction into a RAM code buffer, sets its
+prefixes and destination field, then transfers to it with IRETD. All GPRs,
+arithmetic flags/DF/IF, data selectors, saved CS:EIP/SS:ESP and unchanged CR2
+are checked. LEA r16 must preserve the upper half; addr16 into r32 must zero
+extend. Effective offsets must not include segment bases. Data segments
+alternate between null and nonzero-base/short-limit descriptors; SS has an
+unmapped nonzero base. No source-memory access or segment-limit fault is
+permitted. Six segment overrides and no override rotate across cases; they
+are not a separate exhaustive Cartesian dimension. Flag patterns similarly
+alternate between clear and set arithmetic flags/DF.
+
+Pass requires POST `80:FF` and `CPU386 LEA PASS cases=26528`. Failure prints
+`case`, `check` and `value`. Case ID = `row * 32 + widths * 8 + destination`;
+widths bit 1 selects CS.D, bit 0 selects operand32. Checks are vector/frame
+layout, all GPRs, selectors/flags, saved IP, unchanged CR2 and final count.
+See `build/cpu386_lea.lst` for table order. The runner restores the build
+configuration and uses no disks. Real/v86 mode, instruction-fetch faults,
+LOCK/repeated-prefix policy and exhaustive displacement/input values remain
+outside this matrix; it is not complete 386 conformance.
+
+Specifications: [Intel 80386 LEA](https://pdos.csail.mit.edu/6.828/2005/readings/i386/LEA.htm),
+[Intel 80386 PRM 17.2, Tables 17-2/3/4](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s17_02.htm),
+and [AMD APM vol.3 rev.3.19, LEA pp.195-196](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+Only original 386/legacy rules are used, not 64-bit addressing extensions.
+
 ## test386.asm
 
 `test386.asm` is vendored from:

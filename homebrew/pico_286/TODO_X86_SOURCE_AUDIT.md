@@ -248,6 +248,12 @@ P2 items are narrower instruction/conformance gaps.
   alongside 800 valid ones, varying CS.D/SS.B/operand/address width and
   inaccessible source/destination conditions. LEA and far CALL/JMP invalid
   ModRM cases remain open; do not close the entire item for the POP fix.
+  Further fix 2026-09-27: operand32 LEA now rejects register sources before
+  writing the destination. `cpu386_lea.asm` exercises 26,528 integrated
+  cases: all memory ModRM/SIB forms, register-source #UD, both code/operand
+  widths, all GPR destinations, offset truncation/zero extension and no
+  operand access through null/short/unmapped segments. Far indirect CALL/JMP
+  register forms still need fixing; the whole item remains open.
 
 - [ ] **X86-24 / P2 / Source: descriptor-table operands bypass segment checks.**
   I386:1279 and following pass a linear EA to I286:795/803 table helpers

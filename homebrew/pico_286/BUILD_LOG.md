@@ -1,5 +1,47 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-23: LEA encoding and effective-address matrix
+
+Completed the pending LEA decoder correction and standalone regression ROM.
+The operand32 handler now rejects ModRM register sources with #UD before
+changing a destination; the operand16 handler already rejected them. Intel
+80386 PRM LEA and addressing Tables 17-2/3/4 define the offset/width rules;
+AMD APM vol.3 rev.3.19 pp.195-196 confirms shared legacy behavior. Exact
+links and coverage limits are recorded in `tests/README.md`.
+
+The independent NASM table covers all memory ModRM/SIB encodings, both
+code/operand/address sizes, all GPR destinations, offset overflow and flags,
+plus register-source #UD at CPL3 with null/short/unmapped data segments.
+There are 26,528 cases, not exhaustive input-value or mode coverage. Before
+the fix (after the separate diagnostic fix), case 8 incorrectly completed
+instead of raising #UD. Both MSVC and GCC now pass the full matrix.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_lea.ps1 -Tag lea-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_lea.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag lea-final-mingw
+```
+
+The MSVC `/O2` switch build used base `cd229da7` plus the fix, dirty=1.
+The GCC `-O2 -g` computed-goto build is the artifact in the next compiler
+entry (same source changes). Both pass 40 fault cases, 1,640 POP cases and
+the original test386 with unchanged EE output SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+MSVC test286 also reached POST FF. These tests do not close other stack,
+task, REP, far-transfer or diagnostic issues in the audit.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 829952 | `7d22f6afc738f82f9db1ab7267f68dae935b058471752389c4ef4a260dfda012` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3332237 | `6e7c1898bc7cdd638963b0b44f87481d5cad4e1efaea1dd8cae43d25e6dfa5d8` |
+| `cpu386_lea.bin` | Raw ROM at F0000h | 65536 | `282368b007a8b852e4fffb22d17703016a09952f9e2bd5d548a29dbbf5a8d4f5` |
+
+Defender scans found no threats in the executables and ROM. Build logs are
+patch `diagnostics/x86-audit/build-lea-{msvc,mingw}.log`; regression results
+are under `diagnostics/compiler-lea-*`. GCC was deployed in the compiler
+task; MSVC EXE/PDB are now copied to the active patch too. No config/disk
+changes and no MIPS build. X86-23 remains open for far CALL/JMP encodings.
+
 ## 2026-09-27 Cygwin MinGW requested build: current source verification
 
 The requested compiler option already exists in `08acb110`; no second Cygwin

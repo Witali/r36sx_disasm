@@ -539,6 +539,12 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         /* LEA r32, m */
         case 0x8D:
             modregrm();
+            /* LEA computes a memory-form offset without reading memory.
+             * A register-form source is #UD, not a zero/unchanged address. */
+            if (mode == R36SX_MODRM_MOD_REGISTER) {
+                r36sx_cpu_invalid_opcode(fault_ip);
+                return true;
+            }
             getea(rm);
             putreg32(reg, ea - useseg_base);
             return true;
