@@ -1,5 +1,50 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW build verified at 02a5c13
+
+The requested compiler backend is already implemented in `08acb110`:
+`-Compiler MinGW` selects Cygwin's `x86_64-w64-mingw32-gcc/g++`, while
+MSVC remains the default. Rebuilt current committed sources at `02a5c13`;
+the dirty build marker reflects the untouched user-local patch configuration.
+The untracked comparison-fault ROM and runner are not part of this build or
+these smoke tests and were left unchanged.
+
+Commands, run from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+& tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-02a5c13-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-02a5c13-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+GCC 14.4.0 completed successfully with `-O2 -g -static` and computed goto.
+Existing source warnings remain, including possible path truncation; this
+verification does not claim a warning-free build. Build output is under the
+active patch's `diagnostics/build-mingw-02a5c13.log`; smoke diagnostics are in
+`diagnostics/compiler-cygwin-02a5c13-{386,286}/`.
+
+The PE x86-64 EXE is 3337510 bytes, SHA256
+`D49FBFFBA2756DCE74B1B101BC725FB26FACE069D2449966E514F838F107E28B`.
+Defender found no threats. Imports are dbghelp, GDI32, KERNEL32, msvcrt,
+USER32 and WINMM only, with no Cygwin or extra MinGW runtime DLLs. This
+matches the native Windows target described in
+[Cygwin FAQ 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both test386 and test286 reached POST `80:FF`; the debug mailbox responded
+and a 640x480 RGB565 frame was retrieved (nonblank for test386). The test386
+EE output hash matched the established baseline:
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+These are compiler/startup checks, not full CPU conformance or DOS application
+validation. No disk images were attached or modified.
+
+Copied the named EXE to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe`;
+source and destination hashes match. MSVC artifacts were not replaced. The
+patch config hash remained
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 CMPS/SCAS comparison and repetition matrix
 
 Added `tests/cpu386_compare_strings.asm` and its PowerShell runner. The ROM
