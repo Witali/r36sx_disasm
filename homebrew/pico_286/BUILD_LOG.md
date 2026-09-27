@@ -1,5 +1,78 @@
 # pico-286 Build Log
 
+## 2026-09-27 MOVS overlapping word/dword element ordering
+
+Fixed `r36sx_rep_movs_ram_forward`: overlapping copies now read all bytes
+of one element before storing any of them. The previous interleaved byte
+reads/writes corrupted MOVSW/MOVSD when the destination overlapped within
+the source element. Later elements still observe prior writes in DF order;
+the disjoint memcpy path is unchanged. Byte accesses avoid introducing
+unaligned host loads or host-endian assumptions. The helper is shared with
+the lower-model real-mode fast paths.
+
+Added `tests/cpu386_movs_overlap.asm` and its PowerShell runner: 10368 cases
+through the actual decoder, covering real/PM16/PM32, addr16/32, MOVSB/W/D,
+DF=0/1, aligned/unaligned sources, segment aliases, twelve displacements,
+REP counts 0/1/2/17/1025 and non-REP controls. A scalar MOV reference snapshots
+each element; checks include all GPRs, arithmetic flags/IF/DF, data selectors,
+the entire affected memory union and guards. The README records the case
+matrix and limitations; X86-07 remains open for other REP requirements.
+
+The pre-fix run `compiler-movs-overlap-before` failed case 613 (`265h`),
+check 3: byte at offset 3002h was 6Ah, expected 6Bh. This was addr16 REP MOVSW
+in real mode, DF=0, count=1, destination=source+1. Its EXE build metadata was
+`860e32a` + the now-committed REP progress fix, dirty=1. Fixed EXEs report
+`d77bc96` + this MOVS change, dirty=1.
+
+References checked before the CPU change: Intel 80386 PRM chapter 17
+[MOVS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOVS.htm) and
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm), and
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+MOVS pp.228-229 / section 1.2.6. These vendor-authored manuals are on mirrors;
+only 386-applicable rules were used.
+
+Commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_movs_overlap.ps1 -Tag cpu386-movs-overlap-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_movs_overlap.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-movs-overlap-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Tag overlap-wrap-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag overlap-wrap-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Tag overlap-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_rep_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag overlap-faults-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag overlap-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag overlap-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag overlap-286-msvc -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag overlap-286-mingw -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+Both compilers pass all 10368 new cases, 576 index-wrap cases, 1080 REP
+fault/retry cases, and the standard test386/test286 BIOS checks. Test386
+EE output remains `F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+MSVC 14.51 uses `/O2 /MT /Zi` and switch dispatch; Cygwin MinGW GCC 14.4.0
+uses `-O2 -g -static` and computed goto. Existing compiler warnings remain;
+build logs are `diagnostics/x86-audit/build-movs-overlap-{msvc,mingw}.log`
+under the active patch. Run logs use `diagnostics/compiler-<Tag>/`.
+
+Artifacts under `homebrew/pico_286/build` (SHA256):
+
+| Artifact | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `cpu386_movs_overlap.bin` | NASM 3.01 raw F0000h ROM / 65536 | `8810D34E5B2886AEB392CB055135D64B727DC0A0718294ED4DC089AC47D9E408` |
+| `pico_286_win.exe` | PE x86-64 / 831488 | `0E39D1EF219FD5E77D9A89C9F85E584223899223772F2F32D3368A382CDA8185` |
+| `pico_286_win_mingw.exe` | PE x86-64 / 3336998 | `68E7714714228A5A8FD375F296907FB19250477D0518CA606EEDF22BE069E4A3` |
+
+`tools/scan-download.ps1` scanned the new ROM and both EXEs successfully:
+Defender reported no threats. Copied both EXEs and the MSVC PDB to the active
+patch; EXE hashes match. Patch configuration hash is unchanged:
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+No user disks were attached. No MIPS build was requested or performed.
+This does not establish complete MOVS/REP or 386 conformance; fault splitting,
+v86/real limits, source overrides, debug watchpoints and other instruction
+families remain on the audit list.
+
 ## 2026-09-27 Cygwin MinGW verification at a912040
 
 Rebuilt the requested native Windows GCC variant from `a912040` using the

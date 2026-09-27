@@ -1556,19 +1556,26 @@ static inline void r36sx_rep_movs_ram_forward(uint32_t src,
         return;
     }
 
-    /* x86 forward MOVS does not have memmove's reverse-copy overlap semantics. */
+    /* Intel 80386 MOVS transfers a complete element before advancing indexes.
+     * Snapshot its bytes before any store: dst=src+1 may overlap within a word
+     * or dword. Later iterations still read prior writes, unlike memmove.
+     * Explicit byte accesses also allow unaligned guest operands on the host. */
     for (uint32_t i = 0; i < count; i++) {
-        uint8_t value0 = src_ptr[0];
-        dst_ptr[0] = value0;
+        uint32_t value = src_ptr[0];
         if (unit_bytes >= 2u) {
-            uint8_t value1 = src_ptr[1];
-            dst_ptr[1] = value1;
+            value |= (uint32_t)src_ptr[1] << 8;
         }
         if (unit_bytes == 4u) {
-            uint8_t value2 = src_ptr[2];
-            uint8_t value3 = src_ptr[3];
-            dst_ptr[2] = value2;
-            dst_ptr[3] = value3;
+            value |= (uint32_t)src_ptr[2] << 16;
+            value |= (uint32_t)src_ptr[3] << 24;
+        }
+        dst_ptr[0] = (uint8_t)value;
+        if (unit_bytes >= 2u) {
+            dst_ptr[1] = (uint8_t)(value >> 8);
+        }
+        if (unit_bytes == 4u) {
+            dst_ptr[2] = (uint8_t)(value >> 16);
+            dst_ptr[3] = (uint8_t)(value >> 24);
         }
         src_ptr += unit_bytes;
         dst_ptr += unit_bytes;

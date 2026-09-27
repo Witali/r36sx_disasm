@@ -146,10 +146,17 @@ P2 items are narrower instruction/conformance gaps.
   cases, repairing descriptors/PTEs and resuming via IRETD after 0/2/1025
   successful elements, plus zero-count and non-REP controls. Source and
   destination are nonidentity mapped; DF=1 uses expand-down limit faults.
+  Additional fix 2026-09-27: overlapping real-mode MOVSW/MOVSD raw copies
+  read the entire element before storing any of its bytes. Previously,
+  dst=src+1 corrupted bytes within the same element. The 10368-case
+  `tests/cpu386_movs_overlap.asm` matrix covers real/PM16/PM32, operand/address
+  sizes, DF, unaligned operands, segment aliases, disjoint controls and REP
+  counts above the batch cap. Subsequent elements still see prior writes;
+  whole-range memmove would be incorrect. Nonoverlapping memcpy is retained.
   Open: fixed-16-bit 286 progress, split-element faults, SS/segment overrides,
   real/v86 limit behavior, debug/IRQ interruption, CMPS/SCAS flag restart and
-  other string families. The real-mode raw-copy path also needs watchpoint
-  and overlapping word/dword tests; protected bulk optimization would require
+  other string families. The real-mode raw-copy path still needs watchpoint
+  tests; protected bulk optimization would require
   a non-faulting, page-aware eligibility probe.
 
 - [ ] **X86-08 / P1 / Source: segment cache lookup loses segment-register identity.**

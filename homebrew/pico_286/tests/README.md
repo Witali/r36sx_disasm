@@ -325,8 +325,9 @@ The 386 helpers now commit progress after each completed element. Their raw
 RAM bulk path is reserved for real mode until a non-faulting page-aware probe
 is available. The dedicated 8086/286 helpers retain their existing contract.
 This is not complete REP coverage: split-element faults, SS overrides,
-real/v86 checks, debug/IRQ interruptions, overlap, CMPS/SCAS flag restoration
-and the remaining string families still require tests.
+real/v86 checks, debug/IRQ interruptions, CMPS/SCAS flag restoration
+and the remaining string families still require tests. The separate overlap
+matrix below covers RAM element ordering.
 
 References: [Intel 80386 REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm),
 [PRM 9.8.13/14, #GP/#PF](https://pdos.csail.mit.edu/6.828/2005/readings/i386/s09_08.htm),
@@ -334,6 +335,47 @@ References: [Intel 80386 REP](https://pdos.csail.mit.edu/6.828/2005/readings/i38
 and [AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf),
 section 1.2.6, MOVS/STOS exception tables and legacy IRETD. These are
 vendor-authored manuals hosted on mirrors; AMD64-only behavior is not used.
+
+## MOVS overlapping RAM regression ROM
+
+`cpu386_movs_overlap.asm` executes 10368 cases: 3 modes (real, protected CS.D=0,
+protected CS.D=1) * 2 address sizes * 3 element widths * 2 DF directions *
+2 destination segment aliases * 2 source alignments * 12 displacements *
+6 repeat scenarios. It exercises MOVSB/MOVSW/MOVSD with REP counts 0, 1, 2,
+17 and 1025, plus single MOVS with an unchanged count of 7. Displacements
+are -33, -4, -3, -2, -1, 0, +1, +2, +3, +4, +33 and +1200h. The latter
+is a disjoint-copy control even for the longest dword sequence; the segment
+alias shifts ES.base by 16 bytes while preserving the physical destination.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_movs_overlap.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_movs_overlap.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-movs-overlap-mingw
+```
+
+The independent reference reads one whole element into EAX, then stores its
+bytes using ordinary MOV instructions. Later iterations read the modified
+reference memory: neither a byte-at-a-time copy nor whole-range memmove is
+an acceptable substitute. Checks cover the complete source/destination union
+and four-byte guards, all GPRs (including addr16 upper halves), arithmetic
+flags/IF/DF and DS/ES/FS/GS. The ROM masks IRQs, uses CPL0 and no paging;
+v86, fault restart, source segment overrides and device memory are outside
+this matrix. No disks are attached and the runner restores its build config.
+
+Baseline fails case 613 (`265h`): real-mode addr16 REP MOVSW, DF=0, count=1,
+aligned source, destination=source+1. Byte 3002h becomes 6Ah instead of 6Bh
+because the optimized helper writes byte 0 before reading source byte 1.
+Pass requires POST `80:FF` and `CPU386 MOVS OVERLAP PASS cases=10368`.
+Failure IDs: 1 GPRs, 2 flags/selectors, 3 memory, 4 final case count.
+Case order is the product order above; NASM also writes
+`build/cpu386_movs_overlap.lst` for decoding a failing row.
+
+References: Intel 80386 PRM chapter 17
+[MOVS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOVS.htm) (byte,
+word or dword assignment before index changes) and
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm) (individual
+string operation per iteration); [AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf),
+MOVS pp.228-229 and section 1.2.6. These are vendor-authored manuals on
+mirrors; only 386-applicable legacy rules are used.
 
 ## test386.asm
 
