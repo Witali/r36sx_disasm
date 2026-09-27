@@ -1,5 +1,55 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW build verified at 5dc93570
+
+Rebuilt the requested native Windows variant using the existing compiler
+selection from `08acb110`. `-Compiler MinGW` invokes Cygwin's
+`x86_64-w64-mingw32-gcc/g++`; MSVC remains the default. No duplicate backend
+or compiler-selection change was necessary. The build includes the current
+uncommitted LOOP/JCXZ CPU edits, with build identity `5dc93570`, dirty=1.
+Those CPU/test edits and the user's patch config were not modified or staged
+as part of this compiler verification.
+
+Commands from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/test386.bin
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/test286.bin
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-5dc93570-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-5dc93570-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+Copy-Item homebrew/pico_286/build/pico_286_win_mingw.exe patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+GCC 14.4.0 completed successfully with `-O2 -g -fno-strict-aliasing`, static
+GCC/C++ support libraries and computed-goto dispatch. Existing warnings
+remain; this was not a warning-cleanup pass. Defender reported no threats
+in the EXE or either test ROM. No downloads or MIPS rebuild were needed.
+Build output is in patch `diagnostics/build-mingw-5dc93570.log`.
+
+`objdump -p` reports `pei-x86-64` with imports from dbghelp, GDI32, KERNEL32,
+msvcrt, USER32 and WINMM only: no Cygwin or extra MinGW runtime DLLs. This
+matches the cross-compiler/native-target distinction in the
+[official Cygwin FAQ, section 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both smoke tests reached POST `80:FF`, returned register state and produced
+a 640x480 RGB565 framebuffer. test386's frame was nonblank and its EE output
+SHA256 matched the earlier compiler runs:
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+test286 reports through ports, so a blank frame is allowed. These checks
+verify build/runtime operation, not complete instruction conformance.
+Test diagnostics are under `diagnostics/compiler-cygwin-5dc93570-{386,286}/`.
+
+Artifact: `homebrew/pico_286/build/pico_286_win_mingw.exe`, 3,319,738 bytes,
+SHA256 `9C8C3C781DC4B24B87A19B83AD91242B482C2700C083FC8599E152626AAC8FCD`.
+Copied under the same filename to the active patch, leaving its MSVC EXE
+unchanged. The restored build config retains SHA256
+`240420870457D4F65F4EAA29CB8031E56228EA721824DEC54F76615CF430DD3E`;
+the untouched patch config retains SHA256
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 Wait for compiler-smoke process shutdown
 
 Fixed `tests/smoke_windows_build.ps1` cleanup independently of the Jcc CPU
