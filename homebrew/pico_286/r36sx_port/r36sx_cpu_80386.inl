@@ -210,7 +210,9 @@ static inline void op_div32(uint64_t valdiv, uint32_t divisor, uint32_t fault_ip
 
 static inline void op_idiv32(int64_t dividend, uint32_t divisor, uint32_t fault_ip) {
     int32_t divisor_signed = (int32_t)divisor;
-    if (divisor_signed == 0) {
+    if (divisor_signed == 0 ||
+        (dividend == INT64_MIN && divisor_signed == -1)) {
+        /* Guest quotient overflow must not overflow the host's int64 divide. */
         r36sx_cpu_divide_error(fault_ip);
         return;
     }
@@ -285,7 +287,8 @@ static __not_in_flash() void op_grp3_32(uint8_t rmval, uint32_t fault_ip) {
             break;
 
         case 7: { /* IDIV */
-            int64_t dividend = ((int64_t)(int32_t)CPU_EDX << 32) | CPU_EAX;
+            /* Assemble the two's-complement bits without shifting a negative. */
+            int64_t dividend = (int64_t)(((uint64_t)CPU_EDX << 32) | CPU_EAX);
             op_idiv32(dividend, value, fault_ip);
             break;
         }

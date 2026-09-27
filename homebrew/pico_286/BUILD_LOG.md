@@ -1,5 +1,42 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-02: IDIV32 overflow and dividend construction
+
+Added the INT64_MIN/-1 guard before host division, and changed the F7 /7
+EDX:EAX concatenation to unsigned shifting followed by signed interpretation.
+This fixes both UBSan-reproduced errors without using 128-bit arithmetic in
+the emulator. The tests alone use a 128-bit oracle on the WSL host.
+
+Reference: Intel 80386 PRM IDIV and AMD APM vol. 3 revision 3.19, IDIV
+pp. 162-164, linked in the X86-01 entry and the audit TODO. Only their shared
+16/32-bit legacy semantics are applied.
+
+Verification command:
+
+```powershell
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit --case idiv16_overflow --case idiv16_boundaries --case idiv32_overflow --case idiv32_boundaries --case idiv32_dividend_assembly --case conditions --case adc_sbb8
+```
+
+All seven groups pass, including 100,680 IDIV32 helper/opcode cases and the
+IDIV16 regressions. Both IDIV32 overflow and negative-shift probes failed before
+the fix. Temporary local probe artifacts were removed; no tools were downloaded.
+
+The first Windows build attempt hit Zig global-cache `AccessDenied`; the retry
+uses a workspace-local cache. Full output is in the patch diagnostics directory
+at `x86-audit/build-idiv32.log` (not staged).
+
+```powershell
+$env:ZIG_GLOBAL_CACHE_DIR = 'C:\Work\r36sx_disasm\homebrew\pico_286\build\zig-cache'
+powershell -ExecutionPolicy Bypass -File homebrew\pico_286\build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+```
+
+Retry succeeded (debug/O2, x86-64 PE), with existing source warnings and
+nullability warnings while populating Zig's new runtime cache.
+`build/pico_286_win.exe`: 976384 bytes, SHA256
+`ace6094b0b2baa2d3d79dff5b801fd30891a7137eabb68d237c833339715eaca`.
+No new antivirus scan was performed on this local build. No patch EXE,
+configuration or disk-image changes; remaining CPU audit items stay open.
+
 ## 2026-09-27 X86-01: IDIV16 host-overflow guard
 
 Fixed `op_idiv16` to report guest #DE before evaluating INT32_MIN / -1 in C.

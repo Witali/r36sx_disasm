@@ -14,7 +14,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 PORT = ROOT / "r36sx_port"
 PROBES = ("conditions", "adc_sbb8", "idiv16_overflow", "idiv16_boundaries",
-          "idiv32_overflow", "bit_negative16", "bit_negative32",
+          "idiv32_overflow", "idiv32_boundaries", "idiv32_dividend_assembly",
+          "bit_negative16", "bit_negative32",
           "xchg_address_alias", "rep16_index_wrap")
 
 
@@ -105,6 +106,11 @@ static void putmem8(uint16_t s, uint32_t o, uint8_t v) {
     xchg_case = between(cpu386, "        /* XCHG r/m32, r32 */", "        /* MOV r/m32, r32 */")
     slices.append("static bool xchg_probe(void) { switch (0x87) {\n" +
                   xchg_case + "} return false; }\n")
+    group3 = between(cpu386, "static __not_in_flash() void op_grp3_32(",
+                     "static inline uint32_t r36sx_read_moffs(")
+    idiv_case = between(group3, "        case 7: { /* IDIV */", "\n    }\n}")
+    slices.append("static void idiv32_opcode_probe(uint32_t value, "
+                  "uint32_t fault_ip) { switch (7) {\n" + idiv_case + "\n} }\n")
     driver = r"""
 static int check_idiv16(int32_t dividend, int32_t divisor) {
     /* Widen the oracle: even INT32_MIN / -1 is representable here. */
@@ -124,6 +130,30 @@ static int check_idiv16(int32_t dividend, int32_t divisor) {
                     CPU_DX != (uint16_t)remainder))) {
         printf("IDIV16 mismatch: dividend=%ld divisor=%ld faults=%d\n",
                (long)dividend, (long)divisor, divide_fault);
+        return 1;
+    }
+    return 0;
+}
+
+static int check_idiv32(int64_t dividend, int32_t divisor, bool decoded) {
+    /* Host-only oracle: 128-bit division also represents INT64_MIN / -1. */
+    __int128 quotient = divisor ? (__int128)dividend / divisor : 0;
+    __int128 remainder = divisor ? (__int128)dividend % divisor : 0;
+    bool fault = !divisor || quotient < INT32_MIN || quotient > INT32_MAX;
+    CPU_EAX = (uint32_t)dividend;
+    CPU_EDX = (uint32_t)((uint64_t)dividend >> 32);
+    uint32_t old_eax = CPU_EAX, old_edx = CPU_EDX;
+    divide_fault = 0;
+    divide_fault_ip = 0;
+    if (decoded) idiv32_opcode_probe((uint32_t)divisor, 0x87654321);
+    else op_idiv32(dividend, (uint32_t)divisor, 0x87654321);
+    if (divide_fault != fault ||
+        (fault && (divide_fault_ip != 0x87654321 ||
+                   CPU_EAX != old_eax || CPU_EDX != old_edx)) ||
+        (!fault && (CPU_EAX != (uint32_t)quotient ||
+                    CPU_EDX != (uint32_t)remainder))) {
+        printf("IDIV32 mismatch: dividend=%lld divisor=%ld decoded=%u faults=%d\n",
+               (long long)dividend, (long)divisor, decoded, divide_fault);
         return 1;
     }
     return 0;
@@ -156,6 +186,42 @@ int main(int argc, char **argv) {
         volatile int64_t dividend = INT64_MIN;
         op_idiv32(dividend, UINT32_MAX, 0x100);
         return divide_fault != 1;
+    }
+    if (!strcmp(argv[1], "idiv32_dividend_assembly")) {
+        return check_idiv32(-7, 3, true);
+    }
+    if (!strcmp(argv[1], "idiv32_boundaries")) {
+        const int64_t dividends[] = {
+            INT64_MIN, INT64_MIN + 1, -INT64_C(4611686018427387904),
+            -INT64_C(4294967297), -INT64_C(4294967296), -INT64_C(2147483649),
+            INT32_MIN, INT32_MIN + 1, -7, -1, 0, 1, 7, INT32_MAX,
+            INT64_C(2147483648), INT64_C(2147483649), INT64_C(4294967295),
+            INT64_C(4294967296), INT64_C(4611686018427387904), INT64_MAX
+        };
+        const int32_t divisors[] = {
+            INT32_MIN, INT32_MIN + 1, -65536, -32768, -7, -3, -2, -1,
+            0, 1, 2, 3, 7, 32767, 65535, INT32_MAX - 1, INT32_MAX
+        };
+        unsigned cases = 0;
+        for (unsigned i = 0; i < sizeof(dividends) / sizeof(dividends[0]); i++)
+        for (unsigned j = 0; j < sizeof(divisors) / sizeof(divisors[0]); j++)
+        for (unsigned decoded = 0; decoded < 2; decoded++) {
+            if (check_idiv32(dividends[i], divisors[j], decoded)) return 1;
+            cases++;
+        }
+        /* Fixed-seed mixed-sign dividends, including nonzero high halves. */
+        uint64_t bits = UINT64_C(0xabcdef1234567890);
+        for (unsigned i = 0; i < 50000; i++) {
+            bits ^= bits << 13; bits ^= bits >> 7; bits ^= bits << 17;
+            int64_t dividend = (int64_t)bits;
+            int32_t divisor = (int32_t)(bits >> 17);
+            for (unsigned decoded = 0; decoded < 2; decoded++) {
+                if (check_idiv32(dividend, divisor, decoded)) return 1;
+                cases++;
+            }
+        }
+        printf("%u IDIV32 helper/opcode cases passed\n", cases);
+        return 0;
     }
     if (!strcmp(argv[1], "bit_negative16") ||
         !strcmp(argv[1], "bit_negative32")) {

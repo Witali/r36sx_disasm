@@ -52,11 +52,17 @@ P2 items are narrower instruction/conformance gaps.
   word-divisor behavior with [AMD APM volume 3, IDIV pp. 162-164][amd-apm3].
   Generation-specific #DE return IP remains a separate X86-27 item.
 
-- [ ] **X86-02 / P1 / Probe: IDIV32 has the same host-overflow problem.**
+- [x] **X86-02 / P1 / Probe: IDIV32 has the same host-overflow problem.**
   I386:211, `op_idiv32`: `INT64_MIN / -1` reaches undefined C division.
   Also remove the negative signed left shift used to assemble EDX:EAX in
   `op_grp3_32` near line 288. Build the bit pattern with unsigned arithmetic.
   Test `EDX:EAX=80000000:00000000`, divisor `FFFFFFFFh`. [Intel IDIV][idiv].
+  Fixed 2026-09-27: guard INT64_MIN/-1 and assemble EDX:EAX with an unsigned
+  shift. The legacy dword-divisor rules agree with [AMD IDIV][amd-apm3].
+  UBSan first reproduced both failures, then passed `idiv32_overflow`,
+  `idiv32_dividend_assembly` and 100,680 helper/opcode boundary/random cases.
+  Tests include zero divisors, signed quotient/remainder and preserved results
+  on #DE, with a host-only 128-bit reference calculation.
 
 - [ ] **X86-03 / P1 / Probe: XCHG recalculates its memory operand after changing a register.**
   CORE:2143/2157 and I386:505 change the register between `readrm*` and
