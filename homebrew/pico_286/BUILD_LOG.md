@@ -1,5 +1,77 @@
 # pico-286 Build Log
 
+## 2026-09-27 INS/OUTS address size and final REP trap
+
+Fixed X86-22: INSB/INSW/OUTSB/OUTSW now select (E)SI/(E)DI/(E)CX with
+the shared address-size helpers, including 16-bit wrapping and high-half
+preservation. All six forms, including INSD/OUTSD, stop rewinding EIP after
+the last REP element. The fixed-16 cores retain their specialized helpers.
+No device, I/O permission, or 8086 opcode-availability behavior was changed.
+
+Added `tests/cpu386_io_strings.asm` and `test_cpu386_io_strings.ps1`: 2496
+CPL3 cases / 6144 TF traps / 768 permission faults. The matrix covers code,
+address and operand widths, DF, REP count selection/termination, FS/GS/SS
+overrides, index wrap, TSS permission bits, absent bitmap, IOPL bypass,
+zero-count null operands and permission removal after one element. It checks
+GPRs, flags, exact frames, guarded memory and four observable DMA register
+bytes. DMA stays masked. The ECX=10000h case checks only its first element;
+other remaining scope is listed explicitly in `tests/README.md`.
+
+Authority: Intel 80386 PRM INS, OUTS, REP, 8.3.2 and 12.3, cross-checked
+against AMD APM vol.3 rev.3.19 table 1-4 / INSx / OUTSx. Exact vendor-manual
+mirror links are recorded in the test README. The fixture uses the current
+Pico adjacent-byte port model; it is not an ISA bus-timing conformance test.
+
+Before/after evidence:
+
+- The pre-fix GCC EXE from `61c1973` fails case 0/check 7/step 1: addr32
+  INSB leaves CCh at the intended destination, expected 78h.
+- The same matrix reordered with `-DIO_STRINGS_FIRST_ADDRESS=16` fails old
+  case 2/check 2/step 1: final REP INSB saves EIP=0, expected 2.
+- Initial MSVC build with I/O fixes (log `build-io-strings-msvc.log`) reached
+  case 7 and exposed the separate RF defect, fixed in `c9070e9`.
+- Both final MSVC/switch and GCC/computed-goto builds pass all 2496 cases.
+  Both reject the deliberately wrong port-byte oracle at case 0/check 8,
+  got 78h versus 79h. This is an expected negative test, not a timeout.
+
+Commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_io_strings.ps1 -Tag io-strings-rf-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_io_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag io-strings-rf-mingw -VerifyOracle
+& tools/nasm-3.01-win64/nasm-3.01/nasm.exe -f bin -DIO_STRINGS_FIRST_ADDRESS=16 homebrew/pico_286/tests/cpu386_io_strings.asm -o homebrew/pico_286/build/cpu386_io_strings_addr16_first.bin
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/cpu386_io_strings_addr16_first.bin
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/io-strings-before.exe -Tag io-final-ip-before -Rom homebrew/pico_286/build/cpu386_io_strings_addr16_first.bin -SuccessMessage 'CPU386 IO STRINGS PASS cases=2496'
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Tag io-memory-traps-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_string_traps.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag io-memory-traps-mingw -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Tag io-rf-compare-faults-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_compare_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag io-rf-compare-faults-mingw
+```
+
+All positive runs passed, including 1128 memory-string TF cases and their
+negative final-EIP oracle, and 2592 comparison fault/retry cases per compiler.
+The RF entry below records the build commands, 42-case fault tests, general
+test386/test286 checks, EXE sizes/hashes and existing warnings. Builds contain
+both fixes (`bc08dec` plus RF and I/O work, dirty=1). NASM 3.01 ROMs are each
+65536 bytes; Defender found no threats before execution. ROM SHA256 values:
+
+- `cpu386_io_strings.bin`:
+  `8E65224FC632A4843F11103E32C9E4983816E453973939B7B9A51B71E9A9B4C4`.
+- `cpu386_io_strings_bad_oracle.bin`:
+  `054438543D1E6C2F26FEFB79FDCEB417E93D31BD5D8B9819CC8B8D2574434E67`.
+- `cpu386_io_strings_addr16_first.bin`:
+  `1F9F34EB9C9A136A8E513259E12144F619DF11E883436EA0BA9BF8FB170C5BE5`.
+
+Test logs/frames are in patch `diagnostics/compiler-<Tag>/`. Reassembling
+the final source after adding the optional row-order macro produced the same
+default ROM hash as the tested one. Copied both EXEs and the MSVC PDB into
+the active patch; EXE hashes match the RF entry below. Patch config stayed
+at SHA256 `36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`;
+restored build config stayed at
+`240420870457D4F65F4EAA29CB8031E56228EA721824DEC54F76615CF430DD3E`.
+No disk images or MIPS artifacts were changed. X86-07/X86-29 and the overall
+instruction-conformance goal remain open.
+
 ## 2026-09-27 RF in non-debug fault gate frames
 
 The new I/O-string regression exposed a missing RF bit in #GP's saved

@@ -1715,25 +1715,25 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                if (reptype && (CPU_CX == 0)) {
+                if (reptype && (r36sx_rep_get_count() == 0)) {
                     break;
                 }
                 if (!r36sx_cpu_require_io_permission(CPU_DX, 1u, firstip)) {
                     break;
                 }
 
-                putmem8(CPU_ES, CPU_DI, portin(CPU_DX));
-                if (df) {
-                    CPU_DI = CPU_DI - 1;
-                } else {
-                    CPU_DI = CPU_DI + 1;
-                }
+                /* Address size selects (E)DI and (E)CX independently of
+                 * the I/O operand width (Intel 80386 INS and REP). */
+                putmem8(CPU_ES, r36sx_dst_index(), portin(CPU_DX));
+                r36sx_set_dst_index(df ? r36sx_dst_index() - 1u :
+                                        r36sx_dst_index() + 1u);
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1u);
                 }
 
-                if (!reptype) {
+                /* The final #DB trap must point after the REP instruction. */
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -1749,25 +1749,22 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                if (reptype && (CPU_CX == 0)) {
+                if (reptype && (r36sx_rep_get_count() == 0)) {
                     break;
                 }
                 if (!r36sx_cpu_require_io_permission(CPU_DX, 2u, firstip)) {
                     break;
                 }
 
-                putmem16(CPU_ES, CPU_DI, portin16(CPU_DX));
-                if (df) {
-                    CPU_DI = CPU_DI - 2;
-                } else {
-                    CPU_DI = CPU_DI + 2;
-                }
+                putmem16(CPU_ES, r36sx_dst_index(), portin16(CPU_DX));
+                r36sx_set_dst_index(df ? r36sx_dst_index() - 2u :
+                                        r36sx_dst_index() + 2u);
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1u);
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -1783,25 +1780,23 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                if (reptype && (CPU_CX == 0)) {
+                if (reptype && (r36sx_rep_get_count() == 0)) {
                     break;
                 }
                 if (!r36sx_cpu_require_io_permission(CPU_DX, 1u, firstip)) {
                     break;
                 }
 
-                portout(CPU_DX, getmem8(useseg, CPU_SI));
-                if (df) {
-                    CPU_SI = CPU_SI - 1;
-                } else {
-                    CPU_SI = CPU_SI + 1;
-                }
+                /* OUTS honors a source override; INS always writes ES. */
+                portout(CPU_DX, getmem8(useseg, r36sx_src_index()));
+                r36sx_set_src_index(df ? r36sx_src_index() - 1u :
+                                        r36sx_src_index() + 1u);
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1u);
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 
@@ -1817,25 +1812,22 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                     r36sx_cpu_invalid_opcode(firstip);
                     break;
                 }
-                if (reptype && (CPU_CX == 0)) {
+                if (reptype && (r36sx_rep_get_count() == 0)) {
                     break;
                 }
                 if (!r36sx_cpu_require_io_permission(CPU_DX, 2u, firstip)) {
                     break;
                 }
 
-                portout16(CPU_DX, getmem16(useseg, CPU_SI));
-                if (df) {
-                    CPU_SI = CPU_SI - 2;
-                } else {
-                    CPU_SI = CPU_SI + 2;
-                }
+                portout16(CPU_DX, getmem16(useseg, r36sx_src_index()));
+                r36sx_set_src_index(df ? r36sx_src_index() - 2u :
+                                        r36sx_src_index() + 2u);
 
                 if (reptype) {
-                    CPU_CX = CPU_CX - 1;
+                    r36sx_rep_set_count(r36sx_rep_get_count() - 1u);
                 }
 
-                if (!reptype) {
+                if (!reptype || r36sx_rep_get_count() == 0) {
                     break;
                 }
 

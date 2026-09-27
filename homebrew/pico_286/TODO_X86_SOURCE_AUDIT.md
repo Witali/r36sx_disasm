@@ -176,6 +176,10 @@ P2 items are narrower instruction/conformance gaps.
   Each step checks registers, flags, frame, DR6 and memory; MSVC/GCC pass
   and both reject a deliberately wrong final-EIP oracle. This closes the
   final-iteration TF boundary in these PM cases, not all interrupt behavior.
+  Further fix 2026-09-27: INS/OUTS now retire their last REP element at the
+  following EIP as well. The 2496-case I/O-string matrix checks 6144 TF traps
+  and 768 I/O-permission faults, including denial after one completed element.
+  Memory faults during INS/OUTS and full high-count execution remain open.
   Open: fixed-16-bit 286 progress, split-element faults, SS/segment overrides,
   real/v86 limit/debug behavior, data breakpoints and IRQ/NMI interruption,
   other string families. The real-mode
@@ -290,11 +294,20 @@ P2 items are narrower instruction/conformance gaps.
   Implement signed displacement and address-size handling without changing
   the immediate-index form. [Intel BT memory addressing][bt].
 
-- [ ] **X86-22 / P2 / Source: byte/word INS/OUTS ignore address-size 32.**
+- [x] **X86-22 / P2 / Source: byte/word INS/OUTS ignore address-size 32.**
   CORE:1679 and following use DI/SI/CX directly for INSB/INSW/OUTSB/OUTSW;
   the dword handlers use the proper index/count helpers.
   Test 67h with indexes above FFFFh and ECX=10000h, both REP and single forms.
   [Intel INS][ins], [Intel OUTS][outs].
+  Fixed 2026-09-27: the byte/word handlers now use the existing address-size
+  index/count helpers; all six I/O-string forms stop rewinding EIP after
+  the last REP element. `cpu386_io_strings.asm` checks 2496 CPL3 cases for
+  code/address/operand widths, DF, REP, source overrides, index wrap,
+  high count selection, I/O bitmap denial and per-element #DB frames.
+  Both MSVC and GCC pass, including rejection of a wrong port-data oracle.
+  This closes the decoder defect, not every I/O corner: real/v86, memory
+  faults, bitmap page faults, port-space boundaries and complete 65536-count
+  transfers remain explicit gaps in `tests/README.md`.
 
 - [x] **X86-23 / P2 / Source: operand32 dispatch omits invalid-ModRM checks.**
   I386:527 accepts register-source LEA; line 534 accepts non-/0 POP; line 926
@@ -470,7 +483,7 @@ Memory forms also inherit X86-04/08/09/10 even if their arithmetic is correct.
 | PUSH, POP, PUSHA/PUSHAD, POPA/POPAD, ENTER, LEAVE | Stack restartability X86-05; bad POP encoding X86-23 |
 | PUSHF/PUSHFD, POPF/POPFD, LAHF, SAHF | Flag masks/privilege paths inspected; fault handling and IRET restore context still open |
 | MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | MOVS/STOS wrap/fault/overlap matrices, 10752 normal CMPS/SCAS cases, 2592 comparison fault cases and 1128 per-iteration TF cases; X86-07 remains open for further fault, prefix, mode and interrupt coverage |
-| IN, OUT, INS, OUTS | I/O permission paths inspected; byte/word string address-size gap X86-22 |
+| IN, OUT, INS, OUTS | INS/OUTS: 2496 CPL3 regression cases, X86-22 fixed; scalar I/O and remaining mode/fault coverage still open |
 | Jcc, SETcc | All 512 condition/flag combinations pass; transfer target size/limit and memory-fault issues remain |
 | LOOP, LOOPE/LOOPZ, LOOPNE/LOOPNZ, JCXZ/JECXZ | Counter-selection handlers inspected; target/fetch boundaries need integrated tests |
 | CALL, JMP, RET/RETF, INT, INTO, IRET | X86-05/11..20; gate/task/exception combinations need broad regressions |

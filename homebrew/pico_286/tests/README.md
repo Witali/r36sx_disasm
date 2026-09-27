@@ -281,11 +281,10 @@ The pre-fix MSVC binary fails case 0's memory comparison after MOVSB reads
 2 flags/frame/selectors/CR2, 3 memory, 4 total case count.
 
 The runner restores its temporary build config and never attaches user disks.
-This matrix covers index wrapping, not all string semantics: segment/page
-fault restart, overlap, debug traps, segment overrides, real/v86 limits,
-and the remaining LODS/INS/OUTS families need separate tests. Normal
-CMPS/SCAS completion is covered by the comparison ROM below; its fault
-restart behavior is not yet covered.
+This matrix covers index wrapping, not all string semantics. The separate
+ROMs below cover overlap, selected memory-fault restart cases, comparisons,
+per-element TF traps, and I/O strings. LODS/INS/OUTS operand faults and the
+remaining real/v86, breakpoint and interrupt paths still need coverage.
 
 Specifications: Intel 80386 PRM chapter 17
 [MOVS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOVS.htm),
@@ -543,6 +542,67 @@ instruction contradicts its own section 3.1; Intel's generation-specific TF
 rule is authoritative here. No modern RF, BTF or fast-string rules are imported.
 This does not certify real/v86 stepping, SS-override/split-operand faults,
 hardware data breakpoints, INS/OUTS, IRQ/NMI or a physical Intel/AMD chip.
+
+## INS/OUTS regression ROM
+
+`cpu386_io_strings.asm` checks 2496 CPL3 cases: INSB/W/D and OUTSB/W/D,
+CS.D=0/1, 16/32-bit address sizes, both DF directions, and default/FS/GS/SS
+prefixes. OUTS must use the selected source; INS always writes ES. The
+13 scenarios per row exercise 6144 TF traps and 768 permission faults:
+
+- Single non-REP transfers with an untouched count sentinel.
+- REP counts 0, 1, 3 and 17; every element single-steps into a CPL0 checker.
+- Index crossing at 64 KiB: addr16 wraps the low half and preserves its high
+  sentinel; addr32 continues across the boundary. Normal addr32 operands
+  also live above FFFFh.
+- ECX=10000h: addr16 performs no I/O; addr32 performs its first element and
+  reaches ECX=FFFFh before the handler deliberately skips the remainder.
+  This scenario checks count selection, not a complete 65536-element run.
+- Denied first/last I/O bitmap bit, absent bitmap, and CPL=IOPL bypass of a
+  denied bitmap. A count-zero case combines null selectors and denied ports.
+- Permission removal after one REP element: #GP(0) must preserve completed
+  progress, point to the first prefix, and set RF in its fault frame.
+
+The oracle uses scalar loads/stores and byte IN/OUT only. Masked DMA
+address/count registers at ports 0..3 provide four observable byte lanes;
+the flip-flop is reset before seeding/checking. No DMA transfer or guest disk
+is enabled. This fixture depends on Pico's adjacent-byte port model, not on
+a promise about real ISA dword transactions. Transfer data varies per
+element. Every step checks all eight GPRs, saved flags, CS/SS, frame EIP,
+source/destination bytes with guards, and all four port bytes (including
+unwritten lanes). Completion requires the exact trap/fault counts. INS port
+read side effects on memory faults are not covered by this fixture.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_io_strings.ps1 -Tag io-strings-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_io_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag io-strings-mingw -VerifyOracle
+```
+
+The runner scans each ROM, requires POST `80:FF` and
+`CPU386 IO STRINGS PASS cases=2496`, and restores the build config.
+`-VerifyOracle` must reject a deliberately wrong port byte at case 0,
+check 8, step 1 (`78h` versus `79h`); an unrelated crash is not success.
+Failure check IDs: 1 trap/fault count or error code, 2 EIP, 3 CS, 4 flags,
+5 SS, 6 GPRs, 7 memory, 8 ports, 9 total cases. Check diagnostics under
+`diagnostics/compiler-<Tag>/`. Do not run these scripts concurrently.
+
+The pre-fix EXE fails case 0: addr32 INSB leaves the intended destination at
+`CCh`, expected `78h`. Assembling with `-DIO_STRINGS_FIRST_ADDRESS=16`
+reorders the same matrix to expose the independent last-REP-step bug first:
+case 2 saves IP=0 instead of 2. The default matrix covers both orders' cases.
+
+Authority (vendor manuals on mirrors): Intel 80386 PRM
+[INS](https://www.scs.stanford.edu/05au-cs240c/lab/i386/INS.htm),
+[OUTS](https://www.scs.stanford.edu/05au-cs240c/lab/i386/OUTS.htm),
+[REP](https://www.scs.stanford.edu/05au-cs240c/lab/i386/REP.htm),
+[8.3.2 I/O permissions](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s08_03.htm)
+and [12.3 debugging](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s12_03.htm).
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf)
+table 1-4, INSx pp.170-171 and OUTSx pp.243-244 corroborate legacy index,
+width and IOPL behavior. The 386 manual is authoritative for RF/traps.
+Real/v86, segment/page faults, page-crossing I/O maps, 16-bit TSS rejection,
+port-FFFFh boundaries, IRQ/NMI interruption and full high-count execution
+remain test gaps; this is not full I/O instruction conformance.
 
 ## IRET privilege and flags regression ROM
 
