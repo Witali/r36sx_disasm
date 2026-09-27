@@ -3597,7 +3597,12 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 /* E9 JMP Jv */
                 oper1 = getmem16(CPU_CS, CPU_IP);
                 StepIP(2);
+#if R36SX_CPU_CORE_FIXED_16BIT
                 r36sx_cpu_add_ip((int16_t)oper1);
+#else
+                r36sx_cpu_near_jump(CPU_IP + (uint32_t)(int32_t)(int16_t)oper1,
+                                     0, firstip);
+#endif
                 break;
 
             case 0xEA:
@@ -3624,7 +3629,14 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 /* EB JMP Jb */
                 oper1 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
+#if R36SX_CPU_CORE_FIXED_16BIT
                 r36sx_cpu_add_ip((int16_t)oper1);
+#else
+                /* Even the short form uses operand size for target width;
+                 * its signed displacement stays eight bits. */
+                r36sx_cpu_near_jump(CPU_IP + (uint32_t)(int32_t)(int16_t)oper1,
+                                     operandSizeOverride, firstip);
+#endif
                 break;
 
             case 0xEC:
@@ -3926,6 +3938,12 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 }
 
                 oper1 = readrm16(rm);
+#if !R36SX_CPU_CORE_FIXED_16BIT
+                if (reg == 4) { /* JMP r/m16 clears the complete upper EIP. */
+                    r36sx_cpu_near_jump(oper1, 0, firstip);
+                    break;
+                }
+#endif
                 op_grp5(firstip);
                 break;
 

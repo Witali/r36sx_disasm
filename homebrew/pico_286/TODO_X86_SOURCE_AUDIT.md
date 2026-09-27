@@ -217,6 +217,13 @@ P2 items are narrower instruction/conformance gaps.
   low `ip` alias without necessarily clearing upper EIP.
   Test 66h near branches in both D=0 and D=1 code, including a D=0 descriptor
   whose limit permits targets above FFFFh. [Intel JMP][jmp], [Intel Jcc][jcc].
+  Partial fix 2026-09-27: protected 386 EIP and sequential advancement now
+  retain all 32 bits even with CS.D=0. Near JMP rel8/16/32 and r/m16/32
+  explicitly truncate by operand size, including full high-EIP clearing for
+  word indirect targets. `tests/cpu386_near_jmp.asm` checks 3136 CPL3 cases,
+  with entry/target above 64 KiB, signed displacements, target NOP execution
+  and both 66h/67h combinations. The baseline fails at case 448 after losing
+  high EIP on entry. CALL, RET, Jcc/LOOP and real/v86 behavior remain open.
 
 - [ ] **X86-12 / P1 / Source: near transfers lack target-limit validation before commit.**
   I386:920 pushes a return address before checking the destination; word
@@ -224,6 +231,13 @@ P2 items are narrower instruction/conformance gaps.
   A later fetch fault is not equivalent to a fault on CALL/JMP/Jcc itself.
   Validate a taken target before changing EIP or the return stack.
   [Intel CALL][call], [Intel JMP][jmp].
+  Partial fix 2026-09-27: near JMP checks the truncated target against cached
+  CS.limit before committing EIP; #GP(0) retains the complete instruction
+  address. The 3136-case ROM verifies 4704 TF traps and 784 faults, including
+  target==limit, target>limit, an instruction above 64 KiB, null selectors,
+  missing operand pages and missing target pages. Target-page #PF retains the
+  destination EIP instead of being speculated at JMP. CALL/Jcc/LOOP/RET and
+  the remaining mode/fault-priority coverage are still outstanding.
 
 - [ ] **X86-13 / P1 / Source: call-gate stack writes use the old CPL.**
   CPU:3794 installs the inner-level SS/SP and pushes the frame, but does not
@@ -486,7 +500,7 @@ Memory forms also inherit X86-04/08/09/10 even if their arithmetic is correct.
 | IN, OUT, INS, OUTS | INS/OUTS: 2496 CPL3 regression cases, X86-22 fixed; scalar I/O and remaining mode/fault coverage still open |
 | Jcc, SETcc | All 512 condition/flag combinations pass; transfer target size/limit and memory-fault issues remain |
 | LOOP, LOOPE/LOOPZ, LOOPNE/LOOPNZ, JCXZ/JECXZ | Counter-selection handlers inspected; target/fetch boundaries need integrated tests |
-| CALL, JMP, RET/RETF, INT, INTO, IRET | X86-05/11..20; gate/task/exception combinations need broad regressions |
+| CALL, JMP, RET/RETF, INT, INTO, IRET | Near JMP: 3136 CPL3 cases for widths/limits/target fetch; X86-05/11..20 remain open for other transfers and gate/task/exception combinations |
 | LDS, LES, LSS, LFS, LGS; MOV/POP segment | Cache/protection gaps X86-08/09/31; LSS shadow CHECK-02 |
 | BOUND, ARPL, LAR, LSL, VERR, VERW | Handlers inspected; selector matrix CHECK-06; LAR's old-386 gate types were not incorrectly rejected using modern rules |
 | SGDT, SIDT, LGDT, LIDT, SLDT, LLDT, STR, LTR, SMSW, LMSW | X86-24; task-loaded selectors X86-15; real/protected restrictions need runtime matrices |

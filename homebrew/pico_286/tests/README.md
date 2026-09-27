@@ -210,6 +210,61 @@ Specifications: [Intel 80386 LEA](https://pdos.csail.mit.edu/6.828/2005/readings
 and [AMD APM vol.3 rev.3.19, LEA pp.195-196](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 Only original 386/legacy rules are used, not 64-bit addressing extensions.
 
+## Near JMP regression ROM
+
+`cpu386_near_jmp.asm` runs 3136 CPL3 cases: 112 encoding rows x fourteen
+scenarios x two EFLAGS images. Rows cover both CS.D, operand and address sizes,
+`EB`/`E9`, every `FF /4` register and memory through DS/FS/GS/SS. The FS, GS
+and SS bases differ, so ignoring a segment override cannot pass accidentally.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_near_jmp.ps1 -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_near_jmp.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag near-jmp-mingw -VerifyOracle
+```
+
+Scenarios cover forward/backward targets, an entry above 64 KiB, crossing that
+boundary, signed underflow, a target exactly at CS.limit and one beyond it,
+rel8 displacements +127/-128, an absent target page, absent indirect-operand
+pages, null data selectors, a faulting instruction above 64 KiB, and a target
+NOP at offset FFFFh. The endpoint scenarios use ordinary targets for indirect
+forms. Both word and dword register targets include ESP; word forms have high
+register bits set to prove zero-extension rather than preservation.
+
+For each successful JMP, #DB checks the exact target EIP and then resumes its
+NOP for a second #DB at target+1. The test checks all GPRs, data selectors,
+SS:ESP, defined flags, DR6.BS, CR2, pointer contents and stack canaries. Faults
+check the vector, error code, RF and saved EIP: a bad CS target faults at JMP,
+while a missing target page faults at the new instruction (TF disabled in
+those cases). Pointer faults retain the full prefixed JMP address.
+Independent final counters require **4704 traps and 784 faults**.
+
+The runner requires POST `80:FF` and `CPU386 NEAR JMP PASS cases=3136`.
+Failure reports zero-based case/check/step and actual/expected values.
+Check IDs: 1 vector/error, 2 CS:EIP, 3 flags/CR2, 4 GPRs/SS:ESP, 5 selectors,
+6 unchanged memory/DR6, 7 counters, 8 unexpected execution/exception.
+Cases are `context * 112 + row`; contexts pair each scenario with clear/set
+arithmetic flags and DF. `-VerifyOracle` deliberately changes the expected
+first EIP from 1040h to 1041h and accepts only that precise rejection.
+Like the other ROM runners, it scans generated binaries, uses no guest disks,
+temporarily changes the build config and restores it, not the patch config.
+
+The old EXEs fail at case 448: entering D=0 code above 64 KiB loses high EIP
+bits. The fix preserves 386 protected EIP independently of CS.D, truncates
+near-JMP targets by operand size and validates CS.limit before committing the
+target. It does not prefetch/translate the target. Lower-model interpreters
+and real/v86 IP handling are unchanged. **This is not complete JMP or branch
+conformance:** real/v86, all ModRM/SIB combinations, operand split-page/segment
+faults, mixed fault priorities and external interruption still need tests.
+CALL/RET/Jcc/LOOP target-width/limit paths remain separate audit work.
+
+Primary references: [Intel 80386 JMP](https://www.scs.stanford.edu/05au-cs240c/lab/i386/JMP.htm),
+[instruction pointer 2.3.4.3](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s02_03.htm),
+[16/32-bit segment defaults 16.1](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s16_01.htm),
+[fault classification 9.1](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s09_01.htm),
+and [AMD APM vol.3 rev.3.19, JMP (Near), pp.185-186](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+These are vendor-authored manuals on mirrors; modern AMD long-mode/AC rules
+are not added to the original 80386 model.
+
 ## Far CALL/JMP encoding and pointer regression ROM
 
 `cpu386_far.asm` runs 1,152 cases at CPL3 with paging. A table of 192 rows

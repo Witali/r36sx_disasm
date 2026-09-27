@@ -326,6 +326,25 @@ static inline void r36sx_cpu_portout32(uint16_t port, uint32_t value)
     portout16((uint16_t)(port + 2u), (uint16_t)(value >> 16));
 }
 
+static inline void r36sx_cpu_near_jump(uint32_t target,
+                                       uint8_t operand32,
+                                       uint32_t fault_ip)
+{
+    /* Intel 80386 JMP: truncate by operand size before checking CS.limit.
+     * A limit violation faults on JMP itself, not on the target's fetch.
+     * Do not translate/prefetch the target: a target-page #PF belongs to
+     * the following instruction and must retain the committed target EIP. */
+    if (!operand32) {
+        target = (uint16_t)target;
+    }
+    if (r36sx_cpu_native_protected_enabled() &&
+        target > r36sx_seg_cache[regcs].limit) {
+        r36sx_cpu_raise_exception(R36SX_EXCEPTION_GP, 0, 1, fault_ip);
+        return;
+    }
+    r36sx_cpu_set_ip(target);
+}
+
 static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                                                              uint32_t fault_ip,
                                                              uint32_t execloops,
@@ -879,7 +898,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
         case 0xE9: {
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
-            r36sx_cpu_add_ip(rel);
+            r36sx_cpu_near_jump(CPU_IP + (uint32_t)rel, 1, fault_ip);
             return true;
         }
 
@@ -979,7 +998,7 @@ static __not_in_flash() bool r36sx_cpu_exec_operand32_opcode(uint8_t opcode,
                     return true;
                 }
                 case 4: /* JMP Ev */
-                    r36sx_cpu_set_ip(readrm32(rm));
+                    r36sx_cpu_near_jump(readrm32(rm), 1, fault_ip);
                     return true;
                 case 5: { /* JMP Mp */
                     getea(rm);

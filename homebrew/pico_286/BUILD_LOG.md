@@ -1,5 +1,81 @@
 # pico-286 Build Log
 
+## 2026-09-27 Near JMP widths, code limits and target fetch
+
+Made concrete progress on X86-11/12 without closing the remaining transfer
+families. Protected 386 EIP now retains its high bits independently of CS.D,
+including sequential advancement and exception restart. The near-JMP paths
+truncate by operand size before validating cached CS.limit and committing
+EIP. They do not translate/prefetch the destination. The specialized 8086/286
+cores and real/v86 handling remain unchanged; the old relative-transfer
+helper explicitly retains its prior behavior for CALL/Jcc/LOOP until those
+families receive their own target-size/limit tests.
+
+References: Intel 80386 PRM JMP, 2.3.4.3, 16.1, 9.1/9.8 and 12.3; AMD APM
+volume 3 revision 3.19, JMP (Near), pp.185-186. Vendor-authored manual links
+and precise coverage/limitations are in `tests/README.md`.
+
+Added `cpu386_near_jmp.asm` / `test_cpu386_near_jmp.ps1`: 3136 CPL3 cases,
+4704 checked #DB traps and 784 checked #GP/#PF faults. The final ROM fails
+on the pre-fix GCC EXE (SHA256
+`45e27bbccb99caacb6973ac002dd02420cd37bf19b80944c2f879aced7de7dc3`)
+at case 448: got saved EIP=1001h, expected 1040h, after losing high EIP on
+entry to D=0 code at 11000h. Evidence: patch
+`diagnostics/compiler-near-jmp-final-before/pico_286.log`.
+An earlier MSVC baseline run produced the same failure. During fixture
+development, corrected diagnostics to the existing private ASCII port 191h
+and made the printer independent of guest DF. A development POST FF without
+the exact pass message was rejected, not counted as success.
+
+Final build/test commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_near_jmp.ps1 -Tag near-jmp-msvc-final -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_near_jmp.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag near-jmp-mingw-final -VerifyOracle
+```
+
+Both compilers pass every case and reject the deliberately wrong first EIP
+(1041h instead of 1040h). Rerun regression scripts `test_cpu386_faults.ps1`
+(42 cases), `test_cpu386_string_traps.ps1` (1128 cases) and
+`test_cpu386_io_strings.ps1` (2496 cases) with each EXE; all pass.
+Tags are `near-jmp-{faults,string_traps,io_strings}-{msvc,mingw}`.
+Also assembled `cpu386_far.asm` with the local NASM `-f bin`, scanned it and
+used `smoke_windows_build.ps1 -Rom homebrew/pico_286/build/cpu386_far.bin
+-SuccessMessage 'CPU386 FAR PASS cases=1152'`; both EXEs pass, tags
+`near-jmp-far-{msvc,mingw}`. Default test386 and test286 (`-CpuModel 80286
+-Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS'
+-AllowBlankFrame`) pass via the smoke runner, tags `near-jmp-general-*`
+and `near-jmp-286-*`. test386 EE output remains SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+
+Builds use `51cdc96d1a0e` plus this source change (`dirty=1`): MSVC 14.51
+`/O2 /MT /Zi`, switch dispatch; Cygwin MinGW-w64 GCC 14.4.0 `-O2 -g
+-static`, computed goto. Existing warnings remain. Full build logs are in
+patch `diagnostics/build-near-jmp-{msvc,mingw}-final.log`; runtime evidence
+is under `diagnostics/compiler-<Tag>/`. No downloads or MIPS build.
+Defender scans of both final EXEs and generated ROMs reported no threats.
+
+Final artifacts, all under `homebrew/pico_286/build`:
+
+| Artifact | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `pico_286_win.exe` | Windows x86-64 PE, 835072 | `165be4b621c2c9655be220d1e5e3f0e9a4f19361b98e43f9033f4b3f96b25dd8` |
+| `pico_286_win_mingw.exe` | Windows x86-64 PE, 3319225 | `e54609039d6e3bdbf35dedf8fc50fd5c111f3c7fc41cea5c59941ec344676f3c` |
+| `cpu386_near_jmp.bin` | Raw reset ROM, 65536 | `faf3d762cd6f5c64cac903a95c0621eeaf3267c6289775ba14c630ddb553b4c8` |
+| `cpu386_near_jmp_bad_oracle.bin` | Deliberately failing ROM, 65536 | `f0a94b43bffa175d988c0cbb2c60966f551ad6c3fb805f2890e948a489fdc4a6` |
+
+Copied both verified EXEs and the MSVC PDB into the active patch directory;
+EXE copy hashes match. No disk image was attached or edited. Build config was
+restored (SHA256 `240420870457d4f65f4eaa29cb8031e56228ea721824dec54f76615cf430dd3e`),
+and the user's patch config remains untouched
+(`36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`).
+Real/v86, further operand faults/addressing modes and other transfer families
+remain open; this is not full 386 instruction coverage.
+
 ## 2026-09-27 INS/OUTS address size and final REP trap
 
 Fixed X86-22: INSB/INSW/OUTSB/OUTSW now select (E)SI/(E)DI/(E)CX with

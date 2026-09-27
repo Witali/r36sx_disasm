@@ -277,7 +277,13 @@ static inline uint8_t r36sx_cpu_stack_default32(void)
 
 static inline uint32_t r36sx_cpu_mask_ip(uint32_t value)
 {
-    return r36sx_cpu_code_default32() ? value : (uint16_t)value;
+    /* CS.D selects default operand/address sizes, not the protected-mode
+     * EIP width. A 386 can execute above 64 KiB in a D=0 code segment;
+     * individual 16-bit transfers must truncate their targets explicitly.
+     * Keep the existing real/v86 and lower-model paths separate. */
+    return (r36sx_cpu_code_default32() ||
+            (r36sx_cpu_has_80386_features() &&
+             r36sx_cpu_native_protected_enabled())) ? value : (uint16_t)value;
 }
 
 static inline uint8_t r36sx_cpu_debug_code_byte(uint32_t offset)
@@ -306,7 +312,11 @@ static inline void r36sx_cpu_set_ip(uint32_t value)
 
 static inline void r36sx_cpu_add_ip(int32_t delta)
 {
-    r36sx_cpu_set_ip(ip32 + (uint32_t)delta);
+    /* Legacy relative-transfer callers still have their own CS.D-based
+     * behavior (audit X86-11). Do not change their truncation implicitly
+     * when widening sequential EIP; migrate them with per-opcode tests. */
+    uint32_t target = ip32 + (uint32_t)delta;
+    ip32 = r36sx_cpu_code_default32() ? target : (uint16_t)target;
 }
 
 #if R36SX_DEBUG_PM_DIAG
