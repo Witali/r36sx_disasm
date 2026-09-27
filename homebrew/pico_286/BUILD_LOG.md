@@ -1,5 +1,51 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-33: keep invalid-opcode diagnostics non-faulting
+
+The new LEA matrix exposed a diagnostic failure before its decoder check:
+dumping 256 bytes around a #UD at CS:EIP=001B:0 crossed the short code-segment
+limit and raised #GP, replacing the intended exception. The invalid-opcode
+header/dump and first-PM-fault message now use a shared code-byte peek with
+read-only page translation and a non-faulting CS-limit check. Instruction
+tracing reuses it. Unavailable bytes display as FF; these peeks do not update
+CR2 or page A/D bits. Other raw physical diagnostic readers and MMIO read-side
+effects remain open in X86-33.
+
+Added five focused cases to `cpu386_faults.asm` (40 total): a two-byte code
+segment and #UD next to missing preceding/following pages in CS.D=0/1. Every
+instruction byte is accessible. The test checks original #UD delivery, its
+no-error-code frame, exact fault CS:EIP, registers/flags and unchanged CR2.
+The prior EXE fails the first short-CS case with #GP. Both rebuilt compilers
+pass all 40 cases. The separate in-progress LEA matrix now advances to its
+known operand32 invalid-ModRM failure (case 8); it is not claimed to pass yet.
+The architectural contract is Intel 80386 PRM 9.8.6/14; source links and
+remaining coverage limitations are in `tests/README.md`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag dump-boundary-before
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Tag dump-boundary-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_faults.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag dump-boundary-mingw
+```
+
+The first command is the expected fail-before test. Builds use base `f8849845`
+plus this change, dirty=1: MSVC `/O2` switch and GCC `-O2 -g` computed goto.
+Existing warnings remain. Build logs are patch
+`diagnostics/x86-audit/build-dump-boundary-{msvc,mingw}.log`; run artifacts are
+in `diagnostics/compiler-dump-boundary-*`. Initial LEA investigation logs are
+`diagnostics/compiler-lea-before/` and `compiler-lea-after-dump-fix/`.
+
+| File under `homebrew/pico_286/build/` | Format | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+| `pico_286_win.exe` | PE32+ x86-64, MSVC | 829952 | `96cc68718fb825003d90189e24663ed589602e0dc73393680c64b276741443d1` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64, GCC | 3330750 | `0cec1334a82f17e48004c0b0ed2e27fcdecd50612e4096ffa6ea96829c681bb7` |
+| `cpu386_faults.bin` | Raw 80386 ROM at F0000h | 65536 | `e82aea60c324e7f00d06d1852e2d4e651419e2114d2e2208c876e91cd93c05b3` |
+
+Defender via `tools/scan-download.ps1` found no threats in all three artifacts.
+No patch deployment yet, no patch config or disk changes, no MIPS build.
+The shared runner restores the build config; the full CPU-test goal is open.
+
 ## 2026-09-27 X86-23: reject undefined operand32 POP encodings
 
 The operand32 dispatcher omitted the ModRM group check already present in

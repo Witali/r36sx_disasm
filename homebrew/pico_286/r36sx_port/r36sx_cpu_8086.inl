@@ -26,7 +26,7 @@ static inline void r36sx_cpu_log_invalid_opcode_dump(uint32_t fault_ip)
 
         for (uint32_t col = 0; col < 16u; ++col) {
             const uint32_t code_ip = r36sx_cpu_mask_ip(start_ip + row + col);
-            bytes[col] = getmem8(CPU_CS, code_ip);
+            bytes[col] = r36sx_cpu_debug_code_byte(code_ip);
             marks[col] = (code_ip == center_ip) ? '^' : ' ';
         }
         marks[16] = '\0';
@@ -63,14 +63,14 @@ static inline void r36sx_cpu_invalid_opcode(uint32_t fault_ip)
     r36sx_pico286_debug_log(
         "[CPU] INT6 invalid opcode at %04X:%08lX bytes=%02X %02X %02X %02X %02X %02X %02X %02X flags=%04X ax=%04X bx=%04X cx=%04X dx=%04X si=%04X di=%04X bp=%04X sp=%04X ds=%04X es=%04X ss=%04X",
         CPU_CS, (unsigned long)fault_ip,
-        getmem8(CPU_CS, fault_ip),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 1u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 2u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 3u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 4u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 5u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 6u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 7u)),
+        r36sx_cpu_debug_code_byte(fault_ip),
+        r36sx_cpu_debug_code_byte(fault_ip + 1u),
+        r36sx_cpu_debug_code_byte(fault_ip + 2u),
+        r36sx_cpu_debug_code_byte(fault_ip + 3u),
+        r36sx_cpu_debug_code_byte(fault_ip + 4u),
+        r36sx_cpu_debug_code_byte(fault_ip + 5u),
+        r36sx_cpu_debug_code_byte(fault_ip + 6u),
+        r36sx_cpu_debug_code_byte(fault_ip + 7u),
         (uint16_t)(2u | x86_flags.value),
         CPU_AX, CPU_BX, CPU_CX, CPU_DX,
         CPU_SI, CPU_DI, CPU_BP, CPU_SP,

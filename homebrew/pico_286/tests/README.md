@@ -16,7 +16,7 @@ powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_fau
 ```
 
 The runner assembles with the local NASM, temporarily changes only the build
-config, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=35` message,
+config, checks POST `80:FF`, the exact `CPU386 FAULTS PASS cases=40` message,
 the debug mailbox and framebuffer, then restores the config. POST `80:FE`
 means failure. ROM/listing artifacts are in `build/`; diagnostics are in the
 patch `diagnostics/compiler-<Tag>/` directory. Do not run multiple instances
@@ -25,7 +25,7 @@ The common `smoke_windows_build.ps1` also accepts `-CpuModel 80286` and
 `-AllowBlankFrame` for port-only ROMs such as `test286`; the latter still
 checks framebuffer dimensions and the requested POST/text completion markers.
 
-Coverage (35 cases):
+Coverage (40 cases):
 
 - 24 memory MOV loads: byte/word/dword operands, 16/32-bit addresses, CS.D=0/1,
   with null DS (#GP) and a non-present data page (#PF).
@@ -37,6 +37,11 @@ Coverage (35 cases):
 - One fault while TF is set: no stale single-step trap over the fault handler.
 - One #GP followed by a not-present #GP gate, producing #DF(0), followed by
   another ordinary #GP to check delivery-state cleanup.
+- Five #UD diagnostic boundaries: an instruction in a two-byte code segment,
+  and instructions next to absent preceding/following pages with CS.D=0/1.
+  The opcode bytes themselves are valid memory; only the diagnostic peek
+  would exceed the segment/page boundary. Assert #UD, exact saved CS:EIP,
+  no hardware error code, preserved EAX/flags and unchanged CR2.
 
 Checks include preserved EAX/defined arithmetic flags, handler entry, saved
 CS:EIP, error code and CR2. Data-load CR2 is checked exactly; instruction-fetch

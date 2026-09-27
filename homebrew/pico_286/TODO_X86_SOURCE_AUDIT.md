@@ -321,6 +321,13 @@ P2 items are narrower instruction/conformance gaps.
   (#PF at F000h after INC). This also removes diagnostic interference with
   the immediate-fetch cases in `cpu386_faults.asm`. Other diagnostic/context
   dump readers still need conversion, so this item remains open.
+  Further fix 2026-09-27: invalid-opcode header/context dumps and the initial
+  PM fault message now share a non-faulting code-byte reader with instruction
+  tracing. Out-of-limit/unmapped bytes yield FF without raising #GP/#PF or
+  changing CR2/page A/D. Five new integrated #UD boundary cases cover short
+  CS and absent neighboring pages, both CS.D values (40 fault cases total).
+  Separate PM exception-context physical reads still ignore paging; MMIO
+  read-side effects and a debug-on/off equivalence run remain to be checked.
 
 ## Investigations not yet established as conformance bugs
 

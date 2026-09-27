@@ -280,6 +280,25 @@ static inline uint32_t r36sx_cpu_mask_ip(uint32_t value)
     return r36sx_cpu_code_default32() ? value : (uint16_t)value;
 }
 
+static inline uint8_t r36sx_cpu_debug_code_byte(uint32_t offset)
+{
+    uint32_t physical;
+    offset = r36sx_cpu_mask_ip(offset);
+    /* Diagnostic peeks must not replace the pending exception with #GP/#PF,
+     * change CR2, or set page A/D bits. FF marks an unavailable code byte. */
+    if (r36sx_cpu_native_protected_enabled() &&
+        (!r36sx_seg_cache[regcs].valid ||
+         offset > r36sx_seg_cache[regcs].limit)) {
+        return 0xffu;
+    }
+    if (!r36sx_cpu_debug_translate_linear(segbase32[regcs] + offset, 0,
+                                          r36sx_cpu_cpl() == 3u,
+                                          &physical, NULL, NULL)) {
+        return 0xffu;
+    }
+    return read86_ob(physical);
+}
+
 static inline void r36sx_cpu_set_ip(uint32_t value)
 {
     ip32 = r36sx_cpu_mask_ip(value);
@@ -322,14 +341,14 @@ static void r36sx_pm_diag_log_first_fault(const char *reason,
         "[PM] first fault reason=%s cs:eip=%04X:%08lX "
         "bytes=%02X %02X %02X %02X %02X %02X %02X %02X",
         reason, CPU_CS, (unsigned long)fault_ip,
-        getmem8(CPU_CS, fault_ip),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 1u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 2u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 3u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 4u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 5u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 6u)),
-        getmem8(CPU_CS, r36sx_cpu_mask_ip(fault_ip + 7u)));
+        r36sx_cpu_debug_code_byte(fault_ip),
+        r36sx_cpu_debug_code_byte(fault_ip + 1u),
+        r36sx_cpu_debug_code_byte(fault_ip + 2u),
+        r36sx_cpu_debug_code_byte(fault_ip + 3u),
+        r36sx_cpu_debug_code_byte(fault_ip + 4u),
+        r36sx_cpu_debug_code_byte(fault_ip + 5u),
+        r36sx_cpu_debug_code_byte(fault_ip + 6u),
+        r36sx_cpu_debug_code_byte(fault_ip + 7u));
     r36sx_pm_diag_log_state("first fault state");
 }
 

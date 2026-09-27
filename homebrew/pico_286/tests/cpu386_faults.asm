@@ -11,6 +11,7 @@ org 0
 %define CODE32 16
 %define DATA 24
 %define STACK 32
+%define CODE_SHORT 40
 %define IDT 0x4000
 %define PD 0x1000
 %define PT 0x2000
@@ -24,6 +25,7 @@ org 0
 %define HITS STATE+24
 %define COUNT STATE+28
 %define EXPECT_FLAGS STATE+32
+%define RESUME_CS STATE+36
 %define SENTINEL 0x12345678
 
 %macro DESC 4
@@ -93,6 +95,7 @@ setup:
     mov word [IDT+13*8], gp_handler
     mov word [IDT+14*8], pf_handler
     mov word [IDT+8*8], df_handler
+    mov word [IDT+6*8], ud_handler
     lidt [cs:idt_ptr]
     mov eax, PD
     mov cr3, eax
@@ -107,6 +110,7 @@ setup:
     mov dword [es:EXPECT_IP], %1
     mov dword [es:RESUME_IP], %2
     mov word [es:EXPECT_CS], %3
+    mov word [es:RESUME_CS], %3
     mov byte [es:EXPECT_VECTOR], %4
     mov dword [es:EXPECT_ERROR], 0
     mov dword [es:EXPECT_CR2], %5
@@ -170,9 +174,41 @@ setup:
 %endrep
 %endmacro
 
+; Invalid instructions at page edges must remain #UD even when the diagnostic
+; header/context dump peeks into an absent neighboring page. Both bytes of the
+; instruction itself are mapped. CR2 must remain unchanged by diagnostic reads.
+%macro UD_BOUNDARY_CASES 1
+    mov eax, 0x13579bdf
+    mov cr2, eax
+    mov dword [es:PT+0xf2*4], 0
+    mov eax, cr3
+    mov cr3, eax
+    ARM 0x1ffe, %%after_end, %1, 6, 0x13579bdf
+    jmp 0x1ffe
+%%after_end:
+    CHECK_RETURN
+    mov dword [es:PT+0xf2*4], 0xf2003
+    mov eax, cr3
+    mov cr3, eax
+    ARM 0x4000, %%after_start, %1, 6, 0x13579bdf
+    jmp 0x4000
+%%after_start:
+    CHECK_RETURN
+%endmacro
+
 bits 16
 %define fail_current fail16
 tests16:
+    ; First #UD also exercises the one-shot first-fault diagnostic. Its code
+    ; segment contains exactly the two opcode bytes and no dump/lookahead area.
+    mov eax, 0x13579bdf
+    mov cr2, eax
+    ARM 0, after_short_ud, CODE_SHORT, 6, 0x13579bdf
+    mov word [es:RESUME_CS], CODE16
+    jmp CODE_SHORT:0
+after_short_ud:
+    CHECK_RETURN
+    UD_BOUNDARY_CASES CODE16
     MEMORY_CASES CODE16
     ARM imm8_16, after_imm8_16, CODE16, 14, 0xf3000
     jmp imm8_16
@@ -193,6 +229,7 @@ fail16:
 bits 32
 %define fail_current unexpected
 tests32:
+    UD_BOUNDARY_CASES CODE32
     MEMORY_CASES CODE32
     ARM imm8_32, after_imm8_32, CODE32, 14, 0xf9000
     jmp imm8_32
@@ -255,7 +292,7 @@ final_fault:
     jmp unexpected
 after_final:
     CHECK_RETURN
-    cmp dword [es:COUNT], 35
+    cmp dword [es:COUNT], 40
     jne unexpected
     mov esi, passed
     call print
@@ -269,6 +306,12 @@ gp_handler:
     inc dword [es:HITS]
     pushad
     mov bl, 13
+    jmp check_frame
+ud_handler:
+    push dword 0 ; Normalize #UD, which has no hardware error code.
+    inc dword [es:HITS]
+    pushad
+    mov bl, 6
     jmp check_frame
 df_handler:
     inc dword [es:HITS]
@@ -300,6 +343,12 @@ check_frame:
     and eax, 0x9d5 ; Defined arithmetic flags plus TF.
     cmp eax, [es:EXPECT_FLAGS]
     jne unexpected
+    cmp bl, 6
+    jne .not_ud
+    mov eax, cr2
+    cmp eax, [es:EXPECT_CR2]
+    jne unexpected
+.not_ud:
     cmp bl, 14
     jne .resume
     mov eax, cr2
@@ -318,6 +367,8 @@ check_frame:
     and dword [ss:esp+44], ~0x100 ; Only the faulting instruction is stepped.
     mov eax, [es:RESUME_IP]
     mov [ss:esp+36], eax
+    movzx eax, word [es:RESUME_CS]
+    mov [ss:esp+40], eax
     popad
     add esp, 4
     iretd
@@ -341,8 +392,9 @@ print:
     jmp print
 .done:
     ret
-passed: db 'CPU386 FAULTS PASS cases=35',10,0
+passed: db 'CPU386 FAULTS PASS cases=40',10,0
 failed: db 'CPU386 FAULTS FAIL',10,0
+short_ud: db 0x8f,0xc8 ; Undefined /1 encoding; descriptor limit is one.
 
 align 8
 gdt:
@@ -351,6 +403,7 @@ gdt:
     DESC ROM_BASE, 0xffff, 0x9a, 0x40
     DESC 0, 0xfffff, 0x92, 0xc0
     DESC 0, 0xfffff, 0x92, 0xc0
+    DESC ROM_BASE+(short_ud-$$), 1, 0x9a, 0
 gdt_end:
 gdt_ptr: dw gdt_end-gdt-1
     dd ROM_BASE+gdt
@@ -360,8 +413,12 @@ idt_ptr: dw 32*8-1
 ; Force a byte of each immediate onto a non-present page. Prefixes are part
 ; of saved fault EIP. These locations are outside the normal code/data pages.
 bits 16
+times 0x1ffe-($-$$) db 0x90
+    db 0x8f,0xc8
 times 0x2fff-($-$$) db 0x90
 imm8_16: mov al, 0x5a
+times 0x4000-($-$$) db 0x90
+    db 0x8f,0xc8
 times 0x4ffe-($-$$) db 0x90
 imm16_16: mov ax, 0x55aa
 times 0x6ffc-($-$$) db 0x90
