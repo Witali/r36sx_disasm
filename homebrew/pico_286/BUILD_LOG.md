@@ -1,5 +1,104 @@
 # pico-286 Build Log
 
+## 2026-09-27 Jcc operand-size targets and conditional limit checks
+
+Further partial X86-11/12 fix: all sixteen short/near Jcc forms now use
+operand size, not CS.D, for taken-target truncation and validate CS.limit
+before committing EIP. Not-taken branches preserve sequential EIP and do
+not test their unused target. Displacement fetch still happens regardless
+of the condition. The fixed-16-bit 8086/286 implementations are unchanged.
+Authority: Intel 80386 PRM Jcc, 9.1/9.8 and 12.3; cross-check AMD APM vol.3
+rev.3.19 pp.180-183. Links, the Intel HTML JLE transcription caveat, test
+decoding and remaining scope are recorded in `tests/README.md`.
+
+Added `tests/cpu386_jcc.asm` / `test_cpu386_jcc.ps1`: thirteen independently
+assembled 8192-case phases (106496 total), 172032 checked #DB traps and
+24576 checked #GP/#PF faults. NASM derives the condition truth table; guest
+code checks target/fall-through EIP, following-NOP retirement, flags, GPRs,
+selectors, SS:ESP, CR2, DR6 and canaries. An intentionally wrong expected
+not-taken EIP tests the checker itself. During fixture development, changed
+`JCC_PHASE%10` to `JCC_PHASE % 10` because NASM parsed `%10` as a macro
+parameter; that assembly failure was not counted as a test run.
+
+The pre-fix MSVC EXE (SHA256
+`165be4b621c2c9655be220d1e5e3f0e9a4f19361b98e43f9033f4b3f96b25dd8`)
+fails `-Phase 2` at case 401h: saved EIP=1040h instead of 11040h.
+`-Phase 6` fails at case 1: #DB (1) instead of #GP (13). Baseline tags
+are `jcc-before-width-02` and `jcc-before-limit-06`; evidence lives under
+patch `diagnostics/compiler-<Tag>/pico_286.log`.
+
+Build/test commands (repository root):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_jcc.ps1 -Tag jcc-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_jcc.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag jcc-mingw -VerifyOracle
+```
+
+Both compilers pass all thirteen phases and reject the deliberately incorrect
+first EIP (1003h instead of 1002h). Regressions also pass with each EXE:
+`test_cpu386_near_jmp.ps1` (3136 cases), `test_cpu386_faults.ps1` (42),
+`test_cpu386_string_traps.ps1` (1128), `test_cpu386_io_strings.ps1` (2496),
+and the far-transfer ROM (1152). Tags are
+`jcc-{near-jmp,faults,string-traps,io-strings,far}-{msvc,mingw}`. The far ROM
+was assembled with NASM `-f bin`, scanned and run through
+`smoke_windows_build.ps1 -Rom homebrew/pico_286/build/cpu386_far.bin
+-Seconds 120 -SuccessMessage 'CPU386 FAR PASS cases=1152'`.
+
+General test386 reaches POST FF with unchanged EE-output SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+Both initial general runs hit a host script sharing violation while hashing
+that file immediately after process termination, not a guest failure; a
+later read confirmed the same hash. The cleanup race is fixed separately.
+Both repeated general runs pass completely, tags `jcc-general-{msvc,mingw}-wait`.
+test286 also passes with both EXEs via `smoke_windows_build.ps1 -CpuModel
+80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS'
+-AllowBlankFrame`, tags `jcc-286-{msvc,mingw}`. The shared runner cleanup
+was additionally checked by rerunning Jcc phase 00 plus its negative oracle
+(`-Tag jcc-cleanup -Phase 0 -VerifyOracle`) on GCC.
+
+Builds use HEAD `300ffc8` plus this change (`dirty=1`): MSVC 14.51
+`/O2 /MT /Zi`, switch dispatch; Cygwin MinGW-w64 GCC 14.4.0 `-O2 -g
+-static`, computed goto. Existing warnings remain. Build logs:
+patch `diagnostics/build-jcc-{msvc,mingw}.log`. Defender scans of both EXEs
+reported no threats; the runner scans each generated ROM before execution.
+MinGW `objdump -p` confirms `pei-x86-64` and imports only dbghelp, GDI32,
+KERNEL32, msvcrt, USER32 and WINMM, with no Cygwin/GCC runtime DLL.
+
+Artifacts under `homebrew/pico_286/build`:
+
+| Artifact | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `pico_286_win.exe` | Windows x86-64 PE, 835072 | `7917ad6ade0ca4e01ba46fc9c00a71549631464694d35544481165dbe4de48ba` |
+| `pico_286_win_mingw.exe` | Windows x86-64 PE, 3319737 | `dc6d44c4281be53728e4c023e61f46b7f509c5ded6beeb49541ad333dd64d29e` |
+| `pico_286_win.pdb` | MSVC symbols, 8249344 | `6fdf5652b36c623839720df7bd1cddddcdcef3c9c9a195884421e90d7141f205c` |
+| `cpu386_jcc_00.bin` | Raw reset ROM, 65536 | `7b47b1504b4e25261ddde8470b4dfda8c86e6dbe2ece4d7b91a17145811e9741` |
+| `cpu386_jcc_01.bin` | Raw reset ROM, 65536 | `0fc40d9e90b0a7fbc38a0921d0f31c76bd13306d5abb0532b865e76c203fb72b` |
+| `cpu386_jcc_02.bin` | Raw reset ROM, 65536 | `5738e849be0b2f9d33cd81b2b9dfe57fe8fa4598e7916ef9822266c12441bec1` |
+| `cpu386_jcc_03.bin` | Raw reset ROM, 65536 | `7c4d2d16fb5b492a57ae4e7730841a7de86d26cc53053c3fd728e51efdbcc6ea` |
+| `cpu386_jcc_04.bin` | Raw reset ROM, 65536 | `eb5df455fcee726e8d9d512393ee1664629a71ace74ef0b6fe224fed2106f685` |
+| `cpu386_jcc_05.bin` | Raw reset ROM, 65536 | `d0cc431cf1e90a7e3407b80b084326f6645e31053d7f21d564a392aa356bab09` |
+| `cpu386_jcc_06.bin` | Raw reset ROM, 65536 | `d171cd2d0c9fa70348263cc9f0e56e8cc011dcbcd59e58465260f5ff59fabc49` |
+| `cpu386_jcc_07.bin` | Raw reset ROM, 65536 | `d73a8756b37a686f532647e874e36b948ac6206a694c725bd3137251564294eb` |
+| `cpu386_jcc_08.bin` | Raw reset ROM, 65536 | `4bae79c33f5718dac44f17347b9b22e80ac4a6368a360fc5ee43b355e1693b8d` |
+| `cpu386_jcc_09.bin` | Raw reset ROM, 65536 | `dd80061e76e3f281ff24af02f2398fbd5f1ddf214c6ab362003954c38f1fbfa5` |
+| `cpu386_jcc_10.bin` | Raw reset ROM, 65536 | `f35d3343a575a281fafe349a6515e9bde0027855d886da088f2869660637c0ed` |
+| `cpu386_jcc_11.bin` | Raw reset ROM, 65536 | `1c4311b543d39bec131eec8f236291a4aed2d8e2205090aa09dce6ed58d93e2b` |
+| `cpu386_jcc_12.bin` | Raw reset ROM, 65536 | `28c91732c2615932da69a71d2a8576165041a9cb9b2044138635f3ad6965405d` |
+| `cpu386_jcc_bad_oracle.bin` | Deliberately failing ROM, 65536 | `0302a460c050f0d27324eeae9f0e86a18fbf736cd22e918de6d1d7d45eba46a1` |
+
+Copied both verified EXEs and the MSVC PDB to the active patch directory;
+all copy hashes match. No guest disk was attached/modified, no downloads
+were needed, and no MIPS binary was rebuilt. Build config was restored
+(SHA256 `240420870457d4f65f4eaa29cb8031e56228ea721824dec54f76615cf430dd3e`).
+The user's patch config is unchanged
+(`36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`).
+Real/v86, further fetch/priority/prefix cases and CALL/RET/LOOP/JCXZ remain
+open; this is not complete 386 instruction conformance.
+
 ## 2026-09-27 Near JMP widths, code limits and target fetch
 
 Made concrete progress on X86-11/12 without closing the remaining transfer

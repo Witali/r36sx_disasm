@@ -330,8 +330,8 @@ static inline void r36sx_cpu_near_jump(uint32_t target,
                                        uint8_t operand32,
                                        uint32_t fault_ip)
 {
-    /* Intel 80386 JMP: truncate by operand size before checking CS.limit.
-     * A limit violation faults on JMP itself, not on the target's fetch.
+    /* Intel 80386 JMP/taken Jcc: truncate by operand size before CS.limit.
+     * A limit violation faults on the branch, not on the target's fetch.
      * Do not translate/prefetch the target: a target-page #PF belongs to
      * the following instruction and must retain the committed target EIP. */
     if (!operand32) {
@@ -1232,18 +1232,20 @@ static __not_in_flash() void r36sx_cpu_exec_0f(uint32_t fault_ip)
     }
 
     if (op2 >= 0x80 && op2 <= 0x8F) {
+        /* Jcc rel16/rel32: fetch the displacement even when not taken,
+         * but only a taken branch truncates/checks its destination. */
         uint8_t take = r36sx_cpu_condition(op2);
         if (operandSizeOverride) {
             int32_t rel = (int32_t)getmem32(CPU_CS, CPU_IP);
             StepIP(4);
             if (take) {
-                r36sx_cpu_add_ip(rel);
+                r36sx_cpu_near_jump(CPU_IP + (uint32_t)rel, 1, fault_ip);
             }
         } else {
             int16_t rel = (int16_t)getmem16(CPU_CS, CPU_IP);
             StepIP(2);
             if (take) {
-                r36sx_cpu_add_ip(rel);
+                r36sx_cpu_near_jump(CPU_IP + (uint32_t)(int32_t)rel, 0, fault_ip);
             }
         }
         return;

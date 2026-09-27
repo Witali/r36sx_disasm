@@ -223,7 +223,13 @@ P2 items are narrower instruction/conformance gaps.
   word indirect targets. `tests/cpu386_near_jmp.asm` checks 3136 CPL3 cases,
   with entry/target above 64 KiB, signed displacements, target NOP execution
   and both 66h/67h combinations. The baseline fails at case 448 after losing
-  high EIP on entry. CALL, RET, Jcc/LOOP and real/v86 behavior remain open.
+  high EIP on entry. CALL, RET, LOOP/JCXZ and real/v86 behavior remain open.
+  Further fix 2026-09-27: short and near Jcc use operand-size target
+  truncation only when taken; a not-taken word branch preserves high
+  sequential EIP. `tests/cpu386_jcc.asm` adds 106496 CPL3 cases over all
+  sixteen conditions, all 32 relevant flag images, CS.D/operand/address
+  widths and thirteen target/fetch scenarios. The pre-fix EXE fails phase
+  02 case 401h with target 1040h instead of 11040h. Fixed-16 cores are unchanged.
 
 - [ ] **X86-12 / P1 / Source: near transfers lack target-limit validation before commit.**
   I386:920 pushes a return address before checking the destination; word
@@ -236,8 +242,15 @@ P2 items are narrower instruction/conformance gaps.
   address. The 3136-case ROM verifies 4704 TF traps and 784 faults, including
   target==limit, target>limit, an instruction above 64 KiB, null selectors,
   missing operand pages and missing target pages. Target-page #PF retains the
-  destination EIP instead of being speculated at JMP. CALL/Jcc/LOOP/RET and
+  destination EIP instead of being speculated at JMP. CALL/LOOP/JCXZ/RET and
   the remaining mode/fault-priority coverage are still outstanding.
+  Further fix 2026-09-27: taken Jcc validates CS.limit before committing
+  the target, while not-taken branches ignore the unused target. The Jcc
+  matrix checks 172032 #DB traps and 24576 #GP/#PF faults, including bad
+  targets, missing target/fall-through pages and missing displacement bytes.
+  The latter must fault regardless of the condition. The pre-fix EXE emits
+  #DB instead of #GP in phase 06 case 1. Partial immediate and fetch-segment
+  limit faults, real/v86 and other transfer families still need coverage.
 
 - [ ] **X86-13 / P1 / Source: call-gate stack writes use the old CPL.**
   CPU:3794 installs the inner-level SS/SP and pushes the frame, but does not
@@ -498,7 +511,8 @@ Memory forms also inherit X86-04/08/09/10 even if their arithmetic is correct.
 | PUSHF/PUSHFD, POPF/POPFD, LAHF, SAHF | Flag masks/privilege paths inspected; fault handling and IRET restore context still open |
 | MOVS, STOS, LODS, CMPS, SCAS, REP/REPE/REPNE | MOVS/STOS wrap/fault/overlap matrices, 10752 normal CMPS/SCAS cases, 2592 comparison fault cases and 1128 per-iteration TF cases; X86-07 remains open for further fault, prefix, mode and interrupt coverage |
 | IN, OUT, INS, OUTS | INS/OUTS: 2496 CPL3 regression cases, X86-22 fixed; scalar I/O and remaining mode/fault coverage still open |
-| Jcc, SETcc | All 512 condition/flag combinations pass; transfer target size/limit and memory-fault issues remain |
+| Jcc | 106496 CPL3 cases: all conditions/flags, widths, taken/not-taken target limits and selected fetch faults; real/v86, JCXZ and further fetch/prefix cases remain |
+| SETcc | All 512 condition/flag combinations pass in component tests; integrated register/memory destination and fault coverage remains |
 | LOOP, LOOPE/LOOPZ, LOOPNE/LOOPNZ, JCXZ/JECXZ | Counter-selection handlers inspected; target/fetch boundaries need integrated tests |
 | CALL, JMP, RET/RETF, INT, INTO, IRET | Near JMP: 3136 CPL3 cases for widths/limits/target fetch; X86-05/11..20 remain open for other transfers and gate/task/exception combinations |
 | LDS, LES, LSS, LFS, LGS; MOV/POP segment | Cache/protection gaps X86-08/09/31; LSS shadow CHECK-02 |

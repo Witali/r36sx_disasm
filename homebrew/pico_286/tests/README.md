@@ -255,7 +255,8 @@ target. It does not prefetch/translate the target. Lower-model interpreters
 and real/v86 IP handling are unchanged. **This is not complete JMP or branch
 conformance:** real/v86, all ModRM/SIB combinations, operand split-page/segment
 faults, mixed fault priorities and external interruption still need tests.
-CALL/RET/Jcc/LOOP target-width/limit paths remain separate audit work.
+CALL/RET/LOOP target-width/limit paths remain separate audit work; Jcc has
+its own matrix below.
 
 Primary references: [Intel 80386 JMP](https://www.scs.stanford.edu/05au-cs240c/lab/i386/JMP.htm),
 [instruction pointer 2.3.4.3](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s02_03.htm),
@@ -264,6 +265,70 @@ Primary references: [Intel 80386 JMP](https://www.scs.stanford.edu/05au-cs240c/l
 and [AMD APM vol.3 rev.3.19, JMP (Near), pp.185-186](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 These are vendor-authored manuals on mirrors; modern AMD long-mode/AC rules
 are not added to the original 80386 model.
+
+## Jcc condition, target and fetch regression ROM
+
+`cpu386_jcc.asm` tests all sixteen conditions in both short (`70h..7Fh`)
+and near (`0F 80h..8Fh`) encodings. Each of thirteen independently assembled
+phases has 8192 cases: 16 conditions x 32 CF/PF/ZF/SF/OF combinations x
+CS.D x operand size x address size x short/near. NASM calculates the truth
+table independently of the emulator's condition helper. AF/DF also vary and
+must remain unchanged, but are not additional Cartesian dimensions.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_jcc.ps1 -Tag jcc-msvc -VerifyOracle
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_jcc.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag jcc-mingw -VerifyOracle
+```
+
+Use `-Phase 2` to isolate one phase. Full execution covers **106496 cases**,
+with independent counters checking **172032 #DB traps and 24576 faults**:
+
+| Phase | Scenario |
+| --- | --- |
+| 00 / 01 | Forward / backward destination |
+| 02 / 03 | Entry above 64 KiB / destination crossing that boundary |
+| 04 | Signed underflow: word target FFF0h versus invalid dword FFFFFFF0h |
+| 05 / 06 | Target exactly at / one byte beyond CS.limit |
+| 07 / 08 | Displacement +127 / -128 |
+| 09 | Missing taken-target page, present fall-through page |
+| 10 | Missing fall-through page, present taken-target page |
+| 11 | High instruction address and invalid dword target, valid word target |
+| 12 | First displacement byte absent, independent of the condition |
+
+For successful transfers and fall-through, TF first checks the exact EIP,
+then resumes a NOP and checks EIP+1. An invalid taken target must instead
+produce #GP(0) at the prefixed Jcc. A not-taken branch must neither truncate
+sequential EIP nor check the unused target's limit/page. Phases 09/10 first
+check #DB at the committed EIP, clear TF and then require a fetch #PF at that
+same destination. Phase 12 requires #PF at Jcc itself even if not taken.
+Fault frames include error code, RF and CR2. Every event checks all GPRs,
+selectors, flags, SS:ESP and stack canaries; #DB additionally checks DR6.BS.
+
+Pass requires POST `80:FF` plus the exact `CPU386 JCC PASS phase=NN
+cases=8192` marker in every phase. Failure reports phase, hexadecimal case,
+check, step, actual and expected values. Case bits 0..3 encode condition,
+4..8 flags, 9 address32, 10 operand32, 11 CS.D, and 12 near form. Check IDs
+are 1 vector/error, 2 CS:EIP, 3 flags/CR2, 4 GPRs/SS:ESP, 5 selectors,
+6 canaries/DR6, 7 counters and 8 unexpected execution/exception.
+`-VerifyOracle` accepts only the deliberately incorrect first EIP rejection
+(actual 1002h versus expected 1003h); unrelated failures cannot pass it.
+Runs use no disks, scan each ROM, and restore the build configuration.
+
+The pre-fix EXE fails phase 02 case 401h (1040h rather than 11040h) and
+phase 06 case 1 (#DB instead of #GP). The fix uses operand-size truncation
+and CS.limit validation only when the condition is true. Fixed-16-bit
+8086/286 paths retain their prior code. Real/v86 segment semantics, fetch
+segment-limit/partial-immediate faults, arbitrary displacement values,
+LOCK/repeated-prefix handling, IRQ/NMI and JCXZ/JECXZ remain separate work.
+This matrix does not certify all control-transfer instructions.
+
+References: [Intel 80386 Jcc](https://www.scs.stanford.edu/05au-cs240c/lab/i386/Jcc.htm),
+[fault/trap classification 9.1](https://www.scs.stanford.edu/05au-cs240c/lab/i386/s09_01.htm),
+and [AMD APM vol.3 rev.3.19, Jcc pp.180-183](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
+These vendor manuals are hosted on mirrors. The Intel HTML transcription's
+JLE descriptions incorrectly say AND; its equivalent JNG descriptions and
+the AMD table give the correct `ZF || (SF != OF)`, used by the test oracle.
+No AMD64-only behavior is imported into the original 386 model.
 
 ## Far CALL/JMP encoding and pointer regression ROM
 

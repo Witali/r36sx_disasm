@@ -48,6 +48,16 @@
 #define R36SX_CPU_CORE_SHIFT_COUNT(count) ((uint8_t)(count))
 #endif
 
+/* Keep fixed-16 cores free of 386 target-width/protection work. Short Jcc
+ * still has an operand-size attribute even though its displacement is byte. */
+#if R36SX_CPU_CORE_FIXED_16BIT
+#define R36SX_CPU_CORE_JCC_REL8(delta) r36sx_cpu_add_ip(delta)
+#else
+#define R36SX_CPU_CORE_JCC_REL8(delta) \
+    r36sx_cpu_near_jump(CPU_IP + (uint32_t)(int32_t)(delta), \
+                         operandSizeOverride, firstip)
+#endif
+
 static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
     static uint32_t firstip;
     static bool was_TF;
@@ -1843,7 +1853,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (of) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1855,7 +1865,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!of) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1867,7 +1877,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1879,7 +1889,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1891,7 +1901,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1903,7 +1913,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1915,7 +1925,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (cf || zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1927,7 +1937,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!cf && !zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1939,7 +1949,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1951,7 +1961,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!sf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1963,7 +1973,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (pf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1975,7 +1985,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (!pf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1987,7 +1997,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf != of) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -1999,7 +2009,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if (sf == of) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -2011,7 +2021,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 temp16 = signext(getmem8(CPU_CS, CPU_IP));
                 StepIP(1);
                 if ((sf != of) || zf) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -2025,7 +2035,7 @@ static void __not_in_flash() R36SX_CPU_EXEC_CORE_NAME(uint32_t execloops) {
                 if (!
                     zf && (sf
                            == of)) {
-                    r36sx_cpu_add_ip((int16_t)temp16);
+                    R36SX_CPU_CORE_JCC_REL8((int16_t)temp16);
                 }
                 break;
 
@@ -4000,6 +4010,7 @@ r36sx_exec_done:
 }
 
 #undef R36SX_CPU_CORE_SHIFT_COUNT
+#undef R36SX_CPU_CORE_JCC_REL8
 #ifdef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT_DEFAULTED
 #undef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT_DEFAULTED
 #undef R36SX_CPU_CORE_LIMIT_SHIFT_COUNT
