@@ -116,13 +116,19 @@ P2 items are narrower instruction/conformance gaps.
   cases across CS.D/SS.B/operand widths and source/destination #SS/#PF.
   Segment POP, the fixed-16-bit cores and compound operations remain open.
 
-- [ ] **X86-06 / P1 / Probe: the generic REP batch does not wrap 16-bit indexes per element.**
+- [x] **X86-06 / P1 / Probe: the generic REP batch does not wrap 16-bit indexes per element.**
   CPU:1666, `r36sx_rep_movsb` and adjacent MOVSW/STOS helpers keep SI/DI in
   uint32_t locals and truncate only when committing registers. Starting
   SI=FFFFh, two MOVSB iterations read FFFFh then 10000h instead of 0000h.
   Fix the 386 addr16 fallback for both DF directions and operand widths.
   The specialized 8086/286 loops already use uint16_t indexes; do not regress
   them. [Intel MOVS][movs], [Intel REP][rep].
+  Fixed 2026-09-27: all six generic MOVS/STOS fallback helpers mask indexes
+  after each completed element, independently of operand size. Existing
+  fixed-16-bit 8086/286 helpers are unchanged. `tests/cpu386_strings.asm`
+  checks 576 combinations of CS.D, address/element sizes, DF, count and
+  source/destination boundary patterns, including count 0 and 2049. Paging
+  and fault restart are deliberately separate X86-07 work.
 
 - [ ] **X86-07 / P1 / Source: REP batches continue after a fault.**
   CPU:1666 and CPU:7574 loops lack per-element abort checks; CORE:2516 and
@@ -444,7 +450,7 @@ unfixed regressions:
 | `bit_negative16` | FAIL, address 00002FFE, expected 00000FFE |
 | `bit_negative32` | FAIL, address 20000FFC, expected 00000FFC |
 | `xchg_address_alias` | FAIL, write address 00002000, expected 00001000 |
-| `rep16_index_wrap` | FAIL, second source 00010000, expected 00000000 |
+| `rep16_index_wrap` | Fixed 2026-09-27: PASS, second source 00000000; 576-case guest ROM added |
 
 These six failing probes cover five numbered findings (X86-21 has two probes).
 The temporary C and native executable are deleted by the script. No downloaded

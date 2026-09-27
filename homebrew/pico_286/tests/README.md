@@ -242,6 +242,49 @@ Specifications: [Intel 80386 CALL](https://pdos.csail.mit.edu/6.828/2005/reading
 and [AMD APM vol.3 rev.3.19, CALL (Far) pp.124-130 / JMP (Far) pp.187-191](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf).
 AMD64-only exceptions and instructions are not imported into 386 behavior.
 
+## MOVS/STOS address-size and index-wrap regression ROM
+
+`cpu386_strings.asm` executes 576 cases through the production 386 decoder:
+2 code defaults * 2 address sizes * 3 element widths * 2 DF directions *
+6 repeat scenarios * 4 source/destination patterns. The tested opcodes are
+MOVSB/MOVSW/MOVSD and STOSB/STOSW/STOSD, with REP counts 0, 1, 3, 17 and
+2049, plus a non-REP instruction that must leave the count unchanged.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-strings-mingw
+```
+
+Each case runs at CPL3 with paging disabled and distinct source/destination
+segments. Addr16 cases cross the 64 KiB index boundary in both directions;
+addr32 controls cross the same boundary without truncation. Words/dwords do
+not straddle the segment limit. Three MOVS patterns wrap the source, the
+destination, or both; STOS wraps the destination and preserves ESI. The
+longest REP exceeds the current 1024-element batch cap.
+
+An independent scalar-byte reference verifies every destination byte and two
+guard elements at each end, with source data differing across the 64 KiB
+boundary. The ROM also checks all GPRs, preserved upper halves of SI/DI/CX,
+arithmetic flags/IF/DF, CS:EIP, SS:ESP, data selectors and unchanged CR2.
+The pre-fix MSVC binary fails case 0's memory comparison after MOVSB reads
+10000h instead of 0000h. Success requires both POST `80:FF` and the message
+`CPU386 STRINGS PASS cases=576`. Case order is the product order above; see
+`build/cpu386_strings.lst`. Check IDs: 0 unexpected exception, 1 GPRs,
+2 flags/frame/selectors/CR2, 3 memory, 4 total case count.
+
+The runner restores its temporary build config and never attaches user disks.
+This matrix covers index wrapping, not all string semantics: segment/page
+fault restart, overlap, debug traps, segment overrides, real/v86 limits,
+and the remaining LODS/CMPS/SCAS/INS/OUTS families need separate tests.
+
+Specifications: Intel 80386 PRM chapter 17
+[MOVS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/MOVS.htm),
+[STOS](https://pdos.csail.mit.edu/6.828/2005/readings/i386/STOS.htm),
+[REP](https://pdos.csail.mit.edu/6.828/2005/readings/i386/REP.htm);
+[AMD APM vol.3 rev.3.19](https://kib.kiev.ua/x86docs/AMD/AMD64/24594_APM_v3-r3.19.pdf),
+table 1-4 (address-size register selection), section 1.2.6 (REP),
+MOVS pp.228-229 and STOS pp.301-302. AMD64-only rules are not used.
+
 ## test386.asm
 
 `test386.asm` is vendored from:

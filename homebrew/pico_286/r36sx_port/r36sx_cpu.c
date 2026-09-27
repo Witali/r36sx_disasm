@@ -1691,6 +1691,9 @@ static inline void r36sx_rep_movsb(uint32_t count)
 {
     uint32_t si = r36sx_src_index();
     uint32_t di = r36sx_dst_index();
+    /* Address size, not operand size, controls wrap between string elements.
+     * Keep a word/dword access intact; only its following index wraps. */
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_movs_ram(count, 1u, si, di, addressSizeOverride)) {
         return;
@@ -1699,14 +1702,14 @@ static inline void r36sx_rep_movsb(uint32_t count)
     if (df) {
         while (count--) {
             putmem8(CPU_ES, di, getmem8(useseg, si));
-            si--;
-            di--;
+            si = (si - 1u) & index_mask;
+            di = (di - 1u) & index_mask;
         }
     } else {
         while (count--) {
             putmem8(CPU_ES, di, getmem8(useseg, si));
-            si++;
-            di++;
+            si = (si + 1u) & index_mask;
+            di = (di + 1u) & index_mask;
         }
     }
 
@@ -1718,6 +1721,7 @@ static inline void r36sx_rep_movsw(uint32_t count)
 {
     uint32_t si = r36sx_src_index();
     uint32_t di = r36sx_dst_index();
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_movs_ram(count, 2u, si, di, addressSizeOverride)) {
         return;
@@ -1726,14 +1730,14 @@ static inline void r36sx_rep_movsw(uint32_t count)
     if (df) {
         while (count--) {
             putmem16(CPU_ES, di, getmem16(useseg, si));
-            si -= 2;
-            di -= 2;
+            si = (si - 2u) & index_mask;
+            di = (di - 2u) & index_mask;
         }
     } else {
         while (count--) {
             putmem16(CPU_ES, di, getmem16(useseg, si));
-            si += 2;
-            di += 2;
+            si = (si + 2u) & index_mask;
+            di = (di + 2u) & index_mask;
         }
     }
 
@@ -1745,6 +1749,7 @@ static inline void r36sx_rep_movsd(uint32_t count)
 {
     uint32_t si = r36sx_src_index();
     uint32_t di = r36sx_dst_index();
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_movs_ram(count, 4u, si, di, addressSizeOverride)) {
         return;
@@ -1753,14 +1758,14 @@ static inline void r36sx_rep_movsd(uint32_t count)
     if (df) {
         while (count--) {
             putmem32(CPU_ES, di, getmem32(useseg, si));
-            si -= 4;
-            di -= 4;
+            si = (si - 4u) & index_mask;
+            di = (di - 4u) & index_mask;
         }
     } else {
         while (count--) {
             putmem32(CPU_ES, di, getmem32(useseg, si));
-            si += 4;
-            di += 4;
+            si = (si + 4u) & index_mask;
+            di = (di + 4u) & index_mask;
         }
     }
 
@@ -1772,6 +1777,7 @@ static inline void r36sx_rep_stosb(uint32_t count)
 {
     uint32_t di = r36sx_dst_index();
     uint8_t value = CPU_AL;
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_stos_ram(count, 1u, di, addressSizeOverride)) {
         return;
@@ -1780,12 +1786,12 @@ static inline void r36sx_rep_stosb(uint32_t count)
     if (df) {
         while (count--) {
             putmem8(CPU_ES, di, value);
-            di--;
+            di = (di - 1u) & index_mask;
         }
     } else {
         while (count--) {
             putmem8(CPU_ES, di, value);
-            di++;
+            di = (di + 1u) & index_mask;
         }
     }
 
@@ -1796,6 +1802,7 @@ static inline void r36sx_rep_stosd(uint32_t count)
 {
     uint32_t di = r36sx_dst_index();
     uint32_t value = CPU_EAX;
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_stos_ram(count, 4u, di, addressSizeOverride)) {
         return;
@@ -1804,12 +1811,12 @@ static inline void r36sx_rep_stosd(uint32_t count)
     if (df) {
         while (count--) {
             putmem32(CPU_ES, di, value);
-            di -= 4;
+            di = (di - 4u) & index_mask;
         }
     } else {
         while (count--) {
             putmem32(CPU_ES, di, value);
-            di += 4;
+            di = (di + 4u) & index_mask;
         }
     }
 
@@ -1820,6 +1827,7 @@ static inline void r36sx_rep_stosw(uint32_t count)
 {
     uint32_t di = r36sx_dst_index();
     uint16_t value = CPU_AX;
+    const uint32_t index_mask = addressSizeOverride ? UINT32_MAX : 0xffffu;
 
     if (r36sx_rep_try_stos_ram(count, 2u, di, addressSizeOverride)) {
         return;
@@ -1828,12 +1836,12 @@ static inline void r36sx_rep_stosw(uint32_t count)
     if (df) {
         while (count--) {
             putmem16(CPU_ES, di, value);
-            di -= 2;
+            di = (di - 2u) & index_mask;
         }
     } else {
         while (count--) {
             putmem16(CPU_ES, di, value);
-            di += 2;
+            di = (di + 2u) & index_mask;
         }
     }
 

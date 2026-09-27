@@ -1,5 +1,63 @@
 # pico-286 Build Log
 
+## 2026-09-27 X86-06: wrap string indexes between REP elements
+
+The six generic MOVS/STOS helpers now apply the address-size mask after
+every element, rather than waiting until the batch commits SI/DI. Addr32
+remains 32-bit; addr16 wraps independently of the byte/word/dword operand
+width. The fixed-16-bit 8086/286 helpers and block-copy eligibility were not
+changed. References: Intel 80386 PRM chapter 17 MOVS, STOS, REP; AMD APM
+vol.3 rev.3.19 table 1-4, section 1.2.6 and MOVS/STOS entries. URLs and exact
+matrix scope are in `tests/README.md`.
+
+Added `tests/cpu386_strings.asm` and `test_cpu386_strings.ps1`: a 64 KiB
+standalone ROM with 576 protected-mode cases, independent scalar reference
+memory, both code/address defaults, all element widths, both DF directions,
+source/destination wrap, REP 0/1/3/17/2049 and non-REP controls. No disk images
+are attached. The pre-fix binary failed case 0, check 3 (destination bytes),
+recorded in patch `diagnostics/compiler-strings-before/pico_286.log`.
+The component probe previously observed the second source offset 10000h;
+after this fix it observes 0000h and passes.
+
+```powershell
+wsl --exec python3 /mnt/c/Work/r36sx_disasm/homebrew/pico_286/tests/audit_cpu_helpers.py --output-dir /mnt/c/Work/r36sx_disasm/patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/diagnostics/x86-audit --case rep16_index_wrap
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -DebugLog -NoPatchCopy
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/test_cpu386_strings.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cpu386-strings-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag strings-general-msvc
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag strings-general-mingw
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win.exe -Tag strings-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+All tests above passed. The initial sandbox WSL call was denied access to
+the WSL service; the approved retry completed normally. MSVC and GCC both
+reported `CPU386 STRINGS PASS cases=576` and POST 80:FF. The general test386
+EE result remained SHA256
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+These regressions do not establish fault restart, overlap, paging, debug
+traps, real/v86 limit behavior or conformance of the other string families.
+
+Build base `53d8eb7`, dirty=1. MSVC 14.51 x64 `/O2 /Zi /MT`, switch dispatch;
+Cygwin MinGW GCC 14.4.0 `-O2 -g -static`, computed goto. Existing compiler
+warnings remain (45 GCC warnings). Build logs are patch
+`diagnostics/x86-audit/build-strings-{msvc,mingw}.log`; runtime logs/frames
+are in the matching `diagnostics/compiler-<Tag>/` directories.
+
+Generated artifacts (SHA256):
+
+| File under `build/` | Format / bytes | SHA256 |
+| --- | --- | --- |
+| `pico_286_win.exe` | PE32+ x86-64 / 830464 | `ea7c858da9af0a2bcf963e36731485b9bbc3e4478876ff81a509a948df056aba` |
+| `pico_286_win_mingw.exe` | PE32+ x86-64 / 3332749 | `427e4d44db4efcb63d87bf4e1cc09a8cab7bc5857c1ca3832797abac1c626278` |
+| `cpu386_strings.bin` | raw x86 ROM / 65536 | `e75bb51b642e762619cd17ecf94f9a1bed02032131d658526aaa821fbdcadfcd` |
+
+`tools/scan-download.ps1` scanned both EXEs and the ROM with Defender: no
+threats. NASM 3.01 emitted the ROM and `build/cpu386_strings.lst`. Both EXEs
+and the MSVC PDB were copied to the active patch; deployed EXE hashes match.
+The runner restored the build config. Patch config remains untouched, SHA256
+`36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`.
+
 ## 2026-09-27 Cygwin MinGW build at 4566ad92
 
 Verified the requested compiler path already present in `08acb110`: use
