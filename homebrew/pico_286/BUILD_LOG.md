@@ -1,5 +1,49 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW build verified at 61c1973
+
+The requested backend is already present in `build_pico_286_windows.ps1`
+(`08acb110`): `-Compiler MinGW` selects Cygwin's
+`x86_64-w64-mingw32-gcc/g++`; MSVC remains the default. No duplicate backend
+or CPU changes were needed. Rebuilt the current committed source with GCC
+14.4.0, `-O2 -g`, computed goto enabled and `-static` at link time.
+
+Commands from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+& tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-61c1973-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-61c1973-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+Copy-Item -LiteralPath homebrew/pico_286/build/pico_286_win_mingw.exe -Destination patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+Build succeeded with existing warnings (including upstream FPU return-value
+and uninitialized-variable warnings); this is not a warning-clean build.
+Output is Windows PE x86-64, 3345177 bytes, SHA256
+`6A1B67E9CC7B63151C7FCAC0481C258A62B9FD475B8892405AD15D5A277319DF`.
+Defender found no threats before execution. `objdump -p` lists only dbghelp,
+GDI32, KERNEL32, msvcrt, USER32 and WINMM imports: no Cygwin or extra MinGW
+runtime DLL. This matches the native cross-compiler distinction in the
+[Cygwin FAQ, section 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both test386 and test286 reached POST `80:FF`; debug-register requests and
+640x480 RGB565 framebuffer readback passed. test386's frame was nonblank;
+its EE-output hash remains
+`F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+These smoke checks do not establish full CPU conformance or application
+coverage. No guest disks were attached. Diagnostics are in the active patch's
+`diagnostics/build-mingw-61c1973.log` and
+`diagnostics/compiler-cygwin-61c1973-{386,286}/`.
+
+Deployed EXE hash matches the build output; the MSVC EXE was not replaced.
+Build provenance is `61c1973`, dirty only due to the user's patch config.
+That config remains untouched at SHA256
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+The temporary test config was restored; its hash before and after is
+`240420870457D4F65F4EAA29CB8031E56228EA721824DEC54F76615CF430DD3E`.
+
 ## 2026-09-27 REP last-iteration single-step instruction pointer
 
 Fixed count exhaustion in CMPSB/W/D, SCASB/W/D and LODSB/W/D. The handlers
