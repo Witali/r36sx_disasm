@@ -1,5 +1,45 @@
 # pico-286 Build Log
 
+## 2026-09-27 Requested Cygwin MinGW build at abe8eda
+
+Verified the existing `-Compiler MinGW` backend from `08acb110`; it already
+uses Cygwin's `x86_64-w64-mingw32-gcc/g++`, with MSVC still the default.
+No duplicate backend or CPU changes were needed for this request.
+
+Commands from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+& tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-abe8eda-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-abe8eda-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+```
+
+GCC 14.4.0 built successfully with `-O2 -g -static`, computed goto enabled.
+Existing compiler warnings remain; this was not a warning-cleanup pass.
+Build provenance is `abe8eda`, dirty only because of the unchanged user-local
+patch config. Output is PE x86-64, 3340106 bytes, SHA256
+`8A38B36F3092513F20A5659AA0D781FFC74EFB9A1CB304704C42AA42A6F03A5A`.
+Defender reported no threats before execution. Imports are dbghelp, GDI32,
+KERNEL32, msvcrt, USER32 and WINMM only. No Cygwin or extra MinGW runtime
+DLL is imported, consistent with the rechecked
+[official Cygwin FAQ 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both smoke runs passed POST `80:FF`, debug-register requests and framebuffer
+readback. test386 produced a nonblank 640x480 RGB565 frame and the established
+EE-output hash `F09AB657081F52C559A8B64F843B8293B4CFF0DA164893DBD904822C81C04A19`.
+These checks do not claim full CPU conformance or DOS application coverage.
+No guest disks were attached. Build and test diagnostics are under the active
+patch's `diagnostics/build-cygwin-abe8eda.log` and
+`diagnostics/compiler-cygwin-abe8eda-{386,286}/`.
+
+Copied the named EXE to
+`patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe`;
+build and deployed hashes match. MSVC artifacts were not replaced. Patch
+config SHA256 stayed
+`36D271C00D8E13F434233865363F832F3653D56FE07184FD418A20CB0E6517CC`.
+
 ## 2026-09-27 REP CMPS/SCAS fault-time EFLAGS restoration
 
 Completed `tests/cpu386_compare_faults.asm` and its runner: 2592 CPL3
