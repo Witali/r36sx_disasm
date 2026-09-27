@@ -1,5 +1,38 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW rebuild from committed compiler support
+
+Reverified the requested Cygwin MinGW-w64 path from commit `08acb110` with
+the installed GCC `14.4.0`, target `x86_64-w64-mingw32`, `-O2 -g`, static
+GCC support libraries and computed-goto dispatch. MSVC remains the default.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag mingw-08acb110
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+```
+
+Build and link succeeded; existing source warnings remain. The PE32+ x86-64
+EXE is 3335781 bytes, SHA256
+`12be7926905d2535ae03758d9d7ea167663d4f696ce25775482e3e150564b25a`.
+The active patch's `pico_286_win_mingw.exe` is byte-identical. The default
+MSVC `pico_286_win.exe` was not replaced. Defender found no threats.
+Imports are dbghelp, GDI32, KERNEL32, msvcrt, USER32 and WINMM only;
+there is no Cygwin or extra MinGW runtime DLL dependency.
+
+The smoke test reached POST `80:FF`, responded to register/frame queries,
+and produced a nonblank 614400-byte RGB565 frame. CR0 was `80000011`
+(protected mode and paging). The POST EE output SHA256 was
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`,
+matching the earlier MSVC/Zig/MinGW runs. This is not full instruction or
+DOS application conformance coverage. No disk images were attached.
+Both build and patch config hashes are unchanged after the test; the
+user's pre-existing patch config edit remains unstaged.
+
+Diagnostics: patch `diagnostics/x86-audit/build-mingw-08acb110.log` and
+`diagnostics/compiler-mingw-08acb110/`. No downloads or MIPS rebuild.
+
 ## 2026-09-27 Selectable Windows compilers: MSVC, Zig, Cygwin MinGW-w64
 
 Added `-Compiler MSVC|Zig|MinGW`, with MSVC as the default. MSVC is discovered
