@@ -1,5 +1,46 @@
 # pico-286 Build Log
 
+## 2026-09-27 Cygwin MinGW requested build: current source verification
+
+The requested compiler option already exists in `08acb110`; no second Cygwin
+backend was added. `-Compiler MinGW` selects Cygwin's native-Windows cross
+compiler; MSVC remains the default. Rebuilt current sources with the installed
+GCC/G++ 14.4.0, target `x86_64-w64-mingw32`, `-O2 -g`, computed goto and
+statically linked GCC support libraries. Source base was `cd229da7`, dirty=1,
+including the pre-existing uncommitted LEA decoder fix. This compiler task
+does not commit or change those CPU/test edits or the user's patch config.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/build_pico_286_windows.ps1 -Compiler MinGW -DebugLog -NoPatchCopy -Out C:/Work/r36sx_disasm/homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File tools/scan-download.ps1 homebrew/pico_286/build/pico_286_win_mingw.exe
+tools/cygwin64/bin/x86_64-w64-mingw32-objdump.exe -p homebrew/pico_286/build/pico_286_win_mingw.exe
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-request-386
+powershell -ExecutionPolicy Bypass -File homebrew/pico_286/tests/smoke_windows_build.ps1 -Exe homebrew/pico_286/build/pico_286_win_mingw.exe -Tag cygwin-request-286 -CpuModel 80286 -Rom homebrew/pico_286/build/test286.bin -SuccessMessage 'test386: PASS' -AllowBlankFrame
+Copy-Item -LiteralPath homebrew/pico_286/build/pico_286_win_mingw.exe -Destination patches/disk_image_patch_pico_286/MIPS_NATIVE/pico_286/pico_286_win_mingw.exe -Force
+```
+
+Compilation/linking succeeded with 45 existing warning messages. The PE32+
+x86-64 executable is 3,332,237 bytes, SHA256
+`6e7c1898bc7cdd638963b0b44f87481d5cad4e1efaea1dd8cae43d25e6dfa5d8`.
+Defender found no threats. Imports are dbghelp, GDI32, KERNEL32, msvcrt,
+USER32 and WINMM; no Cygwin or additional MinGW runtime DLL is imported.
+This agrees with the cross-compiler distinction documented in the
+[Cygwin FAQ, section 6.13](https://cygwin.com/faq.html#faq.programming.win32-no-cygwin).
+
+Both test386 and test286 reached POST 80:FF, responded to the live debug
+mailbox and returned a 640x480 RGB565 framebuffer (test286 permits blank VGA).
+The test386 frame was nonblank and the EE output SHA256 remained
+`f09ab657081f52c559a8b64f843b8293b4cff0da164893dbd904822c81c04a19`.
+These are compiler smoke checks, not full CPU or DOS/game conformance tests.
+
+Build output is in patch `diagnostics/x86-audit/build-cygwin-request.log`;
+runtime artifacts are in `diagnostics/compiler-cygwin-request-{386,286}/`.
+The named MinGW EXE was deployed to the active patch copy; source and
+destination SHA256 match. The existing MSVC EXE was not replaced. No disk
+images were attached or modified, and no MIPS build was run. The runner
+restored the build config; patch config SHA256 stayed
+`36d271c00d8e13f434233865363f832f3653d56fe07184fd418a20cb0e6517cc`.
+
 ## 2026-09-27 X86-33: keep invalid-opcode diagnostics non-faulting
 
 The new LEA matrix exposed a diagnostic failure before its decoder check:
