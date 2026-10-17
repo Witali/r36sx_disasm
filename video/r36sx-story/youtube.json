@@ -6,7 +6,7 @@
   "chapter_titles": {
     "opening": "From stock firmware to DOS",
     "backup": "Recovering the original SD card",
-    "platform": "MIPS firmware and only 42 MiB of usable RAM",
+    "platform": "MIPS 74Kc: one core, clock configuration and 42 MiB RAM",
     "loader": "Finding an entry point for custom code",
     "first-code": "Button Demo: the first code on the device",
     "driver": "Tiny MC and the vendor hardware library",

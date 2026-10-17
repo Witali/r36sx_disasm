@@ -6,21 +6,21 @@
   "voice_rate": "-4%",
   "verification": {
     "file": "C:/Work/YouTube Videos/R36SX/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
-    "sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc",
-    "bytes": 83009475,
-    "duration_seconds": 510.43333333333334,
-    "video_frames": 15313,
+    "sha256": "ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d",
+    "bytes": 81409132,
+    "duration_seconds": 519.2333333333333,
+    "video_frames": 15577,
     "width": 1920,
     "height": 1080,
     "fps": 30.0,
     "chapters": 14,
     "packets": {
       "v:0": {
-        "count": 15313,
-        "max_dts_step": 0.033334000000024844
+        "count": 15577,
+        "max_dts_step": 0.03333400000008169
       },
       "a:0": {
-        "count": 23928,
+        "count": 24341,
         "max_dts_step": 0.02133400000002439
       }
     },
@@ -37,63 +37,63 @@
       },
       {
         "scene": "platform",
-        "reference_rms": 0.15311174094676971,
-        "correlation": 0.9999341836639111
+        "reference_rms": 0.15221914649009705,
+        "correlation": 0.9999548753034637
       },
       {
         "scene": "loader",
-        "reference_rms": 0.14431531727313995,
-        "correlation": 0.9999442408153937
+        "reference_rms": 0.14450041949748993,
+        "correlation": 0.9999277794106995
       },
       {
         "scene": "first-code",
-        "reference_rms": 0.14757563173770905,
-        "correlation": 0.9999597478758933
+        "reference_rms": 0.14770007133483887,
+        "correlation": 0.9999620445444428
       },
       {
         "scene": "driver",
-        "reference_rms": 0.14730434119701385,
-        "correlation": 0.9999580713194715
+        "reference_rms": 0.14739137887954712,
+        "correlation": 0.9999629167943987
       },
       {
         "scene": "boot-route",
-        "reference_rms": 0.14391574263572693,
-        "correlation": 0.999959696113659
+        "reference_rms": 0.14399079978466034,
+        "correlation": 0.9999287449034469
       },
       {
         "scene": "native",
-        "reference_rms": 0.14499439299106598,
-        "correlation": 0.9999634290225539
+        "reference_rms": 0.1450592428445816,
+        "correlation": 0.9999721611622974
       },
       {
         "scene": "dos",
-        "reference_rms": 0.15166853368282318,
-        "correlation": 0.9999632411147555
+        "reference_rms": 0.15171916782855988,
+        "correlation": 0.9999641221012372
       },
       {
         "scene": "controls",
-        "reference_rms": 0.14284271001815796,
-        "correlation": 0.9999690151313176
+        "reference_rms": 0.14288224279880524,
+        "correlation": 0.9999393626935142
       },
       {
         "scene": "graphics",
-        "reference_rms": 0.1457992047071457,
-        "correlation": 0.9999493538996428
+        "reference_rms": 0.14582806825637817,
+        "correlation": 0.9999560760402404
       },
       {
         "scene": "correctness",
-        "reference_rms": 0.14747120440006256,
-        "correlation": 0.9999466325280878
+        "reference_rms": 0.1474946141242981,
+        "correlation": 0.9999550598730591
       },
       {
         "scene": "frontier",
-        "reference_rms": 0.1476011574268341,
-        "correlation": 0.999953503648962
+        "reference_rms": 0.1476183533668518,
+        "correlation": 0.9999540913791363
       },
       {
         "scene": "closing",
-        "reference_rms": 0.1492013782262802,
-        "correlation": 0.9999532037989616
+        "reference_rms": 0.1492113173007965,
+        "correlation": 0.9999479825300313
       }
     ],
     "decode_check": "passed"
@@ -114,56 +114,56 @@
     },
     {
       "scene": "platform",
-      "narration_correlation": 0.9996599370650966
+      "narration_correlation": 0.9996644546133269
     },
     {
       "scene": "loader",
-      "narration_correlation": 0.9998983926356743
+      "narration_correlation": 0.9998812503728056
     },
     {
       "scene": "first-code",
-      "narration_correlation": 0.9997061212417819
+      "narration_correlation": 0.99970416142743
     },
     {
       "scene": "driver",
-      "narration_correlation": 0.9997108262794195
+      "narration_correlation": 0.9997141791598868
     },
     {
       "scene": "boot-route",
-      "narration_correlation": 0.999880198289864
+      "narration_correlation": 0.9998486990764301
     },
     {
       "scene": "native",
-      "narration_correlation": 0.9997554333758676
+      "narration_correlation": 0.9997618138183034
     },
     {
       "scene": "dos",
-      "narration_correlation": 0.9994852092167645
+      "narration_correlation": 0.9994837023633301
     },
     {
       "scene": "controls",
-      "narration_correlation": 0.9998737367778091
+      "narration_correlation": 0.9998437923486303
     },
     {
       "scene": "graphics",
-      "narration_correlation": 0.9998404813115299
+      "narration_correlation": 0.9998463845132455
     },
     {
       "scene": "correctness",
-      "narration_correlation": 0.99953617564928
+      "narration_correlation": 0.9995434372786572
     },
     {
       "scene": "frontier",
-      "narration_correlation": 0.9998529580215718
+      "narration_correlation": 0.9998534009745398
     },
     {
       "scene": "closing",
-      "narration_correlation": 0.9997954989725462
+      "narration_correlation": 0.9997889505630754
     }
   ],
-  "subtitle_cues": 131,
+  "subtitle_cues": 133,
   "embedded_caption_text_matches_srt": true,
-  "visual_review": "Updated firmware and USB cards and sidebars inspected at full resolution; final encoded frames and captions reviewed across all fourteen scenes",
+  "visual_review": "Final encoded contact sheet reviewed across all fourteen scenes; full-size CPU card, actual CPU and Shell screenshots, sidebars and frequency captions inspected",
   "sources": [
     {
       "id": "LYrICpUo6_A",
@@ -233,30 +233,32 @@
     "router_reference": "https://www.mediatek.com/products/home-networking/mt7628k-n-a",
     "usb_evidence": "Creator confirmed physical keyboard and flash drive through OTG during this editing session",
     "original_memory_screenshot_added": false,
-    "meminfo_sha256": "04ce92d34fac64768836aa1c888a3a4a50388bafc08a77862b93b20c1293433e"
+    "meminfo_sha256": "04ce92d34fac64768836aa1c888a3a4a50388bafc08a77862b93b20c1293433e",
+    "historical_revision": true,
+    "applies_to_sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc"
   },
   "youtube_package": {
     "status": "prepared_locally_not_uploaded",
     "language": "en",
     "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
-    "duration_seconds": 510.43333333333334,
-    "subtitle_cues": 131,
+    "duration_seconds": 519.2333333333333,
+    "subtitle_cues": 133,
     "chapters": 14,
-    "description_characters": 2932,
-    "description_utf8_bytes": 2932,
+    "description_characters": 3518,
+    "description_utf8_bytes": 3518,
     "tag_characters": 128,
     "files": {
       "English-narration.txt": {
-        "bytes": 7724,
-        "sha256": "fdcadb7e5000747c2f015407f59bd6ebc6e8fc44546d12dcc389db912970cbc7"
+        "bytes": 7818,
+        "sha256": "6ef9c9c3560e8158c448ffee88ac92b053139b8391e71b8c5a1308aee1198914"
       },
       "R36SX-From-Stock-Firmware-to-DOS-English.en.srt": {
-        "bytes": 12284,
-        "sha256": "0c5b90163fb801b43aca1127a2760b08acdcb3108411a38003370c712da5f505"
+        "bytes": 12457,
+        "sha256": "a73e4b2221097a13ba8cc38ed14eda154c437146c954386b0061c349d8e5c846"
       },
       "R36SX-From-Stock-Firmware-to-DOS-English.mp4": {
-        "bytes": 83009475,
-        "sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc"
+        "bytes": 81409132,
+        "sha256": "ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d"
       },
       "Thumbnail.png": {
         "bytes": 332900,
@@ -267,8 +269,8 @@
         "sha256": "d21a8498ada8c7483e2cb06258e1d98a6efc41c78808fd810a6cda56a716df3a"
       },
       "YouTube-description-English.txt": {
-        "bytes": 2997,
-        "sha256": "f12142d5ba9c02969cee4b4e6823a83b71e727a3f99156c8db69dfbd9e04fe1d"
+        "bytes": 3586,
+        "sha256": "0a742ca63e7d953e7ecfaeb4f9b380507e6435961202a7790d5a382c2ccba411"
       },
       "YouTube-tags-English.txt": {
         "bytes": 134,
@@ -280,7 +282,7 @@
       }
     }
   },
-  "revision_security_scans": "Microsoft Defender: no threats in C:/Work/YouTube Videos/R36SX and the installed global skill after relocation; quick_validate passed",
+  "revision_security_scans": "Microsoft Defender: no threats in the complete R36SX catalog after the CPU revision; no new downloaded tools or footage",
   "material_locations": {
     "catalog": "C:/Work/YouTube Videos",
     "project": "C:/Work/YouTube Videos/R36SX",
@@ -288,5 +290,32 @@
     "source_snapshot": "C:/Work/YouTube Videos/R36SX/materials/project",
     "previous_project": "C:/Work/YouTube Videos/Z80-Tester",
     "media_and_caption_hashes_preserved": true
+  },
+  "cpu_clock_revision": {
+    "changed_scenes": [
+      "platform",
+      "frontier"
+    ],
+    "previous_file_sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc",
+    "previous_outputs": "C:/Work/YouTube Videos/R36SX/materials/work/revisions/before-cpu-clock",
+    "cpu_model": "MIPS 74Kc V4.12",
+    "online_linux_cpus": 1,
+    "clock_source": "Live read-only HC16xx information and control register selectors both 5",
+    "selected_mhz": 1188,
+    "counter_mhz_approx": 594,
+    "rdhwr_ccres": 2,
+    "timebase_limit": "MIPS clocksource shares the CPU counter: timing is a consistency check, not independent physical calibration",
+    "report": "hardware_info/clock_probe/2026-10-17/cpu_clock_report_ef0quf.txt",
+    "report_sha256": "7429e2edc3b2d2a5eb0d592408adf2881c0bcc97ca9f6cb4fad9f6e843b3a7c5",
+    "actual_device_captures": [
+      "assets/device-cpuinfo.png",
+      "assets/device-shell-top.png"
+    ],
+    "new_jenny_scenes": [
+      "platform"
+    ],
+    "reused_jenny_scenes": 13,
+    "screenshot_sources": "assets/device-capture-sources.json",
+    "separate_downclocking_and_arm_discussion_added_to_film": false
   }
 }

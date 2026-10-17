@@ -158,6 +158,26 @@ def card(scene, kind, index, hero, output):
         aligned_row(d, [(70, 'Only ~42 MiB usable RAM', font(44, bold=True), GOLD),
                         (1170, 'MemTotal: 43,164 KiB', font(29, mono=True), MUTED)],
                     top=859, height=72)
+    elif kind == 'cpu':
+        wrap(d, 'MIPS 74Kc V4.12', (65, 190), 1750, 67, bold=True)
+        d.rounded_rectangle((65, 315, 1195, 775), radius=14, fill='#08131f', outline='#3a5366', width=2)
+        report = REPO/'hardware_info/cpu.txt'
+        if not report.exists():
+            report = HERE/'assets/cpu.txt'
+        # Reproduce the exact captured values; BogoMIPS is not a MHz reading.
+        lines = report.read_text(encoding='utf-8').splitlines()[:7]
+        for i, line in enumerate(lines):
+            name, value = (part.strip() for part in line.split(':', 1))
+            d.text((95, 345+i*55), f'{name:<19}: {value}', font=font(26, mono=True),
+                   fill=GREEN if name == 'BogoMIPS' else INK)
+        wrap(d, 'SAVED /proc/cpuinfo EXCERPT', (95, 735), 1070, 22, MUTED, mono=True)
+        wrap(d, 'ONE LINUX CPU CORE', (1260, 325), 570, 25, GREEN, mono=True)
+        wrap(d, '~1.2 GHz', (1260, 390), 570, 58, GOLD, bold=True)
+        wrap(d, '1.188 GHz selected by the\nlive clock registers', (1260, 475), 570, 28, MUTED, spacing=7)
+        wrap(d, '~42 MiB RAM', (1260, 610), 570, 47, GOLD, bold=True)
+        wrap(d, 'Usable memory reported by Linux', (1260, 680), 570, 27, MUTED, spacing=7)
+        wrap(d, '589.82 BogoMIPS is a calibration score, not a MHz reading.', (70, 823), 1750, 29, GREEN)
+        wrap(d, 'Live register selection confirmed / counter timing is a consistency check', (70, 908), 1750, 23, MUTED)
     elif kind == 'boot':
         wrap(d, 'The captured log identifies the script.', (65, 190), 1780, 60, bold=True)
         d.rounded_rectangle((65, 320, 1855, 625), radius=14, fill='#08131f', outline='#3a5366', width=2)

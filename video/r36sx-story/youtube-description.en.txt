@@ -1,13 +1,13 @@
-A small Linux handheld, a MIPS CPU, and only about 42 MiB of usable RAM. I investigated the R36SX firmware, found a way to run my own code, built native tools, and ported Pico-286 to run DOS software on the console.
+A small Linux handheld, one MIPS CPU core, and only about 42 MiB of usable RAM. I investigated the R36SX firmware, found a way to run my own code, built native tools, and ported Pico-286 to run DOS software on the console.
 
 PROJECT: SOURCE CODE, NOTES AND PATCHES
 https://github.com/Witali/r36sx_disasm
 
 The journey starts with a damaged SD-card partition table and boot files disguised as Windows DLLs. It continues through Ghidra analysis, a moving-square test, the Tiny MC launcher, native Pong, FreeDOS, Volkov Commander, an on-screen keyboard, and VGA compatibility work. I also connected a physical keyboard and a USB flash drive through the USB OTG port.
 
-MIPS is an architecture also used in many home routers. The saved device report shows MemTotal: 43164 kB, or about 42.2 MiB usable by Linux; this is not a claim about the physical RAM chip capacity.
+The Linux CPU is identified as MIPS 74Kc V4.12, with a single core available to applications. A read-only probe on the actual console confirmed live clock-register selector 5, which maps to 1.188 GHz (about 1.2 GHz). The counter check agrees: about 594 MHz with two CPU cycles per count. Linux uses the MIPS clocksource, so that timing check is not an independent physical calibration. The cpu.txt excerpt's 589.82 BogoMIPS is not MHz. MIPS is an architecture also used in many home routers. Linux reports about 42.2 MiB usable RAM.
 
-This film combines my original device recordings from May 2026 with research notes and code history through September 2026. Later CPU and VGA work is shown as repository and host-test evidence. The alternative Debian SD-image work remains an experimental research direction.
+This film combines my original device recordings from May 2026 with research notes and code history through September 2026, plus additional console screenshots and an October 2026 clock check. Later x86 CPU and VGA emulator work is shown as repository and host-test evidence. The alternative Debian SD-image work remains an experimental research direction.
 
 English captions are provided. English narration uses Microsoft Jenny, a synthetic voice.
 
@@ -26,6 +26,9 @@ https://github.com/Witali/r36sx_disasm/blob/single-loop/FIRMWARE_FINDINGS.md
 
 Captured device CPU and memory reports:
 https://github.com/Witali/r36sx_disasm/tree/single-loop/hardware_info
+
+Live CPU clock probe report:
+https://github.com/Witali/r36sx_disasm/blob/single-loop/hardware_info/clock_probe/2026-10-17/cpu_clock_report_ef0quf.txt
 
 ORIGINAL DEVICE RECORDINGS
 R36SX game console reverse engineering:

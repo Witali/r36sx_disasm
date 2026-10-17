@@ -323,12 +323,11 @@ The SoC has a separate RTOS side; "one core" in this film refers to Linux and
 the applications, not a claim about every processing block in the SoC.
 
 A draft CPU card and Jenny platform narration were prepared with configuration
-wording, but the creator then requested an actual device test. The delivered
-8:30 MP4 is retained pending that result; no measured 600 MHz or 1.2 GHz result
-has been inserted into it. `homebrew/cpu_clock_probe/` and its dedicated patch
-overlay provide the read-only diagnostic. Its build, hash, scan and deployment
-to `E:/MIPS_NATIVE/cpu_clock_probe/` are recorded in the probe build log. The
-user will run it on the handheld and return the SD card for reading its report.
+wording, but the creator then requested an actual device test. The prior
+8:30 MP4 was retained until that result arrived. `homebrew/cpu_clock_probe/`
+and its dedicated patch overlay provide the read-only diagnostic. Its build,
+hash, scan and deployment to `E:/MIPS_NATIVE/cpu_clock_probe/` are recorded in
+the probe build log.
 
 The newly connected console card was identified as the removable FAT32 E:
 volume by its `cubegm`, `rootfs` and `MIPS_NATIVE` layout. Only screenshot
@@ -344,5 +343,43 @@ All nine Shell captures were inspected as a contact sheet. They include an
 actual `/proc/cpuinfo` screen (`Shell_19700101_000347_002.bmp`), as well as
 `top` memory/process output and the on-screen keyboard. Device filenames dated
 1970 reflect its unset clock and are not used as real recording dates. Selected
-captures are preserved as pixel-identical PNGs in `assets/` with provenance;
-they are ready for the next video revision after the clock report arrives.
+captures are preserved as pixel-identical PNGs in `assets/` with provenance.
+
+The creator returned the card with one complete 3,259-byte report and one empty
+file. Both were copied byte-for-byte to `hardware_info/clock_probe/2026-10-17/`
+and the video's working sources. Their manifest preserves source paths and
+SHA256. The complete report's SHA256 is
+`7429e2edc3b2d2a5eb0d592408adf2881c0bcc97ca9f6cb4fad9f6e843b3a7c5`.
+Both live information/control fields select source 5 (1188 MHz), and RDHWR
+CCRes is 2 with counter samples near 594 MHz. Since the only Linux clocksource
+is itself `MIPS`, this counter ratio is a consistency check, not independent
+physical calibration. One Linux CPU is present/online; MemTotal is 43164 kB.
+The empty report's cause is unknown. Detailed limits are recorded in
+`hardware_info/clock_probe/README.md`.
+
+The platform narration, CPU card, sidebar, captions and description now state
+approximately 1.2 GHz selected by the live clock registers. They retain the
+distinction between BogoMIPS and MHz and identify the full MIPS 74Kc V4.12 core.
+The actual CPU screenshot and the Shell/top/on-screen-keyboard screenshot are
+now included in the platform and frontier scenes. Only the changed platform
+script was regenerated with Microsoft Jenny; thirteen speech clips were reused.
+The separate curiosity about downclocking/thermal throttling and the subsequent
+ARM performance discussion were not added to the film.
+
+Final revision: 519.233 seconds (8:39), 1920x1080 at 30 fps, 15,577 frames,
+14 chapters and 133 English caption cues. SHA256:
+`ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d`.
+The full MP4 verifier passed frame counts, durations, chapters, English streams,
+packet clocks, full decode and each scene's normalized reference audio. The
+one-off `local_artifacts/verify_cpu_video_revision.py` also compared all fourteen
+Jenny MP3s with decoded final audio (minimum correlation 0.9991245), confirmed
+embedded caption text matches the external SRT, and measured -16.03 LUFS and
+-1.46 dBTP. The final scene contact sheet, CPU card, actual CPU and Shell
+captures, and the frequency caption were visually inspected. These are signal
+and visual checks, not a claimed listening review.
+
+The previous package remains under `materials/work/revisions/before-cpu-clock/`.
+The final upload package and production-source snapshot were refreshed in the
+shared catalog. The package remains prepared locally and has not been uploaded.
+Microsoft Defender scanned the complete R36SX catalog after the revision and
+found no threats. No new tools or footage were downloaded for this revision.
