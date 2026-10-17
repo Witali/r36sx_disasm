@@ -1,0 +1,99 @@
+{
+  "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
+  "creator": "Vitaliy Rudik",
+  "voice": "en-US-JennyNeural",
+  "voice_rate": "-4%",
+  "pronunciations": {"R36SX": "R thirty six S X", "SF3000": "S F three thousand", "Pico-286": "Pico two eighty six", "RGB565": "R G B five six five", "80386": "eight oh three eighty six", "MIPS": "mips", "Ghidra": "Geedra"},
+  "repository_snapshot": "ad37bb30",
+  "sources": [
+    {"id": "LYrICpUo6_A", "url": "https://www.youtube.com/watch?v=LYrICpUo6_A", "title": "R36SX game console reverse engineering", "upload_date": "2026-05-27"},
+    {"id": "MHDpizjIZhw", "url": "https://www.youtube.com/watch?v=MHDpizjIZhw", "title": "R36SX game console additional programs", "upload_date": "2026-05-28"},
+    {"id": "ZWJg3XiHGxE", "url": "https://www.youtube.com/watch?v=ZWJg3XiHGxE", "title": "R36SX pico-286 emulator", "upload_date": "2026-05-30"}
+  ],
+  "scenes": [
+    {
+      "id": "opening", "title": "A handheld with another life", "date": "MAY — SEPTEMBER 2026",
+      "narration": "This little handheld was sold as a ready-made game console. I wanted to know what else it could become. Behind the stock menu, I found a Linux system, a MIPS processor, and a software stack worth exploring. The journey led from a moving square on the screen to my own launcher, native applications, and DOS software running on the actual device. This is how I got there.",
+      "panel_title": "FROM FIRMWARE TO HOMEBREW", "points": ["Understand the stock system", "Find a way to run my code", "Build tools and a DOS port"], "evidence": "Project history: 24 May — 27 September 2026",
+      "shots": [{"source": "ZWJg3XiHGxE", "start": 100, "weight": 1, "label": "Pico-286 / Volkov Commander / original device footage"}, {"source": "LYrICpUo6_A", "start": 10, "weight": 1, "label": "The original R36SX startup and game menu"}, {"card": "opening", "weight": 0.8}]
+    },
+    {
+      "id": "backup", "title": "Start with the evidence", "date": "THE ORIGINAL SD CARD",
+      "narration": "The first problem arrived before any code ran. The card supplied with the console was labelled sixty-four gigabytes, but its real capacity was sixteen. Its partition table was damaged, and Windows wanted to format it. TestDisk recovered the partition table. A raw backup gave me a reference to preserve, and copies of that image became the starting point for experiments. Even the storage needed to be understood before the firmware could be trusted.",
+      "panel_title": "BASELINE BEFORE EXPERIMENTS", "points": ["64 GB printed on the card", "16 GB actual capacity", "Partition table recovered", "Raw image kept as a reference"], "evidence": "Repository README / original SD-card findings",
+      "shots": [{"card": "evidence", "weight": 1.2}, {"source": "LYrICpUo6_A", "start": 0, "weight": 0.6, "label": "Original console footage / storage findings shown as notes"}]
+    },
+    {
+      "id": "platform", "title": "Look past the filenames", "date": "FIRMWARE ANALYSIS",
+      "narration": "The files on the card held the next surprise. A file named advapi thirty-two dot D L L was actually a Linux boot image. Another D L L contained the A V P firmware, while a screensaver-looking filename concealed a device tree. The executable files identified the main userspace as little-endian MIPS. I used Ghidra and the extracted filesystem to map the launcher, helper programs, and hardware library. Their names were clues to investigate, not reliable descriptions of their contents.",
+      "panel_title": "BOOT FILES IN DISGUISE", "points": ["advapi32.dll  →  Linux uImage", "ApplicationFrame.dll  →  AVP uImage", "Bubbles.scr  →  device tree", "Userspace: ELF32 / little-endian MIPS"], "evidence": "FIRMWARE_FINDINGS.md / README.md",
+      "shots": [{"card": "firmware", "weight": 1.4}, {"source": "LYrICpUo6_A", "start": 18, "weight": 0.6, "label": "The stock menu / early device recording"}]
+    },
+    {
+      "id": "loader", "title": "Find the software boundary", "date": "THE STOCK LAUNCHER",
+      "narration": "The stock frontend, called r k game, loaded emulator cores from shared libraries. Those cores exposed a familiar libretro-style interface, with extra compatibility symbols expected by the vendor. That gave me a practical entry point. I could keep the kernel and hardware support in place while adding my own userspace code. The extension mappings and per-file overrides showed how to route a test file to a custom core. A small experiment could answer a much bigger question: could this console run my software?",
+      "panel_title": "A REUSABLE ENTRY POINT", "points": ["rkgame loads cores with dlopen", "retro_* plus vendor exports", "config.xml maps extensions", "filelist.xml overrides individual files"], "evidence": "Firmware notes / Button Demo compatibility patches",
+      "shots": [{"source": "LYrICpUo6_A", "start": 24, "weight": 1, "label": "Selecting a test through the original game menu"}, {"card": "loader", "weight": 1}]
+    },
+    {
+      "id": "first-code", "title": "The first visible proof", "date": "BUTTON DEMO / MAY 2026",
+      "narration": "My first useful proof was deliberately simple: a square, a framebuffer, and a log of button presses. Getting even that onto the screen took several revisions. I matched the stock core interface, removed unwanted runtime dependencies, and used a normal Game Boy filename with an explicit core override. Then I tested the controls, colours, resolution, and sound. The square was modest, but it proved that code I built could be selected in the stock menu and interact with the real handheld.",
+      "panel_title": "SMALL TEST, CLEAR RESULT", "points": ["Custom core through the stock menu", "Moving square and input log", "640 × 480 framebuffer tests", "Button tones added later"], "evidence": "dc8a7f43 → 4710baf3 → c6c044aa",
+      "shots": [{"source": "LYrICpUo6_A", "start": 40, "weight": 1, "label": "The first custom core running through rkgame"}, {"source": "LYrICpUo6_A", "start": 64, "weight": 1, "label": "Physical buttons move the square and change its state"}, {"source": "MHDpizjIZhw", "start": 43, "weight": 0.7, "label": "A later native Button Demo / checkerboard test"}]
+    },
+    {
+      "id": "driver", "title": "Reuse the path that already works", "date": "DRIVER.SO / TINY MC",
+      "narration": "Next, I wanted a launcher for native programs. The first Tiny M C experiments exposed an important detail: drawing pixels was only part of the display path. The stock frontend relied on driver dot S O for video and input. I studied that library and reused its frame presentation and control functions. Tiny M C became a small, button-driven file manager with readable text, directory navigation, and direct program launching. The reverse engineering was turning into infrastructure I could build on.",
+      "panel_title": "THE VENDOR HARDWARE BRIDGE", "points": ["video_driver_disp_frame()", "cube_ioctl() for controls", "sound_driver_playframe()", "Tiny MC launches native programs"], "evidence": "DRIVER_SO_DECOMPILATION.md / Tiny MC build log",
+      "shots": [{"source": "MHDpizjIZhw", "start": 0, "weight": 1, "label": "Tiny MC running directly on the console"}, {"card": "driver", "weight": 0.8}, {"source": "MHDpizjIZhw", "start": 72, "weight": 0.8, "label": "Native applications selected from Tiny MC"}]
+    },
+    {
+      "id": "boot-route", "title": "Let a boot log settle the question", "date": "28 MAY / COLD-BOOT TRACE",
+      "narration": "One of the most useful discoveries came from a failed assumption. A script named i cube start looked like the obvious place to change startup behaviour. But changing it did not control the cold boot I was observing. I added temporary tracing and captured the actual path on the device. The log showed i cube dot S H starting the stock supervisor and frontend. Redirecting that script made Tiny M C start at boot. The name suggested a route; the live trace established which route this device really used.",
+      "panel_title": "OBSERVE THE ACTUAL ROUTE", "points": ["Cold boot enters cubegm/icube.sh", "The trace records the launched process", "Tiny MC replaces that launch", "Temporary tracing removed afterward"], "evidence": "BOOT_ROUTE_FINDINGS.md / a0630803 / 3490da66",
+      "shots": [{"card": "boot", "weight": 1.3}, {"source": "MHDpizjIZhw", "start": 8, "weight": 0.7, "label": "Tiny MC / the resulting native application launcher"}]
+    },
+    {
+      "id": "native", "title": "Turn experiments into applications", "date": "NATIVE PONG AND SHARED TOOLS",
+      "narration": "With a launcher and working hardware access, native applications became easier to test. Pong reused the same core game logic in both a launcher-loaded module and a standalone program. Shared helpers covered hardware constants, fonts, audio, and later screenshots. There were still practical failures to solve: returning from an application could leave a black screen, and button presses could leak across menus. Fixing those transitions mattered just as much as getting the first successful frame.",
+      "panel_title": "BUILD A SMALL NATIVE ENVIRONMENT", "points": ["One Pong source / two launch targets", "Shared display, audio and fonts", "Handle app exit and display reopening", "Debounce controls across transitions"], "evidence": "ae7b6ff1 / 36a52b4b / d50dcc38",
+      "shots": [{"source": "MHDpizjIZhw", "start": 169, "weight": 1, "label": "Native Pong / original device footage"}, {"source": "MHDpizjIZhw", "start": 189, "weight": 0.7, "label": "Pong controlled by the handheld buttons"}, {"source": "MHDpizjIZhw", "start": 201, "weight": 0.6, "label": "Returning to the launcher and stock software"}]
+    },
+    {
+      "id": "dos", "title": "A different machine inside the handheld", "date": "PICO-286 / FIRST DOS BOOT",
+      "narration": "The next step was a personal computer emulator. I ported the existing open-source Pico-286 project to this Linux handheld, replacing the host integration with the console's display, controls, and audio path. The repository records a successful DOS boot on May twenty-eighth. Soon the result was more than a boot message: FreeDOS appeared on the console, and Volkov Commander could browse files inside the emulated P C. An upstream emulator had become a native application on a very different machine.",
+      "panel_title": "A PORT BUILT ON UPSTREAM WORK", "points": ["Upstream: xrip/pico-286 / MIT", "New R36SX host integration", "DOS boot recorded on 28 May", "FreeDOS and Volkov Commander"], "evidence": "85ad7593 / 44990336 / upstream credit",
+      "shots": [{"source": "MHDpizjIZhw", "start": 122, "weight": 0.9, "label": "FreeDOS starting on the physical R36SX"}, {"source": "ZWJg3XiHGxE", "start": 99, "weight": 1.1, "label": "Volkov Commander inside Pico-286 / device recording"}, {"source": "ZWJg3XiHGxE", "start": 271, "weight": 0.7, "label": "DOS file navigation with the handheld controls"}]
+    },
+    {
+      "id": "controls", "title": "Make a PC usable with game controls", "date": "KEYBOARD / DISKS / PRESETS",
+      "narration": "Booting DOS was a milestone, but a P C expects more keys than a handheld provides. I added an on-screen keyboard, remappable button presets, and menus for binding floppy and hard-disk images. Function-button combinations opened those tools without taking away the main controls. Preset editing, disk activity feedback, and screenshot shortcuts made the port more useful away from the development computer. These were small interface details with a direct effect on what software I could actually use.",
+      "panel_title": "BRIDGE THE INPUT GAP", "points": ["On-screen PC keyboard", "Per-game button presets", "Floppy and hard-disk bindings", "Fn shortcuts and screenshots"], "evidence": "Pico-286 May build history / recorded menus",
+      "shots": [{"source": "ZWJg3XiHGxE", "start": 78, "weight": 0.8, "label": "The on-screen keyboard over the DOS display"}, {"source": "ZWJg3XiHGxE", "start": 181, "weight": 0.8, "label": "Disk image bindings and boot settings"}, {"source": "ZWJg3XiHGxE", "start": 207, "weight": 1, "label": "Editing physical button presets on the device"}]
+    },
+    {
+      "id": "graphics", "title": "A running program is only the beginning", "date": "VGA / PERFORMANCE / DIAGNOSTICS",
+      "narration": "Real DOS programs exposed the next layer of problems. A screen could look almost right while its palette, memory layout, or scrolling was still wrong. The work expanded into C G A, E G A, and V G A rendering, along with timing, disk caching, and frame presentation. Preserved captures show Supaplex and the SuperScape benchmark running in the port. Profiling and diagnostics helped separate visible results from the bugs behind them. Getting software to launch was the beginning of compatibility work, rather than the end.",
+      "panel_title": "USE REAL SOFTWARE AS EVIDENCE", "points": ["Video modes and palette handling", "Disk caching and frame timing", "Profiling and diagnostic captures", "Supaplex / SuperScape examples"], "evidence": "Committed Pico-286 screenshots / VGA build notes",
+      "shots": [{"source": "ZWJg3XiHGxE", "start": 137, "weight": 0.7, "label": "An early graphics test / archive footage from May"}, {"image": "homebrew/pico_286/screenshots/pico_286_19700101_001320_001.png", "weight": 1, "label": "Supaplex / preserved emulator framebuffer capture"}, {"image": "homebrew/pico_286/screenshots/pico_286_19700101_002911_000.png", "weight": 1, "label": "SuperScape benchmark / preserved framebuffer capture"}]
+    },
+    {
+      "id": "correctness", "title": "Keep checking the machine being emulated", "date": "JUNE — SEPTEMBER / REPOSITORY HISTORY",
+      "narration": "The later repository history goes beyond what these early videos show. Work continued on the 80386 path, protected-mode behaviour, video conformance, and targeted regression probes. A Windows debug build made it possible to investigate the same emulator sources without copying every experiment to the console. Tests covered details such as division faults, stack updates, and repeated string operations. This part of the story is documented by code and test records. It is ongoing engineering, and individual host-side checks should not be mistaken for complete compatibility on hardware.",
+      "panel_title": "LATER WORK / HOST-SIDE CHECKS", "points": ["Windows debug builds", "80386 source audit", "Focused fault and string-operation probes", "Device validation remains a separate step"], "evidence": "f535f7fc / 135b7201 / d8292040 / ad37bb30",
+      "shots": [{"card": "history", "weight": 1.4}, {"source": "ZWJg3XiHGxE", "start": 288, "weight": 0.6, "label": "Archive device footage / later code work shown in repository panels"}]
+    },
+    {
+      "id": "frontier", "title": "Keep the next step separate from the result", "date": "SHELL AND BOOT RESEARCH",
+      "narration": "The investigation also produced a native shell frontend and tools for exploring an alternative Debian userspace from an S D card. That opened another line of research into the boot chain and device tree. I kept those experiments distinct from the working application demonstrations. Preserving the stock hardware support and keeping recoverable card images made it possible to explore further without treating a plan, a built image, and a verified device boot as the same achievement.",
+      "panel_title": "FURTHER RESEARCH", "points": ["Native shell frontend", "Device-tree and boot-chain notes", "Debian SD-image tooling", "Built image ≠ verified device boot"], "evidence": "SESSION_NOTES_2026-06-02.md / Debian installation plan",
+      "shots": [{"card": "frontier", "weight": 1}, {"source": "ZWJg3XiHGxE", "start": 14, "weight": 0.7, "label": "The native application environment / original device footage"}]
+    },
+    {
+      "id": "closing", "title": "From a closed menu to an open experiment", "date": "PROJECT BY VITALIY RUDIK",
+      "narration": "Looking back, the important progress came from a repeatable loop: inspect the existing system, form a small hypothesis, build a test, and check it on the device. Ghidra analysis, hardware traces, open-source projects, and A I assisted coding all played a part. The result is a documented route from the stock firmware to custom native software and a usable DOS port. There is more to improve, but this little console has already become a much more interesting machine to work with.",
+      "panel_title": "INSPECT → TEST → DOCUMENT", "points": ["Original project and footage: Vitaliy Rudik", "Pico-286 upstream: xrip/pico-286", "English narration: Microsoft Jenny", "Synthetic narration / edited from original recordings"], "evidence": "github.com/Witali/r36sx_disasm",
+      "shots": [{"source": "MHDpizjIZhw", "start": 174, "weight": 0.7, "label": "Native Pong / a small application built on the findings"}, {"source": "ZWJg3XiHGxE", "start": 296, "weight": 0.7, "label": "Pico-286 / Volkov Commander on the console"}, {"card": "closing", "weight": 1}]
+    }
+  ]
+}

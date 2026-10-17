@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-17",
+  "repository_baseline": "ad37bb30",
+  "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
+  "voice": "en-US-JennyNeural",
+  "voice_rate": "-4%",
+  "verification": {
+    "file": "local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
+    "sha256": "184ce2eaa0ee8961333b702e69fdd1f7cd6d3e8c222d3de2bcdd106eb404e59b",
+    "bytes": 80925156,
+    "duration_seconds": 489.0,
+    "video_frames": 14670,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30.0,
+    "chapters": 14,
+    "packets": {
+      "v:0": {
+        "count": 14670,
+        "max_dts_step": 0.033334000000024844
+      },
+      "a:0": {
+        "count": 22923,
+        "max_dts_step": 0.02133400000002439
+      }
+    },
+    "scene_audio": [
+      {
+        "scene": "opening",
+        "reference_rms": 0.1390705108642578,
+        "correlation": 0.9999028744288984
+      },
+      {
+        "scene": "backup",
+        "reference_rms": 0.14247183501720428,
+        "correlation": 0.9999365874198075
+      },
+      {
+        "scene": "platform",
+        "reference_rms": 0.15271949768066406,
+        "correlation": 0.9999357218569308
+      },
+      {
+        "scene": "loader",
+        "reference_rms": 0.14494088292121887,
+        "correlation": 0.9999278492231067
+      },
+      {
+        "scene": "first-code",
+        "reference_rms": 0.1480293571949005,
+        "correlation": 0.9999677632996037
+      },
+      {
+        "scene": "driver",
+        "reference_rms": 0.1476106196641922,
+        "correlation": 0.9999667579847609
+      },
+      {
+        "scene": "boot-route",
+        "reference_rms": 0.14411009848117828,
+        "correlation": 0.999950927944643
+      },
+      {
+        "scene": "native",
+        "reference_rms": 0.14511939883232117,
+        "correlation": 0.9999639302381395
+      },
+      {
+        "scene": "dos",
+        "reference_rms": 0.1517011523246765,
+        "correlation": 0.9999673783185759
+      },
+      {
+        "scene": "controls",
+        "reference_rms": 0.14289845526218414,
+        "correlation": 0.9999530813905683
+      },
+      {
+        "scene": "graphics",
+        "reference_rms": 0.14584745466709137,
+        "correlation": 0.9999561920974718
+      },
+      {
+        "scene": "correctness",
+        "reference_rms": 0.14758552610874176,
+        "correlation": 0.9999484315670771
+      },
+      {
+        "scene": "frontier",
+        "reference_rms": 0.1476813107728958,
+        "correlation": 0.9999618556644443
+      },
+      {
+        "scene": "closing",
+        "reference_rms": 0.14931459724903107,
+        "correlation": 0.9999057103926495
+      }
+    ],
+    "decode_check": "passed"
+  },
+  "loudness": {
+    "input_i": "-16.02",
+    "input_tp": "-1.25",
+    "input_lra": "3.60"
+  },
+  "narration_source_checks": [
+    {
+      "scene": "opening",
+      "narration_correlation": 0.9991245240024518
+    },
+    {
+      "scene": "backup",
+      "narration_correlation": 0.9996798785037606
+    },
+    {
+      "scene": "platform",
+      "narration_correlation": 0.9996411777126689
+    },
+    {
+      "scene": "loader",
+      "narration_correlation": 0.9998771176826239
+    },
+    {
+      "scene": "first-code",
+      "narration_correlation": 0.9997020167745768
+    },
+    {
+      "scene": "driver",
+      "narration_correlation": 0.999710494708762
+    },
+    {
+      "scene": "boot-route",
+      "narration_correlation": 0.9998698704243051
+    },
+    {
+      "scene": "native",
+      "narration_correlation": 0.9997537815490724
+    },
+    {
+      "scene": "dos",
+      "narration_correlation": 0.999487384217917
+    },
+    {
+      "scene": "controls",
+      "narration_correlation": 0.9998570185401378
+    },
+    {
+      "scene": "graphics",
+      "narration_correlation": 0.9998467327831488
+    },
+    {
+      "scene": "correctness",
+      "narration_correlation": 0.9995332750222117
+    },
+    {
+      "scene": "frontier",
+      "narration_correlation": 0.9998840940915665
+    },
+    {
+      "scene": "closing",
+      "narration_correlation": 0.9997453991822008
+    }
+  ],
+  "subtitle_cues": 125,
+  "embedded_caption_text_matches_srt": true,
+  "visual_review": "Representative frames from all 14 scenes inspected, including caption previews",
+  "sources": [
+    {
+      "id": "LYrICpUo6_A",
+      "url": "https://www.youtube.com/watch?v=LYrICpUo6_A",
+      "title": "R36SX game console reverse engineering",
+      "upload_date": "2026-05-27",
+      "sha256": "7e22a78d47ff301d52061d30eab1e15691e494995babd136bfd4d237cc72a12b",
+      "bytes": 16415155,
+      "duration": 94.874
+    },
+    {
+      "id": "MHDpizjIZhw",
+      "url": "https://www.youtube.com/watch?v=MHDpizjIZhw",
+      "title": "R36SX game console additional programs",
+      "upload_date": "2026-05-28",
+      "sha256": "5ea3726400270ce437565b2c1b0fa20b52ec9bddfda03b3b472466f7c2f1646f",
+      "bytes": 38709039,
+      "duration": 236.414
+    },
+    {
+      "id": "ZWJg3XiHGxE",
+      "url": "https://www.youtube.com/watch?v=ZWJg3XiHGxE",
+      "title": "R36SX pico-286 emulator",
+      "upload_date": "2026-05-30",
+      "sha256": "99cb945845d41ad83162b0011def0180d3fcafe8c31769785fd8b7906b6fe9d7",
+      "bytes": 31922195,
+      "duration": 315.254
+    }
+  ],
+  "security_scans": "Defender: no threats in downloaded tools, source media, reused speech packages, PyYAML wheel/extraction, final delivery, and installed skill",
+  "global_skill": {
+    "path": "C:\\Users\\rudol\\.codex\\skills\\narrated-project-video",
+    "quick_validate": "passed",
+    "files": {
+      "SKILL.md": "2582b7afe4f0d8785653813943f356dd66f15480bfd8243e2e3cff4e44cd6b51",
+      "agents/openai.yaml": "4fd8f8e860ad1f7d0954bfaa5f71b3687b488df3aa5d90fc17241fc0d279c218",
+      "references/production.md": "273a6cfec174300e7a99d84002b6dd95376ec537801cdd1a733609e9e00e0a65",
+      "scripts/narrate.py": "c594acd46466900ca1410a3be9884a8084e75361516ec144daee3d805efee971",
+      "scripts/verify_video.py": "0dc29c316604f0ea39b891b2983a34459f263b64b2ac5f008ebc2b435ae3032e"
+    }
+  }
+}
