@@ -1,5 +1,43 @@
 # Power Management Analysis In The Game Side
 
+## 2026-10-17: selectable CPU clocks versus thermal throttling
+
+The returned read-only device probe selected MCPU source 5 in both live clock
+registers, corresponding to 1188 MHz. See
+`hardware_info/clock_probe/2026-10-17/cpu_clock_report_ef0quf.txt`.
+
+The retained HCRTOS SDK at commit
+`1dd13c6ddc034313c0c3b9a31a123449f7baf110` provides direct evidence of
+hardware frequency selection:
+
+- `components/kernel/source/arch/mips/init_hook.c`, `mcpu_clksel2clk()`:
+  selectors 0 through 6 map to 594, 396, 297, 198, 900, 1188 and 24 MHz.
+  `mcpu_clock_init()` programs the selector and triggers the clock change;
+  selector 7 uses the configurable digital PLL.
+- `components/kernel/source/drivers/standby/standby.c`,
+  `standby_set_cpu_clock()`: the HC1600 branch explicitly switches MCPU and
+  SCPU to 24 MHz. This is a standby transition, not evidence that ordinary
+  Linux applications can safely change frequency during normal execution.
+- `hardware_info/dtb/dtb.dts`, `/soc/clocks/base_clk/cpu_clk@18800070`:
+  the CPU clock has eight parent sources and separate control/status fields.
+
+Hardware downclocking is therefore supported. Automatic thermal throttling
+on this unit remains unverified: the captured Linux CPUFreq frequency files
+were absent, and the inspected game-side analysis and retained HCRTOS clock
+code do not establish a temperature-driven governor. Absence of these files
+does not rule out a separate firmware or hardware protection mechanism.
+
+The only reported Linux clocksource is `MIPS`. Safe runtime switching would
+need to account for counter frequency, kernel timekeeping and delay
+calibration; a raw userspace register write is not a verified implementation.
+No registers, device settings or firmware were changed during this inquiry.
+This separate research question was not added to the documentary.
+
+Source repository: <https://git.maschath.de/ignatz/hcrtos> (local retained
+source inspected; the web file endpoint was unavailable). Linux's official
+CPUFreq architecture and required platform driver are documented at
+<https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html>.
+
 ## Short Conclusion
 
 In `cubegm` / the game emulator frontend, I did not find signs of CPU halt, MIPS `wait`, or dynamic CPU frequency scaling.
