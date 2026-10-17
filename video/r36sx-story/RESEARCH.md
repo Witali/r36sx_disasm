@@ -383,3 +383,26 @@ The final upload package and production-source snapshot were refreshed in the
 shared catalog. The package remains prepared locally and has not been uploaded.
 Microsoft Defender scanned the complete R36SX catalog after the revision and
 found no threats. No new tools or footage were downloaded for this revision.
+
+## 2026-10-17 continuous background in the caption area
+
+At the creator's request, removed the separate dark rectangle below y=962 in
+the shared canvas. The existing page gradient now continues to the bottom of
+all cards and footage layouts. Subtitle position, scene timing, narration and
+content were retained. No new speech-service submission was needed.
+
+The previous ready package is preserved in
+`materials/work/revisions/before-continuous-background/`. Final MP4 SHA256:
+`c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6`.
+Duration remains 519.233 seconds with 15,577 frames, 14 chapters and 133 cues.
+The complete media verifier passed again. The one-off
+`local_artifacts/verify_background_revision.py` confirmed byte-identical encoded
+AAC/subtitle payloads and external SRT relative to the previous revision, and
+extracted final evidence/CPU/Shell frames. Pixel samples across the former
+strip boundary confirm a continuous background. The CPU and Shell frames were
+visually inspected, including readable captions on the continued background.
+
+The film already mentions the Windows debug build of Pico-286 in its correctness
+scene: the relevant caption starts at 00:06:57.502. That existing narration and
+sidebar describe host development/testing; a separate Windows application-window
+demonstration has not been added.

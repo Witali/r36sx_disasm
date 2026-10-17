@@ -6,8 +6,8 @@
   "voice_rate": "-4%",
   "verification": {
     "file": "C:/Work/YouTube Videos/R36SX/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
-    "sha256": "ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d",
-    "bytes": 81409132,
+    "sha256": "c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6",
+    "bytes": 81343183,
     "duration_seconds": 519.2333333333333,
     "video_frames": 15577,
     "width": 1920,
@@ -163,7 +163,7 @@
   ],
   "subtitle_cues": 133,
   "embedded_caption_text_matches_srt": true,
-  "visual_review": "Final encoded contact sheet reviewed across all fourteen scenes; full-size CPU card, actual CPU and Shell screenshots, sidebars and frequency captions inspected",
+  "visual_review": "Content and card layouts reviewed in the CPU revision; new evidence/CPU/Shell frames extracted after background edit, full-size CPU and Shell frames inspected with caption rendering",
   "sources": [
     {
       "id": "LYrICpUo6_A",
@@ -257,12 +257,12 @@
         "sha256": "a73e4b2221097a13ba8cc38ed14eda154c437146c954386b0061c349d8e5c846"
       },
       "R36SX-From-Stock-Firmware-to-DOS-English.mp4": {
-        "bytes": 81409132,
-        "sha256": "ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d"
+        "bytes": 81343183,
+        "sha256": "c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6"
       },
       "Thumbnail.png": {
-        "bytes": 332900,
-        "sha256": "8bc18ad103ebe2b30fe87dc690b2b8125ea670066dea8122a11daa895448704d"
+        "bytes": 332895,
+        "sha256": "bb3d37ffe5528e96f8e75dcd4a95266f67d1bbb137981bbeabf9e688cd8632a7"
       },
       "Upload-instructions.txt": {
         "bytes": 935,
@@ -282,7 +282,7 @@
       }
     }
   },
-  "revision_security_scans": "Microsoft Defender: no threats in the complete R36SX catalog after the CPU revision; no new downloaded tools or footage",
+  "revision_security_scans": "Microsoft Defender: no threats in the R36SX catalog after the continuous-background revision",
   "material_locations": {
     "catalog": "C:/Work/YouTube Videos",
     "project": "C:/Work/YouTube Videos/R36SX",
@@ -317,5 +317,59 @@
     "reused_jenny_scenes": 13,
     "screenshot_sources": "assets/device-capture-sources.json",
     "separate_downclocking_and_arm_discussion_added_to_film": false
+  },
+  "background_revision": {
+    "previous_outputs": "C:/Work/YouTube Videos/R36SX/materials/work/revisions/before-continuous-background",
+    "changed_area": "Shared canvas below y=962; continue the original page gradient",
+    "audio_payload_identical": true,
+    "audio_payload_hash": "SHA256=98945f7f8ce475bef7b2c0fce5d66ea1f0bcc5091e9afd45374f3654997ab149",
+    "subtitles_payload_identical": true,
+    "subtitles_payload_hash": "SHA256=b20426e781bad6d9b502715c70af179db7c22855a197eee522534144755c8b71",
+    "external_srt_identical": true,
+    "background_samples": [
+      {
+        "scene": "backup",
+        "timestamp": 37.71666666666667,
+        "before_strip": [
+          18,
+          30,
+          43
+        ],
+        "after_strip": [
+          18,
+          30,
+          43
+        ]
+      },
+      {
+        "scene": "platform",
+        "timestamp": 85.86666666666667,
+        "before_strip": [
+          18,
+          30,
+          43
+        ],
+        "after_strip": [
+          18,
+          30,
+          43
+        ]
+      },
+      {
+        "scene": "frontier",
+        "timestamp": 467.93333333333334,
+        "before_strip": [
+          18,
+          30,
+          43
+        ],
+        "after_strip": [
+          18,
+          30,
+          43
+        ]
+      }
+    ],
+    "previous_file_sha256": "ec394277f75a2997303da297d44602346119c33523ccb606e8144730f110d71d"
   }
 }

@@ -104,7 +104,7 @@ def canvas(scene, index):
     d.text((1860-date_width, label_baseline), date,
            font=font(20, mono=True), fill=MUTED, anchor='ls')
     d.line((60, 145, 1860, 145), fill='#344859', width=2)
-    d.rectangle((0, 962, WIDTH, HEIGHT), fill='#09121e')
+    # Keep the subtitle area on the same continuous background as the cards.
     return im, d
 
 
