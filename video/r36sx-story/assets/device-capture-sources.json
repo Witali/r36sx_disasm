@@ -1,0 +1,30 @@
+{
+  "copied_date": "2026-10-17",
+  "note": "1970 filename dates reflect the device clock; both images show the native shell.",
+  "files": [
+    {
+      "file": "device-cpuinfo.png",
+      "source": "C:\\Work\\YouTube Videos\\R36SX\\materials\\work\\sources\\device-captures-2026-10-17\\shell\\Shell_19700101_000347_002.bmp",
+      "original_card_path": "E:/MIPS_NATIVE/shell/screenshots/Shell_19700101_000347_002.bmp",
+      "original_sha256": "49b1ef056642f412db6bf928d581336357e995e3a58ec061082b21fcc54c579e",
+      "sha256": "7ce650d9a31711c3b1d33a70189cee9f475d6de8dec48aaaa0295afcd2259c71",
+      "conversion": "Lossless RGB BMP to PNG; pixels unchanged",
+      "dimensions": [
+        640,
+        480
+      ]
+    },
+    {
+      "file": "device-shell-top.png",
+      "source": "C:\\Work\\YouTube Videos\\R36SX\\materials\\work\\sources\\device-captures-2026-10-17\\shell\\shell_19700101_000024_000.bmp",
+      "original_card_path": "E:/MIPS_NATIVE/shell/screenshots/shell_19700101_000024_000.bmp",
+      "original_sha256": "b0a882e06842e58da5bbbe6ebe639061b049fe2444009d41de06e73f3a424f5a",
+      "sha256": "f0d956198a118257a3d842d369ad7ebad5410f8f97136f914582211d4481bbf4",
+      "conversion": "Lossless RGB BMP to PNG; pixels unchanged",
+      "dimensions": [
+        640,
+        480
+      ]
+    }
+  ]
+}

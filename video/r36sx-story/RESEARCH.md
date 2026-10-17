@@ -309,3 +309,40 @@ project root and supporting media/source snapshots under `materials/`.
 Explicit user locations take precedence. `quick_validate.py` passed for the
 installed skill. After relocation, Defender found no threats in the complete
 R36SX catalog folder or the installed skill.
+
+## 2026-10-17 CPU clock verification and newly recovered captures
+
+The creator requested CPU clock, single-core wording and the full core name.
+The saved report identifies `MIPS 74Kc V4.12` and a single Linux processor,
+but `589.82 BogoMIPS` is not a clock reading. The saved device trees select
+`clock = <5>` in the CPU/MCPU nodes. Vendor source snapshot
+`internet_sources/hcrtos` at `1dd13c6ddc034313c0c3b9a31a123449f7baf110`,
+`components/kernel/source/arch/mips/init_hook.c:mcpu_clksel2clk()`, maps 5 to
+1188 MHz. Clock configuration and direct runtime measurement remain distinct.
+The SoC has a separate RTOS side; "one core" in this film refers to Linux and
+the applications, not a claim about every processing block in the SoC.
+
+A draft CPU card and Jenny platform narration were prepared with configuration
+wording, but the creator then requested an actual device test. The delivered
+8:30 MP4 is retained pending that result; no measured 600 MHz or 1.2 GHz result
+has been inserted into it. `homebrew/cpu_clock_probe/` and its dedicated patch
+overlay provide the read-only diagnostic. Its build, hash, scan and deployment
+to `E:/MIPS_NATIVE/cpu_clock_probe/` are recorded in the probe build log. The
+user will run it on the handheld and return the SD card for reading its report.
+
+The newly connected console card was identified as the removable FAT32 E:
+volume by its `cubegm`, `rootfs` and `MIPS_NATIVE` layout. Only screenshot
+folders and `cpu.txt`/`mem.txt` were copied. All 42 files (27,798,625 bytes) are
+preserved under
+`C:/Work/YouTube Videos/R36SX/materials/work/sources/device-captures-2026-10-17/`,
+with source paths, sizes, SHA256 and capture classification in `manifest.json`.
+There are 40 images: 19 files without a Windows-capture filename marker and
+21 explicitly named host captures, plus two text reports. A card location alone
+does not turn a host screenshot into proof of operation on physical hardware.
+
+All nine Shell captures were inspected as a contact sheet. They include an
+actual `/proc/cpuinfo` screen (`Shell_19700101_000347_002.bmp`), as well as
+`top` memory/process output and the on-screen keyboard. Device filenames dated
+1970 reflect its unset clock and are not used as real recording dates. Selected
+captures are preserved as pixel-identical PNGs in `assets/` with provenance;
+they are ready for the next video revision after the clock report arrives.
