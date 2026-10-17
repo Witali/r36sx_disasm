@@ -1,20 +1,70 @@
 {
   "date": "2026-10-17",
-  "timezone": "Europe/Budapest",
-  "status": "not_uploaded_browser_tools_unavailable",
+  "recorded_at_utc": "2026-10-17T17:19:39+00:00",
+  "timezone_context": "Europe/Budapest",
+  "status": "published_public_premiere",
   "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
   "file": "R36SX-From-Stock-Firmware-to-DOS-English.mp4",
   "sha256": "c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6",
-  "intended_channel": "Виталий Рудик",
-  "channel_id_from_previous_upload": "UCYrDbWG9hg4MnPmnujHBfXQ",
-  "current_signed_in_channel_verified": false,
-  "youtube_id": null,
-  "upload_started": false,
-  "files_transmitted": false,
-  "error": "failed to write kernel assets: The system cannot find the path specified (os error 3)",
-  "recovery_attempts": [
-    "cua_repl reset and fresh getState: same error",
-    "node_repl reset and fresh @oai/sky initialization: same error"
-  ],
-  "resume": "Restore the desktop browser/computer-use runtime, verify the signed-in channel, then upload the existing verified package with description, thumbnail, English language and timed SRT."
+  "channel": "Виталий Рудик",
+  "channel_id": "UCYrDbWG9hg4MnPmnujHBfXQ",
+  "current_signed_in_channel_verified": true,
+  "youtube_id": "QDrvjlgEsMA",
+  "youtube_url": "https://youtu.be/QDrvjlgEsMA",
+  "upload_started": true,
+  "files_transmitted": true,
+  "visibility": "public",
+  "premiere_now_checked": true,
+  "premiere_start_as_displayed_in_studio": "2026-10-17 19:18",
+  "premiere_start_timezone_displayed": false,
+  "confirmation": "YouTube Studio displayed Video published, the PREMIERE badge, start time and the share URL.",
+  "checks": {
+    "copyright": "completed_no_issues_found",
+    "community_guidelines": "completed_no_issues_found",
+    "observed_before_publish": true
+  },
+  "metadata": {
+    "description_characters": 3518,
+    "chapter_entries": 14,
+    "tags": 13,
+    "custom_thumbnail": "Thumbnail.png",
+    "language": "English",
+    "timed_english_subtitles": "published",
+    "subtitle_cues": 133,
+    "made_for_kids": false,
+    "paid_promotion": false,
+    "ai_disclosure": true
+  },
+  "evidence": {
+    "screenshot": "materials/YouTube-main-published.jpg",
+    "bytes": 65889,
+    "sha256": "da7d18091e5a831547f0c9d03244b5a389e8c123fe6760dd82fe9b9618bc9db3"
+  },
+  "previous_attempts": [
+    {
+      "date": "2026-10-17",
+      "timezone": "Europe/Budapest",
+      "status": "not_uploaded_browser_tools_unavailable",
+      "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
+      "file": "R36SX-From-Stock-Firmware-to-DOS-English.mp4",
+      "sha256": "c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6",
+      "intended_channel": "Виталий Рудик",
+      "channel_id_from_previous_upload": "UCYrDbWG9hg4MnPmnujHBfXQ",
+      "current_signed_in_channel_verified": false,
+      "youtube_id": null,
+      "upload_started": false,
+      "files_transmitted": false,
+      "error": "failed to write kernel assets: The system cannot find the path specified (os error 3)",
+      "recovery_attempts": [
+        "cua_repl reset and fresh getState: same error",
+        "node_repl reset and fresh @oai/sky initialization: same error"
+      ],
+      "resume": "Restore the desktop browser/computer-use runtime, verify the signed-in channel, then upload the existing verified package with description, thumbnail, English language and timed SRT."
+    },
+    {
+      "date": "2026-10-17",
+      "status": "studio_client_error_before_video_id",
+      "detail": "First upload attempt failed after a contenteditable edit. Studio showed an unexpected processing error; no new video row or video ID was created. Retried the unchanged MP4 and used native paste for title and description."
+    }
+  ]
 }

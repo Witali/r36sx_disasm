@@ -406,3 +406,34 @@ The film already mentions the Windows debug build of Pico-286 in its correctness
 scene: the relevant caption starts at 00:06:57.502. That existing narration and
 sidebar describe host development/testing; a separate Windows application-window
 demonstration has not been added.
+
+## 2026-10-17 YouTube publication as an immediate premiere
+
+Uploaded the unchanged final MP4 from `C:/Work/YouTube Videos/R36SX` through
+YouTube Studio using the computer-use browser controls. Verified the signed-in
+channel as Vitaliy Rudik (`UCYrDbWG9hg4MnPmnujHBfXQ`). Applied the prepared title,
+3,518-character description with repository/source links and 14 chapter entries,
+13 tags, custom thumbnail, English video language and the timed English SRT
+(133 cues). Studio confirmed that the English subtitles were published. Marked
+the video as not made for kids, without paid promotion, with AI disclosure for
+the synthetic narration. Copyright and community-guidelines checks both
+completed without issues before publication.
+
+At the creator's explicit request, selected public visibility and Premiere now,
+then clicked Publish. Studio confirmed Video published with the PREMIERE badge
+and displayed the start time as 17 October 2026, 19:18 (no timezone in the dialog).
+Published URL: https://youtu.be/QDrvjlgEsMA . Video ID: `QDrvjlgEsMA`.
+This records a successful public premiere publication, not a completed viewing
+or a claim that the premiere has already finished.
+
+The initial browser-tools failure is preserved in the status record's attempt
+history. A subsequent Studio attempt hit a contenteditable/client processing
+error before any video ID appeared; retrying the same MP4 with native paste for
+title/description succeeded. No duplicate saved video was observed.
+
+Updated `YOUTUBE_UPLOAD_STATUS.json`, `PRODUCTION_REPORT.json`, the catalog
+manifest and upload guide, and mirrored the publication record/source updates
+to the material folder. Screenshot proof is stored at
+`C:/Work/YouTube Videos/R36SX/materials/YouTube-main-published.jpg`; the record
+preserves its SHA256. The uploaded MP4 retains SHA256
+`c9627558d9fd86445d6da35c7f6b9cc05d4e85695e1bad0c4d0766d0088cefa6`.
