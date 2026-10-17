@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,8 +23,8 @@ static void report(const char *fmt, ...)
     va_list a, b;
     va_start(a, fmt);
     va_copy(b, a);
-    vprintf(fmt, a);
     if (logfile) { vfprintf(logfile, fmt, b); fflush(logfile); }
+    vprintf(fmt, a);
     fflush(stdout);
     va_end(b);
     va_end(a);
@@ -107,10 +108,12 @@ static inline uint32_t resolution(void)
 }
 #endif
 
+#if defined(__mips__)
 static double elapsed(struct timespec a, struct timespec b)
 {
     return (double)(b.tv_sec-a.tv_sec) + (b.tv_nsec-a.tv_nsec)/1e9;
 }
+#endif
 
 static void counter_measurement(void)
 {
@@ -187,6 +190,8 @@ int main(int argc, char **argv)
         "/sys/kernel/debug/clk/clk_summary", NULL
     };
     int i;
+    /* A launcher can close stdout; diagnostics must still reach the SD card. */
+    signal(SIGPIPE, SIG_IGN);
     n = readlink("/proc/self/exe", exe, sizeof(exe)-1);
     if (n < 0) snprintf(exe, sizeof(exe), "%s", argv[0]); else exe[n] = 0;
     slash = strrchr(exe, '/');
@@ -198,7 +203,7 @@ int main(int argc, char **argv)
     snprintf(output, sizeof(output), "%s/cpu_clock_report_XXXXXX.txt", directory);
     fd = mkstemps(output, 4);
     if (fd < 0 || !(logfile = fdopen(fd, "w"))) { perror("report file"); return 1; }
-    report("R36SX CPU clock probe v1\nReport: %s\n", output);
+    report("R36SX CPU clock probe v2\nReport: %s\n", output);
     report("Read-only diagnostics; no clock, PLL, firmware or sysfs writes.\n");
     report("cpuinfo BogoMIPS is not a CPU MHz specification.\n");
     for (i = 0; files[i]; ++i) capture(files[i]);

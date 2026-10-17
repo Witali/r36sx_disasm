@@ -1,0 +1,2 @@
+# Keep captured reports byte-for-byte, including kernel trailing whitespace.
+*.txt -text whitespace=-blank-at-eol

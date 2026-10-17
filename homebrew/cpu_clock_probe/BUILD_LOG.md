@@ -61,3 +61,25 @@ about 1188 MHz. Linux's timebase is itself MIPS, so that ratio is a consistency
 check rather than independent physical calibration. One Linux CPU is online
 and present; MemTotal is 43164 kB. Full findings and limits are in
 `hardware_info/clock_probe/README.md`. The empty report's cause is unknown.
+
+## 2026-10-17 version 2: keep reporting after console disconnection
+
+Report output now flushes to the diagnostic file before console output and
+ignores SIGPIPE, so a launcher's closed stdout pipe cannot terminate logging.
+This is a robustness improvement, not a diagnosis of the empty device report.
+The MIPS-only elapsed-time helper is excluded from host builds.
+
+Rebuilt with the same WSL SDK, build script and target flags documented above.
+Both target and WSL host builds completed without warnings. A host run with
+`--no-mem | head -c 0` and `set -o pipefail` exited successfully; its unique
+report retained the final `Done` line after stdout closed. This exercises
+logging only, not hardware clock access.
+
+- Output size: 625,604 bytes; ELF32 little-endian MIPS32r2 O32, static.
+- SHA256: `9639e446f276af08e981af9f92f6008a2fe87895ff9456d387490c36c1297013`.
+- Microsoft Defender scanned the patch directory: no threats.
+- Replaced only this tool's binary and README on `E:/MIPS_NATIVE/cpu_clock_probe/`;
+  destination hash matched, and both returned diagnostic files were preserved.
+- Added a scoped `.gitattributes` in `hardware_info/clock_probe/` so captured
+  reports retain original bytes and kernel trailing whitespace across checkouts.
+  The returned report manifest continues to identify the tested version 1 binary.

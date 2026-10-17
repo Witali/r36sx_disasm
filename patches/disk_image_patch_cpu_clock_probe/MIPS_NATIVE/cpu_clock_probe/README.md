@@ -31,6 +31,8 @@ programs on the SD card. In Tiny MC, open it and run `cpu_clock_probe`, or use:
 Read the newly created `diagnostics/cpu_clock_report_*` file. Reports use unique
 names and do not overwrite earlier runs. The tool does not change CPU frequency,
 PLL settings, firmware, device-tree files, emulator configuration or system time.
+Version 2 flushes the report before console output and ignores a closed stdout
+pipe, so launcher console disconnection cannot terminate report writing.
 
 ## Build
 
