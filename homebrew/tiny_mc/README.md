@@ -30,6 +30,10 @@ by filename first and by index as fallback.
 
 ## Runtime model
 
+Runtime CPU-frequency selection has been investigated but is not yet enabled.
+The stock kernel needs a verified switching path before a selector can be
+added safely; see [CPU_FREQUENCY.md](CPU_FREQUENCY.md) for findings and requirements.
+
 The program uses:
 
 - `cubegm/driver.so` for the normal display path, via `dlopen()`,

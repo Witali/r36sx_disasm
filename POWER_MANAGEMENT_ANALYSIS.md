@@ -40,6 +40,13 @@ CPUFreq architecture and required platform driver are documented at
 
 ## Short Conclusion
 
+The follow-up Tiny MC integration inquiry recovered the vendor kernel's
+`hc16xx_set_cpu_clk` at `0x800011ec`. It replays boot device-tree clock values
+and does not update timekeeping. The exported generic `clk_set_rate` wrapper
+does not itself establish a userspace control interface. Reproduction and
+disassembly are in `disasm/linux/hc16xx-clock/`; the implementation prerequisites
+are in `homebrew/tiny_mc/CPU_FREQUENCY.md`. No clock switch has been enabled.
+
 In `cubegm` / the game emulator frontend, I did not find signs of CPU halt, MIPS `wait`, or dynamic CPU frequency scaling.
 
 What exists:
