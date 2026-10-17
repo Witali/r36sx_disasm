@@ -1,0 +1,18 @@
+{
+  "copied_date": "2026-10-17",
+  "probe_sha256": "0f91022a2b4eb4846d5ca6fb0cc1aebf08ee8eec110d8c5ec1b3f5bc2a4a1656",
+  "files": [
+    {
+      "file": "cpu_clock_report_ef0quf.txt",
+      "source": "E:\\MIPS_NATIVE\\cpu_clock_probe\\diagnostics\\cpu_clock_report_ef0quf.txt",
+      "bytes": 3259,
+      "sha256": "7429e2edc3b2d2a5eb0d592408adf2881c0bcc97ca9f6cb4fad9f6e843b3a7c5"
+    },
+    {
+      "file": "cpu_clock_report_tXqZC5.txt",
+      "source": "E:\\MIPS_NATIVE\\cpu_clock_probe\\diagnostics\\cpu_clock_report_tXqZC5.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

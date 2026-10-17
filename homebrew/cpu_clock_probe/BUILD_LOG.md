@@ -49,3 +49,15 @@ bash homebrew/cpu_clock_probe/build_wsl.sh
 The user will launch the diagnostic via Shell or Tiny MC, return the SD card
 to the computer, and provide `diagnostics/cpu_clock_report_*.txt`. A device
 result is still pending. Instruction and API references are in `README.md`.
+
+## 2026-10-17 returned device report
+
+The user ran the tool and returned the card. One 3,259-byte complete report and
+one empty file were recovered and preserved with hashes in
+`hardware_info/clock_probe/2026-10-17/`. The complete run confirms clock
+information/control selector 5, mapping to 1188 MHz in the vendor table.
+CCRes is 2; the counter runs at about 594 MHz and the derived CPU value is
+about 1188 MHz. Linux's timebase is itself MIPS, so that ratio is a consistency
+check rather than independent physical calibration. One Linux CPU is online
+and present; MemTotal is 43164 kB. Full findings and limits are in
+`hardware_info/clock_probe/README.md`. The empty report's cause is unknown.

@@ -1,0 +1,105 @@
+R36SX CPU clock probe v1
+Report: /mnt/sdcard/MIPS_NATIVE/cpu_clock_probe/diagnostics/cpu_clock_report_ef0quf.txt
+Read-only diagnostics; no clock, PLL, firmware or sysfs writes.
+cpuinfo BogoMIPS is not a CPU MHz specification.
+
+--- /proc/cpuinfo ---
+system type		: Hichip HC16xx Board
+machine			: Hichip hc16xx
+processor		: 0
+cpu model		: MIPS 74Kc V4.12  FPU V0.0
+BogoMIPS		: 589.82
+wait instruction	: yes
+microsecond timers	: yes
+tlb_entries		: 32
+extra interrupt vector	: yes
+hardware watchpoint	: yes, count: 4, address/irw mask: [0x0ffc, 0x0ffc, 0x0ffb, 0x0ffb]
+isa			: mips1 mips2 mips32r1 mips32r2
+ASEs implemented	: mips16 dsp dsp2
+shadow register sets	: 1
+kscratch registers	: 0
+package			: 0
+core			: 1
+VCED exceptions		: not available
+VCEI exceptions		: not available
+
+
+
+--- /proc/meminfo ---
+MemTotal:          43164 kB
+MemFree:           15156 kB
+MemAvailable:      33508 kB
+Buffers:             932 kB
+Cached:            19104 kB
+SwapCached:            0 kB
+Active:             5064 kB
+Inactive:          16980 kB
+Active(anon):       2008 kB
+Inactive(anon):        0 kB
+Active(file):       3056 kB
+Inactive(file):    16980 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:        131068 kB
+SwapFree:         131068 kB
+Dirty:                32 kB
+Writeback:             0 kB
+AnonPages:          2008 kB
+Mapped:             8808 kB
+Shmem:                 0 kB
+Slab:               3072 kB
+SReclaimable:        984 kB
+SUnreclaim:         2088 kB
+KernelStack:         360 kB
+PageTables:          128 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:      152648 kB
+Committed_AS:      46264 kB
+VmallocTotal:    1048372 kB
+VmallocUsed:           0 kB
+VmallocChunk:          0 kB
+
+
+--- /sys/devices/system/cpu/online ---
+0
+
+
+--- /sys/devices/system/cpu/present ---
+0
+
+
+--- /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ---
+Unavailable: No such file or directory
+
+--- /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq ---
+Unavailable: No such file or directory
+
+--- /sys/devices/system/clocksource/clocksource0/current_clocksource ---
+MIPS
+
+
+--- /sys/devices/system/clocksource/clocksource0/available_clocksource ---
+MIPS 
+
+
+--- /sys/kernel/debug/clk/clk_summary ---
+Unavailable: No such file or directory
+
+--- HC16xx clock-register snapshot (read only) ---
+0x18800070 info    = 0x0007f510; selector=5
+0x18800074 control = 0x00000510; selector=5
+Status selector maps to 1188 MHz in the vendor fixed-source table.
+This is register interpretation, not an independent frequency measurement.
+
+--- RDHWR counter against Linux monotonic time ---
+RDHWR CCRes=2 CPU cycles/count; clock=MONOTONIC_RAW
+sample 1: seconds=0.400010 counts=237604778 counter_MHz=593.998 derived_CPU_MHz=1187.995
+sample 2: seconds=0.400008 counts=237603824 counter_MHz=593.997 derived_CPU_MHz=1187.994
+sample 3: seconds=0.400011 counts=237605072 counter_MHz=593.997 derived_CPU_MHz=1187.994
+Interpret together with clocksource and clock registers.
+RDHWR may be virtualized by Linux. A timebase derived from the same
+CPU counter is not an independent calibration of its physical clock.
+
+Done. Return this report for analysis: /mnt/sdcard/MIPS_NATIVE/cpu_clock_probe/diagnostics/cpu_clock_report_ef0quf.txt
