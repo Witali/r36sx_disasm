@@ -132,8 +132,8 @@ The finished MP4 is
 
 - 489 seconds (8:09), 1920×1080, 30 fps, H.264 video, AAC English audio.
 - 14,670 video frames, 14 chapter entries, 125 English subtitle cues.
-- Size: 80,925,156 bytes.
-- SHA256: `184ce2eaa0ee8961333b702e69fdd1f7cd6d3e8c222d3de2bcdd106eb404e59b`.
+- Size: 80,919,934 bytes.
+- SHA256: `41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18`.
 - Measured loudness: -16.02 LUFS; measured true peak: -1.25 dBTP.
 - Full video/audio decoding completed without errors. Frame counts, durations,
   chapter positions, English metadata, and monotonic audio/video DTS passed.
@@ -155,3 +155,40 @@ timeline, and verification reports. Nothing was uploaded to YouTube.
 `PRODUCTION_REPORT.json` retains the compact final artifact and source hashes,
 audio checks, and global skill file hashes. The installed skill's narration
 helper and verifier have both been exercised on this actual documentary.
+
+## 2026-10-17 text-row alignment revision
+
+The user's screenshot exposed a baseline mismatch between the smaller Consolas
+list markers and larger Segoe UI body text. Equal top coordinates put their
+baselines at different heights. The renderer now uses one `numbered_point()`
+helper: each marker is drawn with Pillow's `ls` baseline anchor at the first
+text line's measured ascent. This applies to the full research cards and the
+sidebars, including points that wrap onto a second line. A shared `aligned_row()`
+helper also aligns the filename/arrow/description table, launcher and driver
+diagrams, and date/commit/description history rows. It vertically centers their
+combined visible glyph bounds within each row. The chapter label and date now
+share an explicit baseline as well.
+
+All nine card layouts and all 14 scene sidebars were regenerated for visual
+review. The first intermediate render was stopped when the user's additional
+table-alignment feedback arrived, then restarted with the complete correction.
+The previous deliverable and its verification report were preserved
+under `local_artifacts/reverse_engineering_video/revisions/before-number-alignment/`.
+
+The final revision passed the complete MP4 verifier. Its encoded audio packets
+and embedded subtitle text/timing are byte-identical to the previous film. The
+489-second duration, 14,670 frames, and 14 chapters were retained. Final review
+frames were regenerated from the new MP4 for all scenes.
+
+At the user's request, the global `narrated-project-video` skill was updated in
+English as part of this correction. Its production reference now describes
+shared baselines, font-ascent alignment for list markers, centered glyph bounds
+for boxed rows, and visual review of every card/sidebar variant in the final
+encoded film. The entrypoint routes to those instructions and explicitly calls
+for checking wrapped points and mixed-font rows. The standard skill validator
+passed after updating the two documentation files. Skill file hashes in the
+production report were refreshed.
+
+The corrected delivery also has a fresh filename for opening alongside the
+earlier review copy:
+`local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English-aligned.mp4`.

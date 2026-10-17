@@ -6,8 +6,8 @@
   "voice_rate": "-4%",
   "verification": {
     "file": "local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
-    "sha256": "184ce2eaa0ee8961333b702e69fdd1f7cd6d3e8c222d3de2bcdd106eb404e59b",
-    "bytes": 80925156,
+    "sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18",
+    "bytes": 80919934,
     "duration_seconds": 489.0,
     "video_frames": 14670,
     "width": 1920,
@@ -163,7 +163,7 @@
   ],
   "subtitle_cues": 125,
   "embedded_caption_text_matches_srt": true,
-  "visual_review": "Representative frames from all 14 scenes inspected, including caption previews",
+  "visual_review": "All nine card types and fourteen sidebars reviewed; final encoded frames refreshed for every scene",
   "sources": [
     {
       "id": "LYrICpUo6_A",
@@ -198,11 +198,20 @@
     "path": "C:\\Users\\rudol\\.codex\\skills\\narrated-project-video",
     "quick_validate": "passed",
     "files": {
-      "SKILL.md": "2582b7afe4f0d8785653813943f356dd66f15480bfd8243e2e3cff4e44cd6b51",
+      "SKILL.md": "281a633eb1916284d03c33c3f13b650dc151c794f76a66c72e169493b3759bb1",
       "agents/openai.yaml": "4fd8f8e860ad1f7d0954bfaa5f71b3687b488df3aa5d90fc17241fc0d279c218",
-      "references/production.md": "273a6cfec174300e7a99d84002b6dd95376ec537801cdd1a733609e9e00e0a65",
+      "references/production.md": "e5e8cdcca26f648e82343620cfa3e793087d498d8aede5281eac18a4cbd4d418",
       "scripts/narrate.py": "c594acd46466900ca1410a3be9884a8084e75361516ec144daee3d805efee971",
       "scripts/verify_video.py": "0dc29c316604f0ea39b891b2983a34459f263b64b2ac5f008ebc2b435ae3032e"
-    }
+    },
+    "typography_update": "Explicit shared baselines, boxed-row glyph centering, and review of every card/sidebar variant"
+  },
+  "alignment_revision": {
+    "encoded_audio_identical": true,
+    "audio_packet_hash": "SHA256=96935e1a38e7201d7f45ce203935873c8f2c46443ad1407955404bc72295c6ac",
+    "embedded_subtitles_identical": true,
+    "previous_file_sha256": "184ce2eaa0ee8961333b702e69fdd1f7cd6d3e8c222d3de2bcdd106eb404e59b",
+    "delivery_alias": "local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English-aligned.mp4",
+    "delivery_alias_sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18"
   }
 }

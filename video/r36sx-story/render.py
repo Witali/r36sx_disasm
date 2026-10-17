@@ -66,6 +66,27 @@ def wrap(draw, text, xy, width, size=32, fill=INK, bold=False, mono=False, spaci
     return y
 
 
+def numbered_point(draw, number, text, *, number_x, text_x, y, width,
+                   size, number_size, bold=False, spacing=11):
+    # Different font families/sizes need the same baseline, not the same top.
+    baseline = y + font(size, bold).getmetrics()[0]
+    draw.text((number_x, baseline), f'{number:02}',
+              font=font(number_size, mono=True), fill=GOLD, anchor='ls')
+    return wrap(draw, text, (text_x, y), width, size,
+                bold=bold, spacing=spacing)
+
+
+def aligned_row(draw, cells, *, top, height):
+    # Center the row's visible glyphs while sharing one baseline across columns.
+    bounds = [draw.textbbox((0, 0), text, font=face, anchor='ls')
+              for x, text, face, color in cells]
+    ink_top = min(box[1] for box in bounds)
+    ink_bottom = max(box[3] for box in bounds)
+    baseline = round(top + height / 2 - (ink_top + ink_bottom) / 2)
+    for x, text, face, color in cells:
+        draw.text((x, baseline), text, font=face, fill=color, anchor='ls')
+
+
 def canvas(scene, index):
     im = Image.new('RGB', (WIDTH, HEIGHT))
     d = ImageDraw.Draw(im)
@@ -73,11 +94,14 @@ def canvas(scene, index):
         t = y / HEIGHT
         d.line((0, y, WIDTH, y), fill=(int(15 + 4*t), int(25 + 7*t), int(38 + 8*t)))
     d.rectangle((60, 44, 68, 128), fill=GREEN)
-    d.text((92, 39), f'{index:02d} / R36SX FIELD NOTES', font=font(24, mono=True), fill=GREEN)
+    label_baseline = 39 + font(24, mono=True).getmetrics()[0]
+    d.text((92, label_baseline), f'{index:02d} / R36SX FIELD NOTES',
+           font=font(24, mono=True), fill=GREEN, anchor='ls')
     d.text((92, 79), scene['title'], font=font(45, bold=True), fill=INK)
     date = scene['date']
     date_width = d.textlength(date, font=font(20, mono=True))
-    d.text((1860-date_width, 43), date, font=font(20, mono=True), fill=MUTED)
+    d.text((1860-date_width, label_baseline), date,
+           font=font(20, mono=True), fill=MUTED, anchor='ls')
     d.line((60, 145, 1860, 145), fill='#344859', width=2)
     d.rectangle((0, 962, WIDTH, HEIGHT), fill='#09121e')
     return im, d
@@ -86,8 +110,9 @@ def canvas(scene, index):
 def sidebar(d, scene):
     y = wrap(d, scene['panel_title'], (1390, 190), 455, 24, GREEN, mono=True, spacing=9) + 38
     for i, point in enumerate(scene['points'], 1):
-        d.text((1390, y), f'{i:02}', font=font(22, mono=True), fill=GOLD)
-        y = wrap(d, point, (1440, y-3), 405, 29, bold=True, spacing=9) + 34
+        y = numbered_point(d, i, point, number_x=1390, text_x=1440,
+                           y=y-3, width=405, size=29, number_size=22,
+                           bold=True, spacing=9) + 34
     d.line((1390, 800, 1855, 800), fill='#344859', width=2)
     wrap(d, 'EVIDENCE', (1390, 821), 460, 19, GREEN, mono=True)
     end = wrap(d, scene['evidence'], (1390, 855), 455, 22, MUTED, spacing=7)
@@ -124,9 +149,10 @@ def card(scene, kind, index, hero, output):
         for i, (name, actual) in enumerate(rows):
             y = 410+i*132
             d.rounded_rectangle((65, y, 1855, y+105), radius=14, fill='#203247', outline='#3a5366', width=2)
-            d.text((95, y+31), name, font=font(32, mono=True), fill=GOLD)
-            d.text((740, y+29), '→', font=font(34), fill=GREEN)
-            d.text((815, y+31), actual, font=font(32, bold=True), fill=INK)
+            aligned_row(d, [(95, name, font(32, mono=True), GOLD),
+                            (740, '→', font(34), GREEN),
+                            (815, actual, font(32, bold=True), INK)],
+                        top=y, height=105)
         d.text((70, 861), 'ELF32 / little-endian MIPS userspace / HC16xx platform', font=font(31), fill=MUTED)
     elif kind == 'boot':
         wrap(d, 'The captured log identifies the script.', (65, 190), 1780, 60, bold=True)
@@ -143,9 +169,10 @@ def card(scene, kind, index, hero, output):
         for i, (date, commit, text) in enumerate(rows):
             y = 342+i*126
             d.line((66, y+83, 1855, y+83), fill='#344859', width=2)
-            d.text((70, y), date, font=font(27, mono=True), fill=GREEN)
-            d.text((310, y), commit, font=font(29, mono=True), fill=GOLD)
-            d.text((625, y-4), text, font=font(33, bold=True), fill=INK)
+            aligned_row(d, [(70, date, font(27, mono=True), GREEN),
+                            (310, commit, font(29, mono=True), GOLD),
+                            (625, text, font(33, bold=True), INK)],
+                        top=y-4, height=48)
         wrap(d, 'CODE AND HOST TEST RECORDS / separate from real-device validation', (70, 880), 1770, 27, MUTED, mono=True)
     elif kind in ['loader', 'driver']:
         title = 'The launcher becomes an entry point.' if kind == 'loader' else 'Reuse the vendor’s working hardware path.'
@@ -154,8 +181,9 @@ def card(scene, kind, index, hero, output):
         for i, (heading, detail) in enumerate(blocks):
             y = 330+i*178
             d.rounded_rectangle((85, y, 1835, y+132), radius=14, fill='#203247', outline='#3a5366', width=2)
-            d.text((120, y+29), heading, font=font(38, bold=True), fill=GREEN)
-            d.text((830, y+42), detail, font=font(29), fill=INK)
+            aligned_row(d, [(120, heading, font(38, bold=True), GREEN),
+                            (830, detail, font(29), INK)],
+                        top=y, height=132)
             if i<2:
                 d.text((920, y+133), '↓', font=font(35), fill=GOLD)
         wrap(d, scene['evidence'], (85, 905), 1750, 23, MUTED)
@@ -163,8 +191,9 @@ def card(scene, kind, index, hero, output):
         wrap(d, scene['panel_title'], (65, 193), 1730, 29, GREEN, mono=True)
         y = wrap(d, scene['title'], (65, 260), 1700, 67, bold=True) + 40
         for i, point in enumerate(scene['points'], 1):
-            d.text((80, y+2), f'{i:02}', font=font(29, mono=True), fill=GOLD)
-            y = wrap(d, point, (170, y), 1630, 39, spacing=10) + 28
+            y = numbered_point(d, i, point, number_x=80, text_x=170,
+                               y=y, width=1630, size=39, number_size=29,
+                               spacing=10) + 28
         assert y < 900, (scene['id'], 'Card overflow', y)
         wrap(d, 'RESEARCH NOTES / ' + scene['evidence'], (70, 910), 1760, 22, MUTED)
     im.save(output)
