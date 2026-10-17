@@ -1,0 +1,22 @@
+{
+  "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
+  "language": "en",
+  "tags": ["R36SX", "SF3000", "reverse engineering", "MIPS", "Linux handheld", "Pico-286", "DOS", "FreeDOS", "retrocomputing", "homebrew", "Ghidra", "Tiny MC", "USB OTG"],
+  "description_template": "youtube-description.en.txt",
+  "chapter_titles": {
+    "opening": "From stock firmware to DOS",
+    "backup": "Recovering the original SD card",
+    "platform": "MIPS firmware and only 42 MiB of usable RAM",
+    "loader": "Finding an entry point for custom code",
+    "first-code": "Button Demo: the first code on the device",
+    "driver": "Tiny MC and the vendor hardware library",
+    "boot-route": "Tracing the actual boot path",
+    "native": "Native Pong and shared tools",
+    "dos": "Porting Pico-286 and booting DOS",
+    "controls": "On-screen keyboard, disk images and presets",
+    "graphics": "VGA, Supaplex and SuperScape",
+    "correctness": "Later CPU work and host-side tests",
+    "frontier": "Native shell, USB OTG and Debian research",
+    "closing": "Inspect, test, document, repeat"
+  }
+}

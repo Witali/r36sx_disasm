@@ -5,22 +5,22 @@
   "voice": "en-US-JennyNeural",
   "voice_rate": "-4%",
   "verification": {
-    "file": "local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
-    "sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18",
-    "bytes": 80919934,
-    "duration_seconds": 489.0,
-    "video_frames": 14670,
+    "file": "C:/Work/YouTube Videos/R36SX/R36SX-From-Stock-Firmware-to-DOS-English.mp4",
+    "sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc",
+    "bytes": 83009475,
+    "duration_seconds": 510.43333333333334,
+    "video_frames": 15313,
     "width": 1920,
     "height": 1080,
     "fps": 30.0,
     "chapters": 14,
     "packets": {
       "v:0": {
-        "count": 14670,
+        "count": 15313,
         "max_dts_step": 0.033334000000024844
       },
       "a:0": {
-        "count": 22923,
+        "count": 23928,
         "max_dts_step": 0.02133400000002439
       }
     },
@@ -37,71 +37,71 @@
       },
       {
         "scene": "platform",
-        "reference_rms": 0.15271949768066406,
-        "correlation": 0.9999357218569308
+        "reference_rms": 0.15311174094676971,
+        "correlation": 0.9999341836639111
       },
       {
         "scene": "loader",
-        "reference_rms": 0.14494088292121887,
-        "correlation": 0.9999278492231067
+        "reference_rms": 0.14431531727313995,
+        "correlation": 0.9999442408153937
       },
       {
         "scene": "first-code",
-        "reference_rms": 0.1480293571949005,
-        "correlation": 0.9999677632996037
+        "reference_rms": 0.14757563173770905,
+        "correlation": 0.9999597478758933
       },
       {
         "scene": "driver",
-        "reference_rms": 0.1476106196641922,
-        "correlation": 0.9999667579847609
+        "reference_rms": 0.14730434119701385,
+        "correlation": 0.9999580713194715
       },
       {
         "scene": "boot-route",
-        "reference_rms": 0.14411009848117828,
-        "correlation": 0.999950927944643
+        "reference_rms": 0.14391574263572693,
+        "correlation": 0.999959696113659
       },
       {
         "scene": "native",
-        "reference_rms": 0.14511939883232117,
-        "correlation": 0.9999639302381395
+        "reference_rms": 0.14499439299106598,
+        "correlation": 0.9999634290225539
       },
       {
         "scene": "dos",
-        "reference_rms": 0.1517011523246765,
-        "correlation": 0.9999673783185759
+        "reference_rms": 0.15166853368282318,
+        "correlation": 0.9999632411147555
       },
       {
         "scene": "controls",
-        "reference_rms": 0.14289845526218414,
-        "correlation": 0.9999530813905683
+        "reference_rms": 0.14284271001815796,
+        "correlation": 0.9999690151313176
       },
       {
         "scene": "graphics",
-        "reference_rms": 0.14584745466709137,
-        "correlation": 0.9999561920974718
+        "reference_rms": 0.1457992047071457,
+        "correlation": 0.9999493538996428
       },
       {
         "scene": "correctness",
-        "reference_rms": 0.14758552610874176,
-        "correlation": 0.9999484315670771
+        "reference_rms": 0.14747120440006256,
+        "correlation": 0.9999466325280878
       },
       {
         "scene": "frontier",
-        "reference_rms": 0.1476813107728958,
-        "correlation": 0.9999618556644443
+        "reference_rms": 0.1476011574268341,
+        "correlation": 0.999953503648962
       },
       {
         "scene": "closing",
-        "reference_rms": 0.14931459724903107,
-        "correlation": 0.9999057103926495
+        "reference_rms": 0.1492013782262802,
+        "correlation": 0.9999532037989616
       }
     ],
     "decode_check": "passed"
   },
   "loudness": {
-    "input_i": "-16.02",
-    "input_tp": "-1.25",
-    "input_lra": "3.60"
+    "input_i": "-16.03",
+    "input_tp": "-1.46",
+    "input_lra": "3.50"
   },
   "narration_source_checks": [
     {
@@ -114,56 +114,56 @@
     },
     {
       "scene": "platform",
-      "narration_correlation": 0.9996411777126689
+      "narration_correlation": 0.9996599370650966
     },
     {
       "scene": "loader",
-      "narration_correlation": 0.9998771176826239
+      "narration_correlation": 0.9998983926356743
     },
     {
       "scene": "first-code",
-      "narration_correlation": 0.9997020167745768
+      "narration_correlation": 0.9997061212417819
     },
     {
       "scene": "driver",
-      "narration_correlation": 0.999710494708762
+      "narration_correlation": 0.9997108262794195
     },
     {
       "scene": "boot-route",
-      "narration_correlation": 0.9998698704243051
+      "narration_correlation": 0.999880198289864
     },
     {
       "scene": "native",
-      "narration_correlation": 0.9997537815490724
+      "narration_correlation": 0.9997554333758676
     },
     {
       "scene": "dos",
-      "narration_correlation": 0.999487384217917
+      "narration_correlation": 0.9994852092167645
     },
     {
       "scene": "controls",
-      "narration_correlation": 0.9998570185401378
+      "narration_correlation": 0.9998737367778091
     },
     {
       "scene": "graphics",
-      "narration_correlation": 0.9998467327831488
+      "narration_correlation": 0.9998404813115299
     },
     {
       "scene": "correctness",
-      "narration_correlation": 0.9995332750222117
+      "narration_correlation": 0.99953617564928
     },
     {
       "scene": "frontier",
-      "narration_correlation": 0.9998840940915665
+      "narration_correlation": 0.9998529580215718
     },
     {
       "scene": "closing",
-      "narration_correlation": 0.9997453991822008
+      "narration_correlation": 0.9997954989725462
     }
   ],
-  "subtitle_cues": 125,
+  "subtitle_cues": 131,
   "embedded_caption_text_matches_srt": true,
-  "visual_review": "All nine card types and fourteen sidebars reviewed; final encoded frames refreshed for every scene",
+  "visual_review": "Updated firmware and USB cards and sidebars inspected at full resolution; final encoded frames and captions reviewed across all fourteen scenes",
   "sources": [
     {
       "id": "LYrICpUo6_A",
@@ -198,20 +198,95 @@
     "path": "C:\\Users\\rudol\\.codex\\skills\\narrated-project-video",
     "quick_validate": "passed",
     "files": {
-      "SKILL.md": "281a633eb1916284d03c33c3f13b650dc151c794f76a66c72e169493b3759bb1",
+      "SKILL.md": "74344fb933cb95e918b2e30d13c60afafbeaf43eeabea448a83ad3f381fe48d7",
       "agents/openai.yaml": "4fd8f8e860ad1f7d0954bfaa5f71b3687b488df3aa5d90fc17241fc0d279c218",
-      "references/production.md": "e5e8cdcca26f648e82343620cfa3e793087d498d8aede5281eac18a4cbd4d418",
+      "references/production.md": "8ecc793eb5c2884d20933a72b3f2156d834e25273966db9bca458946bb111d6f",
       "scripts/narrate.py": "c594acd46466900ca1410a3be9884a8084e75361516ec144daee3d805efee971",
       "scripts/verify_video.py": "0dc29c316604f0ea39b891b2983a34459f263b64b2ac5f008ebc2b435ae3032e"
     },
-    "typography_update": "Explicit shared baselines, boxed-row glyph centering, and review of every card/sidebar variant"
+    "typography_update": "Explicit shared baselines, boxed-row glyph centering, and review of every card/sidebar variant",
+    "youtube_update": "Previous-upload material inspection, complete upload package, separate timed UTF-8 SRT, links and credits, timeline-derived chapters, thumbnail, metadata validation, and publication-state distinction",
+    "material_location_update": "Default C:/Work/YouTube Videos/<Project>/; ready files in root, working media and source snapshots under materials; explicit user destinations take precedence"
   },
   "alignment_revision": {
     "encoded_audio_identical": true,
     "audio_packet_hash": "SHA256=96935e1a38e7201d7f45ce203935873c8f2c46443ad1407955404bc72295c6ac",
     "embedded_subtitles_identical": true,
     "previous_file_sha256": "184ce2eaa0ee8961333b702e69fdd1f7cd6d3e8c222d3de2bcdd106eb404e59b",
-    "delivery_alias": "local_artifacts/reverse_engineering_video/delivery/R36SX-From-Stock-Firmware-to-DOS-English-aligned.mp4",
-    "delivery_alias_sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18"
+    "delivery_alias": "C:/Work/YouTube Videos/R36SX/materials/work/delivery/R36SX-From-Stock-Firmware-to-DOS-English-aligned.mp4",
+    "delivery_alias_sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18",
+    "applies_to_sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18",
+    "historical_revision": true
+  },
+  "memory_mips_usb_revision": {
+    "changed_scenes": [
+      "platform",
+      "frontier"
+    ],
+    "previous_file_sha256": "41e5f6594fddf7ff055f51d6cadb51648ea419adb42fd066047bc26cb269eb18",
+    "previous_outputs": "C:/Work/YouTube Videos/R36SX/materials/work/revisions/before-memory-note",
+    "delivery_alias": "C:/Work/YouTube Videos/R36SX/materials/work/delivery/R36SX-From-Stock-Firmware-to-DOS-English-revised.mp4",
+    "delivery_alias_sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc",
+    "memory_source": "hardware_info/mem.txt",
+    "memtotal_kib": 43164,
+    "usable_mib": 42.15234375,
+    "router_reference": "https://www.mediatek.com/products/home-networking/mt7628k-n-a",
+    "usb_evidence": "Creator confirmed physical keyboard and flash drive through OTG during this editing session",
+    "original_memory_screenshot_added": false,
+    "meminfo_sha256": "04ce92d34fac64768836aa1c888a3a4a50388bafc08a77862b93b20c1293433e"
+  },
+  "youtube_package": {
+    "status": "prepared_locally_not_uploaded",
+    "language": "en",
+    "title": "Reverse Engineering the R36SX: From Stock Firmware to DOS",
+    "duration_seconds": 510.43333333333334,
+    "subtitle_cues": 131,
+    "chapters": 14,
+    "description_characters": 2932,
+    "description_utf8_bytes": 2932,
+    "tag_characters": 128,
+    "files": {
+      "English-narration.txt": {
+        "bytes": 7724,
+        "sha256": "fdcadb7e5000747c2f015407f59bd6ebc6e8fc44546d12dcc389db912970cbc7"
+      },
+      "R36SX-From-Stock-Firmware-to-DOS-English.en.srt": {
+        "bytes": 12284,
+        "sha256": "0c5b90163fb801b43aca1127a2760b08acdcb3108411a38003370c712da5f505"
+      },
+      "R36SX-From-Stock-Firmware-to-DOS-English.mp4": {
+        "bytes": 83009475,
+        "sha256": "3e9defeef5ec6a80e3f92c389820f77012e00f76cc6b16365b45327ca6d75ddc"
+      },
+      "Thumbnail.png": {
+        "bytes": 332900,
+        "sha256": "8bc18ad103ebe2b30fe87dc690b2b8125ea670066dea8122a11daa895448704d"
+      },
+      "Upload-instructions.txt": {
+        "bytes": 935,
+        "sha256": "d21a8498ada8c7483e2cb06258e1d98a6efc41c78808fd810a6cda56a716df3a"
+      },
+      "YouTube-description-English.txt": {
+        "bytes": 2997,
+        "sha256": "f12142d5ba9c02969cee4b4e6823a83b71e727a3f99156c8db69dfbd9e04fe1d"
+      },
+      "YouTube-tags-English.txt": {
+        "bytes": 134,
+        "sha256": "2301fc024154a74aeab2574e9358070d096b08320e80e620a2f0b8e368b3106a"
+      },
+      "YouTube-title-English.txt": {
+        "bytes": 59,
+        "sha256": "b80ac880db506bb50ff6e84f4b733c475205c55fce6d3317d605f43dca4f6e26"
+      }
+    }
+  },
+  "revision_security_scans": "Microsoft Defender: no threats in C:/Work/YouTube Videos/R36SX and the installed global skill after relocation; quick_validate passed",
+  "material_locations": {
+    "catalog": "C:/Work/YouTube Videos",
+    "project": "C:/Work/YouTube Videos/R36SX",
+    "work": "C:/Work/YouTube Videos/R36SX/materials/work",
+    "source_snapshot": "C:/Work/YouTube Videos/R36SX/materials/project",
+    "previous_project": "C:/Work/YouTube Videos/Z80-Tester",
+    "media_and_caption_hashes_preserved": true
   }
 }

@@ -10,6 +10,7 @@ import subprocess
 import textwrap
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from package_youtube import DEFAULT_OUTPUT, package as package_youtube
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -153,7 +154,10 @@ def card(scene, kind, index, hero, output):
                             (740, '→', font(34), GREEN),
                             (815, actual, font(32, bold=True), INK)],
                         top=y, height=105)
-        d.text((70, 861), 'ELF32 / little-endian MIPS userspace / HC16xx platform', font=font(31), fill=MUTED)
+        d.text((70, 809), 'MIPS architecture — also used in home routers / little-endian ELF32', font=font(29), fill=MUTED)
+        aligned_row(d, [(70, 'Only ~42 MiB usable RAM', font(44, bold=True), GOLD),
+                        (1170, 'MemTotal: 43,164 KiB', font(29, mono=True), MUTED)],
+                    top=859, height=72)
     elif kind == 'boot':
         wrap(d, 'The captured log identifies the script.', (65, 190), 1780, 60, bold=True)
         d.rounded_rectangle((65, 320, 1855, 625), radius=14, fill='#08131f', outline='#3a5366', width=2)
@@ -254,7 +258,7 @@ def timestamp(value):
     return f'{hours:02}:{minutes:02}:{secs:02},{milliseconds:03}'
 
 
-def render(story, work):
+def render(story, work, upload_dir=None):
     for folder in ['cards','clips','delivery']:
         (work/folder).mkdir(exist_ok=True,parents=True)
     hero=still(work/'sources/LYrICpUo6_A.mp4',55)
@@ -297,6 +301,8 @@ def render(story, work):
                     scaler='lanczos'
                 else:
                     path=REPO/shot['image']
+                    if not path.exists():
+                        path=HERE/'assets'/Path(shot['image']).name
                     cmd+=['-loop','1','-framerate',str(FPS),'-i',str(path)]
                     dependencies=[digest(path),digest(layout)]
                     scaler='neighbor'
@@ -364,40 +370,18 @@ def render(story, work):
         source_report.append(dict(**source,sha256=source_hashes[source['id']],bytes=path.stat().st_size,duration=seconds(path)))
     (work/'delivery'/'sources.json').write_text(json.dumps(source_report,indent=2)+'\n',encoding='utf-8')
     (work/'delivery'/'timeline.json').write_text(json.dumps(timeline,indent=2)+'\n',encoding='utf-8')
-    chapter_text='\n'.join(f'{int(s["start"])//60:02}:{int(s["start"])%60:02} {s["title"]}' for s in timeline)
-    description='''Reverse Engineering the R36SX: From Stock Firmware to DOS
-
-I investigated the R36SX / SF3000-style handheld firmware, traced its startup path, built a native launcher and applications, and ported the open-source Pico-286 emulator so DOS software could run on the console.
-
-This film combines my original device recordings from May 2026 with research notes and later code history through September 2026. The later CPU and VGA work is presented as repository and host-test evidence; it is separate from the earlier device demonstrations. Debian SD-image work is an experimental research direction.
-
-CHAPTERS
-'''+chapter_text+'''
-
-PROJECT AND RESEARCH
-https://github.com/Witali/r36sx_disasm
-
-ORIGINAL RECORDINGS
-'''+ '\n'.join(s['title']+'\n'+s['url'] for s in story['sources'])+'''
-
-CREDITS
-Project and original footage: Vitaliy Rudik.
-English narration: Microsoft Jenny (synthetic voice).
-Pico-286 upstream: https://github.com/xrip/pico-286 (MIT).
-Related platform research: https://github.com/goph-R/SF3000-RE
-Analysis tools and AI-assisted coding supported the project. Game and application names belong to their respective authors.
-
-#R36SX #ReverseEngineering #MIPS #RetroComputing #DOS #Homebrew
-'''
-    (work/'delivery'/'YouTube-description-English.txt').write_text(description,encoding='utf-8')
+    Image.open(work/'cards/01-02.png').save(work/'delivery/Cover.png')
+    package_youtube(work, upload_dir)
     print(f'Finished: {output} / {total_frames/FPS:.3f} seconds / {len(all_cues)} captions',flush=True)
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--work-dir',type=Path,default=REPO/'local_artifacts/reverse_engineering_video')
+    parser.add_argument('--output-dir',type=Path,default=DEFAULT_OUTPUT)
+    parser.add_argument('--work-dir',type=Path)
     args=parser.parse_args()
-    render(json.loads((HERE/'story.json').read_text(encoding='utf-8')),args.work_dir.resolve())
+    work=(args.work_dir or args.output_dir/'materials/work').resolve()
+    render(json.loads((HERE/'story.json').read_text(encoding='utf-8')),work,args.output_dir)
 
 
 if __name__=='__main__':

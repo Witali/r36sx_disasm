@@ -1,0 +1,52 @@
+A small Linux handheld, a MIPS CPU, and only about 42 MiB of usable RAM. I investigated the R36SX firmware, found a way to run my own code, built native tools, and ported Pico-286 to run DOS software on the console.
+
+PROJECT: SOURCE CODE, NOTES AND PATCHES
+https://github.com/Witali/r36sx_disasm
+
+The journey starts with a damaged SD-card partition table and boot files disguised as Windows DLLs. It continues through Ghidra analysis, a moving-square test, the Tiny MC launcher, native Pong, FreeDOS, Volkov Commander, an on-screen keyboard, and VGA compatibility work. I also connected a physical keyboard and a USB flash drive through the USB OTG port.
+
+MIPS is an architecture also used in many home routers. The saved device report shows MemTotal: 43164 kB, or about 42.2 MiB usable by Linux; this is not a claim about the physical RAM chip capacity.
+
+This film combines my original device recordings from May 2026 with research notes and code history through September 2026. Later CPU and VGA work is shown as repository and host-test evidence. The alternative Debian SD-image work remains an experimental research direction.
+
+English captions are provided. English narration uses Microsoft Jenny, a synthetic voice.
+
+CHAPTERS
+{chapters}
+
+PROJECT LINKS
+Pico-286 port and build notes:
+https://github.com/Witali/r36sx_disasm/tree/single-loop/homebrew/pico_286
+
+SD-card patch overlays:
+https://github.com/Witali/r36sx_disasm/tree/single-loop/patches
+
+Firmware findings:
+https://github.com/Witali/r36sx_disasm/blob/single-loop/FIRMWARE_FINDINGS.md
+
+Captured device CPU and memory reports:
+https://github.com/Witali/r36sx_disasm/tree/single-loop/hardware_info
+
+ORIGINAL DEVICE RECORDINGS
+R36SX game console reverse engineering:
+https://www.youtube.com/watch?v=LYrICpUo6_A
+
+R36SX game console additional programs:
+https://www.youtube.com/watch?v=MHDpizjIZhw
+
+R36SX pico-286 emulator:
+https://www.youtube.com/watch?v=ZWJg3XiHGxE
+
+UPSTREAM AND RELATED RESEARCH
+Pico-286 by xrip (MIT):
+https://github.com/xrip/pico-286
+
+Related SF3000 platform research:
+https://github.com/goph-R/SF3000-RE
+
+CREDITS
+Project and original footage: Vitaliy Rudik.
+English narration: Microsoft Jenny (synthetic voice).
+Analysis tools and AI-assisted coding supported the project. Game and application names belong to their respective authors.
+
+#R36SX #ReverseEngineering #RetroComputing

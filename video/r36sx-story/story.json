@@ -25,8 +25,8 @@
     },
     {
       "id": "platform", "title": "Look past the filenames", "date": "FIRMWARE ANALYSIS",
-      "narration": "The files on the card held the next surprise. A file named advapi thirty-two dot D L L was actually a Linux boot image. Another D L L contained the A V P firmware, while a screensaver-looking filename concealed a device tree. The executable files identified the main userspace as little-endian MIPS. I used Ghidra and the extracted filesystem to map the launcher, helper programs, and hardware library. Their names were clues to investigate, not reliable descriptions of their contents.",
-      "panel_title": "BOOT FILES IN DISGUISE", "points": ["advapi32.dll  →  Linux uImage", "ApplicationFrame.dll  →  AVP uImage", "Bubbles.scr  →  device tree", "Userspace: ELF32 / little-endian MIPS"], "evidence": "FIRMWARE_FINDINGS.md / README.md",
+      "narration": "The files on the card held the next surprise. A file named advapi thirty-two dot D L L was actually a Linux boot image. Another D L L contained the A V P firmware, while a screensaver-looking filename concealed a device tree. The executable files identified the main userspace as little-endian MIPS. The same processor architecture is also used in many home routers. The saved system report showed only about forty-two mebibytes of usable RAM, a very small budget for the software I wanted to run. I used Ghidra and the extracted filesystem to map the launcher, helper programs, and hardware library. Their names were clues to investigate, not reliable descriptions of their contents.",
+      "panel_title": "BOOT FILES IN DISGUISE", "points": ["advapi32.dll  →  Linux uImage", "ApplicationFrame.dll  →  AVP uImage", "Bubbles.scr  →  device tree", "MIPS CPU / also used in routers", "Only ~42 MiB usable RAM"], "evidence": "FIRMWARE_FINDINGS.md / hardware_info/mem.txt",
       "shots": [{"card": "firmware", "weight": 1.4}, {"source": "LYrICpUo6_A", "start": 18, "weight": 0.6, "label": "The stock menu / early device recording"}]
     },
     {
@@ -84,9 +84,9 @@
       "shots": [{"card": "history", "weight": 1.4}, {"source": "ZWJg3XiHGxE", "start": 288, "weight": 0.6, "label": "Archive device footage / later code work shown in repository panels"}]
     },
     {
-      "id": "frontier", "title": "Keep the next step separate from the result", "date": "SHELL AND BOOT RESEARCH",
-      "narration": "The investigation also produced a native shell frontend and tools for exploring an alternative Debian userspace from an S D card. That opened another line of research into the boot chain and device tree. I kept those experiments distinct from the working application demonstrations. Preserving the stock hardware support and keeping recoverable card images made it possible to explore further without treating a plan, a built image, and a verified device boot as the same achievement.",
-      "panel_title": "FURTHER RESEARCH", "points": ["Native shell frontend", "Device-tree and boot-chain notes", "Debian SD-image tooling", "Built image ≠ verified device boot"], "evidence": "SESSION_NOTES_2026-06-02.md / Debian installation plan",
+      "id": "frontier", "title": "Keep the next step separate from the result", "date": "SHELL / USB OTG / BOOT RESEARCH",
+      "narration": "The investigation also produced a native shell frontend. Through the USB O T G port, I managed to connect a physical keyboard and a USB flash drive. I also built tools for exploring an alternative Debian userspace from an S D card. That opened another line of research into the boot chain and device tree. I kept those experiments distinct from the working application demonstrations. Preserving the stock hardware support and keeping recoverable card images made it possible to explore further without treating a plan, a built image, and a verified device boot as the same achievement.",
+      "panel_title": "SHELL, USB AND FURTHER RESEARCH", "points": ["Native shell frontend", "USB OTG: keyboard and flash drive", "Device-tree and boot-chain notes", "Debian SD-image tooling", "Built image ≠ verified device boot"], "evidence": "Shell notes / creator-confirmed USB OTG test / Debian plan",
       "shots": [{"card": "frontier", "weight": 1}, {"source": "ZWJg3XiHGxE", "start": 14, "weight": 0.7, "label": "The native application environment / original device footage"}]
     },
     {
