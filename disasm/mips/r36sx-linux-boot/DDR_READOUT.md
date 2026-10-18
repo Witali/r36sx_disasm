@@ -102,9 +102,67 @@ The size field confirms the controller's configuration, not all installed
 cells or lack of aliasing. No firmware update or physical-memory write test
 was performed. No tools were downloaded.
 
+## Physical RAM verification: privilege versus ownership
+
+Follow-up inspection, 2026-10-18: elevated privileges can permit physical
+access, but do not establish that a region is safe to overwrite. The returned
+probe reports already demonstrate access to the two MMIO registers through
+stock `/dev/mem`. This does not establish that the kernel permits every RAM
+range to be mapped. A kernel module could provide accesses that a userspace
+mapping cannot, but neither method reserves memory used by AVP or DMA.
+
+To distinguish independent RAM from an address alias, a diagnostic needs
+controlled writes and readback at multiple addresses, checking whether a write
+at one address changes another. Merely reading all addresses, inspecting zeroes,
+or allocating Linux memory cannot prove total installed capacity. A sparse
+address-alias test and a test of every memory cell are different claims.
+
+The boot sequence matters on this board. The existing stock Stage 3 export
+`disasm/mtd/stage3_89da0000_forced_decompile.c`, lines 569-590, loads and boots
+the AVP resource, checks `0xb880006b == 2`, then loads and boots Linux. The local
+HCRTOS mirror corroborates this sequence in
+`components/applications/apps-bootloader/source/main.c`, lines 346-381.
+Its `common/bootm_os.c` also distinguishes the standalone application handoff
+from the Linux entry. The mirror is supporting evidence, not the exact stock
+source revision. **Replacing only the SD Linux image does not ensure that AVP
+has stopped or that its RAM is available for testing.**
+
+The appropriate design is a standalone early-boot diagnostic, analogous to a
+bootloader memory test, with these prerequisites:
+
+- Verify an SD execution entry before the normal AVP handoff, or a documented
+  way to park the other core and stop all memory-writing engines. SD resource
+  overrides are established; a custom diagnostic's pre-AVP handoff has not yet
+  been implemented or tested. No NOR change is intrinsically required by this
+  design, but the SD-only execution path still needs validation.
+- Protect the diagnostic's code, stack, exception state, bootloader allocations,
+  and result storage. A guessed high address is not sufficient: an alias can
+  overwrite a protected lower address. Reset-time state and active DMA must
+  also be checked; running before Linux alone is insufficient.
+- Account for MIPS caching, ordering, exceptions and watchdog behavior. A cached
+  readback must not be mistaken for a successful physical RAM write. Do not
+  change DDR geometry merely to make a larger range appear accessible.
+- Start with an address-independence test of the candidate 128/256-MiB mapping.
+  Only after establishing the mapping and exclusions should a wider pattern
+  test report coverage and failures. If the controller's current window hides
+  installed cells, a CPU test of that window alone cannot identify those cells.
+- State the excluded bytes in the report. A test executing from DDR cannot
+  overwrite its own live footprint; complete coverage requires a verified
+  relocation strategy or a suitable independent execution memory. Availability
+  of such memory on this device has not been established here.
+
+No ready-made `mtest`/RAM-capacity test was found by `rg` in the inspected
+bootloader, kernel and command source directories of the retained mirror.
+Generic U-Boot documentation describes the desired write/readback mechanism;
+it is not evidence that this stock firmware includes the U-Boot `mtest` command.
+This follow-up inspected existing sources and exports only. No RAM-write
+diagnostic was built, executed, copied to SD or represented as device-tested.
+
 References checked:
 
 - Stock bootloader binary and instructions listed above: direct vendor
   implementation for this device, rather than a generic DDR register guess.
 - [Linux MIPS address definitions](https://raw.githubusercontent.com/torvalds/linux/master/arch/mips/include/asm/addrspace.h).
 - [Linux /dev/mem interface and access restrictions](https://man7.org/linux/man-pages/man4/mem.4.html).
+- [U-Boot mtest documentation](https://docs.u-boot.org/en/latest/usage/cmd/mtest.html):
+  write/readback and address-interaction checks, used as a design reference.
