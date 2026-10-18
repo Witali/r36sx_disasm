@@ -99,5 +99,7 @@ measurement.
 - [Linux /dev/mem interface](https://man7.org/linux/man-pages/man4/mem.4.html).
 - [GNU GCC MIPS options](https://gcc.gnu.org/onlinedocs/gcc/MIPS-Options.html).
 
-Build/host/emulated checks do not establish successful hardware operation.
-The current console's live DDR value is pending its first device run.
+Two complete device reports received on 2026-10-18 agree on register
+`0x0d894084`: **DDR3, 256 MiB configured in the controller**, while Linux
+MemTotal remains 42.15 MiB. Raw reports and the remaining physical-capacity
+limits are in `hardware_info/physical_memory_probe/README.md`.

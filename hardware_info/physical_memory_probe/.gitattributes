@@ -1,0 +1,2 @@
+# Preserve original device report bytes and kernel trailing whitespace.
+*.txt -text whitespace=-blank-at-eol

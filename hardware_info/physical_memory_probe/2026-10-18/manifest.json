@@ -1,0 +1,24 @@
+{
+  "received_date": "2026-10-18",
+  "probe_sha256": "ab75c1b54a8a86ae1a0201ec337b06635234222edffef910f1e3bc537bab7f6a",
+  "files": [
+    {
+      "file": "physical_memory_nsxaOY.txt",
+      "source": "E:/MIPS_NATIVE/physical_memory_probe/diagnostics/physical_memory_nsxaOY.txt",
+      "bytes": 2163,
+      "sha256": "7cd78c7111e7762b1ba0929681355f6461c7d6084f1dd0f14ebd1411a9d99cdd"
+    },
+    {
+      "file": "physical_memory_R9FyQc.txt",
+      "source": "E:/MIPS_NATIVE/physical_memory_probe/diagnostics/physical_memory_R9FyQc.txt",
+      "bytes": 2163,
+      "sha256": "ffd7f200a4c1d28aec6409b016d1e9db4c6cdbd1b0db907802f0c4234f32fe29"
+    }
+  ],
+  "chip_register": "0x1600ac01",
+  "ddr_register": "0x0d894084",
+  "controller_configured_capacity_mib": 256,
+  "ddr_type": "DDR3",
+  "linux_memtotal_kib": 43164,
+  "limitation": "Controller configuration is not an independent installed-capacity or memory-cell test."
+}

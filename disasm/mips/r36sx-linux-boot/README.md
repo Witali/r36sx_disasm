@@ -5,7 +5,9 @@ language/compiler `MIPS:LE:32:default:default`, raw base `0x89da0000`.
 
 Follow-up: [DDR_READOUT.md](DDR_READOUT.md) identifies the stock bootloader's
 live DDR-controller capacity field and documents an SD-launched diagnostic.
-The earlier 128 MiB inference remains distinct from that pending hardware read.
+Two returned device runs now report DDR3 and **256 MiB configured capacity**.
+The earlier 128 MiB installed-capacity inference from the smaller layout is
+withdrawn; see `hardware_info/physical_memory_probe/README.md` for limits.
 
 Input: `disasm/mtd/stage3_89da0000.bin`, 1,106,748 bytes,
 SHA256 `b9a9d1ae074bcd68109161c1219fe98b8c4f7e3fd70045b394dd9aa4ab15981d`.
@@ -62,7 +64,9 @@ selector becomes zero and `FUN_89da926c` uses the table at `0x89ea51d0`:
 Linux's MIPS `CPHYSADDR` definitions map the probe addresses to physical
 `0x08000020` and `0x00000020`, 128 MiB apart. Selection by RAM aliasing,
 the 128 MiB shift between the two DTBs, and the two AVP load addresses are
-strong evidence for smaller/larger memory variants.
+evidence for smaller/larger address layouts. They do not independently prove
+the amount of physically installed RAM: the returned live controller readout
+reports 256 MiB despite the smaller Linux layout.
 
 **Ghidra's C output is wrong for this probe.** It reports removal of an
 unreachable block and omits the conditional selector store. It assumes
@@ -74,7 +78,9 @@ the actual comparison, branch, delay slot, and selector store.
 The saved live-device `uname.txt` reports kernel build `#21`, which matches
 `advapi32.dll`; `vmlinux.uImage` contains build `#7`. The saved 42.2 MiB
 `MemTotal` is also consistent with the smaller `Bubbles.scr` Linux region.
-These are strong historical indications, not a new live-device measurement.
+These identify the smaller boot layout, not the installed physical capacity.
+The new live reports still show #21 and 42.15 MiB Linux MemTotal while the DDR
+controller's size field says 256 MiB.
 
 ## Reproduction and tool log
 

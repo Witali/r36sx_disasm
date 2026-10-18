@@ -1,0 +1,60 @@
+R36SX physical memory probe v1
+Report: /mnt/sdcard/MIPS_NATIVE/physical_memory_probe/diagnostics/physical_memory_nsxaOY.txt
+Reads the total DDR configuration from the hardware controller.
+Only the stock-used chip-ID and DDR registers are read; no MMIO writes.
+No RAM alias writes, allocation stress, firmware changes or MTD writes.
+
+Chip register 0x18800000: 0x1600ac01
+Physical DDR register address: 0x18801000
+DDR controller register: 0x0d894084
+DDR type: DDR3
+TOTAL DDR configured in hardware: 256 MiB (268435456 bytes)
+Source: DDR controller size code 4, decoded like stock meminfo.
+This covers the controller's whole DDR configuration, including AVP.
+It is independent of Linux MemTotal and the DTB Linux reservation.
+It does not independently test every installed RAM cell.
+
+--- Linux reservation, separate from total DDR ---
+
+--- /proc/version (context only) ---
+Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #21 PREEMPT Thu Dec 18 18:13:45 CST 2025
+
+
+--- /proc/meminfo (context only) ---
+MemTotal:          43164 kB
+MemFree:           15116 kB
+MemAvailable:      33496 kB
+Buffers:             964 kB
+Cached:            19092 kB
+SwapCached:            0 kB
+Active:             5088 kB
+Inactive:          16976 kB
+Active(anon):       2008 kB
+Inactive(anon):        0 kB
+Active(file):       3080 kB
+Inactive(file):    16976 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:        131068 kB
+SwapFree:         131068 kB
+Dirty:                56 kB
+Writeback:             0 kB
+AnonPages:          2008 kB
+Mapped:             8864 kB
+Shmem:                 0 kB
+Slab:               3072 kB
+SReclaimable:        996 kB
+SUnreclaim:         2076 kB
+KernelStack:         368 kB
+PageTables:          124 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:      152648 kB
+Committed_AS:      46264 kB
+VmallocTotal:    1048372 kB
+VmallocUsed:           0 kB
+VmallocChunk:          0 kB
+
+
+Done. Give this report back for interpretation: /mnt/sdcard/MIPS_NATIVE/physical_memory_probe/diagnostics/physical_memory_nsxaOY.txt

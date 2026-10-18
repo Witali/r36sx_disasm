@@ -74,7 +74,11 @@ The saved hardware `uname` matches the disguised kernel's **#21**, while the
 saved `MemTotal: 43164 kB` is consistent with `Bubbles.scr`. See the accompanying
 [bootloader analysis](../../mips/r36sx-linux-boot/README.md) for the RAM-probe
 controlled filename substitutions. This narrows the likely historical variant;
-it does not certify the current live device's memory size.
+it does not certify the current live device's memory size. Two later device
+reports received on 2026-10-18 read DDR3 and **256 MiB configured capacity**
+from the controller while retaining #21 and 42.15 MiB Linux MemTotal. See
+`hardware_info/physical_memory_probe/README.md`; the earlier 128 MiB
+installed-capacity inference is withdrawn.
 
 Official reference: [Linux v4.4 ramfs/rootfs/initramfs documentation](https://raw.githubusercontent.com/torvalds/linux/v4.4/Documentation/filesystems/ramfs-rootfs-initramfs.txt),
 sections on embedded CPIO, `/init`, and `switch_root`.

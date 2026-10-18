@@ -91,8 +91,16 @@ an address-window alias can require an early-boot test or chip identification
 to resolve. Never run the bootloader's destructive alias probe after Linux and
 AVP own those addresses. The program does no such writes.
 
-Current hardware result: **pending**. No device register was read during this
-host-side task. No tools were downloaded and no device firmware was modified.
+Current hardware result, 2026-10-18: **two successful device runs** both read
+chip word `0x1600ac01` and DDR configuration `0x0d894084`, which decodes to
+**DDR3, 256 MiB configured capacity**. Linux MemTotal remains 42.15 MiB on
+kernel build #21. Raw reports, hashes and interpretation are preserved in
+`hardware_info/physical_memory_probe/`.
+
+The earlier inference of 128 MiB installed from the smaller layout is withdrawn.
+The size field confirms the controller's configuration, not all installed
+cells or lack of aliasing. No firmware update or physical-memory write test
+was performed. No tools were downloaded.
 
 References checked:
 

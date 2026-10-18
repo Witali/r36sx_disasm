@@ -5,13 +5,18 @@
 Fresh Stage 3 analysis establishes a RAM-alias-controlled filename switch:
 `vmlinux.uImage` -> `advapi32.dll`, `dtb.bin` -> `Bubbles.scr`, and
 `avp.uImage` -> `ApplicationFrame.dll`. Saved live kernel build `#21` and
-42.2 MiB MemTotal point to the smaller variant; do not assume the 175.6 MiB
-region from the alternative DTB is usable on that device.
+42.2 MiB MemTotal point to the smaller boot layout. Two new live-device
+reports read **DDR3, 256 MiB configured in the controller**; the earlier
+inference of 128 MiB physically installed from that layout is withdrawn.
+See [the returned reports](hardware_info/physical_memory_probe/README.md).
+This still does not establish that the alternative DTB's 175.6 MiB Linux
+region is immediately usable: physical backing and address-window aliasing
+have not been independently tested.
 
 A newer project, [r36sx-hclinux](https://github.com/ozkaoz/r36sx-hclinux),
 reports custom Linux 5.12.4 hardware success. Its three stock golden hashes
 exactly match our normal-name kernel/DTB/AVP, but its documented 256 MiB board
-still needs adaptation for our likely smaller variant. Its HCLinux SDK is
+still needs validation against our restricted address layout. Its HCLinux SDK is
 separate from the locally available HCRTOS tree.
 
 See [the current feasibility report](build-own-linux-feature/CUSTOM_LINUX_FEASIBILITY_ru.md),

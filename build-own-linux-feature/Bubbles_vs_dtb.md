@@ -54,12 +54,18 @@ hcRTOS memory regions.
 
 Update, 2026-10-18: Stage 3 probes RAM aliasing 128 MiB apart and selects the
 `Bubbles.scr` / `advapi32.dll` / `ApplicationFrame.dll` filenames when the
-probe detects aliasing. The smaller map is therefore associated with a
-hardware-memory variant, not a freely selectable way to reserve less RAM.
+probe detects aliasing. The smaller map is associated with an address-layout
+variant; this alone is not proof of installed physical capacity.
 Use the map appropriate for the actual device; choosing `dtb.bin` cannot
 create more physical RAM. The saved device's kernel build #21 and 42.2 MiB
 MemTotal strongly match the smaller path. See
 [the new boot analysis](../disasm/mips/r36sx-linux-boot/README.md).
+
+Later device result, 2026-10-18: the live DDR controller reports **DDR3,
+256 MiB configured capacity** in two complete runs, while Linux still sees
+42.15 MiB. Withdraw the earlier 128 MiB installed-capacity inference. Do not
+assume the larger DTB is usable without checking physical backing and address
+mapping. Raw reports: `hardware_info/physical_memory_probe/`.
 
 ## dtc warnings
 

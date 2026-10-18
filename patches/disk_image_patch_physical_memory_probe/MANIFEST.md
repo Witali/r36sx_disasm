@@ -10,4 +10,7 @@ kernel, AVP, boot DTB, boot script or existing app needs replacement.
 
 Source, build command, interpretation and limitations:
 `homebrew/physical_memory_probe/README.md` and `BUILD_LOG.md`.
-Physical operation and the actual DDR register value await a device run.
+Two device runs received on 2026-10-18 successfully read `0x0d894084`: DDR3,
+256 MiB configured controller capacity; Linux MemTotal is 42.15 MiB. This is
+not a complete installed-capacity test. Reports are preserved under
+`hardware_info/physical_memory_probe/`.

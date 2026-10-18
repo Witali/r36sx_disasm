@@ -82,3 +82,21 @@ Defender-scanned build above. No existing application, boot file, DTB, AVP,
 kernel, NOR content or Pico-286 configuration was changed. The diagnostic has
 not been executed on hardware; the user can launch it in Tiny MC and return
 the new `diagnostics/physical_memory_*.txt` report.
+
+## 2026-10-18: two complete device reports recovered
+
+The user ran the program and returned the card. Recovered
+`physical_memory_nsxaOY.txt` and `physical_memory_R9FyQc.txt`, each 2,163 bytes,
+to `hardware_info/physical_memory_probe/2026-10-18/`. Source/destination SHA256
+matched; full hashes and paths are in the saved `manifest.json`.
+
+Both runs report chip `0x1600ac01`, DDR register `0x0d894084`, **DDR3 and
+256 MiB configured controller capacity**, with Linux `MemTotal: 43164 kB`
+and kernel build #21. Both completed without a reported hardware-read fault.
+The binary on the returned card still matches SHA256
+`ab75c1b54a8a86ae1a0201ec337b06635234222edffef910f1e3bc537bab7f6a`.
+
+The earlier assumption of 128 MiB installed solely from the smaller layout is
+withdrawn. This measures controller configuration, not an independent test of
+all physical cells or address aliases. See `hardware_info/physical_memory_probe/README.md`.
+The host read/copied reports only; the card and firmware were not modified.
