@@ -1,5 +1,24 @@
 # Linux kernel build / porting notes for R36SX
 
+## Update: 2026-10-18
+
+Fresh Stage 3 analysis establishes a RAM-alias-controlled filename switch:
+`vmlinux.uImage` -> `advapi32.dll`, `dtb.bin` -> `Bubbles.scr`, and
+`avp.uImage` -> `ApplicationFrame.dll`. Saved live kernel build `#21` and
+42.2 MiB MemTotal point to the smaller variant; do not assume the 175.6 MiB
+region from the alternative DTB is usable on that device.
+
+A newer project, [r36sx-hclinux](https://github.com/ozkaoz/r36sx-hclinux),
+reports custom Linux 5.12.4 hardware success. Its three stock golden hashes
+exactly match our normal-name kernel/DTB/AVP, but its documented 256 MiB board
+still needs adaptation for our likely smaller variant. Its HCLinux SDK is
+separate from the locally available HCRTOS tree.
+
+See [the current feasibility report](build-own-linux-feature/CUSTOM_LINUX_FEASIBILITY_ru.md),
+[new loader decompilation](disasm/mips/r36sx-linux-boot/README.md), and
+[stock image/initramfs inspection](disasm/linux/r36sx-stock-kernel/README.md).
+The dated research below is retained as historical context.
+
 Research date: 2026-05-28.
 
 ## Short answer

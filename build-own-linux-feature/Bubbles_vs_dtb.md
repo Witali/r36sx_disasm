@@ -52,11 +52,14 @@ software stack, but with a smaller Linux memory map. The address delta is
 consistent across the visible memory size, static framebuffer buffer, and
 hcRTOS memory regions.
 
-This likely means `Bubbles.scr` reserves or assumes a different high-memory
-layout than `dtb.bin`. For a custom Linux build, `dtb.bin` is the better base if
-we want to preserve the firmware's larger `memory` range. `Bubbles.scr` is still
-useful as a reference variant showing that the vendor boot path can swap DTB
-memory layout without changing the rest of the board description.
+Update, 2026-10-18: Stage 3 probes RAM aliasing 128 MiB apart and selects the
+`Bubbles.scr` / `advapi32.dll` / `ApplicationFrame.dll` filenames when the
+probe detects aliasing. The smaller map is therefore associated with a
+hardware-memory variant, not a freely selectable way to reserve less RAM.
+Use the map appropriate for the actual device; choosing `dtb.bin` cannot
+create more physical RAM. The saved device's kernel build #21 and 42.2 MiB
+MemTotal strongly match the smaller path. See
+[the new boot analysis](../disasm/mips/r36sx-linux-boot/README.md).
 
 ## dtc warnings
 
