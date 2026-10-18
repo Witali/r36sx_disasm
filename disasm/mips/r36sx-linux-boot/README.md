@@ -3,6 +3,10 @@
 Research date: 2026-10-18. Ghidra 12.0.4, Java 25.0.3,
 language/compiler `MIPS:LE:32:default:default`, raw base `0x89da0000`.
 
+Follow-up: [DDR_READOUT.md](DDR_READOUT.md) identifies the stock bootloader's
+live DDR-controller capacity field and documents an SD-launched diagnostic.
+The earlier 128 MiB inference remains distinct from that pending hardware read.
+
 Input: `disasm/mtd/stage3_89da0000.bin`, 1,106,748 bytes,
 SHA256 `b9a9d1ae074bcd68109161c1219fe98b8c4f7e3fd70045b394dd9aa4ab15981d`.
 It was previously extracted from `hardware_info/mtd-dump/mtd1_boot.bin`;
