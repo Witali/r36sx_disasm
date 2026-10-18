@@ -1,0 +1,281 @@
+{
+  "vmlinux.uImage": {
+    "path": "disk_image/cubegm/vmlinux.uImage",
+    "size": 3905970,
+    "sha256": "53b3e0b3d57fcdbef40d448ae2d3a00159bc84f2fd5be4c10a826827c7f2e01e",
+    "name": "vmlinux",
+    "load": "0x80000000",
+    "entry": "0x803337c0",
+    "payload_size": 3905906,
+    "os_id": 5,
+    "arch_id": 5,
+    "type_id": 2,
+    "compression_id": 1,
+    "header_crc_ok": true,
+    "data_crc_ok": true,
+    "trailing_bytes": 0,
+    "unpacked_size": 8709472,
+    "unpacked_sha256": "1d632d9566acaa390f42f9394c48ac5af17aa101a0d227505d2ec04e8a0b740a",
+    "linux_version": "Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #7 PREEMPT Thu Dec 18 16:55:03 CST 2025",
+    "ikconfig_marker_offset": -1,
+    "newc_archives": [
+      {
+        "offset": "0x4a1ca8",
+        "entry_count": 380,
+        "boot_files": [
+          {
+            "name": "etc/fstab",
+            "mode": "0o100644",
+            "size": 334,
+            "text": "# <file system>\t<mount pt>\t<type>\t<options>\t<dump>\t<pass>\n/dev/root\t/\t\text2\trw,noauto\t0\t1\nproc\t\t/proc\t\tproc\tdefaults\t0\t0\ndevpts\t\t/dev/pts\tdevpts\tdefaults,gid=5,mode=620,ptmxmode=0666\t0\t0\ntmpfs\t\t/dev/shm\ttmpfs\tmode=0777\t0\t0\ntmpfs\t\t/tmp\t\ttmpfs\tmode=1777\t0\t0\ntmpfs\t\t/run\t\ttmpfs\tmode=0755,nosuid,nodev\t0\t0\nsysfs\t\t/sys\t\tsysfs\tdefaults\t0\t0\n"
+          },
+          {
+            "name": "etc/init.d/S10mdev",
+            "mode": "0o100755",
+            "size": 573,
+            "text": "#!/bin/sh\n\nmount -t tmpfs tmpfs /media\n\nif ! grep -q devtmpfs /proc/mounts; then\n        if grep -q devtmpfs /proc/filesystems; then\n                mount -t devtmpfs devtmpfs /dev\n        else\n                mount -t tmpfs tmpfs /dev  -o size=64k,mode=0755\n                rm /dev/null\n                mknod /dev/null c 1 3\n                mkdir /dev/pts /dev/shm\n                mount -t devpts devpts /dev/pts\n        fi\nfi\n\necho > /dev/mdev.seq\n\necho \"/sbin/mdev\" >/proc/sys/kernel/hotplug\n\ntouch /dev/.udev\n\n[ -d \"/sys/kernel\" ] || mount sysfs /sys -t sysfs\n\nmdev -s\n"
+          },
+          {
+            "name": "etc/init.d/S41hcdaemon",
+            "mode": "0o100755",
+            "size": 10,
+            "text": "hcdaemon&\n"
+          },
+          {
+            "name": "etc/init.d/S99app",
+            "mode": "0o100755",
+            "size": 2019,
+            "text": "#!/bin/sh\n#\n# Start the preinit\n#\n\nMNTDIR=\"\"\nwait_for_media_ready()\n{\n\twhile true\n\tdo\n\t\tfor subdir in $(ls /media); do\n\t\t\tif [ -e /media/$subdir/cubegm/icube ] ; then\n\t\t\t\tMNTDIR=$subdir\n\t\t\t\treturn\n\t\t\tfi\n\t\tdone\n\n\t\tsleep 0.5\n\tdone\n}\n\nwait_for_media_ready\n\n#mount\necho \"mount --bind /media/${MNTDIR} /mnt/sdcard\"\nmount --bind /media/${MNTDIR} /mnt/sdcard\nmemsize=$(free | grep Mem | awk '{print $2}')\n\nif [ -d /media/${MNTDIR}/rootfs ] ; then\n\techo \"mount --bind /media/${MNTDIR}/rootfs/lib /lib\"\n\tmount --bind /media/${MNTDIR}/rootfs/lib /lib\n\techo \"mount --bind /media/${MNTDIR}/rootfs/usr /usr\"\n\tmount --bind /media/${MNTDIR}/rootfs/usr /usr\n\techo \"mount --bind /media/${MNTDIR}/rootfs/bin /bin\"\n\tmount --bind /media/${MNTDIR}/rootfs/bin /bin\n\techo \"mount --bind /media/${MNTDIR}/rootfs/sbin /sbin\"\n\tmount --bind /media/${MNTDIR}/rootfs/sbin /sbin\n\techo \"mount --bind /media/${MNTDIR}/rootfs/etc /etc\"\n\tmount --bind /media/${MNTDIR}/rootfs/etc /etc\n\techo \"mount --bind /media/${MNTDIR}/rootfs/hcdemo_files /hcdemo_files\"\n\tmount --bind /media/${MNTDIR}/rootfs/hcdemo_files /hcdemo_files\nelse\n\tmount --bind /media/${MNTDIR}/cubegm/lib /lib\n\techo \"mount --bind /media/${MNTDIR}/cubegm/lib /lib\"\n\tmount --bind /media/${MNTDIR}/cubegm/usr/lib /usr/lib\n\techo \"mount --bind /media/${MNTDIR}/cubegm/usr/lib /usr/lib\"\nfi\n\nif [ $memsize -le 128000 ] ; then\n\tif [ ! -f /mnt/sdcard/cubegm/pagefile.sys ] ; then\n\t\techo \"Not found pagefile.sys, rebooting ...\"\n\t\techo \"Creating pagefile.sys ...\"\n\t\tfallocate -l 128M /mnt/sdcard/cubegm/pagefile.sys\n\t\tmkswap /mnt/sdcard/cubegm/pagefile.sys\n\t\techo \"Creating pagefile.sys done\"\n\tfi\n\tif [ -f /mnt/sdcard/cubegm/pagefile.sys ] ; then\n\t\techo \"Swapon ...\"\n\t\tswapon /mnt/sdcard/cubegm/pagefile.sys\n\t\tif [ $? -eq 0 ] && [ $(free | grep Swap | awk '{print $2}') -gt 0 ]; then\n\t\t\techo \"Swap space activated successfully\"\n\t\t\t/mnt/sdcard/cubegm/icube.sh &\n\t\telse\n\t\t\techo \"Failed to activate swap space\"\n\t\t\t# You can add error handling here if needed\n\t\tfi\n\tfi\nelse\n/mnt/sdcard/cubegm/icube.sh &\nfi\n"
+          },
+          {
+            "name": "etc/init.d/rcK",
+            "mode": "0o100755",
+            "size": 423,
+            "text": "#!/bin/sh\n\n\n# Stop all init scripts in /etc/init.d\n# executing them in reversed numerical order.\n#\nfor i in $(ls -r /etc/init.d/S??*) ;do\n\n     # Ignore dangling symlinks (if any).\n     [ ! -f \"$i\" ] && continue\n\n     case \"$i\" in\n\t*.sh)\n\t    # Source shell script for speed.\n\t    (\n\t\ttrap - INT QUIT TSTP\n\t\tset stop\n\t\t. $i\n\t    )\n\t    ;;\n\t*)\n\t    # No sh extension, so fork subprocess.\n\t    $i stop\n\t    ;;\n    esac\ndone\n\n"
+          },
+          {
+            "name": "etc/init.d/rcS",
+            "mode": "0o100755",
+            "size": 408,
+            "text": "#!/bin/sh\n\n\n# Start all init scripts in /etc/init.d\n# executing them in numerical order.\n#\nfor i in /etc/init.d/S??* ;do\n\n     # Ignore dangling symlinks (if any).\n     [ ! -f \"$i\" ] && continue\n\n     case \"$i\" in\n\t*.sh)\n\t    # Source shell script for speed.\n\t    (\n\t\ttrap - INT QUIT TSTP\n\t\tset start\n\t\t. $i\n\t    )\n\t    ;;\n\t*)\n\t    # No sh extension, so fork subprocess.\n\t    $i start\n\t    ;;\n    esac\ndone\n\n"
+          },
+          {
+            "name": "etc/inittab",
+            "mode": "0o100644",
+            "size": 1277,
+            "text": "# /etc/inittab\n#\n# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>\n#\n# Note: BusyBox init doesn't support runlevels.  The runlevels field is\n# completely ignored by BusyBox init. If you want runlevels, use\n# sysvinit.\n#\n# Format for each entry: <id>:<runlevels>:<action>:<process>\n#\n# id        == tty to run on, or empty for /dev/console\n# runlevels == ignored\n# action    == one of sysinit, respawn, askfirst, wait, and once\n# process   == program to run\n\n# Startup the system\n::sysinit:/bin/mount -t proc proc /proc\n::sysinit:/bin/mount -o remount,rw /\n::sysinit:/bin/mkdir -p /dev/pts /dev/shm\n::sysinit:/bin/mount -a\n::sysinit:/sbin/swapon -a\nnull::sysinit:/bin/ln -sf /proc/self/fd /dev/fd\nnull::sysinit:/bin/ln -sf /proc/self/fd/0 /dev/stdin\nnull::sysinit:/bin/ln -sf /proc/self/fd/1 /dev/stdout\nnull::sysinit:/bin/ln -sf /proc/self/fd/2 /dev/stderr\n::sysinit:/bin/hostname -F /etc/hostname\n# now run any rc scripts\n::sysinit:/etc/init.d/rcS\n\n# Put a getty on the serial port\nconsole::respawn:/sbin/getty -n -L  console 0 vt100 -n -l /bin/sh # GENERIC_SERIAL\n#::respawn:-/bin/sh\n\n# Stuff to do for the 3-finger salute\n#::ctrlaltdel:/sbin/reboot\n\n# Stuff to do before rebooting\n::shutdown:/etc/init.d/rcK\n::shutdown:/sbin/swapoff -a\n::shutdown:/bin/umount -a -r\n"
+          },
+          {
+            "name": "init",
+            "mode": "0o100755",
+            "size": 462,
+            "sha256": "b2b964a5b67f90fece2c83dad0986ae44189fc1b7128c5ed9a38c0ca38e89c90",
+            "script": "#!/bin/sh\n# devtmpfs does not get automounted for initramfs\n/bin/mount -t devtmpfs devtmpfs /dev\n\n# use the /dev/console device node from devtmpfs if possible to not\n# confuse glibc's ttyname_r().\n# This may fail (E.G. booted with console=), and errors from exec will\n# terminate the shell, so use a subshell for the test\nif (exec 0</dev/console) 2>/dev/null; then\n    exec 0</dev/console\n    exec 1>/dev/console\n    exec 2>/dev/console\nfi\n\nexec /sbin/init \"$@\"\n"
+          },
+          {
+            "name": "linuxrc",
+            "mode": "0o120777",
+            "size": 11,
+            "target": "bin/busybox",
+            "sha256": "c98e51923f832db7766318700fc13af6b0adb9dca27074d01b115868243f6316"
+          }
+        ]
+      },
+      {
+        "offset": "0x84d788",
+        "entry_count": 0,
+        "boot_files": []
+      }
+    ]
+  },
+  "avp.uImage": {
+    "path": "disk_image/cubegm/avp.uImage",
+    "size": 1381604,
+    "sha256": "a9788995db80197db6d743b8b237eadbfd3c424fcf1ab448fcd99c003b0950b2",
+    "name": "avp",
+    "load": "0x8bda4000",
+    "entry": "0x8bda4000",
+    "payload_size": 1381540,
+    "os_id": 17,
+    "arch_id": 5,
+    "type_id": 1,
+    "compression_id": 1,
+    "header_crc_ok": true,
+    "data_crc_ok": true,
+    "trailing_bytes": 0,
+    "unpacked_size": 2643016,
+    "unpacked_sha256": "0c27271ab63d56c4e54ec3d115c49ae32cb67051c2a50ab15a1835e9a9b3084b"
+  },
+  "advapi32.dll": {
+    "path": "disk_image/cubegm/advapi32.dll",
+    "size": 3905979,
+    "sha256": "8db1f56e59a05c58bcce15ee3b2927a4e9118ed02fe3ed8094ab1890d773dd61",
+    "name": "vmlinux",
+    "load": "0x80000000",
+    "entry": "0x803337c0",
+    "payload_size": 3905915,
+    "os_id": 5,
+    "arch_id": 5,
+    "type_id": 2,
+    "compression_id": 1,
+    "header_crc_ok": true,
+    "data_crc_ok": true,
+    "trailing_bytes": 0,
+    "unpacked_size": 8709472,
+    "unpacked_sha256": "821ed54f7118c63c15f7632648edf577c785012a3e09d178ac9c5f9e8e6c2b97",
+    "linux_version": "Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #21 PREEMPT Thu Dec 18 18:13:45 CST 2025",
+    "ikconfig_marker_offset": -1,
+    "newc_archives": [
+      {
+        "offset": "0x4a1ca8",
+        "entry_count": 380,
+        "boot_files": [
+          {
+            "name": "etc/fstab",
+            "mode": "0o100644",
+            "size": 334,
+            "text": "# <file system>\t<mount pt>\t<type>\t<options>\t<dump>\t<pass>\n/dev/root\t/\t\text2\trw,noauto\t0\t1\nproc\t\t/proc\t\tproc\tdefaults\t0\t0\ndevpts\t\t/dev/pts\tdevpts\tdefaults,gid=5,mode=620,ptmxmode=0666\t0\t0\ntmpfs\t\t/dev/shm\ttmpfs\tmode=0777\t0\t0\ntmpfs\t\t/tmp\t\ttmpfs\tmode=1777\t0\t0\ntmpfs\t\t/run\t\ttmpfs\tmode=0755,nosuid,nodev\t0\t0\nsysfs\t\t/sys\t\tsysfs\tdefaults\t0\t0\n"
+          },
+          {
+            "name": "etc/init.d/S10mdev",
+            "mode": "0o100755",
+            "size": 573,
+            "text": "#!/bin/sh\n\nmount -t tmpfs tmpfs /media\n\nif ! grep -q devtmpfs /proc/mounts; then\n        if grep -q devtmpfs /proc/filesystems; then\n                mount -t devtmpfs devtmpfs /dev\n        else\n                mount -t tmpfs tmpfs /dev  -o size=64k,mode=0755\n                rm /dev/null\n                mknod /dev/null c 1 3\n                mkdir /dev/pts /dev/shm\n                mount -t devpts devpts /dev/pts\n        fi\nfi\n\necho > /dev/mdev.seq\n\necho \"/sbin/mdev\" >/proc/sys/kernel/hotplug\n\ntouch /dev/.udev\n\n[ -d \"/sys/kernel\" ] || mount sysfs /sys -t sysfs\n\nmdev -s\n"
+          },
+          {
+            "name": "etc/init.d/S41hcdaemon",
+            "mode": "0o100755",
+            "size": 10,
+            "text": "hcdaemon&\n"
+          },
+          {
+            "name": "etc/init.d/S99app",
+            "mode": "0o100755",
+            "size": 2019,
+            "text": "#!/bin/sh\n#\n# Start the preinit\n#\n\nMNTDIR=\"\"\nwait_for_media_ready()\n{\n\twhile true\n\tdo\n\t\tfor subdir in $(ls /media); do\n\t\t\tif [ -e /media/$subdir/cubegm/icube ] ; then\n\t\t\t\tMNTDIR=$subdir\n\t\t\t\treturn\n\t\t\tfi\n\t\tdone\n\n\t\tsleep 0.5\n\tdone\n}\n\nwait_for_media_ready\n\n#mount\necho \"mount --bind /media/${MNTDIR} /mnt/sdcard\"\nmount --bind /media/${MNTDIR} /mnt/sdcard\nmemsize=$(free | grep Mem | awk '{print $2}')\n\nif [ -d /media/${MNTDIR}/rootfs ] ; then\n\techo \"mount --bind /media/${MNTDIR}/rootfs/lib /lib\"\n\tmount --bind /media/${MNTDIR}/rootfs/lib /lib\n\techo \"mount --bind /media/${MNTDIR}/rootfs/usr /usr\"\n\tmount --bind /media/${MNTDIR}/rootfs/usr /usr\n\techo \"mount --bind /media/${MNTDIR}/rootfs/bin /bin\"\n\tmount --bind /media/${MNTDIR}/rootfs/bin /bin\n\techo \"mount --bind /media/${MNTDIR}/rootfs/sbin /sbin\"\n\tmount --bind /media/${MNTDIR}/rootfs/sbin /sbin\n\techo \"mount --bind /media/${MNTDIR}/rootfs/etc /etc\"\n\tmount --bind /media/${MNTDIR}/rootfs/etc /etc\n\techo \"mount --bind /media/${MNTDIR}/rootfs/hcdemo_files /hcdemo_files\"\n\tmount --bind /media/${MNTDIR}/rootfs/hcdemo_files /hcdemo_files\nelse\n\tmount --bind /media/${MNTDIR}/cubegm/lib /lib\n\techo \"mount --bind /media/${MNTDIR}/cubegm/lib /lib\"\n\tmount --bind /media/${MNTDIR}/cubegm/usr/lib /usr/lib\n\techo \"mount --bind /media/${MNTDIR}/cubegm/usr/lib /usr/lib\"\nfi\n\nif [ $memsize -le 128000 ] ; then\n\tif [ ! -f /mnt/sdcard/cubegm/pagefile.sys ] ; then\n\t\techo \"Not found pagefile.sys, rebooting ...\"\n\t\techo \"Creating pagefile.sys ...\"\n\t\tfallocate -l 128M /mnt/sdcard/cubegm/pagefile.sys\n\t\tmkswap /mnt/sdcard/cubegm/pagefile.sys\n\t\techo \"Creating pagefile.sys done\"\n\tfi\n\tif [ -f /mnt/sdcard/cubegm/pagefile.sys ] ; then\n\t\techo \"Swapon ...\"\n\t\tswapon /mnt/sdcard/cubegm/pagefile.sys\n\t\tif [ $? -eq 0 ] && [ $(free | grep Swap | awk '{print $2}') -gt 0 ]; then\n\t\t\techo \"Swap space activated successfully\"\n\t\t\t/mnt/sdcard/cubegm/icube.sh &\n\t\telse\n\t\t\techo \"Failed to activate swap space\"\n\t\t\t# You can add error handling here if needed\n\t\tfi\n\tfi\nelse\n/mnt/sdcard/cubegm/icube.sh &\nfi\n"
+          },
+          {
+            "name": "etc/init.d/rcK",
+            "mode": "0o100755",
+            "size": 423,
+            "text": "#!/bin/sh\n\n\n# Stop all init scripts in /etc/init.d\n# executing them in reversed numerical order.\n#\nfor i in $(ls -r /etc/init.d/S??*) ;do\n\n     # Ignore dangling symlinks (if any).\n     [ ! -f \"$i\" ] && continue\n\n     case \"$i\" in\n\t*.sh)\n\t    # Source shell script for speed.\n\t    (\n\t\ttrap - INT QUIT TSTP\n\t\tset stop\n\t\t. $i\n\t    )\n\t    ;;\n\t*)\n\t    # No sh extension, so fork subprocess.\n\t    $i stop\n\t    ;;\n    esac\ndone\n\n"
+          },
+          {
+            "name": "etc/init.d/rcS",
+            "mode": "0o100755",
+            "size": 408,
+            "text": "#!/bin/sh\n\n\n# Start all init scripts in /etc/init.d\n# executing them in numerical order.\n#\nfor i in /etc/init.d/S??* ;do\n\n     # Ignore dangling symlinks (if any).\n     [ ! -f \"$i\" ] && continue\n\n     case \"$i\" in\n\t*.sh)\n\t    # Source shell script for speed.\n\t    (\n\t\ttrap - INT QUIT TSTP\n\t\tset start\n\t\t. $i\n\t    )\n\t    ;;\n\t*)\n\t    # No sh extension, so fork subprocess.\n\t    $i start\n\t    ;;\n    esac\ndone\n\n"
+          },
+          {
+            "name": "etc/inittab",
+            "mode": "0o100644",
+            "size": 1277,
+            "text": "# /etc/inittab\n#\n# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>\n#\n# Note: BusyBox init doesn't support runlevels.  The runlevels field is\n# completely ignored by BusyBox init. If you want runlevels, use\n# sysvinit.\n#\n# Format for each entry: <id>:<runlevels>:<action>:<process>\n#\n# id        == tty to run on, or empty for /dev/console\n# runlevels == ignored\n# action    == one of sysinit, respawn, askfirst, wait, and once\n# process   == program to run\n\n# Startup the system\n::sysinit:/bin/mount -t proc proc /proc\n::sysinit:/bin/mount -o remount,rw /\n::sysinit:/bin/mkdir -p /dev/pts /dev/shm\n::sysinit:/bin/mount -a\n::sysinit:/sbin/swapon -a\nnull::sysinit:/bin/ln -sf /proc/self/fd /dev/fd\nnull::sysinit:/bin/ln -sf /proc/self/fd/0 /dev/stdin\nnull::sysinit:/bin/ln -sf /proc/self/fd/1 /dev/stdout\nnull::sysinit:/bin/ln -sf /proc/self/fd/2 /dev/stderr\n::sysinit:/bin/hostname -F /etc/hostname\n# now run any rc scripts\n::sysinit:/etc/init.d/rcS\n\n# Put a getty on the serial port\nconsole::respawn:/sbin/getty -n -L  console 0 vt100 -n -l /bin/sh # GENERIC_SERIAL\n#::respawn:-/bin/sh\n\n# Stuff to do for the 3-finger salute\n#::ctrlaltdel:/sbin/reboot\n\n# Stuff to do before rebooting\n::shutdown:/etc/init.d/rcK\n::shutdown:/sbin/swapoff -a\n::shutdown:/bin/umount -a -r\n"
+          },
+          {
+            "name": "init",
+            "mode": "0o100755",
+            "size": 462,
+            "sha256": "b2b964a5b67f90fece2c83dad0986ae44189fc1b7128c5ed9a38c0ca38e89c90",
+            "script": "#!/bin/sh\n# devtmpfs does not get automounted for initramfs\n/bin/mount -t devtmpfs devtmpfs /dev\n\n# use the /dev/console device node from devtmpfs if possible to not\n# confuse glibc's ttyname_r().\n# This may fail (E.G. booted with console=), and errors from exec will\n# terminate the shell, so use a subshell for the test\nif (exec 0</dev/console) 2>/dev/null; then\n    exec 0</dev/console\n    exec 1>/dev/console\n    exec 2>/dev/console\nfi\n\nexec /sbin/init \"$@\"\n"
+          },
+          {
+            "name": "linuxrc",
+            "mode": "0o120777",
+            "size": 11,
+            "target": "bin/busybox",
+            "sha256": "c98e51923f832db7766318700fc13af6b0adb9dca27074d01b115868243f6316"
+          }
+        ]
+      },
+      {
+        "offset": "0x84d788",
+        "entry_count": 0,
+        "boot_files": []
+      }
+    ]
+  },
+  "ApplicationFrame.dll": {
+    "path": "disk_image/cubegm/ApplicationFrame.dll",
+    "size": 1381479,
+    "sha256": "7fe578665a9aa9707fde83cae04a798ca332c7164e56c531c143e3136d88cf5c",
+    "name": "avp",
+    "load": "0x83da4000",
+    "entry": "0x83da4000",
+    "payload_size": 1381415,
+    "os_id": 17,
+    "arch_id": 5,
+    "type_id": 1,
+    "compression_id": 1,
+    "header_crc_ok": true,
+    "data_crc_ok": true,
+    "trailing_bytes": 0,
+    "unpacked_size": 2643016,
+    "unpacked_sha256": "3d1a954d6fefaf9cec406b644607bb72090e3a9e0e6a2b1145007f7868100341"
+  },
+  "dtb.bin": {
+    "path": "disk_image/cubegm/dtb.bin",
+    "size": 33137,
+    "sha256": "1258f1eba809e43540c581b815c87815540a9e5897a4e8584363ab7de5cc27bb",
+    "properties": {
+      "/hcrtos/sfspi/spi_nor_flash/partitions:part3-filename": "persistentmem.bin",
+      "/hcrtos/external_files:path-prefix": "cubegm",
+      "/hcrtos/external_files:part3-filename": "vmlinux.uImage",
+      "/memory:reg": [
+        "0x0",
+        "0xaf91e50"
+      ],
+      "/chosen:bootargs": "root=/dev/ram0 rootfstype=ramfs rw init=/linuxrc console=tty1 earlycon= no_console_suspend noirqdebug",
+      "/board:label": "hc1600a@dbE3100v20"
+    }
+  },
+  "Bubbles.scr": {
+    "path": "disk_image/cubegm/Bubbles.scr",
+    "size": 33137,
+    "sha256": "220be381988651e73f0538d41b446762aa5abd7fd72a808f2f26036970a992cb",
+    "properties": {
+      "/hcrtos/sfspi/spi_nor_flash/partitions:part3-filename": "persistentmem.bin",
+      "/hcrtos/external_files:path-prefix": "cubegm",
+      "/hcrtos/external_files:part3-filename": "vmlinux.uImage",
+      "/memory:reg": [
+        "0x0",
+        "0x2f91e50"
+      ],
+      "/chosen:bootargs": "root=/dev/ram0 rootfstype=ramfs rw init=/linuxrc console=tty1 earlycon= no_console_suspend noirqdebug",
+      "/board:label": "hc1600a@dbE3100v20"
+    }
+  },
+  "disk_image/rootfs/linuxrc": {
+    "path": "disk_image/rootfs/linuxrc",
+    "size": 867948,
+    "sha256": "cfc4f9d0bb1bb149e25d09df648b205c520c6457c730fd2210daa155aaa8b6b5"
+  },
+  "disk_image/rootfs/bin/busybox": {
+    "path": "disk_image/rootfs/bin/busybox",
+    "size": 867948,
+    "sha256": "cfc4f9d0bb1bb149e25d09df648b205c520c6457c730fd2210daa155aaa8b6b5"
+  },
+  "disk_image/cubegm/driver.so": {
+    "path": "disk_image/cubegm/driver.so",
+    "size": 98216,
+    "sha256": "58b180a233b56be7d8e4ed47a7e0aeff730f347690cf74e4280557cbcd667d72"
+  },
+  "disasm/mtd/stage3_89da0000.bin": {
+    "path": "disasm/mtd/stage3_89da0000.bin",
+    "size": 1106748,
+    "sha256": "b9a9d1ae074bcd68109161c1219fe98b8c4f7e3fd70045b394dd9aa4ab15981d"
+  },
+  "stage3_filename_aliases": {
+    "table_address": "0x89ea51d0",
+    "mapping": {
+      "vmlinux.uImage": "advapi32.dll",
+      "dtb.bin": "Bubbles.scr",
+      "dtc.bin": "Bubbles.scr",
+      "avp.uImage": "ApplicationFrame.dll",
+      "xgame-logo.bmp": "xgame-logo.bmp",
+      "app.uImage": "app.uImage"
+    },
+    "selector_address": "0x89ea5290",
+    "initial_selector_value": 1
+  }
+}

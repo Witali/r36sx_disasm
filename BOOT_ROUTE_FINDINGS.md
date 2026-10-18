@@ -1,5 +1,17 @@
 # Boot Route Findings
 
+## Update: embedded startup recovered on 2026-10-18
+
+The initramfs extracted directly from both stock kernel images contains
+`etc/init.d/S99app`, which mounts the SD/rootfs directories and directly starts
+`/mnt/sdcard/cubegm/icube.sh`. `S41hcdaemon` starts a background service, but
+the older inferred `hcdaemon -> icube.sh` link below is not needed to explain
+this boot. `S99app` waits for the `cubegm/icube` file before launching the
+script, so retain that sentinel for a shell-only replacement.
+
+Evidence: [extracted startup text](disasm/linux/r36sx-stock-kernel/initramfs_boot.txt)
+and [inspection method](disasm/linux/r36sx-stock-kernel/README.md).
+
 Date: 2026-05-28
 
 This note records the latest device-side boot route facts discovered from

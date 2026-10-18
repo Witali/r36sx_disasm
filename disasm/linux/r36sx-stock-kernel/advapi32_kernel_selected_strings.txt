@@ -1,0 +1,38 @@
+%s version %s (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) %s
+Linux version 4.4.186-release (linsen.chen@hichip01) (gcc version 6.3.0 (Codescape GNU Tools 2018.09-02 for MIPS MTI Linux) ) #21 PREEMPT Thu Dec 18 18:13:45 CST 2025
+hc16xx_board_ebase_setup
+hichip,dw-mshc
+hichip,amprpc
+hichip,virtuart
+hichip,kshmdev
+hichip,pinctrl
+hichip,hc-gpio
+hichip,hc16xx-spi-sf
+hichip,avp-proxy
+hichip,hc16xx-fb
+hichip,hc16xx-musb
+hichip,mmz
+hichip, hc16xx-check-adc
+hichip,persistentmem
+hichip,hc16xx-ge
+hichip,hc_uart
+6Unpacking initramfs...
+3hc16xx: no DTB found.
+hichip,platform-setup-setreg
+hichip,platform-setup-setbit
+arch/mips/hc16xx/board.c
+drivers/hcdrivers/amprpc/amprpc.c
+6amprpc failed to register platform driver.
+hichip,pinctrl
+avp-proxy
+musb-hc16xx
+hc16xx-check-adc
+hichip-uart
+hc16xx_set_cpu_clk
+hichip,generic-intc
+hichip,base-clk
+hichip,dividers
+hichip,gates
+# devtmpfs does not get automounted for initramfs
+xdrmem_create
+070701077AEE340000A1FF0000000000000000000000016943D3D40000000B000000080000001100000000000000000000000800000000linuxrc
