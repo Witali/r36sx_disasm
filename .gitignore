@@ -34,6 +34,7 @@ tools/*
 !tools/verify_debian12_stage3_shell_image_wsl.sh
 
 # Build outputs and caches
+/.worktree/
 local_artifacts/
 *.o
 *.obj
