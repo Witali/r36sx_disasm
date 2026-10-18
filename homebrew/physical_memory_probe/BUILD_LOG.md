@@ -60,3 +60,25 @@ writes. Register faults are isolated with a three-second child alarm.
 Limit: hardware-configured capacity is not an independent memory-cell test.
 No hardware run, live DDR result or SD-card deployment occurred in this task.
 The user can copy only the new application folder and run it through Tiny MC.
+
+## 2026-10-18: deployed to the user-connected console SD card
+
+The user explicitly requested copying the program to the inserted card.
+Identified `E:` as a removable FAT32 volume (31,263,981,568 bytes), with the
+existing R36SX `cubegm`, `rootfs` and `MIPS_NATIVE` directories.
+
+Copied only these two files using PowerShell `Copy-Item -LiteralPath` into the
+new `E:/MIPS_NATIVE/physical_memory_probe/` directory, then called
+`FileStream.Flush(true)` on each destination and compared source/destination
+SHA256 with `Get-FileHash`:
+
+| File | Size | Verified destination SHA256 |
+| --- | ---: | --- |
+| `physical_memory_probe` | 619716 | `ab75c1b54a8a86ae1a0201ec337b06635234222edffef910f1e3bc537bab7f6a` |
+| `README.md` | 4517 | `42a3235f5899a4eb25a13bd87fdf531601a8d7890ffeb5038fc1030a5710a0ce` |
+
+Both hashes match the repository files. The binary is unchanged from the
+Defender-scanned build above. No existing application, boot file, DTB, AVP,
+kernel, NOR content or Pico-286 configuration was changed. The diagnostic has
+not been executed on hardware; the user can launch it in Tiny MC and return
+the new `diagnostics/physical_memory_*.txt` report.
